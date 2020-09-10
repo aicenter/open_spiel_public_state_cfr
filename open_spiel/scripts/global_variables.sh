@@ -60,3 +60,6 @@ export BUILD_WITH_PUBLIC_STATES="${BUILD_WITH_PUBLIC_STATES:-OFF}"
 # Enable integration with GAMUT game generator (see games/gamut).
 # Requires java and GAMUT, so disabled by default.
 export BUILD_WITH_GAMUT="${BUILD_WITH_GAMUT:-OFF}"
+
+# Build experiments for reproduction of scientific papers.
+export BUILD_WITH_PAPERS="${BUILD_WITH_PAPERS:-OFF}"

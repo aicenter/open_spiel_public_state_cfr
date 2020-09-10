@@ -116,6 +116,8 @@ openspiel_optional_dependency(BUILD_WITH_ROSHAMBO       OFF
   "Build against RoShamBo bots.")
 openspiel_optional_dependency(BUILD_WITH_GAMUT          OFF
   "Build with GAMUT generator integration.")
+openspiel_optional_dependency(BUILD_WITH_PAPERS         OFF
+  "Build papers with code.")
 
 # Needed to disable Abseil tests.
 set (BUILD_TESTING OFF)
@@ -227,6 +229,9 @@ if (BUILD_WITH_LIBTORCH)
 endif()
 if (BUILD_WITH_GAMUT)
   set(OPEN_SPIEL_OBJECTS ${OPEN_SPIEL_OBJECTS} $<TARGET_OBJECTS:gamut>)
+endif()
+if (BUILD_WITH_PAPERS)
+  add_subdirectory(papers_with_code)
 endif()
 
 
