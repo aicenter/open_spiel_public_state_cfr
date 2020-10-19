@@ -32,6 +32,8 @@ add_library (algorithms OBJECT
   history_tree.cc
   history_tree.h
   infostate_tree.h
+  infostate_dl_cfr.h
+  infostate_dl_cfr.cc
   infostate_cfr.h
   infostate_cfr.cc
   is_mcts.cc
@@ -112,6 +114,10 @@ add_test(infostate_tree_test infostate_tree_test)
 add_executable(infostate_cfr_test infostate_cfr_test.cc
         $<TARGET_OBJECTS:algorithms> ${OPEN_SPIEL_OBJECTS})
 add_test(infostate_cfr_test infostate_cfr_test)
+
+add_executable(infostate_dl_cfr_test infostate_dl_cfr_test.cc
+        $<TARGET_OBJECTS:algorithms> ${OPEN_SPIEL_OBJECTS})
+add_test(infostate_dl_cfr_test infostate_dl_cfr_test)
 
 add_executable(is_mcts_test is_mcts_test.cc
         $<TARGET_OBJECTS:algorithms> ${OPEN_SPIEL_OBJECTS})
