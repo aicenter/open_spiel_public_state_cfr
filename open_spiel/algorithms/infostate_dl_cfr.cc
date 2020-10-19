@@ -13,6 +13,7 @@
 // limitations under the License.
 
 
+#include "open_spiel/abseil-cpp/absl/hash/hash.h"
 #include "open_spiel/algorithms/infostate_dl_cfr.h"
 
 namespace open_spiel {
@@ -274,19 +275,37 @@ DepthLimitedCFR::InfoStateValuesPtrTable() const {
 
 bool LeafPublicState::IsConsistent() const {
   // All leaf nodes must be indeed leaf nodes and belong to correct players.
-  // Additionally, they should all be terminal or non-terminal.
+  // They should all be terminal or non-terminal.
+  // The set of corresponding states must be the same across players.
   int num_terminals = 0, num_nonterminals = 0;
 
+  using History = std::vector<Action>;
+  std::unordered_set<History, absl::Hash<History>> state_histories;
   for (int pl = 0; pl < 2; ++pl) {
     for (const CFRNode* node : leaf_nodes[pl]) {
       if (!node->IsLeafNode()) return false;
       if (node->Tree().GetPlayer() != pl) return false;
       if (node->Type() == kTerminalInfostateNode) num_terminals++;
       else num_nonterminals++;
+
+      for (const std::unique_ptr<State>& state : node->CorrespondingStates()) {
+        const auto& h = state->History();
+        if (pl == 0) {
+          if (state_histories.find(h) != state_histories.end()) return false;
+          state_histories.insert(h);
+        } else {
+          if (state_histories.find(h) == state_histories.end()) return false;
+        }
+
+        if (state->IsTerminal()) num_terminals++;
+        else num_nonterminals++;
+      }
     }
   }
-
-  return !(num_terminals > 0 && num_nonterminals > 0);
+  if (num_terminals > 0 && num_nonterminals > 0) return false;
+  // We must count terminals twice (2 players).
+  if (num_terminals % 2 != 0 && num_nonterminals % 2 != 0) return false;
+  return true;
 }
 
 }  // namespace dlcfr
