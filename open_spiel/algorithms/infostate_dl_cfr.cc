@@ -17,6 +17,7 @@
 
 namespace open_spiel {
 namespace algorithms {
+namespace dlcfr {
 
 DepthLimitedCFR::DepthLimitedCFR(
     std::shared_ptr<const Game> game, int max_depth_limit,
@@ -52,11 +53,13 @@ DepthLimitedCFR::DepthLimitedCFR(
     leaf_evaluator_(std::move(leaf_evaluator)),
     terminal_evaluator_(std::move(terminal_evaluator)),
     propagators_({
-      std::make_unique<CFRTree>(start_states, chance_reach_probs,
-                                infostate_observer, 0, max_depth_limit),
-      std::make_unique<CFRTree>(start_states, chance_reach_probs,
-                                infostate_observer, 1, max_depth_limit)
-}) {
+                     std::make_unique<CFRTree>(start_states, chance_reach_probs,
+                                               infostate_observer, 0,
+                                               max_depth_limit),
+                     std::make_unique<CFRTree>(start_states, chance_reach_probs,
+                                               infostate_observer, 1,
+                                               max_depth_limit)
+                 }) {
   SPIEL_CHECK_EQ(start_states.size(), player_ranges_[0].size());
   SPIEL_CHECK_EQ(start_states.size(), player_ranges_[1].size());
   SPIEL_CHECK_EQ(start_states.size(), chance_reach_probs.size());
@@ -268,5 +271,6 @@ DepthLimitedCFR::InfoStateValuesPtrTable() const {
   return vec_ptable;
 }
 
+}  // namespace dlcfr
 }  // namespace algorithms
 }  // namespace open_spiel

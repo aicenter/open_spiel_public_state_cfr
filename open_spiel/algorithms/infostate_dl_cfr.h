@@ -33,6 +33,7 @@
 
 namespace open_spiel {
 namespace algorithms {
+namespace dlcfr {
 
 struct LeafPublicState {
   // An identification of the public state: a tensor of perfect recall
@@ -58,14 +59,9 @@ struct EncodedPublicState {
   virtual ~EncodedPublicState() = default;
 };
 
-// Leaf evaluator use cases:
-// - Oracle evaluator (SQF-LP, CFR)
-// - Memory evaluator
-// - Positional encoding NN
-// - Non-positional encoding NN
-// -
-// Handling terminals (+ non-terminals)
-// GPU version
+// Leaf evaluator returns cf values for leaf public states. It receives their
+// encoded representation for easier usage. The derived classes should down_cast
+// the encoded states they receive with the pointer.
 class LeafEvaluator {
  public:
   virtual std::unique_ptr<EncodedPublicState> EncodePublicState(
@@ -74,7 +70,6 @@ class LeafEvaluator {
       EncodedPublicState*,
       const std::array<std::vector<double>, 2>& ranges) const = 0;
 };
-
 
 struct TerminalPublicState : public EncodedPublicState {
   // Map from player 1 index (key) to player 0 (value).
@@ -85,7 +80,6 @@ struct TerminalPublicState : public EncodedPublicState {
   std::array<std::vector<float>, 2> cfvs;
 
   explicit TerminalPublicState(const LeafPublicState& state);
-
 };
 
 class TerminalEvaluator : public LeafEvaluator {
@@ -146,6 +140,7 @@ class DepthLimitedCFR {
       const CFRNode& node, absl::Span<float> expected_observation);
 };
 
+}  // namespace dlcfr
 }  // namespace algorithms
 }  // namespace open_spiel
 

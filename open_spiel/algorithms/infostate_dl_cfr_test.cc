@@ -29,6 +29,7 @@
 
 namespace open_spiel {
 namespace algorithms {
+namespace dlcfr {
 namespace {
 
 void TestTerminalEvaluatorHasSameIterations() {
@@ -79,10 +80,11 @@ void TestTerminalEvaluatorHasSameIterations() {
 }
 
 }  // namespace
+}  // namespace dlcfr
 }  // namespace algorithms
 }  // namespace open_spiel
 
-namespace algorithms = open_spiel::algorithms;
+namespace algorithms = open_spiel::algorithms::dlcfr;
 
 int main(int argc, char** argv) {
   algorithms::TestTerminalEvaluatorHasSameIterations();
