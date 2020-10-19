@@ -43,15 +43,16 @@ struct LeafPublicState {
   // For each player, encode the position of a leaf node in the flattened
   // tree structure. This is used to identify where we should store the result
   // of leaf evaluation into each of player's tree propagators.
-  std::array<std::vector<CFRNode const*>, 2> leaf_nodes;
+  std::array<std::vector<const CFRNode*>, 2> leaf_nodes;
 
   LeafPublicState(absl::Span<float> tensor)
       : public_tensor(tensor.begin(), tensor.end()) {}
 
   bool IsTerminal() const {
-    // todo: checks
     return leaf_nodes[0][0]->Type() == kTerminalInfostateNode;
   }
+  // Debugging check: makes sure that call to IsTerminal is indeed correct.
+  bool IsConsistent() const;
 };
 
 struct EncodedPublicState {

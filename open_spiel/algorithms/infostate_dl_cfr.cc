@@ -97,12 +97,13 @@ void DepthLimitedCFR::PrepareLeafPublicStates() {
 }
 
 void DepthLimitedCFR::EncodePublicStates() {
-  for (const LeafPublicState& state : public_leaves_) {
-    if (state.IsTerminal()) {
-      encoded_leaves_.push_back(terminal_evaluator_->EncodePublicState(state));
+  for (const LeafPublicState& public_leaf : public_leaves_) {
+    SPIEL_DCHECK_TRUE(public_leaf.IsConsistent());
+    if (public_leaf.IsTerminal()) {
+      encoded_leaves_.push_back(terminal_evaluator_->EncodePublicState(public_leaf));
     } else {
       SPIEL_CHECK_TRUE(leaf_evaluator_);
-      encoded_leaves_.push_back(leaf_evaluator_->EncodePublicState(state));
+      encoded_leaves_.push_back(leaf_evaluator_->EncodePublicState(public_leaf));
     }
   }
 }
@@ -269,6 +270,23 @@ DepthLimitedCFR::InfoStateValuesPtrTable() const {
   CollectInfostateLookupTable(propagators_[0].tree->Root(), &vec_ptable);
   CollectInfostateLookupTable(propagators_[1].tree->Root(), &vec_ptable);
   return vec_ptable;
+}
+
+bool LeafPublicState::IsConsistent() const {
+  // All leaf nodes must be indeed leaf nodes and belong to correct players.
+  // Additionally, they should all be terminal or non-terminal.
+  int num_terminals = 0, num_nonterminals = 0;
+
+  for (int pl = 0; pl < 2; ++pl) {
+    for (const CFRNode* node : leaf_nodes[pl]) {
+      if (!node->IsLeafNode()) return false;
+      if (node->Tree().GetPlayer() != pl) return false;
+      if (node->Type() == kTerminalInfostateNode) num_terminals++;
+      else num_nonterminals++;
+    }
+  }
+
+  return !(num_terminals > 0 && num_nonterminals > 0);
 }
 
 }  // namespace dlcfr
