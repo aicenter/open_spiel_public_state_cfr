@@ -30,6 +30,23 @@
 #include "open_spiel/spiel.h"
 #include "open_spiel/spiel_utils.h"
 
+// Depth-limited CFR is conceptually similar to what `infostate_cfr.h` does.
+// Additionally it saves structure of public states in the leaves of the
+// depth-limited infostate tree. It collects these into a set of
+// `LeafPublicState`s. DL-CFR can be instantiated with different leaf
+// evaluators, which may need to save different structures for those leafs.
+//
+// Therefore the leaf evaluator has to provide two methods:
+//
+// - EncodeLeafPublicState: take "raw" leaf public state and return the
+//   representation needed for this leaf evaluator. These will be saved by
+//   DL-CFR to provide them later as necessary.
+// - EvaluatePublicState: receives a pointer to the encoded state along with
+//   ranges of both players, evaluates such public belief state, and returns
+//   the counterfactual values to continue in the DL-CFR iterations.
+//
+// DL-CFR can be queried for `Policy` only in the DL constructed parts of the
+// tree.
 
 namespace open_spiel {
 namespace algorithms {
@@ -40,21 +57,24 @@ struct LeafPublicState {
   // public observation.
   const std::vector<float> public_tensor;
 
-  // For each player, encode the position of a leaf node in the flattened
-  // tree structure. This is used to identify where we should store the result
-  // of leaf evaluation into each of player's tree propagators.
+  // For each player, store a pointer to a leaf node for this public state,
+  // within the depth-limited infostate tree. If needed, you can get access
+  // to its `State`s via `CFRNode::CorrespondingStates()`.
   std::array<std::vector<const CFRNode*>, 2> leaf_nodes;
 
   LeafPublicState(absl::Span<float> tensor)
       : public_tensor(tensor.begin(), tensor.end()) {}
 
+  // Check if the public state is terminal, i.e. it contains only states
+  // that satisfy `State::IsTerminal()`.
   bool IsTerminal() const {
     return leaf_nodes[0][0]->Type() == kTerminalInfostateNode;
   }
-  // Debugging check: makes sure that call to IsTerminal is indeed correct.
+  // Debugging check: makes sure that the call to IsTerminal() is correct.
   bool IsConsistent() const;
 };
 
+// Derived classes specify the members they need.
 struct EncodedPublicState {
   // Make sure EncodedPublicState is polymorphic.
   virtual ~EncodedPublicState() = default;
@@ -63,14 +83,15 @@ struct EncodedPublicState {
 // Leaf evaluator returns cf values for leaf public states. It receives their
 // encoded representation for easier usage. The derived classes should down_cast
 // the encoded states they receive with the pointer.
-class LeafEvaluator {
- public:
-  virtual std::unique_ptr<EncodedPublicState> EncodePublicState(
+struct LeafEvaluator {
+  virtual std::unique_ptr<EncodedPublicState> EncodeLeafPublicState(
       const LeafPublicState& state) const = 0;
-  virtual std::array<absl::Span<const float>, 2> EvaluatePublicLeaf(
+  virtual std::array<absl::Span<const float>, 2> EvaluatePublicState(
       EncodedPublicState*,
       const std::array<std::vector<double>, 2>& ranges) const = 0;
 };
+
+// -- Terminal evaluator -------------------------------------------------------
 
 struct TerminalPublicState : public EncodedPublicState {
   // Map from player 1 index (key) to player 0 (value).
@@ -83,16 +104,17 @@ struct TerminalPublicState : public EncodedPublicState {
   explicit TerminalPublicState(const LeafPublicState& state);
 };
 
-class TerminalEvaluator : public LeafEvaluator {
- public:
-  std::unique_ptr<EncodedPublicState> EncodePublicState(
+struct TerminalEvaluator : public LeafEvaluator {
+  std::unique_ptr<EncodedPublicState> EncodeLeafPublicState(
       const LeafPublicState& state) const override;
-  std::array<absl::Span<const float>, 2> EvaluatePublicLeaf(
+  std::array<absl::Span<const float>, 2> EvaluatePublicState(
       EncodedPublicState* state,
       const std::array<std::vector<double>, 2>& ranges) const override;
 };
 
 std::shared_ptr<LeafEvaluator> MakeTerminalEvaluator();
+
+// -- DL CFR -------------------------------------------------------------------
 
 class DepthLimitedCFR {
  public:

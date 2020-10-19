@@ -101,10 +101,12 @@ void DepthLimitedCFR::EncodePublicStates() {
   for (const LeafPublicState& public_leaf : public_leaves_) {
     SPIEL_DCHECK_TRUE(public_leaf.IsConsistent());
     if (public_leaf.IsTerminal()) {
-      encoded_leaves_.push_back(terminal_evaluator_->EncodePublicState(public_leaf));
+      encoded_leaves_.push_back(
+          terminal_evaluator_->EncodeLeafPublicState(public_leaf));
     } else {
       SPIEL_CHECK_TRUE(leaf_evaluator_);
-      encoded_leaves_.push_back(leaf_evaluator_->EncodePublicState(public_leaf));
+      encoded_leaves_.push_back(
+          leaf_evaluator_->EncodeLeafPublicState(public_leaf));
     }
   }
 }
@@ -171,12 +173,12 @@ TerminalPublicState::TerminalPublicState(const LeafPublicState& state) {
       num_terminals * (num_terminals - 1) / 2);
 }
 
-std::unique_ptr<EncodedPublicState> TerminalEvaluator::EncodePublicState(
+std::unique_ptr<EncodedPublicState> TerminalEvaluator::EncodeLeafPublicState(
     const LeafPublicState& state) const {
   return std::make_unique<TerminalPublicState>(state);
 }
 
-std::array<absl::Span<const float>, 2> TerminalEvaluator::EvaluatePublicLeaf(
+std::array<absl::Span<const float>, 2> TerminalEvaluator::EvaluatePublicState(
     EncodedPublicState* state,
     const std::array<std::vector<double>, 2>& ranges) const {
   auto* terminal = open_spiel::down_cast<TerminalPublicState*>(state);
@@ -244,10 +246,10 @@ void DepthLimitedCFR::EvaluateLeaves() {
     // 2. Evaluate: compute cfvs.
     std::array<absl::Span<const float>, 2> cfvs;
     if (public_leaf.IsTerminal()) {
-      cfvs = terminal_evaluator_->EvaluatePublicLeaf(encoded_leaf, ranges);
+      cfvs = terminal_evaluator_->EvaluatePublicState(encoded_leaf, ranges);
     } else {
       SPIEL_CHECK_TRUE(leaf_evaluator_);
-      cfvs = leaf_evaluator_->EvaluatePublicLeaf(encoded_leaf, ranges);
+      cfvs = leaf_evaluator_->EvaluatePublicState(encoded_leaf, ranges);
     }
 
     // 3. Update cfvs for propagators.
