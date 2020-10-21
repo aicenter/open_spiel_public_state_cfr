@@ -161,6 +161,30 @@ class InfostateNode {
     if (!parent_->parent_) return std::to_string(incoming_index_);
     return absl::StrCat(parent_->ToString(), ",", incoming_index_);
   }
+  // Compute subtree certificate (string representation) for easy comparison.
+  std::string ComputeCertificate() const {
+    if (type_ == kTerminalInfostateNode) return "{}";
+
+    std::vector<std::string> certificates;
+    for (InfostateNode& child : child_iterator()) {
+      certificates.push_back(child.ComputeCertificate());
+    }
+    std::sort(certificates.begin(), certificates.end());
+
+    std::string open, close;
+    if (type_ == kDecisionInfostateNode) {
+      open = "[";
+      close = "]";
+    } else if (type_ == kObservationInfostateNode) {
+      open = "(";
+      close = ")";
+    }
+
+    return absl::StrCat(
+        open,
+        absl::StrJoin(certificates.begin(), certificates.end(), ""),
+        close);
+  }
 
   // Iterate over children and expose references to the children
   // (instead of unique_ptrs).
