@@ -67,7 +67,7 @@ struct InfostateTreeValuePropagator {
   // Mutable values to keep track of.
   std::vector<float> reach_probs;
   std::vector<float> cf_values;
-  float root_cf_value;
+  float root_cf_value = 0.;
 
   static void CollectTreeStructure(
       CFRNode* node, int depth,
