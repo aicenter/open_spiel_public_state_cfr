@@ -423,6 +423,22 @@ class InfostateTree final {
     for (const Node& n : leaves_iterator()) cnt++;
     return cnt;
   }
+  int CountLeafCorrespondingHistories() const {
+    int cnt = 0;
+    for (const Node& n : leaves_iterator())
+      cnt += n.CorrespondingStates().size();
+    return cnt;
+  }
+  void PrintStats() {
+    std::cout << "Infostate tree for player " << player_ << ".\n"
+              << "Tree height: " << tree_height_ << "\n"
+              << "Root branching: " << Root().NumChildren() << "\n"
+              << "Number of leaves: " << CountLeaves() << "\n"
+              << "Number of leaf corresponding states: "
+              << CountLeafCorrespondingHistories() << "\n"
+              << "Tree certificate: " << std::endl;
+    std::cout << Root().ComputeCertificate() << std::endl;
+  }
 
  private:
   const Player player_;
