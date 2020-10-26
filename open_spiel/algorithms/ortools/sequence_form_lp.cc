@@ -48,23 +48,18 @@ class SolverNode : public InfostateNode</*Self=*/SolverNode> {
   double sol_reach_prob_;
 
   std::vector<Action> terminal_history_;
-  std::string infostate_string_;
  public:
   SolverNode(const SolverTree& tree, SolverNode* parent, int incoming_index,
-             InfostateNodeType type, absl::Span<float> tensor,
+             InfostateNodeType type, const std::string& infostate_string,
              double terminal_value, double terminal_chn_reach_prob,
              const State* originating_state) :
       InfostateNode<SolverNode>(
-          tree, parent, incoming_index, type, tensor, terminal_value,
+          tree, parent, incoming_index, type, infostate_string, terminal_value,
           terminal_chn_reach_prob, originating_state) {
     SPIEL_DCHECK_TRUE(
         !(originating_state && type == kDecisionInfostateNode)
             || originating_state->IsPlayerActing(tree.GetPlayer()));
     if (originating_state) {
-      if (type_ == kDecisionInfostateNode) {
-        infostate_string_ = Tree().GetObserver().StringFrom(
-            *originating_state, Tree().GetPlayer());
-      }
       if (type_ == kTerminalInfostateNode) {
         terminal_history_ = originating_state->History();
       }
@@ -128,7 +123,7 @@ void SpecifyReachProbs(opres::MPSolver* solver, SolverNode* node) {
       // Equality constraint: parent = child
       opres::MPConstraint* ct = solver->MakeRowConstraint(
           /*lb=*/0, /*ub=*/0,
-                 absl::StrCat("rp_", node->ToString(), "_", child.ToString()));
+          absl::StrCat("rp_", node->ToString(), "_", child.ToString()));
       ct->SetCoefficient(node->var_reach_prob_, -1);
       ct->SetCoefficient(child.var_reach_prob_, 1);
     }
@@ -177,7 +172,7 @@ void SpecifyCfValues(
   if (node->Type() == kTerminalInfostateNode) {
     const SolverNode* opponent_node = terminal_map.at(node);
     const double value =
-        node->TerminalValue() * node->TerminalChanceReachProb();
+        node->TerminalUtility() * node->TerminalChanceReachProb();
     // Terminal value constraint comes from the opponent.
     ct->SetCoefficient(opponent_node->var_reach_prob_, value);
     return;
@@ -315,7 +310,7 @@ void CollectTabularPolicy(TabularPolicy* policy, const SolverNode& node) {
       }
       state_policy.push_back({actions[i], prob});
     }
-    policy->SetStatePolicy(node.infostate_string_, state_policy);
+    policy->SetStatePolicy(node.InfostateString(), state_policy);
   }
 
   for (const SolverNode& child : node.child_iterator()) {
