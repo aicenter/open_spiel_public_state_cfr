@@ -374,11 +374,15 @@ ZeroSumSequentialGameSolution SolveZeroSumSequentialGame(
   }
   if (collect_root_cfvs) {
     SPIEL_CHECK_FALSE(solve_only_player);
+    sol.root_cfvs.reserve(
+        solver_trees[0]->Root().NumChildren()
+        + solver_trees[1]->Root().NumChildren());
     for (int pl = 0; pl < 2; ++pl) {
-      sol.root_cfvs[pl].reserve(solver_trees[pl]->Root().NumChildren());
       for (const SolverNode& root_node :
           solver_trees[pl]->Root().child_iterator()) {
-        sol.root_cfvs[pl].push_back(root_node.sol_cf_value_);
+        const std::string& infostate = root_node.InfostateString();
+        SPIEL_DCHECK_TRUE(sol.root_cfvs.find(infostate) == sol.root_cfvs.end());
+        sol.root_cfvs[infostate] = root_node.sol_cf_value_;
       }
     }
   }

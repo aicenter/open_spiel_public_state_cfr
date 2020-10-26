@@ -70,11 +70,11 @@ void TestKuhnPokerRootCfvs() {
                          kErrorTolerance);
   // Check cf values of each individual subtree, i.e. after dealing a card
   // for the player. Notice that these sum up to -1 / 18.
-  SPIEL_CHECK_FLOAT_NEAR(solution.root_cfvs[0][0], -1 / 3., kErrorTolerance);
-  SPIEL_CHECK_FLOAT_NEAR(solution.root_cfvs[0][1], -1 / 9., kErrorTolerance);
-  SPIEL_CHECK_FLOAT_NEAR(solution.root_cfvs[0][2], 7 / 18., kErrorTolerance);
+  SPIEL_CHECK_FLOAT_NEAR(solution.root_cfvs["0"], -1 / 3., kErrorTolerance);
+  SPIEL_CHECK_FLOAT_NEAR(solution.root_cfvs["1"], -1 / 9., kErrorTolerance);
+  SPIEL_CHECK_FLOAT_NEAR(solution.root_cfvs["2"], 7 / 18., kErrorTolerance);
   // Second player didn't receive a card yet, so the utility is -game_value.
-  SPIEL_CHECK_FLOAT_NEAR(solution.root_cfvs[1][0], 1 / 18., kErrorTolerance);
+  SPIEL_CHECK_FLOAT_NEAR(solution.root_cfvs[""], 1 / 18., kErrorTolerance);
 }
 
 }  // namespace

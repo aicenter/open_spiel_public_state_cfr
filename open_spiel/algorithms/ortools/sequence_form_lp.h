@@ -39,7 +39,7 @@ struct ZeroSumSequentialGameSolution {
   TabularPolicy policy;
   // Counterfactual values for both players at the specified starting states.
   // By default, this field is not collected from the solver and is empty.
-  std::array<std::vector<double>, 2> root_cfvs;
+  std::unordered_map<std::string, float> root_cfvs;
 };
 
 // A basic implementation: computes game value and tabular policy for both
