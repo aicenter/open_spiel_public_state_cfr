@@ -85,10 +85,10 @@ struct EncodedPublicState {
 // the encoded states they receive with the pointer.
 struct LeafEvaluator {
   virtual std::unique_ptr<EncodedPublicState> EncodeLeafPublicState(
-      const LeafPublicState& state) const = 0;
+      const LeafPublicState& leaf_state) const = 0;
   virtual std::array<absl::Span<const float>, 2> EvaluatePublicState(
-      EncodedPublicState*,
-      const std::array<std::vector<float>, 2>& ranges) const = 0;
+      EncodedPublicState* public_state,
+      std::array<absl::Span<const float>, 2> ranges) const = 0;
 };
 
 // -- Terminal evaluator -------------------------------------------------------
@@ -109,7 +109,7 @@ struct TerminalEvaluator : public LeafEvaluator {
       const LeafPublicState& state) const override;
   std::array<absl::Span<const float>, 2> EvaluatePublicState(
       EncodedPublicState* state,
-      const std::array<std::vector<float>, 2>& ranges) const override;
+      std::array<absl::Span<const float>, 2> ranges) const override;
 };
 
 std::shared_ptr<LeafEvaluator> MakeTerminalEvaluator();
@@ -120,21 +120,40 @@ class DepthLimitedCFR {
  public:
   DepthLimitedCFR(std::shared_ptr<const Game> game,
                   absl::Span<const State*> start_states,
-                  std::array<std::vector<float>, 2> player_ranges,
                   absl::Span<const float> chance_reach_probs,
-                  int depth_limit,
+                  int max_move_limit,
                   std::shared_ptr<const LeafEvaluator> leaf_evaluator,
                   std::shared_ptr<const LeafEvaluator> terminal_evaluator,
                   std::shared_ptr<Observer> public_observer,
                   const std::shared_ptr<Observer>& infostate_observer);
 
+  DepthLimitedCFR(std::shared_ptr<const Game> game,
+                  std::array<absl::Span<const CFRNode* const>, 2> start_nodes,
+                  int max_move_limit,
+                  std::shared_ptr<const LeafEvaluator> leaf_evaluator,
+                  std::shared_ptr<const LeafEvaluator> terminal_evaluator,
+                  std::shared_ptr<Observer> public_observer,
+                  const std::shared_ptr<Observer>& infostate_observer);
+
+
   DepthLimitedCFR(std::shared_ptr<const Game> game, int depth_limit,
                   std::shared_ptr<const LeafEvaluator> leaf_evaluator,
                   std::shared_ptr<const LeafEvaluator> terminal_evaluator);
 
+  void TrackPlayerRanges(std::array<absl::Span<const float>, 2> track_source);
+  std::array<absl::Span<const float>, 2> RootChildrenCfValues() const;
+  std::array<absl::Span<const float>, 2> RootChildren() const;
+
   void RunSimultaneousIterations(int iterations);
-  void RunAlternatingIterations(int iterations);
+  void PrepareRootReachProbs();
   void EvaluateLeaves();
+
+  std::array<const CFRNode*, 2> Roots() const {
+    return { &propagators_[0].tree->Root(), &propagators_[1].tree->Root()};
+  }
+  float RootCfValue() const {
+    return propagators_[0].RootCfValue(tracked_player_ranges_[0]);
+  }
 
   std::unordered_map<std::string, CFRInfoStateValues const*>
     InfoStateValuesPtrTable() const;
@@ -143,11 +162,17 @@ class DepthLimitedCFR {
  private:
   const std::shared_ptr<const Game> game_;
   const std::shared_ptr<Observer> public_observer_;
-  const std::array<std::vector<float>, 2> player_ranges_;
   const std::shared_ptr<const LeafEvaluator> leaf_evaluator_;
   const std::shared_ptr<const LeafEvaluator> terminal_evaluator_;
 
   std::array<InfostateTreeValuePropagator, 2> propagators_;
+  // Propagators need to have top-most reach probs updated externally.
+  // We do that via tracked_player_ranges_, which represents an arbitrary span:
+  // These could be reach probs of the parent subgame. However, tracking is not
+  // always possible / desirable, so we also save a vector of ranges here
+  // as well.
+  const std::array<std::vector<float>, 2> player_ranges_;
+  std::array<absl::Span<const float>, 2> tracked_player_ranges_;
 
   // Allocated based on propagator / cfr tree construction.
   std::vector<LeafPublicState> public_leaves_;
@@ -161,7 +186,70 @@ class DepthLimitedCFR {
   // Internal checks.
   bool DoStatesProduceEqualPublicObservations(
       const CFRNode& node, absl::Span<float> expected_observation);
+
+  std::array<InfostateTreeValuePropagator, 2> CreatePropagators(
+      std::array<absl::Span<const CFRNode* const>, 2> start_nodes,
+      const std::shared_ptr<Observer>& infostate_observer,
+      int max_move_limit);
 };
+
+
+// -- CFR evaluator ------------------------------------------------------------
+
+struct CFRPublicState : public EncodedPublicState {
+  DepthLimitedCFR dlcfr;
+  explicit CFRPublicState(DepthLimitedCFR d) : dlcfr(std::move(d)) {};
+};
+
+struct CFREvaluator : public LeafEvaluator {
+  std::shared_ptr<const Game> game;
+  int depth_limit;
+  std::shared_ptr<const LeafEvaluator> leaf_evaluator;
+  std::shared_ptr<const LeafEvaluator> terminal_evaluator;
+  std::shared_ptr<Observer> public_observer;
+  std::shared_ptr<Observer> infostate_observer;
+  int num_cfr_iterations = 1;
+
+  CFREvaluator(std::shared_ptr<const Game> game, int depth_limit,
+               std::shared_ptr<const LeafEvaluator> leaf_evaluator,
+               std::shared_ptr<const LeafEvaluator> terminal_evaluator,
+               std::shared_ptr<Observer> public_observer,
+               std::shared_ptr<Observer> infostate_observer)
+      : game(std::move(game)), depth_limit(depth_limit),
+        leaf_evaluator(std::move(leaf_evaluator)),
+        terminal_evaluator(std::move(terminal_evaluator)),
+        public_observer(std::move(public_observer)),
+        infostate_observer(std::move(infostate_observer)) {
+    SPIEL_CHECK_GT(depth_limit, 0);
+  }
+
+  std::unique_ptr<EncodedPublicState> EncodeLeafPublicState(
+      const LeafPublicState& leaf_state) const override;
+  std::array<absl::Span<const float>, 2> EvaluatePublicState(
+      EncodedPublicState* public_state,
+      std::array<absl::Span<const float>, 2>) const override;
+};
+
+// -- epsilon-Oracle evaluator -------------------------------------------------
+
+//struct EpsPublicState : public CFRPublicState {
+//  DepthLimitedCFR dlcfr;
+//  Observation observation;  // TODO: positional encoding
+//  EpsPublicState(DepthLimitedCFR d, Observation obs)
+//    : CFRPublicState(std::move(d)), observation(std::move(obs)) {};
+//};
+//
+//struct EpsOracleEvaluator : public CFREvaluator {
+//  EpsOracleEvaluator(std::shared_ptr<const Game> game,
+//                     std::shared_ptr<const LeafEvaluator> leaf_evaluator,
+//                     std::shared_ptr<const LeafEvaluator> terminal_evaluator,
+//                     std::shared_ptr<Observer> public_observer,
+//                     std::shared_ptr<Observer> infostate_observer)
+//      : CFREvaluator(std::move(game), /*depth_limit=*/1000,
+//                     /*leaf_evaluator=*/nullptr, std::move(terminal_evaluator),
+//                     std::move(public_observer), std::move(infostate_observer)),
+//        num_cfr_iterations(10000) {}
+//};
 
 }  // namespace dlcfr
 }  // namespace algorithms

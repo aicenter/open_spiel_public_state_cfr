@@ -67,7 +67,6 @@ struct InfostateTreeValuePropagator {
   // Mutable values to keep track of.
   std::vector<float> reach_probs;
   std::vector<float> cf_values;
-  float root_cf_value = 0.;
 
   static void CollectTreeStructure(
       CFRNode* node, int depth,
@@ -92,10 +91,15 @@ struct InfostateTreeValuePropagator {
 
   // Return the branching factor of the root node.
   int RootBranchingFactor() const;
-  // Return view-only root counterfactual values.
-  absl::Span<const float> RootCfValues() const;
+
   // Return writeable-only root reach probabilities.
-  absl::Span<float> RootReachProbs();
+  absl::Span<float> RootChildrenReachProbs();
+  // Return view-only root counterfactual values.
+  absl::Span<const float> RootChildrenCfValues() const;
+  // Return the root cf value as weighted sum of root children values and ranges
+  // over them. If the supplied range is empty, it returns their sum
+  // (all weights = 1)
+  float RootCfValue(absl::Span<const float> root_children_range = {}) const;
 };
 
 class InfostateCFR {
@@ -115,6 +119,8 @@ class InfostateCFR {
   void PrepareRootReachProbs(Player pl);
   void EvaluateLeaves();
   void EvaluateLeaves(Player pl);
+
+  float RootCfValue() const { return propagators_[0].RootCfValue(); }
 
   // Similarly to CFRSolver, expose the InfoStateValuesTable.
   // However, this table has pointers to the values, not the actual values.
