@@ -281,7 +281,7 @@ class InfostateNode {
  protected:
   // Needed for adding corresponding_states_ during tree traversal.
   friend class InfostateTree<Self>;
-  
+
   // Reference to the tree that this node belongs to. This reference has a valid
   // lifetime, as all the nodes are recursively owned by their parents, and the
   // root is owned by the tree.
@@ -296,7 +296,7 @@ class InfostateNode {
   // This is not const so that we can change it when we SwapParent() for tree
   // manipulation.
   int incoming_index_;
-  // Type of the node.  
+  // Type of the node.
   const InfostateNodeType type_;
   // Identifier of the infostate.
   const std::string infostate_string_;

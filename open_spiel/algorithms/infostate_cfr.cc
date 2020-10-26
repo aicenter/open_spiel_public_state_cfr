@@ -153,7 +153,14 @@ void InfostateTreeValuePropagator::BottomUp() {
         }
       }
 
-      cf_values[parent_idx] = node_sum;
+      if (d == 0) {
+        // Do not overwrite cf_values, because we might want to use them
+        // through RootCfValues()
+        SPIEL_DCHECK_EQ(parent_idx, 0);
+        root_cf_value = node_sum;
+      } else {
+        cf_values[parent_idx] = node_sum;
+      }
       left_offset += num_children;
     }
     // Check that we passed over all of the children.
@@ -236,7 +243,7 @@ void InfostateCFR::RunSimultaneousIterations(int iterations) {
     PrepareRootReachProbs();
     propagators_[0].TopDown();
     propagators_[1].TopDown();
-//    SPIEL_DCHECK_TRUE(fabs(TerminalReachProbSum() - 1.0) < 1e-5);
+    SPIEL_DCHECK_TRUE(fabs(TerminalReachProbSum() - 1.0) < 1e-6);
 
     EvaluateLeaves();
     propagators_[0].BottomUp();
