@@ -326,7 +326,7 @@ void InfostateCFR::PrepareTerminals() {
     SPIEL_DCHECK_EQ(a->TerminalHistory(), b->TerminalHistory());
 
     const CFRNode* const leaf = leaf_nodes[0][i];
-    const double v = leaf->TerminalValue();
+    const double v = leaf->TerminalUtility();
     const double chn = leaf->TerminalChanceReachProb();
     terminal_values_.push_back(v * chn);
     terminal_ch_reaches_.push_back(chn);
