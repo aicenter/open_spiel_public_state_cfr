@@ -682,6 +682,7 @@ class CFRNode : public InfostateNode</*Self=*/CFRNode> {
 inline void CollectInfostateLookupTable(
     const CFRNode& node,
     std::unordered_map<std::string, const CFRInfoStateValues*>* out) {
+  if (node.IsLeafNode()) return;
   if (node.Type() == kDecisionInfostateNode) {
     (*out)[node.infostate_string_] = &node.values();
   }
