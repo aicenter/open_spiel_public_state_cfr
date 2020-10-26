@@ -88,7 +88,7 @@ struct LeafEvaluator {
       const LeafPublicState& state) const = 0;
   virtual std::array<absl::Span<const float>, 2> EvaluatePublicState(
       EncodedPublicState*,
-      const std::array<std::vector<double>, 2>& ranges) const = 0;
+      const std::array<std::vector<float>, 2>& ranges) const = 0;
 };
 
 // -- Terminal evaluator -------------------------------------------------------
@@ -97,7 +97,7 @@ struct TerminalPublicState : public EncodedPublicState {
   // Map from player 1 index (key) to player 0 (value).
   std::vector<int> permutation;
   // For the player 0 and already multiplied by chance reach probs.
-  std::vector<double> utilities;
+  std::vector<float> utilities;
   // Store terminal cfvs so we can return a span to them when evaluating leaves.
   std::array<std::vector<float>, 2> cfvs;
 
@@ -109,7 +109,7 @@ struct TerminalEvaluator : public LeafEvaluator {
       const LeafPublicState& state) const override;
   std::array<absl::Span<const float>, 2> EvaluatePublicState(
       EncodedPublicState* state,
-      const std::array<std::vector<double>, 2>& ranges) const override;
+      const std::array<std::vector<float>, 2>& ranges) const override;
 };
 
 std::shared_ptr<LeafEvaluator> MakeTerminalEvaluator();
@@ -120,8 +120,8 @@ class DepthLimitedCFR {
  public:
   DepthLimitedCFR(std::shared_ptr<const Game> game,
                   absl::Span<const State*> start_states,
-                  std::array<std::vector<double>, 2> player_ranges,
-                  absl::Span<const double> chance_reach_probs,
+                  std::array<std::vector<float>, 2> player_ranges,
+                  absl::Span<const float> chance_reach_probs,
                   int depth_limit,
                   std::shared_ptr<const LeafEvaluator> leaf_evaluator,
                   std::shared_ptr<const LeafEvaluator> terminal_evaluator,
@@ -143,7 +143,7 @@ class DepthLimitedCFR {
  private:
   const std::shared_ptr<const Game> game_;
   const std::shared_ptr<Observer> public_observer_;
-  const std::array<std::vector<double>, 2> player_ranges_;
+  const std::array<std::vector<float>, 2> player_ranges_;
   const std::shared_ptr<const LeafEvaluator> leaf_evaluator_;
   const std::shared_ptr<const LeafEvaluator> terminal_evaluator_;
 

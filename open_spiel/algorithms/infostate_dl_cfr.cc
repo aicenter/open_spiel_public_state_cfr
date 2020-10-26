@@ -27,7 +27,7 @@ DepthLimitedCFR::DepthLimitedCFR(
 ) :
     game_(std::move(game)),
     public_observer_(std::move(game_->MakeObserver(kPublicStateObsType, {}))),
-    player_ranges_({std::vector<double>{1.}, std::vector<double>{1.}}),
+    player_ranges_({std::vector<float>{1.}, std::vector<float>{1.}}),
     leaf_evaluator_(std::move(leaf_evaluator)),
     terminal_evaluator_(std::move(terminal_evaluator)),
     propagators_({std::make_unique<CFRTree>(*game_, 0, max_depth_limit),
@@ -40,8 +40,8 @@ DepthLimitedCFR::DepthLimitedCFR(
 DepthLimitedCFR::DepthLimitedCFR(
     std::shared_ptr<const Game> game,
     absl::Span<const State*> start_states,
-    std::array<std::vector<double>, 2> player_ranges,
-    absl::Span<const double> chance_reach_probs,
+    std::array<std::vector<float>, 2> player_ranges,
+    absl::Span<const float> chance_reach_probs,
     int max_depth_limit,
     std::shared_ptr<const LeafEvaluator> leaf_evaluator,
     std::shared_ptr<const LeafEvaluator> terminal_evaluator,
@@ -180,7 +180,7 @@ std::unique_ptr<EncodedPublicState> TerminalEvaluator::EncodeLeafPublicState(
 
 std::array<absl::Span<const float>, 2> TerminalEvaluator::EvaluatePublicState(
     EncodedPublicState* state,
-    const std::array<std::vector<double>, 2>& ranges) const {
+    const std::array<std::vector<float>, 2>& ranges) const {
   auto* terminal = open_spiel::down_cast<TerminalPublicState*>(state);
 
   for (int i = 0; i < terminal->utilities.size(); ++i) {
@@ -231,7 +231,7 @@ void DepthLimitedCFR::EvaluateLeaves() {
     EncodedPublicState* encoded_leaf = encoded_leaves_[i].get();
 
     // 1. Prepare ranges
-    auto ranges = std::array<std::vector<double>, 2>();
+    auto ranges = std::array<std::vector<float>, 2>();
     for (int pl = 0; pl < 2; pl++) {
       const int num_infostate_leafs = public_leaf.leaf_nodes[pl].size();
       ranges[pl].reserve(num_infostate_leafs);
