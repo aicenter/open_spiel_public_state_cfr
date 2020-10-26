@@ -374,7 +374,7 @@ void TestTreeRebalancing() {
 void CheckTreeLeaves(const CFRTree& tree, int move_limit) {
   for (const CFRNode& leaf_node : tree.leaves_iterator()) {
     SPIEL_CHECK_TRUE(leaf_node.IsLeafNode());
-    SPIEL_CHECK_TRUE(leaf_node.HasTensor());
+    SPIEL_CHECK_TRUE(leaf_node.HasInfostateString());
     SPIEL_CHECK_FALSE(leaf_node.CorrespondingStates().empty());
 
     // Check MoveNumber() for all corresponding states.
@@ -445,7 +445,7 @@ void TestDepthLimitedTrees() {
       SPIEL_CHECK_TRUE(acting.IsLeafNode());
       SPIEL_CHECK_EQ(acting.Type(), kDecisionInfostateNode);
       SPIEL_CHECK_EQ(acting.CorrespondingStates().size(), 2);
-      SPIEL_CHECK_TRUE(acting.HasTensor());
+      SPIEL_CHECK_TRUE(acting.HasInfostateString());
     }
   }
 
