@@ -19,7 +19,6 @@
 #include <random>
 
 #include "open_spiel/abseil-cpp/absl/algorithm/container.h"
-#include "open_spiel/abseil-cpp/absl/random/distributions.h"
 #include "open_spiel/abseil-cpp/absl/strings/charconv.h"
 #include "open_spiel/abseil-cpp/absl/strings/numbers.h"
 #include "open_spiel/spiel_utils.h"
@@ -234,9 +233,8 @@ void CFRSolverBase::InitializeInfostateNodes(const State& state) {
   std::vector<Action> legal_actions = state.LegalActions();
 
   if (random_initial_regrets_) {
-    CFRInfoStateValues is_vals(
-        legal_actions,
-        kRandomInitialRegretsMagnitude * absl::Uniform<double>(rng_, 0.0, 1.0));
+    CFRInfoStateValues is_vals(legal_actions, &rng_,
+                               kRandomInitialRegretsMagnitude);
     info_states_[info_state] = is_vals;
   } else {
     CFRInfoStateValues is_vals(legal_actions);
@@ -766,3 +764,4 @@ PartiallyDeserializedCFRSolver PartiallyDeserializeCFRSolver(
 
 }  // namespace algorithms
 }  // namespace open_spiel
+
