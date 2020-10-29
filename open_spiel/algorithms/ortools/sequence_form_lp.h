@@ -16,6 +16,10 @@
 #define OPEN_SPIEL_ALGORITHMS_ORTOOLS_SEQUENCE_FORM_LP_H_
 
 #include <vector>
+#include <string>
+#include <memory>
+#include <array>
+#include <unordered_map>
 
 #include "open_spiel/algorithms/infostate_tree.h"
 
@@ -37,9 +41,9 @@ struct ZeroSumSequentialGameSolution {
   double game_value;
   // Optimal policy. Could be computed only for a single player, see below.
   TabularPolicy policy;
-  // Counterfactual values for both players at the specified starting states.
+  // Counter-factual values for both players at the specified starting states.
   // By default, this field is not collected from the solver and is empty.
-  std::unordered_map<std::string, float> root_cfvs;
+  std::array<std::unordered_map<std::string, float>, 2> root_cfvs;
 };
 
 // A basic implementation: computes game value and tabular policy for both
@@ -48,7 +52,7 @@ ZeroSumSequentialGameSolution SolveZeroSumSequentialGame(const Game& game);
 
 // A more advanced implementation, where we can restrict the computation only
 // to a "subset" of the infostate tree (specified by the starting states and
-// restricted to ranges of chance and the players).
+// their chance reach probabilities).
 // This is useful for the computation of optimal extensions of depth-limited
 // subgames [2].
 //
@@ -57,7 +61,6 @@ ZeroSumSequentialGameSolution SolveZeroSumSequentialGame(const Game& game);
 ZeroSumSequentialGameSolution SolveZeroSumSequentialGame(
     std::shared_ptr<Observer> infostate_observer,
     absl::Span<const State*> starting_states,
-    std::array<absl::Span<const float>, 2> player_ranges,
     absl::Span<const float> chance_range,
     std::optional<int> solve_only_player = {},
     bool collect_tabular_policy = true,

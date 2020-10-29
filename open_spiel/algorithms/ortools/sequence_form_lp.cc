@@ -250,25 +250,17 @@ void PrintProblemSpecification(const opres::MPSolver& solver) {
 void SolveForPlayer(
     Player pl,
     const std::array<std::unique_ptr<SolverTree>, 2>& solver_trees,
-    const std::map<const SolverNode*, const SolverNode*>& terminal_map,
-    absl::Span<const float> player_ranges) {
-  // Make sure player ranges are over all the root nodes.
-  SPIEL_CHECK_EQ(solver_trees[pl]->Root().NumChildren(), player_ranges.size());
-
+    const std::map<const SolverNode*, const SolverNode*>& terminal_map) {
   // 1. Create the linear solver (with the GLOP backend).
   opres::MPSolver solver("sf_lp", opres::MPSolver::GLOP_LINEAR_PROGRAMMING);
 
   // 2. Recursively create variables and constraints.
   SpecifyReachProbs(&solver, solver_trees[pl]->MutableRoot());
   SpecifyCfValues(&solver, solver_trees[1 - pl]->MutableRoot(), terminal_map);
-  // Add constraints for ranges.
-  int i = 0;
-  for (SolverNode& root_node :
-      solver_trees[pl]->MutableRoot()->child_iterator()) {
-    root_node.var_reach_prob_->SetLB(player_ranges[i]);
-    root_node.var_reach_prob_->SetUB(player_ranges[i]);
-    i++;
-  }
+  // Add constraints for root node.
+  SolverNode* root_node = solver_trees[pl]->MutableRoot();
+  root_node->var_reach_prob_->SetLB(1.);
+  root_node->var_reach_prob_->SetUB(1.);
 
   // 3. Solve the problem.
   opres::MPObjective* const objective = solver.MutableObjective();
@@ -323,7 +315,6 @@ void CollectTabularPolicy(TabularPolicy* policy, const SolverNode& node) {
 ZeroSumSequentialGameSolution SolveZeroSumSequentialGame(
     std::shared_ptr<Observer> infostate_observer,
     absl::Span<const State*> start_states,
-    std::array<absl::Span<const float>, 2> player_ranges,
     absl::Span<const float> chance_range,
     std::optional<int> solve_only_player,
     bool collect_tabular_policy,
@@ -344,12 +335,10 @@ ZeroSumSequentialGameSolution SolveZeroSumSequentialGame(
   // 3. Solve for players.
   if (solve_only_player) {
     int pl = solve_only_player.value();
-    SolveForPlayer(pl, solver_trees, terminal_map.association(1 - pl),
-                   player_ranges[pl]);
+    SolveForPlayer(pl, solver_trees, terminal_map.association(1 - pl));
   } else {
     for (int pl = 0; pl < 2; ++pl) {
-      SolveForPlayer(pl, solver_trees, terminal_map.association(1 - pl),
-                     player_ranges[pl]);
+      SolveForPlayer(pl, solver_trees, terminal_map.association(1 - pl));
     }
     // Check zero-sum-ness of the root values.
     SPIEL_CHECK_FLOAT_NEAR(
@@ -374,15 +363,14 @@ ZeroSumSequentialGameSolution SolveZeroSumSequentialGame(
   }
   if (collect_root_cfvs) {
     SPIEL_CHECK_FALSE(solve_only_player);
-    sol.root_cfvs.reserve(
-        solver_trees[0]->Root().NumChildren()
-        + solver_trees[1]->Root().NumChildren());
     for (int pl = 0; pl < 2; ++pl) {
+      sol.root_cfvs[pl].reserve(solver_trees[pl]->Root().NumChildren());
       for (const SolverNode& root_node :
           solver_trees[pl]->Root().child_iterator()) {
         const std::string& infostate = root_node.InfostateString();
-        SPIEL_DCHECK_TRUE(sol.root_cfvs.find(infostate) == sol.root_cfvs.end());
-        sol.root_cfvs[infostate] = root_node.sol_cf_value_;
+        SPIEL_DCHECK_TRUE(
+            sol.root_cfvs[pl].find(infostate) == sol.root_cfvs[pl].end());
+        sol.root_cfvs[pl][infostate] = root_node.sol_cf_value_;
       }
     }
   }
@@ -393,16 +381,10 @@ ZeroSumSequentialGameSolution SolveZeroSumSequentialGame(const Game& game) {
   std::unique_ptr<State> state = game.NewInitialState();
   std::vector<const State*> starting_states;
   starting_states.push_back(state.get());
-
-  std::array<std::vector<float>, 2> player_ranges = {
-      std::vector<float>{1.}, std::vector<float>{1.}
-  };
   std::vector<float> chance_range = {1.};
 
   return SolveZeroSumSequentialGame(game.MakeObserver(kInfoStateObsType, {}),
                                     absl::MakeSpan(starting_states),
-                                    {absl::MakeSpan(player_ranges[0]),
-                                     absl::MakeSpan(player_ranges[1])},
                                     absl::MakeSpan(chance_range));
 }
 
