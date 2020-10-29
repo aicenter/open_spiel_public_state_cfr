@@ -153,14 +153,7 @@ void InfostateTreeValuePropagator::BottomUp() {
         }
       }
 
-      if (d == 0) {
-        // Do not overwrite cf_values, because we might want to use them
-        // through RootCfValues()
-        SPIEL_DCHECK_EQ(parent_idx, 0);
-        root_cf_value = node_sum;
-      } else {
-        cf_values[parent_idx] = node_sum;
-      }
+      cf_values[parent_idx] = node_sum;
       left_offset += num_children;
     }
     // Check that we passed over all of the children.
