@@ -317,8 +317,7 @@ ZeroSumSequentialGameSolution SolveZeroSumSequentialGame(
     absl::Span<const State*> start_states,
     absl::Span<const float> chance_range,
     std::optional<int> solve_only_player,
-    bool collect_tabular_policy,
-    bool collect_root_cfvs) {
+    bool collect_tabular_policy) {
 
   // 1. Construct infoset trees for the game.
   std::array<std::unique_ptr<SolverTree>, 2> solver_trees;
@@ -358,19 +357,6 @@ ZeroSumSequentialGameSolution SolveZeroSumSequentialGame(
     } else {
       for (int pl = 0; pl < 2; ++pl) {
         CollectTabularPolicy(&sol.policy, solver_trees[pl]->Root());
-      }
-    }
-  }
-  if (collect_root_cfvs) {
-    SPIEL_CHECK_FALSE(solve_only_player);
-    for (int pl = 0; pl < 2; ++pl) {
-      sol.root_cfvs[pl].reserve(solver_trees[pl]->Root().NumChildren());
-      for (const SolverNode& root_node :
-          solver_trees[pl]->Root().child_iterator()) {
-        const std::string& infostate = root_node.InfostateString();
-        SPIEL_DCHECK_TRUE(
-            sol.root_cfvs[pl].find(infostate) == sol.root_cfvs[pl].end());
-        sol.root_cfvs[pl][infostate] = root_node.sol_cf_value_;
       }
     }
   }

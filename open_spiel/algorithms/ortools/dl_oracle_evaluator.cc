@@ -14,6 +14,11 @@
 
 
 #include "open_spiel/algorithms/ortools/dl_oracle_evaluator.h"
+
+#include <vector>
+#include <unordered_map>
+
+#include "open_spiel/algorithms/expected_returns.h"
 #include "open_spiel/algorithms/ortools/sequence_form_lp.h"
 
 namespace open_spiel {
@@ -41,6 +46,8 @@ std::array<absl::Span<const float>, 2> OracleEvaluator::EvaluatePublicState(
   const std::array<std::vector<const CFRNode*>, 2>& leaf_nodes =
       oracle_state->public_state.leaf_nodes;
 
+  std::array<ortools::ZeroSumSequentialGameSolution, 2> solutions;
+  std::unordered_map<std::string, std::array<float, 2>> history_ranges;
   for (int pl = 0; pl < 2; ++pl) {
     std::vector<const State*> start_states;
     std::vector<float> chance_range;
@@ -48,39 +55,55 @@ std::array<absl::Span<const float>, 2> OracleEvaluator::EvaluatePublicState(
     SPIEL_CHECK_EQ(leaf_nodes[1 - pl].size(), ranges[1 - pl].size());
     for (int i = 0; i < leaf_nodes[1 - pl].size(); ++i) {
       const CFRNode* cfr_node = leaf_nodes[1 - pl][i];
-      const double oponent_prob = ranges[1 - pl][i];
+      const double opponent_prob = ranges[1 - pl][i];
       SPIEL_DCHECK_TRUE(cfr_node->IsLeafNode());
       SPIEL_CHECK_EQ(cfr_node->CorrespondingStates().size(),
                      cfr_node->CorrespondingChanceReaches().size());
       for (int j = 0; j < cfr_node->CorrespondingStates().size(); ++j) {
         const State* state = cfr_node->CorrespondingStates()[j].get();
         const double chn_prob = cfr_node->CorrespondingChanceReaches()[j];
+        history_ranges[state->HistoryString()][1 - pl] = opponent_prob;
 
         start_states.push_back(state);
-        chance_range.push_back(chn_prob * oponent_prob);
+        chance_range.push_back(chn_prob * opponent_prob);
       }
     }
 
-    ortools::ZeroSumSequentialGameSolution solution =
-        ortools::SolveZeroSumSequentialGame(
-            infostate_observer,
-            absl::MakeSpan(start_states),
-            absl::MakeSpan(chance_range),
-            /*solve_only_player=*/{},
-            /*collect_tabular_policy=*/true,
-            /*collect_root_cfvs=*/true);
+    solutions[pl] = ortools::SolveZeroSumSequentialGame(
+      infostate_observer,
+      absl::MakeSpan(start_states),
+      absl::MakeSpan(chance_range),
+      /*solve_only_player=*/pl,
+      /*collect_tabular_policy=*/true);
+  }
+  const std::vector<const Policy*>& policy_profile = {
+      &solutions[0].policy, &solutions[1].policy
+  };
 
-    const std::vector<const CFRNode*>& leaf_nodes =
-        oracle_state->public_state.leaf_nodes[pl];
-    SPIEL_CHECK_EQ(leaf_nodes.size(), ranges[pl].size());
-    SPIEL_CHECK_EQ(solution.root_cfvs[pl].size(), ranges[pl].size());
+  // Compute the root cfvs.
+  double public_state_utility = 0.;
+  for (int pl = 0; pl < 2; ++pl) {
+    SPIEL_CHECK_EQ(leaf_nodes[pl].size(), ranges[pl].size());
     SPIEL_CHECK_EQ(oracle_state->root_cfvs[pl].size(), ranges[pl].size());
 
-    for (int i = 0; i < leaf_nodes.size(); ++i) {
-      oracle_state->root_cfvs[pl][i] =
-          solution.root_cfvs[pl][leaf_nodes[i]->InfostateString()];
+    for (int i = 0; i < leaf_nodes[pl].size(); ++i) {
+      const CFRNode* cfr_node = leaf_nodes[pl][i];
+      double infostate_value = 0.;
+      for (int j = 0; j < cfr_node->CorrespondingStates().size(); ++j) {
+        const State* state = cfr_node->CorrespondingStates()[j].get();
+        const double chn_prob = cfr_node->CorrespondingChanceReaches()[j];
+        const double opponent_prob = history_ranges[state->HistoryString()][1 - pl];
+        const double state_utility = ExpectedReturns(
+            *state, policy_profile, /*depth_limit=*/-1)[pl];
+
+        public_state_utility += state_utility;
+        infostate_value += chn_prob * opponent_prob * state_utility;
+      }
+      oracle_state->root_cfvs[pl][i] = infostate_value;
     }
   }
+  SPIEL_DCHECK_FLOAT_NEAR(public_state_utility, 0., 1e-6);
+
   return {oracle_state->root_cfvs[0], oracle_state->root_cfvs[1]};
 }
 

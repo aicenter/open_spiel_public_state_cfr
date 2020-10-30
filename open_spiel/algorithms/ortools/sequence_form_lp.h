@@ -41,9 +41,6 @@ struct ZeroSumSequentialGameSolution {
   double game_value;
   // Optimal policy. Could be computed only for a single player, see below.
   TabularPolicy policy;
-  // Counter-factual values for both players at the specified starting states.
-  // By default, this field is not collected from the solver and is empty.
-  std::array<std::unordered_map<std::string, float>, 2> root_cfvs;
 };
 
 // A basic implementation: computes game value and tabular policy for both
@@ -63,8 +60,7 @@ ZeroSumSequentialGameSolution SolveZeroSumSequentialGame(
     absl::Span<const State*> starting_states,
     absl::Span<const float> chance_range,
     std::optional<int> solve_only_player = {},
-    bool collect_tabular_policy = true,
-    bool collect_root_cfvs = false);
+    bool collect_tabular_policy = true);
 
 
 }  // namespace ortools

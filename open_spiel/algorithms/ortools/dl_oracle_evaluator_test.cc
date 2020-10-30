@@ -59,7 +59,7 @@ void TestOptimalValuesKuhnBettingPublicState() {
   // does not return correct values for \alpha \in [0; 0.25)
   // Let's test various parametrizations to make sure that the values are indeed
   // correctly computed.
-  std::vector<float> test_parametrizations = { /* todo 0., 0.1,*/ 0.25, 0.5, 1. };
+  std::vector<float> test_parametrizations = { 0., 0.1, 0.25, 0.5, 1. };
 
   for (float alpha : test_parametrizations) {
     std::array<std::vector<float>, 2> ranges = {
@@ -70,13 +70,24 @@ void TestOptimalValuesKuhnBettingPublicState() {
     };
     std::array<absl::Span<const float>, 2> values =
         leaf_evaluator->EvaluatePublicState(bet_state, {ranges[0], ranges[1]});
-    SPIEL_CHECK_FLOAT_NEAR(values[0][0], -2 / 3., 1e-10);
+    if (alpha < 0.25) {
+      // PL1 passes
+      SPIEL_CHECK_FLOAT_NEAR(values[0][0], -1 / 6., 1e-10);
+      SPIEL_CHECK_FLOAT_NEAR(values[0][2], 1 / 3., 1e-10);
+    } else {
+      // PL1 bets
+      SPIEL_CHECK_FLOAT_NEAR(values[0][0], -2 / 3., 1e-10);
+      SPIEL_CHECK_FLOAT_NEAR(values[0][2], 1 / 2., 1e-10);
+    }
     SPIEL_CHECK_FLOAT_NEAR(values[0][1], -1 / 6., 1e-10);
-    SPIEL_CHECK_FLOAT_NEAR(values[0][2], 1 / 2., 1e-10);
+
     // Be mindful of the ordering: index 0 is infostate 1b, see above.
-    SPIEL_CHECK_FLOAT_NEAR(values[1][0], (2 * alpha - 1) / 3., 1e-6);
-    SPIEL_CHECK_FLOAT_NEAR(values[1][1], 2 * alpha / 3, 1e-10);
-    SPIEL_CHECK_FLOAT_NEAR(values[1][2], -1 / 6., 1e-10);
+    const int is_J = 2;
+    const int is_Q = 0;
+    const int is_K = 1;
+    SPIEL_CHECK_FLOAT_NEAR(values[1][is_J], -1 / 6., 1e-6);
+    SPIEL_CHECK_FLOAT_NEAR(values[1][is_Q], std::fmax((2 * alpha - 1) / 3., -1/6.), 1e-6);
+    SPIEL_CHECK_FLOAT_NEAR(values[1][is_K], 2 * alpha / 3, 1e-6);
   }
 }
 
@@ -99,7 +110,7 @@ void TestValueOracle(const std::string& game_name) {
 
     dlcfr::DepthLimitedCFR dl_solver(game, trunk_depth_limit,
                                      leaf_evaluator, terminal_evaluator);
-    dl_solver.RunSimultaneousIterations(1); /* todo: 10 */
+    dl_solver.RunSimultaneousIterations(10);
   }
 }
 
@@ -115,7 +126,7 @@ int main(int argc, char** argv) {
 
   std::vector<std::string> test_games = {
       "kuhn_poker",
-      // todo: "leduc_poker",
+      "leduc_poker",
       "goofspiel(players=2,num_cards=4,imp_info=True)",
   };
   for (const std::string& game_name : test_games) {
