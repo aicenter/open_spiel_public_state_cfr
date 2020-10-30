@@ -158,6 +158,8 @@ class DepthLimitedCFR {
   std::unordered_map<std::string, CFRInfoStateValues const*>
     InfoStateValuesPtrTable() const;
 
+  const std::vector<std::unique_ptr<EncodedPublicState>>&
+    GetEncodedLeaves() const { return encoded_leaves_; }
 
  private:
   const std::shared_ptr<const Game> game_;
@@ -230,26 +232,6 @@ struct CFREvaluator : public LeafEvaluator {
       std::array<absl::Span<const float>, 2>) const override;
 };
 
-// -- epsilon-Oracle evaluator -------------------------------------------------
-
-//struct EpsPublicState : public CFRPublicState {
-//  DepthLimitedCFR dlcfr;
-//  Observation observation;  // TODO: positional encoding
-//  EpsPublicState(DepthLimitedCFR d, Observation obs)
-//    : CFRPublicState(std::move(d)), observation(std::move(obs)) {};
-//};
-//
-//struct EpsOracleEvaluator : public CFREvaluator {
-//  EpsOracleEvaluator(std::shared_ptr<const Game> game,
-//                     std::shared_ptr<const LeafEvaluator> leaf_evaluator,
-//                     std::shared_ptr<const LeafEvaluator> terminal_evaluator,
-//                     std::shared_ptr<Observer> public_observer,
-//                     std::shared_ptr<Observer> infostate_observer)
-//      : CFREvaluator(std::move(game), /*depth_limit=*/1000,
-//                     /*leaf_evaluator=*/nullptr, std::move(terminal_evaluator),
-//                     std::move(public_observer), std::move(infostate_observer)),
-//        num_cfr_iterations(10000) {}
-//};
 
 }  // namespace dlcfr
 }  // namespace algorithms
