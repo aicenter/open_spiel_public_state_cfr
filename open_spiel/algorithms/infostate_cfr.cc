@@ -236,7 +236,7 @@ void InfostateCFR::RunSimultaneousIterations(int iterations) {
     PrepareRootReachProbs();
     propagators_[0].TopDown();
     propagators_[1].TopDown();
-    SPIEL_DCHECK_TRUE(fabs(TerminalReachProbSum() - 1.0) < 1e-6);
+    SPIEL_DCHECK_TRUE(fabs(TerminalReachProbSum() - 1.0) < 1e-3);
 
     EvaluateLeaves();
     propagators_[0].BottomUp();
