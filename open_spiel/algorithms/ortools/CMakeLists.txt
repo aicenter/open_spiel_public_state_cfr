@@ -10,15 +10,22 @@ add_library(open_spiel_ortools OBJECT
   lp_solver.h
   sequence_form_lp.cc
   sequence_form_lp.h
+  dl_oracle_evaluator.cc
+  dl_oracle_evaluator.h
 )
 target_link_libraries(open_spiel_ortools ${ORTOOLS_LIBS})
 
 add_executable(lp_solver_test lp_solver_test.cc ${OPEN_SPIEL_OBJECTS}
-  $<TARGET_OBJECTS:tests> $<TARGET_OBJECTS:open_spiel_ortools>)
+               $<TARGET_OBJECTS:tests> $<TARGET_OBJECTS:open_spiel_ortools>)
 target_link_libraries(lp_solver_test ${ORTOOLS_LIBS})
 add_test(lp_solver_test lp_solver_test)
 
 add_executable(sequence_form_lp_test sequence_form_lp_test.cc ${OPEN_SPIEL_OBJECTS}
-  $<TARGET_OBJECTS:tests> $<TARGET_OBJECTS:open_spiel_ortools>)
+               $<TARGET_OBJECTS:tests> $<TARGET_OBJECTS:open_spiel_ortools>)
 target_link_libraries(sequence_form_lp_test ${ORTOOLS_LIBS})
 add_test(sequence_form_lp_test sequence_form_lp_test)
+
+add_executable(dl_oracle_evaluator_test dl_oracle_evaluator_test.cc ${OPEN_SPIEL_OBJECTS}
+               $<TARGET_OBJECTS:tests> $<TARGET_OBJECTS:open_spiel_ortools>)
+target_link_libraries(dl_oracle_evaluator_test ${ORTOOLS_LIBS})
+add_test(dl_oracle_evaluator_test dl_oracle_evaluator_test)

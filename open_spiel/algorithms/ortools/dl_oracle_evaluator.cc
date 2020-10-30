@@ -1,0 +1,89 @@
+// Copyright 2019 DeepMind Technologies Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+
+#include "open_spiel/algorithms/ortools/dl_oracle_evaluator.h"
+#include "open_spiel/algorithms/ortools/sequence_form_lp.h"
+
+namespace open_spiel {
+namespace algorithms {
+namespace ortools {
+
+
+OraclePublicState::OraclePublicState(
+    const dlcfr::LeafPublicState& s) : public_state(s) {
+  for (int pl = 0; pl < 2; ++pl) {
+    root_cfvs[pl] = std::vector<float>(public_state.leaf_nodes[pl].size());
+  }
+}
+
+std::unique_ptr<dlcfr::EncodedPublicState>
+OracleEvaluator::EncodeLeafPublicState(
+    const dlcfr::LeafPublicState& leaf_state) const {
+  return std::make_unique<OraclePublicState>(leaf_state);
+}
+
+std::array<absl::Span<const float>, 2> OracleEvaluator::EvaluatePublicState(
+    dlcfr::EncodedPublicState* public_state,
+    std::array<absl::Span<const float>, 2> ranges) const {
+  auto* oracle_state = open_spiel::down_cast<OraclePublicState*>(public_state);
+  const std::array<std::vector<const CFRNode*>, 2>& leaf_nodes =
+      oracle_state->public_state.leaf_nodes;
+
+  for (int pl = 0; pl < 2; ++pl) {
+    std::vector<const State*> start_states;
+    std::vector<float> chance_range;
+
+    SPIEL_CHECK_EQ(leaf_nodes[1 - pl].size(), ranges[1 - pl].size());
+    for (int i = 0; i < leaf_nodes[1 - pl].size(); ++i) {
+      const CFRNode* cfr_node = leaf_nodes[1 - pl][i];
+      const double oponent_prob = ranges[1 - pl][i];
+      SPIEL_DCHECK_TRUE(cfr_node->IsLeafNode());
+      SPIEL_CHECK_EQ(cfr_node->CorrespondingStates().size(),
+                     cfr_node->CorrespondingChanceReaches().size());
+      for (int j = 0; j < cfr_node->CorrespondingStates().size(); ++j) {
+        const State* state = cfr_node->CorrespondingStates()[j].get();
+        const double chn_prob = cfr_node->CorrespondingChanceReaches()[j];
+
+        start_states.push_back(state);
+        chance_range.push_back(chn_prob * oponent_prob);
+      }
+    }
+
+    ortools::ZeroSumSequentialGameSolution solution =
+        ortools::SolveZeroSumSequentialGame(
+            infostate_observer,
+            absl::MakeSpan(start_states),
+            absl::MakeSpan(chance_range),
+            /*solve_only_player=*/{},
+            /*collect_tabular_policy=*/true,
+            /*collect_root_cfvs=*/true);
+
+    const std::vector<const CFRNode*>& leaf_nodes =
+        oracle_state->public_state.leaf_nodes[pl];
+    SPIEL_CHECK_EQ(leaf_nodes.size(), ranges[pl].size());
+    SPIEL_CHECK_EQ(solution.root_cfvs[pl].size(), ranges[pl].size());
+    SPIEL_CHECK_EQ(oracle_state->root_cfvs[pl].size(), ranges[pl].size());
+
+    for (int i = 0; i < leaf_nodes.size(); ++i) {
+      oracle_state->root_cfvs[pl][i] =
+          solution.root_cfvs[pl][leaf_nodes[i]->InfostateString()];
+    }
+  }
+  return {oracle_state->root_cfvs[0], oracle_state->root_cfvs[1]};
+}
+
+}  // namespace ortools
+}  // namespace algorithms
+}  // namespace open_spiel
