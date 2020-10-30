@@ -95,6 +95,24 @@ DepthLimitedCFR::DepthLimitedCFR(
   EncodePublicStates();
 }
 
+void FillStatesAndChanceRange(std::vector<const State*>* start_states,
+                              std::vector<float>* chance_reach_probs,
+                              absl::Span<const CFRNode* const> start_nodes) {
+  // Collect pointers to starting states, along with their reach probs.
+  // It's enough to do this just through one player, as the other player
+  // has just a permutation of these states.
+  for (const CFRNode* cfr_node : start_nodes) {
+    SPIEL_CHECK_EQ(cfr_node->CorrespondingStates().size(),
+                   cfr_node->CorrespondingChanceReaches().size());
+    for (int i = 0; i < cfr_node->CorrespondingStates().size(); ++i) {
+      start_states->push_back(
+          cfr_node->CorrespondingStates()[i].get());
+      chance_reach_probs->push_back(
+          cfr_node->CorrespondingChanceReaches()[i]);
+    }
+  }
+}
+
 std::array<InfostateTreeValuePropagator, 2> DepthLimitedCFR::CreatePropagators(
     std::array<absl::Span<const CFRNode* const>, 2> start_nodes,
     const std::shared_ptr<Observer>& infostate_observer,
@@ -102,21 +120,10 @@ std::array<InfostateTreeValuePropagator, 2> DepthLimitedCFR::CreatePropagators(
   std::array<std::vector<const State*>, 2> start_states;
   std::array<std::vector<float>, 2> chance_reach_probs;
 
-  // Collect pointers to starting states, along with their reach probs.
-  // It's enough to do this just through one player, as the other player
-  // has just a permutation of these states.
-  for (int pl = 0; pl < 2; ++pl) {
-    for (const CFRNode* cfr_node : start_nodes[pl]) {
-      SPIEL_CHECK_EQ(cfr_node->CorrespondingStates().size(),
-                     cfr_node->CorrespondingChanceReaches().size());
-      for (int i = 0; i < cfr_node->CorrespondingStates().size(); ++i) {
-        start_states[pl].push_back(
-            cfr_node->CorrespondingStates()[i].get());
-        chance_reach_probs[pl].push_back(
-            cfr_node->CorrespondingChanceReaches()[i]);
-      }
-    }
-  }
+  FillStatesAndChanceRange(&start_states[0], &chance_reach_probs[0],
+                           start_nodes[0]);
+  FillStatesAndChanceRange(&start_states[1], &chance_reach_probs[1],
+                           start_nodes[1]);
 
   return {
       std::make_unique<CFRTree>(
@@ -261,10 +268,10 @@ void DepthLimitedCFR::RunSimultaneousIterations(int iterations) {
     EvaluateLeaves();
     propagators_[0].BottomUp();
     propagators_[1].BottomUp();
-    SPIEL_DCHECK_TRUE(
-        fabs(propagators_[0].RootCfValue(tracked_player_ranges_[0])
-           + propagators_[1].RootCfValue(tracked_player_ranges_[1]))
-            < 1e-6);
+    SPIEL_DCHECK_FLOAT_NEAR(
+        propagators_[0].RootCfValue(tracked_player_ranges_[0]),
+        - propagators_[1].RootCfValue(tracked_player_ranges_[1]),
+        1e-6);
   }
 }
 
