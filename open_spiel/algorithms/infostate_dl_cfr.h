@@ -23,10 +23,8 @@
 #include <utility>
 #include <vector>
 
-#include "open_spiel/algorithms/infostate_tree.h"
 #include "open_spiel/algorithms/infostate_cfr.h"
-#include "open_spiel/algorithms/cfr.h"
-#include "open_spiel/policy.h"
+#include "open_spiel/algorithms/infostate_tree.h"
 #include "open_spiel/spiel.h"
 #include "open_spiel/spiel_utils.h"
 

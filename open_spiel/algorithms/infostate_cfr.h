@@ -15,11 +15,9 @@
 #ifndef OPEN_SPIEL_ALGORITHMS_INFOSTATE_CFR_H_
 #define OPEN_SPIEL_ALGORITHMS_INFOSTATE_CFR_H_
 
-#include <map>
 #include <memory>
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -80,7 +78,7 @@ class InfostateTreeValuePropagator {
   // are at the same depth so that we can propagate the computation of reach
   // probs / cf values in a single vector. This requirement is typically
   // satisfied by most domains already during the tree construction anyway.
-  /* implicit */ InfostateTreeValuePropagator(CFRTree* balanced_tree);
+  /*implicit*/ InfostateTreeValuePropagator(CFRTree* balanced_tree);
 
   // Make a top-down pass, using the current policy stored in the tree nodes.
   // This computes the reach_probs_ buffer for storing cumulative product
@@ -128,6 +126,7 @@ class InfostateTreeValuePropagator {
   int num_leaves() const { return nodes_at_depth.back().size(); }
 };
 
+// Run vectorized CFR on the whole game or on specified trees.
 class InfostateCFR {
  public:
   // Basic constructor for the whole game.
@@ -142,9 +141,6 @@ class InfostateCFR {
   // of the game, this converges to the game value.
   float RootValue() const { return propagators_[0].RootCfValue(); }
 
-  // Similarly to CFRSolver, expose the InfoStateValuesTable.
-  // However, this table has pointers to the values, not the actual values,
-  // because they are stored within the infostate tree.
   CFRInfoStateValuesPtrTable InfoStateValuesPtrTable();
   std::shared_ptr<Policy> AveragePolicy();
 

@@ -15,11 +15,9 @@
 #ifndef OPEN_SPIEL_ALGORITHMS_INFOSTATE_TREE_H_
 #define OPEN_SPIEL_ALGORITHMS_INFOSTATE_TREE_H_
 
-#include <map>
 #include <memory>
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -287,6 +285,12 @@ class CFRNode : public InfostateNode</*Self=*/CFRNode> {
 };
 
 // A type for tables holding pointers to CFR values.
+//
+// It is similar to what CFRSolver uses, i.e. the InfoStateValuesTable.
+// However, this table has pointers to the values, not the actual values,
+// because they are stored within the infostate tree.
+//
+// It makes looking up the strategies / regrets for players easier to do.
 using CFRInfoStateValuesPtrTable =
   std::unordered_map<std::string, CFRInfoStateValues*>;
 
