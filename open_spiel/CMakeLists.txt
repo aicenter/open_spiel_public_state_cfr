@@ -245,7 +245,6 @@ if (BUILD_WITH_ORTOOLS)
   set_target_properties(open_spiel_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
   include_directories(${ORTOOLS_INC_DIRS})
   link_directories(${ORTOOLS_LIB_DIRS})
-  set(OPEN_SPIEL_OBJECTS ${OPEN_SPIEL_OBJECTS} $<TARGET_OBJECTS:open_spiel_ortools>)
 endif()
 
 
