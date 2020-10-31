@@ -34,6 +34,8 @@ add_library (algorithms OBJECT
   history_tree.cc
   history_tree.h
   infostate_tree.h
+  infostate_tree.hpp
+  infostate_tree.cc
   infostate_dl_cfr.h
   infostate_dl_cfr.cc
   infostate_cfr.h
