@@ -97,7 +97,7 @@ void DepthLimitedCFR::PrepareLeafPublicStates() {
 
   for (int pl = 0; pl < 2; ++pl) {
     int leaf_position = 0;
-    for (CFRNode* leaf_node : propagators_[pl].LeafNodes()) {
+    for (CFRNode* leaf_node : propagators_[pl].leaf_nodes()) {
 // TODO: common parent branching invariant
 //      // The tree is balanced, therefore we should be iterating over leaves
 //      // in an ordered fashion.
@@ -116,7 +116,7 @@ void DepthLimitedCFR::PrepareLeafPublicStates() {
       leaf_position++;
     }
 
-    SPIEL_CHECK_EQ(leaf_position, propagators_[pl].cf_values.size());
+    SPIEL_CHECK_EQ(leaf_position, propagators_[pl].num_leaves());
   }
 }
 
@@ -232,7 +232,7 @@ void DepthLimitedCFR::RunSimultaneousIterations(int iterations) {
 
 void DepthLimitedCFR::PrepareRootReachProbs() {
   for (int pl = 0; pl < 2; ++pl) {
-    absl::Span<float> root_reaches = propagators_[pl].RootChildrenReachProbs();
+    absl::Span<float> root_reaches = propagators_[pl].range();
     SPIEL_CHECK_EQ(tracked_player_ranges_[pl].size(), root_reaches.size());
     for (int i = 0; i < root_reaches.size(); ++i) {
       root_reaches[i] = tracked_player_ranges_[pl][i];
@@ -262,8 +262,9 @@ void DepthLimitedCFR::EvaluateLeaves() {
       for (const CFRNode* leaf_node : public_leaf.leaf_nodes[pl]) {
         const int leaf_position = leaf_positions_.at(leaf_node);
         SPIEL_DCHECK_GE(leaf_position, 0);
-        SPIEL_DCHECK_LT(leaf_position, propagators_[pl].reach_probs.size());
-        vec_ranges[pl].push_back(propagators_[pl].reach_probs[leaf_position]);
+        SPIEL_DCHECK_LT(leaf_position, propagators_[pl].num_leaves());
+        vec_ranges[pl].push_back(
+            propagators_[pl].leaves_reach_probs()[leaf_position]);
       }
     }
 
@@ -286,8 +287,8 @@ void DepthLimitedCFR::EvaluateLeaves() {
         const CFRNode* leaf_node = public_leaf.leaf_nodes[pl][l];
         const int leaf_position = leaf_positions_.at(leaf_node);
         SPIEL_DCHECK_GE(leaf_position, 0);
-        SPIEL_DCHECK_LT(leaf_position, propagators_[pl].reach_probs.size());
-        propagators_[pl].cf_values[leaf_position] = cfvs[pl][l];
+        SPIEL_DCHECK_LT(leaf_position, propagators_[pl].num_leaves());
+        propagators_[pl].leaves_cf_values()[leaf_position] = cfvs[pl][l];
       }
     }
   }
@@ -307,8 +308,7 @@ void DepthLimitedCFR::TrackPlayerRanges(
 
 std::array<absl::Span<const float>, 2>
 DepthLimitedCFR::RootChildrenCfValues() const {
-  return {propagators_[0].RootChildrenCfValues()
-         , propagators_[1].RootChildrenCfValues() };
+  return {propagators_[0].values(), propagators_[1].values() };
 }
 
 bool LeafPublicState::IsConsistent() const {

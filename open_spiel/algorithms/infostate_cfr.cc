@@ -55,6 +55,16 @@ ActionsAndProbs InfostateCFRAveragePolicy::GetStatePolicy(
   }
   return out;
 }
+
+void CollectTreeStructure(
+    CFRNode* node, int depth,
+    std::vector<std::vector<CFRNode*>>* nodes_at_depth) {
+  (*nodes_at_depth)[depth].push_back(node);
+
+  for (CFRNode& child : node->child_iterator())
+    CollectTreeStructure(&child, depth + 1, nodes_at_depth);
+}
+
 }  // namespace
 
 void InfostateTreeValuePropagator::TopDown() {
@@ -171,14 +181,6 @@ void InfostateTreeValuePropagator::BottomUp() {
     SPIEL_DCHECK_EQ(left_offset, nodes_at_depth[d + 1].size());
   }
 }
-void InfostateTreeValuePropagator::CollectTreeStructure(
-    CFRNode* node, int depth,
-    std::vector<std::vector<CFRNode*>>* nodes_at_depth) {
-  (*nodes_at_depth)[depth].push_back(node);
-
-  for (CFRNode& child : node->child_iterator())
-    CollectTreeStructure(&child, depth + 1, nodes_at_depth);
-}
 InfostateTreeValuePropagator::InfostateTreeValuePropagator(
     CFRTree* balanced_tree) {
   SPIEL_DCHECK_TRUE(balanced_tree->is_balanced());
@@ -190,17 +192,17 @@ InfostateTreeValuePropagator::InfostateTreeValuePropagator(
   reach_probs = std::vector<float>(max_nodes_across_depths);
 }
 float InfostateTreeValuePropagator::RootCfValue(
-    absl::Span<const float> root_children_range) const {
-  SPIEL_CHECK_TRUE(root_children_range.empty() ||
-      root_children_range.size() == RootBranchingFactor());
+    absl::Span<const float> range) const {
+  SPIEL_CHECK_TRUE(range.empty() ||
+      range.size() == root_branching_factor());
   float root_value = 0.;
-  if (root_children_range.empty()) {
-    for (int i = 0; i < RootBranchingFactor(); ++i) {
+  if (range.empty()) {
+    for (int i = 0; i < root_branching_factor(); ++i) {
       root_value += cf_values[i];
     }
   } else {
-    for (int i = 0; i < RootBranchingFactor(); ++i) {
-      root_value += root_children_range[i] * cf_values[i];
+    for (int i = 0; i < root_branching_factor(); ++i) {
+      root_value += range[i] * cf_values[i];
     }
   }
   return root_value;
@@ -249,7 +251,7 @@ void InfostateCFR::PrepareRootReachProbs() {
 }
 
 void InfostateCFR::PrepareRootReachProbs(Player pl) {
-  absl::Span<float> root_reaches = propagators_[pl].RootChildrenReachProbs();
+  absl::Span<float> root_reaches = propagators_[pl].range();
   for (int i = 0; i < root_reaches.size(); ++i) {
     root_reaches[i] = 1.;
   }
@@ -257,25 +259,27 @@ void InfostateCFR::PrepareRootReachProbs(Player pl) {
 
 void InfostateCFR::EvaluateLeaves() {
   auto& prop = propagators_;
-  SPIEL_DCHECK_EQ(prop[0].cf_values.size(), prop[1].cf_values.size());
-  for (int i = 0; i < prop[0].cf_values.size(); ++i) {
+  auto& u = terminal_values_;
+  SPIEL_DCHECK_EQ(prop[0].num_leaves(), prop[1].num_leaves());
+  for (int i = 0; i < prop[0].num_leaves(); ++i) {
     const int j = terminal_permutation_[i];
-    prop[0].cf_values[i] = terminal_values_[i] * prop[1].reach_probs[j];
-    prop[1].cf_values[j] = -terminal_values_[i] * prop[0].reach_probs[i];
+    prop[0].leaves_cf_values()[i] =  u[i] * prop[1].leaves_reach_probs()[j];
+    prop[1].leaves_cf_values()[j] = -u[i] * prop[0].leaves_reach_probs()[i];
   }
 }
 void InfostateCFR::EvaluateLeaves(Player pl) {
   auto& prop = propagators_;
-  SPIEL_DCHECK_EQ(prop[0].cf_values.size(), prop[1].cf_values.size());
+  auto& u = terminal_values_;
+  SPIEL_DCHECK_EQ(prop[0].num_leaves(), prop[1].num_leaves());
   if (pl == 0) {
-    for (int i = 0; i < prop[0].cf_values.size(); ++i) {
+    for (int i = 0; i < prop[0].num_leaves(); ++i) {
       const int j = terminal_permutation_[i];
-      prop[0].cf_values[i] = terminal_values_[i] * prop[1].reach_probs[j];
+      prop[0].leaves_reach_probs()[i] = u[i] * prop[1].leaves_reach_probs()[j];
     }
   } else {
-    for (int i = 0; i < prop[0].cf_values.size(); ++i) {
+    for (int i = 0; i < prop[1].num_leaves(); ++i) {
       const int j = terminal_permutation_[i];
-      prop[1].cf_values[j] = -terminal_values_[i] * prop[0].reach_probs[i];
+      prop[1].leaves_reach_probs()[j] = -u[i] * prop[0].leaves_reach_probs()[i];
     }
   }
 }
@@ -287,8 +291,8 @@ InfostateCFR::InfoStateValuesPtrTable() const {
   return vec_ptable;
 }
 void InfostateCFR::PrepareTerminals() {
-  const std::vector<CFRNode*>& leaves_a = propagators_[0].LeafNodes();
-  const std::vector<CFRNode*>& leaves_b = propagators_[1].LeafNodes();
+  const std::vector<CFRNode*>& leaves_a = propagators_[0].leaf_nodes();
+  const std::vector<CFRNode*>& leaves_b = propagators_[1].leaf_nodes();
   SPIEL_CHECK_EQ(leaves_a.size(), leaves_b.size());
 
   const int num_terminals = leaves_a.size();
@@ -332,8 +336,8 @@ float InfostateCFR::TerminalReachProbSum() {
   for (int i = 0; i < num_terminals; ++i) {
     const int j = terminal_permutation_[i];
     const float leaf_reach = terminal_ch_reaches_[i]
-        * propagators_[0].reach_probs[i]
-        * propagators_[1].reach_probs[j];
+        * propagators_[0].leaves_reach_probs()[i]
+        * propagators_[1].leaves_reach_probs()[j];
     SPIEL_CHECK_LE(leaf_reach, 1.0);
     reach_sum += leaf_reach;
   }
