@@ -225,17 +225,17 @@ int main(int argc, char** argv) {
   // Useful for future reference. Compiled using BUILD_TYPE=Release
 
   //             Vec         Str         Speedup
-  //  Start:     0.00137985  0.00143035  1.0366
-  //  CFR iters: 0.00199572  0.02147450  10.7603
+  // Start:      6.86039e-05 6.90454e-05  1.00644
+  // CFR iters:  8.53516e-05 0.0036098   42.2933
 //  algorithms::BenchmarkImplementations("kuhn_poker");
 
   //             Vec         Str         Speedup
-  //  Start:     0.509767    0.333749    0.654708
-  //  CFR iters: 1.304290    4.962850    3.80503
+  // Start:      0.0457932   0.0443538    0.968568
+  // CFR iters:  0.0570296   0.951303    16.6809
 //  algorithms::BenchmarkImplementations("leduc_poker");
 
   //             Vec         Str         Speedup
-  //  Start:     0.913013     1.60385    1.75666
-  //  CFR iters: 0.800187    15.95760    19.9423
+  //  Start:     0.114543    0.145594     1.27108
+  //  CFR iters: 0.0407394   3.30333     81.0843
 //  algorithms::BenchmarkImplementations("goofspiel(num_cards=4,imp_info=True)");
 }
