@@ -70,6 +70,7 @@ class InfostateTreeValuePropagator {
 
  public:
   // Mutable values to keep track of.
+  // These have the size of largest depth of the tree (i.e. leaf nodes).
   std::vector<float> reach_probs;
   std::vector<float> cf_values;
 
@@ -122,9 +123,9 @@ class InfostateTreeValuePropagator {
 class InfostateCFR {
  public:
   // Basic constructor for the whole game.
-  InfostateCFR(const Game& game);
-  // Run CFR on specified trees.
-  InfostateCFR(std::array<CFRTree, 2> cfr_trees);
+  explicit InfostateCFR(const Game& game);
+  // Run CFR on the specified trees.
+  explicit InfostateCFR(std::array<CFRTree, 2> cfr_trees);
 
   void RunSimultaneousIterations(int iterations);
   void RunAlternatingIterations(int iterations);
@@ -137,25 +138,11 @@ class InfostateCFR {
   float RootCfValue() const { return propagators_[0].RootCfValue(); }
 
   // Similarly to CFRSolver, expose the InfoStateValuesTable.
-  // However, this table has pointers to the values, not the actual values.
-  std::unordered_map<std::string, CFRInfoStateValues const*>
+  // However, this table has pointers to the values, not the actual values,
+  // because they are stored within the infostate tree.
+  std::unordered_map<std::string, const CFRInfoStateValues*>
     InfoStateValuesPtrTable() const;
-
-  // Make sure we can get the average policy to compute expected values
-  // and exploitability.
-  class InfostateCFRAveragePolicy : public Policy {
-    const InfostateCFR& cfr_;
-    const std::unordered_map<
-        std::string, CFRInfoStateValues const*> infostate_table_;
-   public:
-    InfostateCFRAveragePolicy(const InfostateCFR& cfr)
-        : cfr_(cfr), infostate_table_(cfr_.InfoStateValuesPtrTable()) {}
-    ActionsAndProbs GetStatePolicy(
-        const std::string& info_state) const override;
-  };
-  std::shared_ptr<Policy> AveragePolicy() const {
-    return std::make_shared<InfostateCFRAveragePolicy>(*this);
-  }
+  std::shared_ptr<Policy> AveragePolicy() const;
 
  private:
   std::array<CFRTree, 2> trees_;

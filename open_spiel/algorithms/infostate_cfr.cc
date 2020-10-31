@@ -19,9 +19,23 @@
 namespace open_spiel {
 namespace algorithms {
 
-ActionsAndProbs InfostateCFR::InfostateCFRAveragePolicy::GetStatePolicy(
+namespace {
+// Make sure we can get the average policy to compute expected values
+// and exploitability.
+class InfostateCFRAveragePolicy : public Policy {
+  const std::unordered_map<
+      std::string, CFRInfoStateValues const*> infostate_ptr_table_;
+ public:
+  InfostateCFRAveragePolicy(const InfostateCFR& cfr);
+  ActionsAndProbs GetStatePolicy(const std::string& info_state) const override;
+};
+
+InfostateCFRAveragePolicy::InfostateCFRAveragePolicy(const InfostateCFR& cfr)
+    : infostate_ptr_table_(cfr.InfoStateValuesPtrTable()) {}
+
+ActionsAndProbs InfostateCFRAveragePolicy::GetStatePolicy(
     const std::string& info_state) const {
-  const CFRInfoStateValues& vs = *infostate_table_.at(info_state);
+  const CFRInfoStateValues& vs = *infostate_ptr_table_.at(info_state);
   float sum_prob = 0.0;
   for (int i = 0; i < vs.num_actions(); ++i) {
     sum_prob += vs.cumulative_policy[i];
@@ -41,6 +55,7 @@ ActionsAndProbs InfostateCFR::InfostateCFRAveragePolicy::GetStatePolicy(
   }
   return out;
 }
+}  // namespace
 
 void InfostateTreeValuePropagator::TopDown() {
   const int tree_depth = nodes_at_depth.size();
@@ -177,7 +192,7 @@ InfostateTreeValuePropagator::InfostateTreeValuePropagator(
 float InfostateTreeValuePropagator::RootCfValue(
     absl::Span<const float> root_children_range) const {
   SPIEL_CHECK_TRUE(root_children_range.empty() ||
-    root_children_range.size() == RootBranchingFactor());
+      root_children_range.size() == RootBranchingFactor());
   float root_value = 0.;
   if (root_children_range.empty()) {
     for (int i = 0; i < RootBranchingFactor(); ++i) {
@@ -192,7 +207,7 @@ float InfostateTreeValuePropagator::RootCfValue(
 }
 
 InfostateCFR::InfostateCFR(std::array<CFRTree, 2> cfr_trees)
-  : trees_(std::move(cfr_trees)), propagators_({&trees_[0], &trees_[1]}) {
+    : trees_(std::move(cfr_trees)), propagators_({&trees_[0], &trees_[1]}) {
   PrepareTerminals();
 }
 InfostateCFR::InfostateCFR(const Game& game)
@@ -245,8 +260,8 @@ void InfostateCFR::EvaluateLeaves() {
   SPIEL_DCHECK_EQ(prop[0].cf_values.size(), prop[1].cf_values.size());
   for (int i = 0; i < prop[0].cf_values.size(); ++i) {
     const int j = terminal_permutation_[i];
-    prop[0].cf_values[i] =   terminal_values_[i] * prop[1].reach_probs[j];
-    prop[1].cf_values[j] = - terminal_values_[i] * prop[0].reach_probs[i];
+    prop[0].cf_values[i] = terminal_values_[i] * prop[1].reach_probs[j];
+    prop[1].cf_values[j] = -terminal_values_[i] * prop[0].reach_probs[i];
   }
 }
 void InfostateCFR::EvaluateLeaves(Player pl) {
@@ -260,7 +275,7 @@ void InfostateCFR::EvaluateLeaves(Player pl) {
   } else {
     for (int i = 0; i < prop[0].cf_values.size(); ++i) {
       const int j = terminal_permutation_[i];
-      prop[1].cf_values[j] = - terminal_values_[i] * prop[0].reach_probs[i];
+      prop[1].cf_values[j] = -terminal_values_[i] * prop[0].reach_probs[i];
     }
   }
 }
@@ -305,8 +320,8 @@ void InfostateCFR::PrepareTerminals() {
     terminal_permutation_.push_back(permutation_index);
   }
   SPIEL_DCHECK_EQ(
-      // A quick check to see if the permutation is ok
-      // by computing the arithmetic sum.
+  // A quick check to see if the permutation is ok
+  // by computing the arithmetic sum.
       std::accumulate(terminal_permutation_.begin(),
                       terminal_permutation_.end(), 0),
       num_terminals * (num_terminals - 1) / 2);
@@ -323,6 +338,10 @@ float InfostateCFR::TerminalReachProbSum() {
     reach_sum += leaf_reach;
   }
   return reach_sum;
+}
+
+std::shared_ptr<Policy> InfostateCFR::AveragePolicy() const {
+  return std::make_shared<InfostateCFRAveragePolicy>(*this);
 }
 
 }  // namespace algorithms
