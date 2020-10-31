@@ -89,19 +89,20 @@ class InfostateNode {
   InfostateNode(InfostateNode&&) noexcept = default;
   virtual ~InfostateNode() = default;
 
-  const InfostateTree<Self>& Tree() const { return tree_; }
-  Self* Parent() const { return parent_; }
-  int IncomingIndex() const { return incoming_index_; }
-  const InfostateNodeType& Type() const { return type_; }
-  bool IsLeafNode() const { return children_.empty(); }
-  bool IsRootNode() const { return !parent_; }
-  const std::string& InfostateString() const;
-  bool HasInfostateString() const;
-  double TerminalUtility() const;
-  double TerminalChanceReachProb() const;
-  absl::Span<const Action> LegalActions() const;
-  const std::vector<std::unique_ptr<State>>& CorrespondingStates() const;
-  const std::vector<double>& CorrespondingChanceReaches() const;
+  const InfostateTree<Self>& tree() const { return tree_; }
+  Self* parent() const { return parent_; }
+  int incoming_index() const { return incoming_index_; }
+  const InfostateNodeType& type() const { return type_; }
+  bool is_leaf_node() const { return children_.empty(); }
+  bool is_root_node() const { return !parent_; }
+  const std::string& infostate_string() const;
+  bool has_infostate_string() const;
+  double terminal_utility() const;
+  double terminal_chance_reach_prob() const;
+  absl::Span<const Action> legal_actions() const;
+  const std::vector<std::unique_ptr<State>>& corresponding_states() const;
+  const std::vector<double>& corresponding_chance_reach_probs() const;
+
   Self* AddChild(std::unique_ptr<Self> child);
   Self* GetChild(const std::string& infostate_string) const;
   Self* ChildAt(int i) const { return children_.at(i).get(); }
@@ -197,12 +198,11 @@ class InfostateTree final {
       std::shared_ptr<Observer> infostate_observer, Player acting_player,
       int max_move_ahead_limit = 1000, bool make_balanced = true);
 
-  const Node& Root() const { return root_; }
-  Node* MutableRoot() { return &root_; }
-  Player GetPlayer() const { return player_; }
-  const Observer& GetObserver() const { return *infostate_observer_; }
-  int TreeHeight() const { return tree_height_; }
-  bool IsBalanced() const { return is_tree_balanced_; }
+  const Node& root() const { return root_; }
+  Node* mutable_root() { return &root_; }
+  Player acting_player() const { return player_; }
+  int tree_height() const { return tree_height_; }
+  bool is_balanced() const { return is_tree_balanced_; }
 
   // Makes sure that all tree leaves are at the same height.
   // It inserts a linked list of dummy observation nodes with appropriate length
@@ -279,11 +279,11 @@ class CFRNode : public InfostateNode</*Self=*/CFRNode> {
           terminal_utility, terminal_chn_reach_prob, originating_state)  {
     SPIEL_DCHECK_TRUE(
         !(originating_state && type == kDecisionInfostateNode)
-            || originating_state->IsPlayerActing(tree.GetPlayer()));
+            || originating_state->IsPlayerActing(tree.acting_player()));
     if (originating_state) {
       if (type_ == kDecisionInfostateNode) {
         values_ = CFRInfoStateValues(
-            originating_state->LegalActions(tree.GetPlayer()));
+            originating_state->LegalActions(tree.acting_player()));
       }
       if (type_ == kTerminalInfostateNode) {
         terminal_history_ = originating_state->History();

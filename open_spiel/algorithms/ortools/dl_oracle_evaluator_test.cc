@@ -45,18 +45,18 @@ void TestOptimalValuesKuhnBettingPublicState() {
   // as when writing this test.
   const std::array<std::vector<const CFRNode*>, 2>& leaf_nodes =
       oracle_state->public_state.leaf_nodes;
-  SPIEL_CHECK_EQ(leaf_nodes[0][0]->InfostateString(), "0b");
-  SPIEL_CHECK_EQ(leaf_nodes[0][1]->InfostateString(), "1b");
-  SPIEL_CHECK_EQ(leaf_nodes[0][2]->InfostateString(), "2b");
+  SPIEL_CHECK_EQ(leaf_nodes[0][0]->infostate_string(), "0b");
+  SPIEL_CHECK_EQ(leaf_nodes[0][1]->infostate_string(), "1b");
+  SPIEL_CHECK_EQ(leaf_nodes[0][2]->infostate_string(), "2b");
   const int PL0_J = 0;
   const int PL0_Q = 1;
   const int PL0_K = 2;
   // This does not follow an intuitive order, because of the way how the tree
   // is constructed: we recurse through dealing card 0 to player 0, and player 1
   // receives cards 1 or 2, so we also build those infostates first.
-  SPIEL_CHECK_EQ(leaf_nodes[1][0]->InfostateString(), "1b");
-  SPIEL_CHECK_EQ(leaf_nodes[1][1]->InfostateString(), "2b");
-  SPIEL_CHECK_EQ(leaf_nodes[1][2]->InfostateString(), "0b");
+  SPIEL_CHECK_EQ(leaf_nodes[1][0]->infostate_string(), "1b");
+  SPIEL_CHECK_EQ(leaf_nodes[1][1]->infostate_string(), "2b");
+  SPIEL_CHECK_EQ(leaf_nodes[1][2]->infostate_string(), "0b");
   const int PL1_J = 2;
   const int PL1_Q = 0;
   const int PL1_K = 1;

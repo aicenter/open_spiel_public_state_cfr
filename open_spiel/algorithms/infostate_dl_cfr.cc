@@ -34,8 +34,8 @@ DepthLimitedCFR::DepthLimitedCFR(
     leaf_evaluator_(std::move(leaf_evaluator)),
     terminal_evaluator_(std::move(terminal_evaluator)),
     player_ranges_({
-       std::vector<float>(trees_[0].Root().NumChildren(), 1.),
-       std::vector<float>(trees_[1].Root().NumChildren(), 1.)
+       std::vector<float>(trees_[0].root().NumChildren(), 1.),
+       std::vector<float>(trees_[1].root().NumChildren(), 1.)
     }),
     tracked_player_ranges_({ player_ranges_[0], player_ranges_[1] }) {
   SPIEL_CHECK_TRUE(terminal_evaluator_);
@@ -81,13 +81,13 @@ void FillStatesAndChanceRange(std::vector<const State*>* start_states,
   // It's enough to do this just through one player, as the other player
   // has just a permutation of these states.
   for (const CFRNode* cfr_node : start_nodes) {
-    SPIEL_CHECK_EQ(cfr_node->CorrespondingStates().size(),
-                   cfr_node->CorrespondingChanceReaches().size());
-    for (int i = 0; i < cfr_node->CorrespondingStates().size(); ++i) {
+    SPIEL_CHECK_EQ(cfr_node->corresponding_states().size(),
+                   cfr_node->corresponding_chance_reach_probs().size());
+    for (int i = 0; i < cfr_node->corresponding_states().size(); ++i) {
       start_states->push_back(
-          cfr_node->CorrespondingStates()[i].get());
+          cfr_node->corresponding_states()[i].get());
       chance_reach_probs->push_back(
-          cfr_node->CorrespondingChanceReaches()[i]);
+          cfr_node->corresponding_chance_reach_probs()[i]);
     }
   }
 }
@@ -126,9 +126,9 @@ void DepthLimitedCFR::PrepareLeafPublicStates() {
 //      const int tree_depth = propagators_[pl].depth_branching.size();
 //      SPIEL_CHECK_EQ(propagators_[pl].depth_branching[tree_depth - 2].back())
 
-      SPIEL_CHECK_FALSE(leaf_node->CorrespondingStates().empty());
+      SPIEL_CHECK_FALSE(leaf_node->corresponding_states().empty());
       const std::unique_ptr<State>& some_state =
-          leaf_node->CorrespondingStates()[0];
+          leaf_node->corresponding_states()[0];
       public_observation.SetFrom(*some_state, kDefaultPlayerId);
       SPIEL_DCHECK_TRUE(DoStatesProduceEqualPublicObservations(
           *leaf_node, public_observation.Tensor()));
@@ -171,7 +171,7 @@ bool DepthLimitedCFR::DoStatesProduceEqualPublicObservations(
   Observation public_observation(*game_, public_observer_);
 
   // Check that indeed all states produce the same public observations.
-  for (const std::unique_ptr<State>& state : node.CorrespondingStates()) {
+  for (const std::unique_ptr<State>& state : node.corresponding_states()) {
     public_observation.SetFrom(*state, kDefaultPlayerId);
     if (public_observation.Tensor() != expected_observation) return false;
   }
@@ -205,8 +205,8 @@ TerminalPublicState::TerminalPublicState(const LeafPublicState& state) {
     SPIEL_DCHECK_EQ(a->TerminalHistory(), b->TerminalHistory());
 
     const CFRNode const* leaf = leaf_nodes[0][i];
-    const double v = leaf->TerminalUtility();
-    const double chn = leaf->TerminalChanceReachProb();
+    const double v = leaf->terminal_utility();
+    const double chn = leaf->terminal_chance_reach_prob();
     utilities.push_back(v * chn);
     permutation.push_back(permutation_index);
   }
@@ -318,8 +318,8 @@ void DepthLimitedCFR::EvaluateLeaves() {
 std::unordered_map<std::string, CFRInfoStateValues const*>
 DepthLimitedCFR::InfoStateValuesPtrTable() const {
   std::unordered_map<std::string, CFRInfoStateValues const*> vec_ptable;
-  CollectInfostateLookupTable(trees_[0].Root(), &vec_ptable);
-  CollectInfostateLookupTable(trees_[1].Root(), &vec_ptable);
+  CollectInfostateLookupTable(trees_[0].root(), &vec_ptable);
+  CollectInfostateLookupTable(trees_[1].root(), &vec_ptable);
   return vec_ptable;
 }
 void DepthLimitedCFR::TrackPlayerRanges(
@@ -343,12 +343,12 @@ bool LeafPublicState::IsConsistent() const {
   std::unordered_set<History, absl::Hash<History>> state_histories;
   for (int pl = 0; pl < 2; ++pl) {
     for (const CFRNode* node : leaf_nodes[pl]) {
-      if (!node->IsLeafNode()) return false;
-      if (node->Tree().GetPlayer() != pl) return false;
-      if (node->Type() == kTerminalInfostateNode) num_terminals++;
+      if (!node->is_leaf_node()) return false;
+      if (node->tree().acting_player() != pl) return false;
+      if (node->type() == kTerminalInfostateNode) num_terminals++;
       else num_nonterminals++;
 
-      for (const std::unique_ptr<State>& state : node->CorrespondingStates()) {
+      for (const std::unique_ptr<State>& state : node->corresponding_states()) {
         const auto& h = state->History();
         if (pl == 0) {
           if (state_histories.find(h) != state_histories.end()) return false;
@@ -376,7 +376,7 @@ bool CheckChildPublicStateConsistency(
     for (int i = 0; i < roots[pl]->NumChildren(); ++i) {
       const CFRNode& actual = *roots[pl]->ChildAt(i);
       const CFRNode& expected = *leaf_state.leaf_nodes[pl][i];
-      SPIEL_CHECK_EQ(actual.InfostateString(), expected.InfostateString());
+      SPIEL_CHECK_EQ(actual.infostate_string(), expected.infostate_string());
     }
   }
   return true;

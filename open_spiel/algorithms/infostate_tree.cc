@@ -20,9 +20,9 @@ namespace algorithms {
 void CollectInfostateLookupTable(
     const CFRNode& node,
     std::unordered_map<std::string, const CFRInfoStateValues*>* out) {
-  if (node.IsLeafNode()) return;
-  if (node.Type() == kDecisionInfostateNode) {
-    (*out)[node.InfostateString()] = &node.values();
+  if (node.is_leaf_node()) return;
+  if (node.type() == kDecisionInfostateNode) {
+    (*out)[node.infostate_string()] = &node.values();
   }
   for (const CFRNode& child : node.child_iterator()) {
     CollectInfostateLookupTable(child, out);

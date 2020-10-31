@@ -36,52 +36,52 @@ InfostateNode<Self>::InfostateNode(
   // Implications for kObservationNode
   SPIEL_DCHECK_TRUE(
       !(type == kObservationInfostateNode && parent
-          && parent->Type() == kDecisionInfostateNode)
+          && parent->type() == kDecisionInfostateNode)
           || (incoming_index >= 0
-              && incoming_index < parent->LegalActions().size())
+              && incoming_index < parent->legal_actions().size())
   );
 
   if (type == kDecisionInfostateNode) {
-    legal_actions_ = originating_state->LegalActions(tree_.GetPlayer());
+    legal_actions_ = originating_state->LegalActions(tree_.acting_player());
   }
 }
 
 template<class Self>
-const std::string& InfostateNode<Self>::InfostateString() const {
+const std::string& InfostateNode<Self>::infostate_string() const {
   // Avoid working with empty infostate strings.
-  // Use HasInfostateString() first to check.
-  SPIEL_DCHECK_TRUE(HasInfostateString());
+  // Use Hasinfostate_string() first to check.
+  SPIEL_DCHECK_TRUE(has_infostate_string());
   return infostate_string_;
 }
 
 template<class Self>
-bool InfostateNode<Self>::HasInfostateString() const {
+bool InfostateNode<Self>::has_infostate_string() const {
   return infostate_string_ != kFillerInfostate
       && infostate_string_ != kDummyRootNodeInfostate;
 }
 template<class Self>
-double InfostateNode<Self>::TerminalUtility() const {
+double InfostateNode<Self>::terminal_utility() const {
   SPIEL_CHECK_EQ(type_, kTerminalInfostateNode);
   return terminal_utility_;
 }
 template<class Self>
-double InfostateNode<Self>::TerminalChanceReachProb() const {
+double InfostateNode<Self>::terminal_chance_reach_prob() const {
   SPIEL_CHECK_EQ(type_, kTerminalInfostateNode);
   return terminal_chn_reach_prob_;
 }
 template<class Self>
-absl::Span<const Action> InfostateNode<Self>::LegalActions() const {
+absl::Span<const Action> InfostateNode<Self>::legal_actions() const {
   SPIEL_CHECK_EQ(type_, kDecisionInfostateNode);
   return absl::MakeSpan(legal_actions_);
 }
 template<class Self>
 const std::vector<std::unique_ptr<State>>&
-InfostateNode<Self>::CorrespondingStates() const {
+InfostateNode<Self>::corresponding_states() const {
   return corresponding_states_;
 }
 template<class Self>
 const std::vector<double>&
-InfostateNode<Self>::CorrespondingChanceReaches() const {
+InfostateNode<Self>::corresponding_chance_reach_probs() const {
   return corresponding_ch_reaches_;
 }
 template<class Self>
@@ -93,7 +93,7 @@ Self* InfostateNode<Self>::AddChild(std::unique_ptr<Self> child) {
 template<class Self>
 Self* InfostateNode<Self>::GetChild(const std::string& infostate_string) const {
   for (const std::unique_ptr<Self>& child : children_) {
-    if (child->InfostateString() == infostate_string) return child.get();
+    if (child->infostate_string() == infostate_string) return child.get();
   }
   return nullptr;
 }
@@ -142,16 +142,16 @@ std::string InfostateNode<Self>::ComputeCertificate() const {
 template<class Self>
 void InfostateNode<Self>::Rebalance(int target_depth, int current_depth) {
   SPIEL_DCHECK_LE(current_depth, target_depth);
-  if (IsLeafNode() && target_depth != current_depth) {
+  if (is_leaf_node() && target_depth != current_depth) {
     // Prepare the chain of dummy observations.
     std::unique_ptr<Self> node = Release();
-    Self* node_parent = node->Parent();
-    int position_in_leaf_parent = node->IncomingIndex();
+    Self* node_parent = node->parent();
+    int position_in_leaf_parent = node->incoming_index();
     std::unique_ptr<Self> chain_head =
         std::unique_ptr<Self>(new Self(
             /*tree=*/tree_, /*parent=*/nullptr,
             /*incoming_index=*/position_in_leaf_parent,
-                     kObservationInfostateNode,
+            kObservationInfostateNode,
             /*infostate_string=*/kFillerInfostate, /*terminal_utility=*/NAN,
             /*terminal_ch_reach_prob=*/NAN, /*originating_state=*/nullptr));
     Self* chain_tail = chain_head.get();
@@ -209,7 +209,7 @@ InfostateTree<Node>::InfostateTree(const Game& game, Player acting_player,
   std::unique_ptr<State> root_state = game.NewInitialState();
   RecursivelyBuildTree(&root_, /*depth=*/1, *root_state,
                        max_move_limit, /*chance_reach_prob=*/1.);
-  if (make_balanced && !IsBalanced()) Rebalance();
+  if (make_balanced && !is_balanced()) Rebalance();
 }
 
 template<class Node>
@@ -239,11 +239,11 @@ InfostateTree<Node>::InfostateTree(
         start_max_move_number + max_move_ahead_limit,
         chance_reach_probs[i]);
   }
-  if (make_balanced && !IsBalanced()) Rebalance();
+  if (make_balanced && !is_balanced()) Rebalance();
 }
 template<class Node>
 void InfostateTree<Node>::Rebalance() {
-  root_.Rebalance(TreeHeight(), 0);
+  root_.Rebalance(tree_height(), 0);
   is_tree_balanced_ = true;
 }
 
@@ -252,31 +252,31 @@ InfostateTree<Node>::LeavesIterator::LeavesIterator(const InfostateTree* tree,
                                                     const Node* current)
     : tree_(tree), current_(current) {
   SPIEL_CHECK_TRUE(current_);
-  SPIEL_CHECK_TRUE(current_->IsLeafNode() || current_->IsRootNode());
+  SPIEL_CHECK_TRUE(current_->is_leaf_node() || current_->is_root_node());
 }
 template<class Node>
 typename InfostateTree<Node>::LeavesIterator&
 InfostateTree<Node>::LeavesIterator::operator++() {
-  if (!current_->Parent())
+  if (!current_->parent())
     SpielFatalError("All leaves have been iterated!");
-  SPIEL_CHECK_TRUE(current_->IsLeafNode());
+  SPIEL_CHECK_TRUE(current_->is_leaf_node());
   int child_idx;
   do {  // Find some parent that was not fully traversed.
-    SPIEL_DCHECK_LT(current_->IncomingIndex(),
-                    current_->Parent()->NumChildren());
-    SPIEL_DCHECK_EQ(current_->Parent()->ChildAt(current_->IncomingIndex()),
+    SPIEL_DCHECK_LT(current_->incoming_index(),
+                    current_->parent()->NumChildren());
+    SPIEL_DCHECK_EQ(current_->parent()->ChildAt(current_->incoming_index()),
                     current_);
-    child_idx = current_->IncomingIndex();
-    current_ = current_->Parent();
-  } while (current_->Parent()
+    child_idx = current_->incoming_index();
+    current_ = current_->parent();
+  } while (current_->parent()
       && child_idx + 1 == current_->NumChildren());
   // We traversed the whole tree and we got the root node.
-  if (!current_->Parent() && child_idx + 1 == current_->NumChildren())
+  if (!current_->parent() && child_idx + 1 == current_->NumChildren())
     return *this;
   // Choose the next sibling node.
   current_ = current_->ChildAt(child_idx + 1);
   // Find the first leaf.
-  while (!current_->IsLeafNode()) {
+  while (!current_->is_leaf_node()) {
     current_ = current_->ChildAt(0);
   }
   return *this;
@@ -299,14 +299,14 @@ InfostateTree<Node>::LeavesIterator::begin() const { return *this; }
 template<class Node>
 typename InfostateTree<Node>::LeavesIterator
 InfostateTree<Node>::LeavesIterator::end() const {
-  return LeavesIterator(tree_, &(current_->Tree().Root()));
+  return LeavesIterator(tree_, &(current_->tree().root()));
 }
 template<class Node>
 typename InfostateTree<Node>::LeavesIterator
 InfostateTree<Node>::leaves_iterator() const {
   // Find the first leaf.
   const Node* node = &root_;
-  while (!node->IsLeafNode()) node = node->ChildAt(0);
+  while (!node->is_leaf_node()) node = node->ChildAt(0);
   return LeavesIterator(this, node);
 }
 template<class Node>
@@ -326,12 +326,12 @@ template<class Node>
 void InfostateTree<Node>::PrintStats() {
   std::cout << "Infostate tree for player " << player_ << ".\n"
             << "Tree height: " << tree_height_ << "\n"
-            << "Root branching: " << Root().NumChildren() << "\n"
+            << "Root branching: " << root().NumChildren() << "\n"
             << "Number of leaves: " << CountLeaves() << "\n"
             << "Number of leaf corresponding states: "
             << CountLeafCorrespondingHistories() << "\n"
             << "Tree certificate: " << std::endl;
-  std::cout << Root().ComputeCertificate() << std::endl;
+  std::cout << root().ComputeCertificate() << std::endl;
 }
 
 template<class Node>
@@ -391,7 +391,7 @@ template<class Node>
 void InfostateTree<Node>::BuildDecisionNode(
     Node* parent, int depth, const State& state,
     int move_limit, double chance_reach_prob) {
-  SPIEL_DCHECK_EQ(parent->Type(), kObservationInfostateNode);
+  SPIEL_DCHECK_EQ(parent->type(), kObservationInfostateNode);
   std::string info_state = infostate_observer_->StringFrom(state, player_);
   Node* decision_node = parent->GetChild(info_state);
   const bool is_leaf_node = state.MoveNumber() >= move_limit;
@@ -400,7 +400,7 @@ void InfostateTree<Node>::BuildDecisionNode(
     // The decision node has been already constructed along with children
     // for each action: these are observation nodes.
     // Fetches the observation child and goes deeper recursively.
-    SPIEL_DCHECK_EQ(decision_node->Type(), kDecisionInfostateNode);
+    SPIEL_DCHECK_EQ(decision_node->type(), kDecisionInfostateNode);
 
     if (is_leaf_node)  // Do not build deeper.
       return UpdateLeafNode(decision_node, state, depth, chance_reach_prob);
@@ -409,7 +409,7 @@ void InfostateTree<Node>::BuildDecisionNode(
       const ActionView action_view(state);
       for (int i = 0; i < action_view.legal_actions[player_].size(); ++i) {
         Node* observation_node = decision_node->ChildAt(i);
-        SPIEL_DCHECK_EQ(observation_node->Type(),
+        SPIEL_DCHECK_EQ(observation_node->type(),
                         kObservationInfostateNode);
 
         for (Action flat_actions : action_view.fixed_action(player_, i)) {
@@ -422,7 +422,7 @@ void InfostateTree<Node>::BuildDecisionNode(
       std::vector<Action> legal_actions = state.LegalActions(player_);
       for (int i = 0; i < legal_actions.size(); ++i) {
         Node* observation_node = decision_node->ChildAt(i);
-        SPIEL_DCHECK_EQ(observation_node->Type(),
+        SPIEL_DCHECK_EQ(observation_node->type(),
                         kObservationInfostateNode);
         std::unique_ptr<State> child = state.Child(legal_actions.at(i));
         RecursivelyBuildTree(observation_node, depth + 2, *child,
@@ -493,7 +493,7 @@ void InfostateTree<Node>::BuildObservationNode(
         parent, kObservationInfostateNode, info_state,
         /*terminal_utility=*/NAN, /*chance_reach_prob=*/NAN, &state));
   }
-  SPIEL_DCHECK_EQ(observation_node->Type(), kObservationInfostateNode);
+  SPIEL_DCHECK_EQ(observation_node->type(), kObservationInfostateNode);
 
   if (is_leaf_node)  // Do not build deeper.
     return UpdateLeafNode(observation_node, state, depth, chance_reach_prob);

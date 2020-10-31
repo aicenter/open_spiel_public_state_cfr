@@ -65,7 +65,7 @@ void InfostateTreeValuePropagator::TopDown() {
       const int num_children = nodes_at_depth[d - 1][parent_idx]->NumChildren();
       right_offset -= num_children;
       CFRNode& node = *(nodes_at_depth[d - 1][parent_idx]);
-      if (node.Type() == kDecisionInfostateNode) {
+      if (node.type() == kDecisionInfostateNode) {
         const std::vector<double>& policy = node->current_policy;
         const std::vector<double>& regrets = node->cumulative_regrets;
         std::vector<double>& avg_policy = node->cumulative_policy;
@@ -82,7 +82,7 @@ void InfostateTreeValuePropagator::TopDown() {
         }
 
       } else {
-        SPIEL_DCHECK_EQ(node.Type(), kObservationInfostateNode);
+        SPIEL_DCHECK_EQ(node.type(), kObservationInfostateNode);
         // Copy only the reach probs.
         for (int i = 0; i < num_children; i++) {
           reach_probs[right_offset + i] = current_reach;
@@ -111,7 +111,7 @@ void InfostateTreeValuePropagator::BottomUp() {
       CFRNode& node = *(nodes_at_depth[d][parent_idx]);
       const int num_children = node.NumChildren();
       double node_sum = 0.;
-      if (node.Type() == kDecisionInfostateNode) {
+      if (node.type() == kDecisionInfostateNode) {
         std::vector<double>& regrets = node->cumulative_regrets;
         std::vector<double>& policy = node->current_policy;
         SPIEL_DCHECK_EQ(policy.size(), num_children);
@@ -142,7 +142,7 @@ void InfostateTreeValuePropagator::BottomUp() {
           }
         }
       } else {
-        SPIEL_DCHECK_EQ(node.Type(), kObservationInfostateNode);
+        SPIEL_DCHECK_EQ(node.type(), kObservationInfostateNode);
         // Just sum the child values, no policy weighing is needed.
         for (int i = 0; i < num_children; i++) {
           node_sum += cf_values[left_offset + i];
@@ -166,9 +166,9 @@ void InfostateTreeValuePropagator::CollectTreeStructure(
 }
 InfostateTreeValuePropagator::InfostateTreeValuePropagator(
     CFRTree* balanced_tree) {
-  SPIEL_DCHECK_TRUE(balanced_tree->IsBalanced());
-  nodes_at_depth.resize(balanced_tree->TreeHeight() + 1);
-  CollectTreeStructure(balanced_tree->MutableRoot(), 0, &nodes_at_depth);
+  SPIEL_DCHECK_TRUE(balanced_tree->is_balanced());
+  nodes_at_depth.resize(balanced_tree->tree_height() + 1);
+  CollectTreeStructure(balanced_tree->mutable_root(), 0, &nodes_at_depth);
 
   const int max_nodes_across_depths = nodes_at_depth.back().size();
   cf_values = std::vector<float>(max_nodes_across_depths);
@@ -274,8 +274,8 @@ void InfostateCFR::EvaluateLeaves(Player pl) {
 std::unordered_map<std::string, const CFRInfoStateValues*>
 InfostateCFR::InfoStateValuesPtrTable() const {
   std::unordered_map<std::string, const CFRInfoStateValues*> vec_ptable;
-  CollectInfostateLookupTable(trees_[0].Root(), &vec_ptable);
-  CollectInfostateLookupTable(trees_[1].Root(), &vec_ptable);
+  CollectInfostateLookupTable(trees_[0].root(), &vec_ptable);
+  CollectInfostateLookupTable(trees_[1].root(), &vec_ptable);
   return vec_ptable;
 }
 void InfostateCFR::PrepareTerminals() {
@@ -298,15 +298,15 @@ void InfostateCFR::PrepareTerminals() {
   for (int i = 0; i < num_terminals; ++i) {
     // This CFR variant works only with leaf nodes being terminal nodes.
     const CFRNode* const a = leaves_a[i];
-    SPIEL_CHECK_TRUE(a->Type() == kTerminalInfostateNode);
+    SPIEL_CHECK_TRUE(a->type() == kTerminalInfostateNode);
     const int permutation_index = player1_map.at(a->TerminalHistory());
     const CFRNode* const b = leaves_b[permutation_index];
-    SPIEL_CHECK_TRUE(b->Type() == kTerminalInfostateNode);
+    SPIEL_CHECK_TRUE(b->type() == kTerminalInfostateNode);
     SPIEL_DCHECK_EQ(a->TerminalHistory(), b->TerminalHistory());
 
     const CFRNode* const leaf = leaves_a[i];
-    const double v = leaf->TerminalUtility();
-    const double chn = leaf->TerminalChanceReachProb();
+    const double v = leaf->terminal_utility();
+    const double chn = leaf->terminal_chance_reach_prob();
     terminal_values_.push_back(v * chn);
     terminal_ch_reaches_.push_back(chn);
     terminal_permutation_.push_back(permutation_index);

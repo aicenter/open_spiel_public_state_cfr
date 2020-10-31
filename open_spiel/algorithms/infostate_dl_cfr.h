@@ -68,7 +68,7 @@ struct LeafPublicState {
   // Check if the public state is terminal, i.e. it contains only states
   // that satisfy `State::IsTerminal()`.
   bool IsTerminal() const {
-    return leaf_nodes[0][0]->Type() == kTerminalInfostateNode;
+    return leaf_nodes[0][0]->type() == kTerminalInfostateNode;
   }
   // Debugging check: makes sure that the call to IsTerminal() is correct.
   bool IsConsistent() const;
@@ -146,7 +146,7 @@ class DepthLimitedCFR {
   void EvaluateLeaves();
 
   std::array<const CFRNode*, 2> Roots() const {
-    return { &trees_[0].Root(), &trees_[1].Root() };
+    return {&trees_[0].root(), &trees_[1].root() };
   }
   float RootCfValue() const {
     return propagators_[0].RootCfValue(tracked_player_ranges_[0]);

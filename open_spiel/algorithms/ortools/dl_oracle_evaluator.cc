@@ -57,12 +57,12 @@ std::array<absl::Span<const float>, 2> OracleEvaluator::EvaluatePublicState(
     for (int i = 0; i < leaf_nodes[1 - pl].size(); ++i) {
       const CFRNode* cfr_node = leaf_nodes[1 - pl][i];
       const double opponent_prob = ranges[1 - pl][i];
-      SPIEL_DCHECK_TRUE(cfr_node->IsLeafNode());
-      SPIEL_CHECK_EQ(cfr_node->CorrespondingStates().size(),
-                     cfr_node->CorrespondingChanceReaches().size());
-      for (int j = 0; j < cfr_node->CorrespondingStates().size(); ++j) {
-        const State* state = cfr_node->CorrespondingStates()[j].get();
-        const double chn_prob = cfr_node->CorrespondingChanceReaches()[j];
+      SPIEL_DCHECK_TRUE(cfr_node->is_leaf_node());
+      SPIEL_CHECK_EQ(cfr_node->corresponding_states().size(),
+                     cfr_node->corresponding_chance_reach_probs().size());
+      for (int j = 0; j < cfr_node->corresponding_states().size(); ++j) {
+        const State* state = cfr_node->corresponding_states()[j].get();
+        const double chn_prob = cfr_node->corresponding_chance_reach_probs()[j];
         history_ranges[state->HistoryString()][1 - pl] = opponent_prob;
 
         start_states.push_back(state);
@@ -90,9 +90,9 @@ std::array<absl::Span<const float>, 2> OracleEvaluator::EvaluatePublicState(
     for (int i = 0; i < leaf_nodes[pl].size(); ++i) {
       const CFRNode* cfr_node = leaf_nodes[pl][i];
       double infostate_value = 0.;
-      for (int j = 0; j < cfr_node->CorrespondingStates().size(); ++j) {
-        const State* state = cfr_node->CorrespondingStates()[j].get();
-        const double chn_prob = cfr_node->CorrespondingChanceReaches()[j];
+      for (int j = 0; j < cfr_node->corresponding_states().size(); ++j) {
+        const State* state = cfr_node->corresponding_states()[j].get();
+        const double chn_prob = cfr_node->corresponding_chance_reach_probs()[j];
         const double opponent_prob = history_ranges[state->HistoryString()][1 - pl];
         const double state_utility = ExpectedReturns(
             *state, policy_profile, /*depth_limit=*/-1)[pl];
