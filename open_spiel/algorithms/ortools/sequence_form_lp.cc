@@ -283,17 +283,17 @@ void SolveForPlayer(
 void CollectTabularPolicy(TabularPolicy* policy, const SolverNode& node) {
   if (node.type() == kDecisionInfostateNode) {
     absl::Span<const Action> actions = node.legal_actions();
-    SPIEL_CHECK_EQ(actions.size(), node.NumChildren());
+    SPIEL_CHECK_EQ(actions.size(), node.num_children());
     ActionsAndProbs state_policy;
-    state_policy.reserve(node.NumChildren());
+    state_policy.reserve(node.num_children());
     double rp_sum = 0.;
     for (int i = 0; i < actions.size(); ++i) {
-      rp_sum += node.ChildAt(i)->sol_reach_prob_;
+      rp_sum += node.child_at(i)->sol_reach_prob_;
     }
     for (int i = 0; i < actions.size(); ++i) {
       double prob;
       if (rp_sum) {
-        prob = node.ChildAt(i)->sol_reach_prob_ / rp_sum;
+        prob = node.child_at(i)->sol_reach_prob_ / rp_sum;
       } else {
         // If the infostate is unreachable, the strategy is not defined.
         // However some code in the library may require having the strategy,

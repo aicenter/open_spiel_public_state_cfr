@@ -99,14 +99,14 @@ class InfostateNode {
   bool has_infostate_string() const;
   double terminal_utility() const;
   double terminal_chance_reach_prob() const;
-  absl::Span<const Action> legal_actions() const;
+  const std::vector<Action>& legal_actions() const;
   const std::vector<std::unique_ptr<State>>& corresponding_states() const;
   const std::vector<double>& corresponding_chance_reach_probs() const;
 
+  Self* child_at(int i) const { return children_.at(i).get(); }
+  int num_children() const { return children_.size(); }
   Self* AddChild(std::unique_ptr<Self> child);
   Self* GetChild(const std::string& infostate_string) const;
-  Self* ChildAt(int i) const { return children_.at(i).get(); }
-  int NumChildren() const { return children_.size(); }
   const Self* FindNode(const std::string& infostate_lookup) const;
 
   // Intended only for debug purposes.
@@ -268,7 +268,7 @@ using CFRTree = InfostateTree<CFRNode>;
 
 class CFRNode : public InfostateNode</*Self=*/CFRNode> {
  public:
-  CFRInfoStateValues values_;  // TODO: use just floats.
+  CFRInfoStateValues values_;
   std::vector<Action> terminal_history_;
   CFRNode(const CFRTree& tree, CFRNode* parent, int incoming_index,
           InfostateNodeType type, const std::string& infostate_string,
@@ -301,13 +301,9 @@ class CFRNode : public InfostateNode</*Self=*/CFRNode> {
     SPIEL_CHECK_EQ(type_, kDecisionInfostateNode);
     return values_;
   }
-  CFRInfoStateValues& values() {
-    SPIEL_CHECK_EQ(type_, kDecisionInfostateNode);
-    return values_;
-  }
-  absl::Span<const Action> TerminalHistory() const {
+  const std::vector<Action>& TerminalHistory() const {
     SPIEL_DCHECK_EQ(type_, kTerminalInfostateNode);
-    return absl::MakeSpan(terminal_history_);
+    return terminal_history_;
   }
 };
 

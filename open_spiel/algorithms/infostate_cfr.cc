@@ -62,7 +62,7 @@ void InfostateTreeValuePropagator::TopDown() {
     for (int parent_idx = nodes_at_depth[d - 1].size() - 1;
          parent_idx >= 0; parent_idx--) {
       const float current_reach = reach_probs[parent_idx];
-      const int num_children = nodes_at_depth[d - 1][parent_idx]->NumChildren();
+      const int num_children = nodes_at_depth[d - 1][parent_idx]->num_children();
       right_offset -= num_children;
       CFRNode& node = *(nodes_at_depth[d - 1][parent_idx]);
       if (node.type() == kDecisionInfostateNode) {
@@ -109,7 +109,7 @@ void InfostateTreeValuePropagator::BottomUp() {
     for (int parent_idx = 0; parent_idx < nodes_at_depth[d].size();
          parent_idx++) {
       CFRNode& node = *(nodes_at_depth[d][parent_idx]);
-      const int num_children = node.NumChildren();
+      const int num_children = node.num_children();
       double node_sum = 0.;
       if (node.type() == kDecisionInfostateNode) {
         std::vector<double>& regrets = node->cumulative_regrets;

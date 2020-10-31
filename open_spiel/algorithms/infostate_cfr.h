@@ -94,7 +94,7 @@ class InfostateTreeValuePropagator {
 
   // Return the branching factor of the root node.
   int RootBranchingFactor() const {
-    return nodes_at_depth[0][0]->NumChildren();
+    return nodes_at_depth[0][0]->num_children();
   }
   // Return root reach probabilities.
   absl::Span<float> RootChildrenReachProbs() {

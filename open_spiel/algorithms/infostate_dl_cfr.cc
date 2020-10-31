@@ -34,8 +34,8 @@ DepthLimitedCFR::DepthLimitedCFR(
     leaf_evaluator_(std::move(leaf_evaluator)),
     terminal_evaluator_(std::move(terminal_evaluator)),
     player_ranges_({
-       std::vector<float>(trees_[0].root().NumChildren(), 1.),
-       std::vector<float>(trees_[1].root().NumChildren(), 1.)
+       std::vector<float>(trees_[0].root().num_children(), 1.),
+       std::vector<float>(trees_[1].root().num_children(), 1.)
     }),
     tracked_player_ranges_({ player_ranges_[0], player_ranges_[1] }) {
   SPIEL_CHECK_TRUE(terminal_evaluator_);
@@ -372,9 +372,9 @@ bool CheckChildPublicStateConsistency(
     const CFRPublicState& cfr_public_state, const LeafPublicState& leaf_state) {
   std::array<const CFRNode*, 2> roots = cfr_public_state.dlcfr->Roots();
   for (int pl = 0; pl < 2; ++pl) {
-    SPIEL_CHECK_EQ(leaf_state.leaf_nodes[pl].size(), roots[pl]->NumChildren());
-    for (int i = 0; i < roots[pl]->NumChildren(); ++i) {
-      const CFRNode& actual = *roots[pl]->ChildAt(i);
+    SPIEL_CHECK_EQ(leaf_state.leaf_nodes[pl].size(), roots[pl]->num_children());
+    for (int i = 0; i < roots[pl]->num_children(); ++i) {
+      const CFRNode& actual = *roots[pl]->child_at(i);
       const CFRNode& expected = *leaf_state.leaf_nodes[pl][i];
       SPIEL_CHECK_EQ(actual.infostate_string(), expected.infostate_string());
     }
