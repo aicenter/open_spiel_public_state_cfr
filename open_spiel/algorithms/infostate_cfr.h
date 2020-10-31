@@ -55,26 +55,31 @@
 namespace open_spiel {
 namespace algorithms {
 
-// A helper struct that allows to propagate reach probs / cf values
-// up and down the tree.
-struct InfostateTreeValuePropagator {
-  // Tree and the tree structure information. These must not change!
-  // TODO: make some const kung-fu so we can't modify these after construction.
-  /*const*/ std::unique_ptr<CFRTree> tree;
-  /*const*/ std::vector<std::vector<CFRNode*>> nodes_at_depth;
-
-  // Mutable values to keep track of.
-  std::vector<float> reach_probs;
-  std::vector<float> cf_values;
+// A helper class that allows to propagate reach probs / cf values
+// up and down the tree. It modifies the contents of CFRInfoStateValues saved
+// in the supplied tree to save the player's regrets and strategy.
+// To operate more efficiently, it caches the pointers to nodes at each depth.
+// The tree structure must not change in order for this class to work properly!
+class InfostateTreeValuePropagator {
+  // Tree structure information.
+  std::vector<std::vector<CFRNode*>> nodes_at_depth;
 
   static void CollectTreeStructure(
       CFRNode* node, int depth,
       std::vector<std::vector<CFRNode*>>* nodes_at_depth);
 
  public:
+  // Mutable values to keep track of.
+  std::vector<float> reach_probs;
+  std::vector<float> cf_values;
+
   // Construct the value propagator, so we can use vectorized top-down
   // and bottom-up passes.
-  InfostateTreeValuePropagator(std::unique_ptr<CFRTree> t);
+  // We require the tree is balanced: we need to make sure that all terminals
+  // are at the same depth so that we can propagate the computation of reach
+  // probs / cf values in a single vector. This requirement is typically
+  // satisfied by most domains already during the tree construction anyway.
+  InfostateTreeValuePropagator(CFRTree* balanced_tree);
 
   // Make a top-down pass, using the current policy stored in the tree nodes.
   // This computes the reach_probs_ buffer for storing cumulative product
@@ -88,16 +93,30 @@ struct InfostateTreeValuePropagator {
   void BottomUp();
 
   // Return the branching factor of the root node.
-  int RootBranchingFactor() const;
-
-  // Return writeable-only root reach probabilities.
-  absl::Span<float> RootChildrenReachProbs();
-  // Return view-only root counterfactual values.
-  absl::Span<const float> RootChildrenCfValues() const;
+  int RootBranchingFactor() const {
+    return nodes_at_depth[0][0]->NumChildren();
+  }
+  // Return root reach probabilities.
+  absl::Span<float> RootChildrenReachProbs() {
+    return absl::MakeSpan(/*ptr=*/&reach_probs[0],
+                          /*size=*/RootBranchingFactor());
+  }
+  // Return root counterfactual values.
+  absl::Span<const float> RootChildrenCfValues() const {
+    return absl::MakeSpan(/*ptr=*/&cf_values[0],
+                          /*size=*/RootBranchingFactor());
+  }
   // Return the root cf value as weighted sum of root children values and ranges
   // over them. If the supplied range is empty, it returns their sum
   // (all weights = 1)
   float RootCfValue(absl::Span<const float> root_children_range = {}) const;
+
+  // Return cached pointers to leaf nodes of the CFR tree. Unlike the
+  // CFRTree::leaves_iterator(), this does not need to recursively traverse
+  // the tree.
+  const std::vector<CFRNode*>& LeafNodes() const {
+    return nodes_at_depth.back();
+  }
 };
 
 class InfostateCFR {
@@ -109,6 +128,9 @@ class InfostateCFR {
   InfostateCFR(absl::Span<const State*> start_states,
                absl::Span<const float> chance_reach_probs,
                const std::shared_ptr<Observer>& infostate_observer);
+
+  // Run CFR on specified trees.
+  InfostateCFR(std::array<CFRTree, 2> cfr_trees);
 
   void RunSimultaneousIterations(int iterations);
   void RunAlternatingIterations(int iterations);
@@ -142,6 +164,7 @@ class InfostateCFR {
   }
 
  private:
+  std::array<CFRTree, 2> trees_;
   std::array<InfostateTreeValuePropagator, 2> propagators_;
   // Map from player 1 index (key) to player 0 (value).
   std::vector<int> terminal_permutation_;

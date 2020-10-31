@@ -21,22 +21,38 @@ namespace algorithms {
 namespace dlcfr {
 
 DepthLimitedCFR::DepthLimitedCFR(
-    std::shared_ptr<const Game> game, int max_depth_limit,
+    std::shared_ptr<const Game> game,
+    std::array<CFRTree, 2> trees,
     std::shared_ptr<const LeafEvaluator> leaf_evaluator,
-    std::shared_ptr<const LeafEvaluator> terminal_evaluator
+    std::shared_ptr<const LeafEvaluator> terminal_evaluator,
+    std::shared_ptr<Observer> public_observer
 ) :
     game_(std::move(game)),
-    public_observer_(std::move(game_->MakeObserver(kPublicStateObsType, {}))),
+    trees_(std::move(trees)),
+    propagators_({&trees_[0], &trees_[1]}),
+    public_observer_(std::move(public_observer)),
     leaf_evaluator_(std::move(leaf_evaluator)),
     terminal_evaluator_(std::move(terminal_evaluator)),
-    propagators_({std::make_unique<CFRTree>(*game_, 0, max_depth_limit),
-                  std::make_unique<CFRTree>(*game_, 1, max_depth_limit)}),
-    player_ranges_({std::vector<float>{1.}, std::vector<float>{1.}}),
+    player_ranges_({
+       std::vector<float>(trees_[0].Root().NumChildren(), 1.),
+       std::vector<float>(trees_[1].Root().NumChildren(), 1.)
+    }),
     tracked_player_ranges_({ player_ranges_[0], player_ranges_[1] }) {
   SPIEL_CHECK_TRUE(terminal_evaluator_);
   PrepareLeafPublicStates();
   EncodePublicStates();
 }
+
+DepthLimitedCFR::DepthLimitedCFR(
+    std::shared_ptr<const Game> game, int max_depth_limit,
+    std::shared_ptr<const LeafEvaluator> leaf_evaluator,
+    std::shared_ptr<const LeafEvaluator> terminal_evaluator
+) : DepthLimitedCFR(game,
+                    { CFRTree(*game, 0, max_depth_limit),
+                      CFRTree(*game, 1, max_depth_limit) },
+                    std::move(leaf_evaluator),
+                    std::move(terminal_evaluator),
+                    game->MakeObserver(kPublicStateObsType, {})) {}
 
 DepthLimitedCFR::DepthLimitedCFR(
     std::shared_ptr<const Game> game,
@@ -47,53 +63,16 @@ DepthLimitedCFR::DepthLimitedCFR(
     std::shared_ptr<const LeafEvaluator> terminal_evaluator,
     std::shared_ptr<Observer> public_observer,
     const std::shared_ptr<Observer>& infostate_observer
-) :
-    game_(std::move(game)),
-    public_observer_(std::move(public_observer)),
-    leaf_evaluator_(std::move(leaf_evaluator)),
-    terminal_evaluator_(std::move(terminal_evaluator)),
-    propagators_({
-      std::make_unique<CFRTree>(start_states, chance_reach_probs,
-                                infostate_observer, /*acting_player=*/0,
-                                max_move_limit),
-      std::make_unique<CFRTree>(start_states, chance_reach_probs,
-                                infostate_observer, /*acting_player=*/1,
-                                max_move_limit)
-    }),
-    player_ranges_({
-      std::vector<float>(propagators_[0].RootBranchingFactor(), 1.),
-      std::vector<float>(propagators_[1].RootBranchingFactor(), 1.)
-    }),
-    tracked_player_ranges_({ player_ranges_[0], player_ranges_[1] }) {
-  SPIEL_CHECK_TRUE(terminal_evaluator_);
-  PrepareLeafPublicStates();
-  EncodePublicStates();
-}
+) : DepthLimitedCFR(std::move(game),
+                    { CFRTree(start_states, chance_reach_probs,
+                              infostate_observer, /*acting_player=*/0,
+                              max_move_limit),
+                      CFRTree(start_states, chance_reach_probs,
+                              infostate_observer, /*acting_player=*/1,
+                              max_move_limit) },
+                    std::move(leaf_evaluator), std::move(terminal_evaluator),
+                    std::move(public_observer)) {}
 
-DepthLimitedCFR::DepthLimitedCFR(
-    std::shared_ptr<const Game> game,
-    std::array<absl::Span<const CFRNode* const>, 2> start_nodes,
-    int max_move_limit,
-    std::shared_ptr<const LeafEvaluator> leaf_evaluator,
-    std::shared_ptr<const LeafEvaluator> terminal_evaluator,
-    std::shared_ptr<Observer> public_observer,
-    const std::shared_ptr<Observer>& infostate_observer
-) :
-    game_(std::move(game)),
-    public_observer_(std::move(public_observer)),
-    leaf_evaluator_(std::move(leaf_evaluator)),
-    terminal_evaluator_(std::move(terminal_evaluator)),
-    propagators_(
-        CreatePropagators(start_nodes, infostate_observer, max_move_limit)),
-    player_ranges_({
-      std::vector<float>(propagators_[0].RootBranchingFactor(), 1.),
-      std::vector<float>(propagators_[1].RootBranchingFactor(), 1.)
-    }),
-    tracked_player_ranges_({ player_ranges_[0], player_ranges_[1] }) {
-  SPIEL_CHECK_TRUE(terminal_evaluator_);
-  PrepareLeafPublicStates();
-  EncodePublicStates();
-}
 
 void FillStatesAndChanceRange(std::vector<const State*>* start_states,
                               std::vector<float>* chance_reach_probs,
@@ -113,7 +92,7 @@ void FillStatesAndChanceRange(std::vector<const State*>* start_states,
   }
 }
 
-std::array<InfostateTreeValuePropagator, 2> DepthLimitedCFR::CreatePropagators(
+std::array<CFRTree, 2> CreateTrees(
     std::array<absl::Span<const CFRNode* const>, 2> start_nodes,
     const std::shared_ptr<Observer>& infostate_observer,
     int max_move_limit) {
@@ -126,14 +105,12 @@ std::array<InfostateTreeValuePropagator, 2> DepthLimitedCFR::CreatePropagators(
                            start_nodes[1]);
 
   return {
-      std::make_unique<CFRTree>(
-          absl::MakeSpan(start_states[0]),
-          absl::MakeSpan(chance_reach_probs[0]),
-          infostate_observer, /*acting_player=*/0, max_move_limit),
-      std::make_unique<CFRTree>(
-          absl::MakeSpan(start_states[1]),
-          absl::MakeSpan(chance_reach_probs[1]),
-          infostate_observer, /*acting_player=*/1, max_move_limit)
+      CFRTree(absl::MakeSpan(start_states[0]),
+              absl::MakeSpan(chance_reach_probs[0]),
+              infostate_observer, /*acting_player=*/0, max_move_limit),
+      CFRTree(absl::MakeSpan(start_states[1]),
+              absl::MakeSpan(chance_reach_probs[1]),
+              infostate_observer, /*acting_player=*/1, max_move_limit)
   };
 }
 
@@ -142,22 +119,22 @@ void DepthLimitedCFR::PrepareLeafPublicStates() {
 
   for (int pl = 0; pl < 2; ++pl) {
     int leaf_position = 0;
-    for (const CFRNode& leaf_node : propagators_[pl].tree->leaves_iterator()) {
+    for (CFRNode* leaf_node : propagators_[pl].LeafNodes()) {
 // TODO: common parent branching invariant
 //      // The tree is balanced, therefore we should be iterating over leaves
 //      // in an ordered fashion.
 //      const int tree_depth = propagators_[pl].depth_branching.size();
 //      SPIEL_CHECK_EQ(propagators_[pl].depth_branching[tree_depth - 2].back())
 
-      SPIEL_CHECK_FALSE(leaf_node.CorrespondingStates().empty());
+      SPIEL_CHECK_FALSE(leaf_node->CorrespondingStates().empty());
       const std::unique_ptr<State>& some_state =
-          leaf_node.CorrespondingStates()[0];
+          leaf_node->CorrespondingStates()[0];
       public_observation.SetFrom(*some_state, kDefaultPlayerId);
       SPIEL_DCHECK_TRUE(DoStatesProduceEqualPublicObservations(
-          leaf_node, public_observation.Tensor()));
+          *leaf_node, public_observation.Tensor()));
       LeafPublicState* leaf_state = GetPublicLeaf(public_observation.Tensor());
-      leaf_state->leaf_nodes[pl].push_back(&leaf_node);
-      leaf_positions_[&leaf_node] = leaf_position;
+      leaf_state->leaf_nodes[pl].push_back(leaf_node);
+      leaf_positions_[leaf_node] = leaf_position;
       leaf_position++;
     }
 
@@ -341,8 +318,8 @@ void DepthLimitedCFR::EvaluateLeaves() {
 std::unordered_map<std::string, CFRInfoStateValues const*>
 DepthLimitedCFR::InfoStateValuesPtrTable() const {
   std::unordered_map<std::string, CFRInfoStateValues const*> vec_ptable;
-  CollectInfostateLookupTable(propagators_[0].tree->Root(), &vec_ptable);
-  CollectInfostateLookupTable(propagators_[1].tree->Root(), &vec_ptable);
+  CollectInfostateLookupTable(trees_[0].Root(), &vec_ptable);
+  CollectInfostateLookupTable(trees_[1].Root(), &vec_ptable);
   return vec_ptable;
 }
 void DepthLimitedCFR::TrackPlayerRanges(
@@ -350,7 +327,8 @@ void DepthLimitedCFR::TrackPlayerRanges(
   tracked_player_ranges_ = track_source;
 }
 
-std::array<absl::Span<const float>, 2> DepthLimitedCFR::RootChildrenCfValues() const {
+std::array<absl::Span<const float>, 2>
+DepthLimitedCFR::RootChildrenCfValues() const {
   return {propagators_[0].RootChildrenCfValues()
          , propagators_[1].RootChildrenCfValues() };
 }
@@ -392,7 +370,7 @@ bool LeafPublicState::IsConsistent() const {
 
 bool CheckChildPublicStateConsistency(
     const CFRPublicState& cfr_public_state, const LeafPublicState& leaf_state) {
-  std::array<const CFRNode*, 2> roots = cfr_public_state.dlcfr.Roots();
+  std::array<const CFRNode*, 2> roots = cfr_public_state.dlcfr->Roots();
   for (int pl = 0; pl < 2; ++pl) {
     SPIEL_CHECK_EQ(leaf_state.leaf_nodes[pl].size(), roots[pl]->NumChildren());
     for (int i = 0; i < roots[pl]->NumChildren(); ++i) {
@@ -407,11 +385,11 @@ bool CheckChildPublicStateConsistency(
 std::unique_ptr<EncodedPublicState> CFREvaluator::EncodeLeafPublicState(
     const LeafPublicState& leaf_state) const {
 
-  auto cfr_public_state = std::make_unique<CFRPublicState>(
-      DepthLimitedCFR(
-          game, {leaf_state.leaf_nodes[0], leaf_state.leaf_nodes[1]},
-          depth_limit, leaf_evaluator, terminal_evaluator,
-          public_observer, infostate_observer));
+  auto dlcfr = std::make_unique<DepthLimitedCFR>(
+      game, CreateTrees({leaf_state.leaf_nodes[0], leaf_state.leaf_nodes[1]},
+                        infostate_observer, depth_limit),
+      leaf_evaluator, terminal_evaluator, public_observer);
+  auto cfr_public_state = std::make_unique<CFRPublicState>(std::move(dlcfr));
   SPIEL_DCHECK_TRUE(
       CheckChildPublicStateConsistency(*cfr_public_state, leaf_state));
   return cfr_public_state;
@@ -421,9 +399,9 @@ std::array<absl::Span<const float>, 2> CFREvaluator::EvaluatePublicState(
     EncodedPublicState* public_state,
     std::array<absl::Span<const float>, 2> ranges) const {
   auto* cfr_state = open_spiel::down_cast<CFRPublicState*>(public_state);
-  cfr_state->dlcfr.TrackPlayerRanges(ranges);
-  cfr_state->dlcfr.RunSimultaneousIterations(num_cfr_iterations);
-  return cfr_state->dlcfr.RootChildrenCfValues();
+  cfr_state->dlcfr->TrackPlayerRanges(ranges);
+  cfr_state->dlcfr->RunSimultaneousIterations(num_cfr_iterations);
+  return cfr_state->dlcfr->RootChildrenCfValues();
 }
 
 }  // namespace dlcfr

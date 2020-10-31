@@ -40,7 +40,7 @@ std::unique_ptr<CFRTree> MakeTree(const std::string& game_name,
                                   Player player_id,
                                   int max_move_limit = 1000) {
   return std::make_unique<CFRTree>(*LoadGame(game_name), player_id,
-                                   max_move_limit);
+                                   max_move_limit, /*make_balanced=*/false);
 }
 
 std::unique_ptr<CFRTree> MakeTree(
@@ -63,7 +63,7 @@ std::unique_ptr<CFRTree> MakeTree(
 
   return std::make_unique<CFRTree>(
       absl::MakeSpan(start_state_ptrs), absl::MakeSpan(start_reaches),
-      infostate_observer, player_id, max_move_limit);
+      infostate_observer, player_id, max_move_limit, /*make_balanced=*/false);
 }
 
 bool IsNodeBalanced(const CFRNode& node, int height, int current_depth = 0) {

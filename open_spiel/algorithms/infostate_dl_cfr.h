@@ -118,6 +118,10 @@ std::shared_ptr<LeafEvaluator> MakeTerminalEvaluator();
 
 class DepthLimitedCFR {
  public:
+  DepthLimitedCFR(std::shared_ptr<const Game> game, int depth_limit,
+                  std::shared_ptr<const LeafEvaluator> leaf_evaluator,
+                  std::shared_ptr<const LeafEvaluator> terminal_evaluator);
+
   DepthLimitedCFR(std::shared_ptr<const Game> game,
                   absl::Span<const State*> start_states,
                   absl::Span<const float> chance_reach_probs,
@@ -128,17 +132,10 @@ class DepthLimitedCFR {
                   const std::shared_ptr<Observer>& infostate_observer);
 
   DepthLimitedCFR(std::shared_ptr<const Game> game,
-                  std::array<absl::Span<const CFRNode* const>, 2> start_nodes,
-                  int max_move_limit,
+                  std::array<CFRTree, 2> trees,
                   std::shared_ptr<const LeafEvaluator> leaf_evaluator,
                   std::shared_ptr<const LeafEvaluator> terminal_evaluator,
-                  std::shared_ptr<Observer> public_observer,
-                  const std::shared_ptr<Observer>& infostate_observer);
-
-
-  DepthLimitedCFR(std::shared_ptr<const Game> game, int depth_limit,
-                  std::shared_ptr<const LeafEvaluator> leaf_evaluator,
-                  std::shared_ptr<const LeafEvaluator> terminal_evaluator);
+                  std::shared_ptr<Observer> public_observer);
 
   void TrackPlayerRanges(std::array<absl::Span<const float>, 2> track_source);
   std::array<absl::Span<const float>, 2> RootChildrenCfValues() const;
@@ -149,7 +146,7 @@ class DepthLimitedCFR {
   void EvaluateLeaves();
 
   std::array<const CFRNode*, 2> Roots() const {
-    return { &propagators_[0].tree->Root(), &propagators_[1].tree->Root()};
+    return { &trees_[0].Root(), &trees_[1].Root() };
   }
   float RootCfValue() const {
     return propagators_[0].RootCfValue(tracked_player_ranges_[0]);
@@ -163,11 +160,12 @@ class DepthLimitedCFR {
 
  private:
   const std::shared_ptr<const Game> game_;
+  std::array<CFRTree, 2> trees_;
+  std::array<InfostateTreeValuePropagator, 2> propagators_;
   const std::shared_ptr<Observer> public_observer_;
   const std::shared_ptr<const LeafEvaluator> leaf_evaluator_;
   const std::shared_ptr<const LeafEvaluator> terminal_evaluator_;
 
-  std::array<InfostateTreeValuePropagator, 2> propagators_;
   // Propagators need to have top-most reach probs updated externally.
   // We do that via tracked_player_ranges_, which represents an arbitrary span:
   // These could be reach probs of the parent subgame. However, tracking is not
@@ -188,19 +186,15 @@ class DepthLimitedCFR {
   // Internal checks.
   bool DoStatesProduceEqualPublicObservations(
       const CFRNode& node, absl::Span<float> expected_observation);
-
-  std::array<InfostateTreeValuePropagator, 2> CreatePropagators(
-      std::array<absl::Span<const CFRNode* const>, 2> start_nodes,
-      const std::shared_ptr<Observer>& infostate_observer,
-      int max_move_limit);
 };
 
 
 // -- CFR evaluator ------------------------------------------------------------
 
 struct CFRPublicState : public EncodedPublicState {
-  DepthLimitedCFR dlcfr;
-  explicit CFRPublicState(DepthLimitedCFR d) : dlcfr(std::move(d)) {};
+  std::unique_ptr<DepthLimitedCFR> dlcfr;
+  explicit CFRPublicState(std::unique_ptr<DepthLimitedCFR> d)
+      : dlcfr(std::move(d)) {};
 };
 
 struct CFREvaluator : public LeafEvaluator {
