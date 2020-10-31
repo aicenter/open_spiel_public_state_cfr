@@ -294,11 +294,10 @@ void DepthLimitedCFR::EvaluateLeaves() {
   }
 }
 
-std::unordered_map<std::string, CFRInfoStateValues const*>
-DepthLimitedCFR::InfoStateValuesPtrTable() const {
-  std::unordered_map<std::string, CFRInfoStateValues const*> vec_ptable;
-  CollectInfostateLookupTable(trees_[0].root(), &vec_ptable);
-  CollectInfostateLookupTable(trees_[1].root(), &vec_ptable);
+CFRInfoStateValuesPtrTable DepthLimitedCFR::InfoStateValuesPtrTable() {
+  CFRInfoStateValuesPtrTable vec_ptable;
+  CollectInfostateLookupTable(trees_[0].mutable_root(), &vec_ptable);
+  CollectInfostateLookupTable(trees_[1].mutable_root(), &vec_ptable);
   return vec_ptable;
 }
 void DepthLimitedCFR::TrackPlayerRanges(

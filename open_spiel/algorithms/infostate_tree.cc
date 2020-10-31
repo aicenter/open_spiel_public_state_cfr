@@ -17,15 +17,14 @@
 namespace open_spiel {
 namespace algorithms {
 
-void CollectInfostateLookupTable(
-    const CFRNode& node,
-    std::unordered_map<std::string, const CFRInfoStateValues*>* out) {
-  if (node.is_leaf_node()) return;
-  if (node.type() == kDecisionInfostateNode) {
-    (*out)[node.infostate_string()] = &node.values();
+void CollectInfostateLookupTable(CFRNode* node,
+                                 CFRInfoStateValuesPtrTable* out) {
+  if (node->is_leaf_node()) return;
+  if (node->type() == kDecisionInfostateNode) {
+    (*out)[node->infostate_string()] = &node->values();
   }
-  for (const CFRNode& child : node.child_iterator()) {
-    CollectInfostateLookupTable(child, out);
+  for (CFRNode& child : node->child_iterator()) {
+    CollectInfostateLookupTable(&child, out);
   }
 }
 
@@ -54,8 +53,11 @@ CFRInfoStateValues* CFRNode::operator->() {
   SPIEL_CHECK_EQ(type_, kDecisionInfostateNode);
   return &values_;
 }
-
 const CFRInfoStateValues& CFRNode::values() const {
+  SPIEL_CHECK_EQ(type_, kDecisionInfostateNode);
+  return values_;
+}
+CFRInfoStateValues& CFRNode::values() {
   SPIEL_CHECK_EQ(type_, kDecisionInfostateNode);
   return values_;
 }

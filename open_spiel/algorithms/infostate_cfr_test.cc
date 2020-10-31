@@ -126,10 +126,8 @@ void TestImplementationsHaveSameIterations() {
                                   /*linear_averaging=*/false,
                                   /*regret_matching_plus=*/false);
 
-  std::unordered_map<std::string, const CFRInfoStateValues*> vec_ptable =
-      vec_solver.InfoStateValuesPtrTable();
-  std::unordered_map<std::string, CFRInfoStateValues>& str_table =
-      str_solver.InfoStateValuesTable();
+  CFRInfoStateValuesPtrTable vec_ptable = vec_solver.InfoStateValuesPtrTable();
+  CFRInfoStateValuesTable & str_table = str_solver.InfoStateValuesTable();
   SPIEL_CHECK_EQ(vec_ptable.size(), str_table.size());
 
   for (int i = 0; i < cfr_iterations; ++i) {

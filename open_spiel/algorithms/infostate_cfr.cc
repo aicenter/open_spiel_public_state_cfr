@@ -23,38 +23,32 @@ namespace {
 // Make sure we can get the average policy to compute expected values
 // and exploitability.
 class InfostateCFRAveragePolicy : public Policy {
-  const std::unordered_map<
-      std::string, CFRInfoStateValues const*> infostate_ptr_table_;
+  const CFRInfoStateValuesPtrTable infostate_ptr_table_;
  public:
-  InfostateCFRAveragePolicy(const InfostateCFR& cfr);
-  ActionsAndProbs GetStatePolicy(const std::string& info_state) const override;
-};
-
-InfostateCFRAveragePolicy::InfostateCFRAveragePolicy(const InfostateCFR& cfr)
-    : infostate_ptr_table_(cfr.InfoStateValuesPtrTable()) {}
-
-ActionsAndProbs InfostateCFRAveragePolicy::GetStatePolicy(
-    const std::string& info_state) const {
-  const CFRInfoStateValues& vs = *infostate_ptr_table_.at(info_state);
-  float sum_prob = 0.0;
-  for (int i = 0; i < vs.num_actions(); ++i) {
-    sum_prob += vs.cumulative_policy[i];
-  }
-
-  ActionsAndProbs out;
-  out.reserve(vs.num_actions());
-  for (int i = 0; i < vs.num_actions(); ++i) {
-    if (sum_prob > 0) {
-      out.push_back({vs.legal_actions[i],
-                     vs.cumulative_policy[i] / sum_prob});
-    } else {
-      // Return a uniform policy at this node
-      out.push_back({vs.legal_actions[i],
-                     vs.cumulative_policy[i] / vs.num_actions()});
+  InfostateCFRAveragePolicy(const CFRInfoStateValuesPtrTable& ptable)
+      : infostate_ptr_table_(ptable) {}
+  ActionsAndProbs GetStatePolicy(const std::string& info_state) const override {
+    const CFRInfoStateValues& vs = *infostate_ptr_table_.at(info_state);
+    float sum_prob = 0.0;
+    for (int i = 0; i < vs.num_actions(); ++i) {
+      sum_prob += vs.cumulative_policy[i];
     }
+
+    ActionsAndProbs out;
+    out.reserve(vs.num_actions());
+    for (int i = 0; i < vs.num_actions(); ++i) {
+      if (sum_prob > 0) {
+        out.push_back({vs.legal_actions[i],
+                       vs.cumulative_policy[i] / sum_prob});
+      } else {
+        // Return a uniform policy at this node
+        out.push_back({vs.legal_actions[i],
+                       vs.cumulative_policy[i] / vs.num_actions()});
+      }
+    }
+    return out;
   }
-  return out;
-}
+};
 
 void CollectTreeStructure(
     CFRNode* node, int depth,
@@ -283,11 +277,10 @@ void InfostateCFR::EvaluateLeaves(Player pl) {
     }
   }
 }
-std::unordered_map<std::string, const CFRInfoStateValues*>
-InfostateCFR::InfoStateValuesPtrTable() const {
-  std::unordered_map<std::string, const CFRInfoStateValues*> vec_ptable;
-  CollectInfostateLookupTable(trees_[0].root(), &vec_ptable);
-  CollectInfostateLookupTable(trees_[1].root(), &vec_ptable);
+CFRInfoStateValuesPtrTable InfostateCFR::InfoStateValuesPtrTable() {
+  CFRInfoStateValuesPtrTable vec_ptable;
+  CollectInfostateLookupTable(trees_[0].mutable_root(), &vec_ptable);
+  CollectInfostateLookupTable(trees_[1].mutable_root(), &vec_ptable);
   return vec_ptable;
 }
 void InfostateCFR::PrepareTerminals() {
@@ -344,8 +337,8 @@ float InfostateCFR::TerminalReachProbSum() {
   return reach_sum;
 }
 
-std::shared_ptr<Policy> InfostateCFR::AveragePolicy() const {
-  return std::make_shared<InfostateCFRAveragePolicy>(*this);
+std::shared_ptr<Policy> InfostateCFR::AveragePolicy(){
+  return std::make_shared<InfostateCFRAveragePolicy>(InfoStateValuesPtrTable());
 }
 
 }  // namespace algorithms

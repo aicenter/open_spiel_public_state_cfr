@@ -143,8 +143,7 @@ class DepthLimitedCFR {
     return propagators_[0].RootCfValue(tracked_player_ranges_[0]);
   }
 
-  std::unordered_map<std::string, CFRInfoStateValues const*>
-    InfoStateValuesPtrTable() const;
+  CFRInfoStateValuesPtrTable InfoStateValuesPtrTable();
 
   const std::vector<std::unique_ptr<EncodedPublicState>>&
     GetEncodedLeaves() const { return encoded_leaves_; }

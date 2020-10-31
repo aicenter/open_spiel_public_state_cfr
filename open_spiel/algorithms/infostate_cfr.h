@@ -138,32 +138,34 @@ class InfostateCFR {
   void RunSimultaneousIterations(int iterations);
   void RunAlternatingIterations(int iterations);
 
-  void PrepareRootReachProbs();
-  void PrepareRootReachProbs(Player pl);
-  void EvaluateLeaves();
-  void EvaluateLeaves(Player pl);
-
-  float RootCfValue() const { return propagators_[0].RootCfValue(); }
+  // Computes the root value. If the algorithm is running on the full trees
+  // of the game, this converges to the game value.
+  float RootValue() const { return propagators_[0].RootCfValue(); }
 
   // Similarly to CFRSolver, expose the InfoStateValuesTable.
   // However, this table has pointers to the values, not the actual values,
   // because they are stored within the infostate tree.
-  std::unordered_map<std::string, const CFRInfoStateValues*>
-    InfoStateValuesPtrTable() const;
-  std::shared_ptr<Policy> AveragePolicy() const;
+  CFRInfoStateValuesPtrTable InfoStateValuesPtrTable();
+  std::shared_ptr<Policy> AveragePolicy();
 
  private:
+  void PrepareTerminals();
+  void PrepareRootReachProbs();
+  void PrepareRootReachProbs(Player pl);
+  void EvaluateLeaves();
+  void EvaluateLeaves(Player pl);
+  float TerminalReachProbSum();
+
+  // The trees which hold the strategies of the players.
   std::array<CFRTree, 2> trees_;
+  // The propagators that make the top-down bottom-up passed on each iteration.
   std::array<InfostateTreeValuePropagator, 2> propagators_;
-  // Map from player 1 index (key) to player 0 (value).
+  // Map from player 0 index (key) to player 1 (value).
   std::vector<int> terminal_permutation_;
   // Chance reach probs.
   std::vector<float> terminal_ch_reaches_;
   // For the player 0 and already multiplied by chance reach probs.
   std::vector<float> terminal_values_;
-
-  void PrepareTerminals();
-  float TerminalReachProbSum();
 };
 
 }  // namespace algorithms

@@ -279,15 +279,19 @@ class CFRNode : public InfostateNode</*Self=*/CFRNode> {
 
   // Provide a convenient operator to access the values.
   CFRInfoStateValues* operator->();
-  // Provide getter as well.
+  // Provide getters as well.
   const CFRInfoStateValues& values() const;
+  CFRInfoStateValues& values();
 
   const std::vector<Action>& TerminalHistory() const;
 };
 
-void CollectInfostateLookupTable(
-    const CFRNode& node,
-    std::unordered_map<std::string, const CFRInfoStateValues*>* out);
+// A type for tables holding pointers to CFR values.
+using CFRInfoStateValuesPtrTable =
+  std::unordered_map<std::string, CFRInfoStateValues*>;
+
+void CollectInfostateLookupTable(CFRNode* node,
+                                 CFRInfoStateValuesPtrTable* out);
 
 }  // namespace algorithms
 }  // namespace open_spiel
