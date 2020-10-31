@@ -111,8 +111,7 @@ InfostateNode<Self>::FindNode(const std::string& infostate_lookup) const {
 }
 template<class Self>
 std::string InfostateNode<Self>::ToString() const {
-  if (!parent_) return "";
-  if (!parent_->parent_) return std::to_string(incoming_index_);
+  if (!parent_) return "x";
   return absl::StrCat(parent_->ToString(), ",", incoming_index_);
 }
 template<class Self>
