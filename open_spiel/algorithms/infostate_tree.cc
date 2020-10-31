@@ -29,5 +29,41 @@ void CollectInfostateLookupTable(
   }
 }
 
+CFRNode::CFRNode(const CFRTree& tree, CFRNode* parent, int incoming_index,
+                 InfostateNodeType type, const std::string& infostate_string,
+                 double terminal_utility, double terminal_chn_reach_prob,
+                 const State* originating_state) :
+    InfostateNode<CFRNode>(
+        tree, parent, incoming_index, type, infostate_string,
+        terminal_utility, terminal_chn_reach_prob, originating_state)  {
+  SPIEL_DCHECK_TRUE(
+      !(originating_state && type == kDecisionInfostateNode)
+          || originating_state->IsPlayerActing(tree.acting_player()));
+  if (originating_state) {
+    if (type_ == kDecisionInfostateNode) {
+      values_ = CFRInfoStateValues(
+          originating_state->LegalActions(tree.acting_player()));
+    }
+    if (type_ == kTerminalInfostateNode) {
+      terminal_history_ = originating_state->History();
+    }
+  }
+}
+
+CFRInfoStateValues* CFRNode::operator->() {
+  SPIEL_CHECK_EQ(type_, kDecisionInfostateNode);
+  return &values_;
+}
+
+const CFRInfoStateValues& CFRNode::values() const {
+  SPIEL_CHECK_EQ(type_, kDecisionInfostateNode);
+  return values_;
+}
+
+const std::vector<Action>& CFRNode::TerminalHistory() const {
+  SPIEL_DCHECK_EQ(type_, kTerminalInfostateNode);
+  return terminal_history_;
+}
+
 }  // namespace algorithms
 }  // namespace open_spiel
