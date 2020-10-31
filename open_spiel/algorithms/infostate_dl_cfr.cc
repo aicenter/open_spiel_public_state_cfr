@@ -54,26 +54,6 @@ DepthLimitedCFR::DepthLimitedCFR(
                     std::move(terminal_evaluator),
                     game->MakeObserver(kPublicStateObsType, {})) {}
 
-DepthLimitedCFR::DepthLimitedCFR(
-    std::shared_ptr<const Game> game,
-    const std::vector<const State*>& start_states,
-    const std::vector<float>& chance_reach_probs,
-    int max_move_limit,
-    std::shared_ptr<const LeafEvaluator> leaf_evaluator,
-    std::shared_ptr<const LeafEvaluator> terminal_evaluator,
-    std::shared_ptr<Observer> public_observer,
-    const std::shared_ptr<Observer>& infostate_observer
-) : DepthLimitedCFR(std::move(game),
-                    { CFRTree(start_states, chance_reach_probs,
-                              infostate_observer, /*acting_player=*/0,
-                              max_move_limit),
-                      CFRTree(start_states, chance_reach_probs,
-                              infostate_observer, /*acting_player=*/1,
-                              max_move_limit) },
-                    std::move(leaf_evaluator), std::move(terminal_evaluator),
-                    std::move(public_observer)) {}
-
-
 void FillStatesAndChanceRange(std::vector<const State*>* start_states,
                               std::vector<float>* chance_reach_probs,
                               absl::Span<const CFRNode* const> start_nodes) {
