@@ -71,11 +71,8 @@ std::array<absl::Span<const float>, 2> OracleEvaluator::EvaluatePublicState(
     }
 
     solutions[pl] = ortools::SolveZeroSumSequentialGame(
-      infostate_observer,
-      absl::MakeSpan(start_states),
-      absl::MakeSpan(chance_range),
-      /*solve_only_player=*/pl,
-      /*collect_tabular_policy=*/true);
+      infostate_observer, start_states, chance_range,
+      /*solve_only_player=*/pl, /*collect_tabular_policy=*/true);
   }
   const std::vector<const Policy*>& policy_profile = {
       &solutions[0]->policy, &solutions[1]->policy

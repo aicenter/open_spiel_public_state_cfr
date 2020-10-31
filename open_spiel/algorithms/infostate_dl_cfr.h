@@ -123,8 +123,8 @@ class DepthLimitedCFR {
                   std::shared_ptr<const LeafEvaluator> terminal_evaluator);
 
   DepthLimitedCFR(std::shared_ptr<const Game> game,
-                  absl::Span<const State*> start_states,
-                  absl::Span<const float> chance_reach_probs,
+                  const std::vector<const State*>& start_states,
+                  const std::vector<float>& chance_reach_probs,
                   int max_move_limit,
                   std::shared_ptr<const LeafEvaluator> leaf_evaluator,
                   std::shared_ptr<const LeafEvaluator> terminal_evaluator,

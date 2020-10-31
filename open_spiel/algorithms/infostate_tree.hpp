@@ -214,8 +214,8 @@ InfostateTree<Node>::InfostateTree(const Game& game, Player acting_player,
 
 template<class Node>
 InfostateTree<Node>::InfostateTree(
-    absl::Span<const State*> start_states,
-    absl::Span<const float> chance_reach_probs,
+    const std::vector<const State*>& start_states,
+    const std::vector<float>& chance_reach_probs,
     std::shared_ptr<Observer> infostate_observer, Player acting_player,
     int max_move_ahead_limit, bool make_balanced)
     : player_(acting_player),

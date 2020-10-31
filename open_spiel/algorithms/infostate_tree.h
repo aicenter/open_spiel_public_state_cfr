@@ -193,8 +193,8 @@ class InfostateTree final {
   // Creates an infostate tree for a player based on some start states,
   // up to some move limit from the deepest start state.
   InfostateTree(
-      absl::Span<const State*> start_states,
-      absl::Span<const float> chance_reach_probs,
+      const std::vector<const State*>& start_states,
+      const std::vector<float>& chance_reach_probs,
       std::shared_ptr<Observer> infostate_observer, Player acting_player,
       int max_move_ahead_limit = 1000, bool make_balanced = true);
 

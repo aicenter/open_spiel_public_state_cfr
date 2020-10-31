@@ -125,8 +125,8 @@ class InfostateCFR {
   InfostateCFR(const Game& game);
 
   // Run CFR only at specific start states.
-  InfostateCFR(absl::Span<const State*> start_states,
-               absl::Span<const float> chance_reach_probs,
+  InfostateCFR(const std::vector<const State*>& start_states,
+               const std::vector<float>& chance_reach_probs,
                const std::shared_ptr<Observer>& infostate_observer);
 
   // Run CFR on specified trees.

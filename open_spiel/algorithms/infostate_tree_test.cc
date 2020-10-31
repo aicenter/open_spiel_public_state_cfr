@@ -62,8 +62,8 @@ std::unique_ptr<CFRTree> MakeTree(
       game->MakeObserver(kInfoStateObsType, {});
 
   return std::make_unique<CFRTree>(
-      absl::MakeSpan(start_state_ptrs), absl::MakeSpan(start_reaches),
-      infostate_observer, player_id, max_move_limit, /*make_balanced=*/false);
+      start_state_ptrs, start_reaches, infostate_observer,
+      player_id, max_move_limit, /*make_balanced=*/false);
 }
 
 bool IsNodeBalanced(const CFRNode& node, int height, int current_depth = 0) {

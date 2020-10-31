@@ -314,8 +314,8 @@ void CollectTabularPolicy(TabularPolicy* policy, const SolverNode& node) {
 
 std::unique_ptr<ZeroSumSequentialGameSolution> SolveZeroSumSequentialGame(
     std::shared_ptr<Observer> infostate_observer,
-    absl::Span<const State*> start_states,
-    absl::Span<const float> chance_range,
+    const std::vector<const State*>& start_states,
+    const std::vector<float>& chance_reach_probs,
     std::optional<int> solve_only_player,
     bool collect_tabular_policy) {
 
@@ -323,7 +323,7 @@ std::unique_ptr<ZeroSumSequentialGameSolution> SolveZeroSumSequentialGame(
   std::array<std::unique_ptr<SolverTree>, 2> solver_trees;
   for (int pl = 0; pl < 2; ++pl) {
     solver_trees[pl] = std::make_unique<SolverTree>(
-        start_states, chance_range, infostate_observer, pl);
+        start_states, chance_reach_probs, infostate_observer, pl);
   }
 
   // 2. Connect the terminals - now we can go from one tree to the other
@@ -368,11 +368,10 @@ std::unique_ptr<ZeroSumSequentialGameSolution> SolveZeroSumSequentialGame(
   std::unique_ptr<State> state = game.NewInitialState();
   std::vector<const State*> starting_states;
   starting_states.push_back(state.get());
-  std::vector<float> chance_range = {1.};
+  std::vector<float> chance_reach_probs = {1.};
 
   return SolveZeroSumSequentialGame(game.MakeObserver(kInfoStateObsType, {}),
-                                    absl::MakeSpan(starting_states),
-                                    absl::MakeSpan(chance_range));
+                                    starting_states, chance_reach_probs);
 }
 
 }  // namespace ortools

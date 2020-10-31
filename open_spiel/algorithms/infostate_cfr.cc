@@ -198,8 +198,8 @@ InfostateCFR::InfostateCFR(std::array<CFRTree, 2> cfr_trees)
 InfostateCFR::InfostateCFR(const Game& game)
     : InfostateCFR({CFRTree(game, 0), CFRTree(game, 1)}) {}
 InfostateCFR::InfostateCFR(
-    absl::Span<const State*> start_states,
-    absl::Span<const float> chance_reach_probs,
+    const std::vector<const State*>& start_states,
+    const std::vector<float>& chance_reach_probs,
     const std::shared_ptr<Observer>& infostate_observer)
   : InfostateCFR({
       CFRTree(start_states, chance_reach_probs, infostate_observer, 0),

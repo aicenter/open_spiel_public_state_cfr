@@ -58,8 +58,8 @@ std::unique_ptr<ZeroSumSequentialGameSolution> SolveZeroSumSequentialGame(
 //      https://arxiv.org/abs/1906.06412
 std::unique_ptr<ZeroSumSequentialGameSolution> SolveZeroSumSequentialGame(
     std::shared_ptr<Observer> infostate_observer,
-    absl::Span<const State*> starting_states,
-    absl::Span<const float> chance_range,
+    const std::vector<const State*>& start_states,
+    const std::vector<float>& chance_reach_probs,
     std::optional<int> solve_only_player = {},
     bool collect_tabular_policy = true);
 
