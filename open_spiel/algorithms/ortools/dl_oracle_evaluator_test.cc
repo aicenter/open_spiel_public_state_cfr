@@ -48,12 +48,18 @@ void TestOptimalValuesKuhnBettingPublicState() {
   SPIEL_CHECK_EQ(leaf_nodes[0][0]->InfostateString(), "0b");
   SPIEL_CHECK_EQ(leaf_nodes[0][1]->InfostateString(), "1b");
   SPIEL_CHECK_EQ(leaf_nodes[0][2]->InfostateString(), "2b");
+  const int PL0_J = 0;
+  const int PL0_Q = 1;
+  const int PL0_K = 2;
   // This does not follow an intuitive order, because of the way how the tree
   // is constructed: we recurse through dealing card 0 to player 0, and player 1
   // receives cards 1 or 2, so we also build those infostates first.
   SPIEL_CHECK_EQ(leaf_nodes[1][0]->InfostateString(), "1b");
   SPIEL_CHECK_EQ(leaf_nodes[1][1]->InfostateString(), "2b");
   SPIEL_CHECK_EQ(leaf_nodes[1][2]->InfostateString(), "0b");
+  const int PL1_J = 2;
+  const int PL1_Q = 0;
+  const int PL1_K = 1;
 
   // If the cf. values are computed with BR instead of CBR, the value function
   // does not return correct values for \alpha \in [0; 0.25)
@@ -63,7 +69,7 @@ void TestOptimalValuesKuhnBettingPublicState() {
 
   for (float alpha : test_parametrizations) {
     std::array<std::vector<float>, 2> ranges = {
-        // Player 0 bets with these probabilities when it has cards 0, 1 or 2.
+        // Player 0 bets with these probabilities when it has cards J, Q or K
         std::vector<float>({alpha, alpha, 1 - alpha}),
         // Player 1 did not act before this public state, so ranges are fixed.
         std::vector<float>({1., 1., 1.})
@@ -72,25 +78,21 @@ void TestOptimalValuesKuhnBettingPublicState() {
         leaf_evaluator->EvaluatePublicState(bet_state, {ranges[0], ranges[1]});
     if (alpha < 0.25) {
       // PL1 passes
-      SPIEL_CHECK_FLOAT_NEAR(values[0][0], -1 / 6., 1e-10);
-      SPIEL_CHECK_FLOAT_NEAR(values[0][2], 1 / 3., 1e-10);
+      SPIEL_CHECK_FLOAT_NEAR(values[0][PL0_J], -1 / 6., 1e-10);
+      SPIEL_CHECK_FLOAT_NEAR(values[0][PL0_K], 1 / 3., 1e-10);
     } else {
       // PL1 bets
-      SPIEL_CHECK_FLOAT_NEAR(values[0][0], -2 / 3., 1e-10);
-      SPIEL_CHECK_FLOAT_NEAR(values[0][2], 1 / 2., 1e-10);
+      SPIEL_CHECK_FLOAT_NEAR(values[0][PL0_J], -2 / 3., 1e-10);
+      SPIEL_CHECK_FLOAT_NEAR(values[0][PL0_K], 1 / 2., 1e-10);
     }
-    SPIEL_CHECK_FLOAT_NEAR(values[0][1], -1 / 6., 1e-10);
+    SPIEL_CHECK_FLOAT_NEAR(values[0][PL0_Q], -1 / 6., 1e-10);
 
-    // Be mindful of the ordering: index 0 is infostate 1b, see above.
-    const int is_J = 2;
-    const int is_Q = 0;
-    const int is_K = 1;
-    SPIEL_CHECK_FLOAT_NEAR(values[1][is_J], -1 / 6., 1e-6);
-    SPIEL_CHECK_FLOAT_NEAR(values[1][is_Q], std::fmax((2 * alpha - 1) / 3., -1/6.), 1e-6);
-    SPIEL_CHECK_FLOAT_NEAR(values[1][is_K], 2 * alpha / 3, 1e-6);
+    SPIEL_CHECK_FLOAT_NEAR(values[1][PL1_J], -1 / 6., 1e-6);
+    SPIEL_CHECK_FLOAT_NEAR(values[1][PL1_Q],
+        std::fmax((2 * alpha - 1) / 3., -1/6.), 1e-6);
+    SPIEL_CHECK_FLOAT_NEAR(values[1][PL1_K], 2 * alpha / 3, 1e-6);
   }
 }
-
 
 void TestValueOracle(const std::string& game_name) {
   std::shared_ptr<const Game> game = LoadGame(game_name);
@@ -110,7 +112,7 @@ void TestValueOracle(const std::string& game_name) {
 
     dlcfr::DepthLimitedCFR dl_solver(game, trunk_depth_limit,
                                      leaf_evaluator, terminal_evaluator);
-    dl_solver.RunSimultaneousIterations(10);
+    dl_solver.RunSimultaneousIterations(3);
   }
 }
 
