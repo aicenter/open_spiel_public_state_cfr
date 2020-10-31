@@ -43,7 +43,6 @@ ActionsAndProbs InfostateCFR::InfostateCFRAveragePolicy::GetStatePolicy(
 }
 
 void InfostateTreeValuePropagator::TopDown() {
-  SPIEL_CHECK_EQ(nodes_at_depth.size(), depth_branching.size());
   const int tree_depth = nodes_at_depth.size();
   // Loop over all depths, except for the first two depths:
   // - Depth 0: corresponds to the dummy observation node, which is used mainly
@@ -59,12 +58,11 @@ void InfostateTreeValuePropagator::TopDown() {
     // current reach. However, because the tree is balanced and the usage
     // of the buffer only monotically grows with depth, doing it in reverse we
     // do not overwrite the current reach prob.
-    SPIEL_DCHECK_EQ(depth_branching[d].size(), nodes_at_depth[d].size());
     int right_offset = nodes_at_depth[d].size();
     for (int parent_idx = nodes_at_depth[d - 1].size() - 1;
          parent_idx >= 0; parent_idx--) {
       const float current_reach = reach_probs[parent_idx];
-      const int num_children = depth_branching[d - 1][parent_idx];
+      const int num_children = nodes_at_depth[d - 1][parent_idx]->NumChildren();
       right_offset -= num_children;
       CFRNode& node = *(nodes_at_depth[d - 1][parent_idx]);
       if (node.Type() == kDecisionInfostateNode) {
@@ -96,7 +94,6 @@ void InfostateTreeValuePropagator::TopDown() {
   }
 }
 void InfostateTreeValuePropagator::BottomUp() {
-  SPIEL_CHECK_EQ(nodes_at_depth.size(), depth_branching.size());
   const int tree_depth = nodes_at_depth.size();
   // Loop over all depths, except for the last one, as it is already set
   // by calling the leaf evaluation.
@@ -109,11 +106,10 @@ void InfostateTreeValuePropagator::BottomUp() {
     // forward we do not overwrite the parent's node cf value.
     int left_offset = 0;
     // Loop over all parents of current nodes.
-    SPIEL_DCHECK_EQ(depth_branching[d].size(), nodes_at_depth[d].size());
     for (int parent_idx = 0; parent_idx < nodes_at_depth[d].size();
          parent_idx++) {
-      const int num_children = depth_branching[d][parent_idx];
       CFRNode& node = *(nodes_at_depth[d][parent_idx]);
+      const int num_children = node.NumChildren();
       double node_sum = 0.;
       if (node.Type() == kDecisionInfostateNode) {
         std::vector<double>& regrets = node->cumulative_regrets;
@@ -162,13 +158,11 @@ void InfostateTreeValuePropagator::BottomUp() {
 }
 void InfostateTreeValuePropagator::CollectTreeStructure(
     CFRNode* node, int depth,
-    std::vector<std::vector<int>>* depth_branching,
     std::vector<std::vector<CFRNode*>>* nodes_at_depth) {
-  (*depth_branching)[depth].push_back(node->NumChildren());
   (*nodes_at_depth)[depth].push_back(node);
 
   for (CFRNode& child : node->child_iterator())
-    CollectTreeStructure(&child, depth + 1, depth_branching, nodes_at_depth);
+    CollectTreeStructure(&child, depth + 1, nodes_at_depth);
 }
 InfostateTreeValuePropagator::InfostateTreeValuePropagator(
     std::unique_ptr<CFRTree> t) : tree(std::move(t)) {
@@ -178,18 +172,15 @@ InfostateTreeValuePropagator::InfostateTreeValuePropagator(
   // during the tree construction anyway.
   if (!tree->IsBalanced()) tree->Rebalance();
 
-  depth_branching.resize(tree->TreeHeight() + 1);
   nodes_at_depth.resize(tree->TreeHeight() + 1);
-  CollectTreeStructure(tree->MutableRoot(), 0,
-                       &depth_branching, &nodes_at_depth);
+  CollectTreeStructure(tree->MutableRoot(), 0, &nodes_at_depth);
 
   const int max_nodes_across_depths = nodes_at_depth.back().size();
   cf_values = std::vector<float>(max_nodes_across_depths);
   reach_probs = std::vector<float>(max_nodes_across_depths);
 }
 int InfostateTreeValuePropagator::RootBranchingFactor() const {
-  SPIEL_CHECK_EQ(depth_branching[0][0], tree->Root().NumChildren());
-  return depth_branching[0][0];
+  return tree->Root().NumChildren();
 }
 absl::Span<const float> InfostateTreeValuePropagator::RootChildrenCfValues() const {
   return absl::MakeSpan(/*ptr=*/&cf_values[0],

@@ -61,7 +61,6 @@ struct InfostateTreeValuePropagator {
   // Tree and the tree structure information. These must not change!
   // TODO: make some const kung-fu so we can't modify these after construction.
   /*const*/ std::unique_ptr<CFRTree> tree;
-  /*const*/ std::vector<std::vector<int>> depth_branching;
   /*const*/ std::vector<std::vector<CFRNode*>> nodes_at_depth;
 
   // Mutable values to keep track of.
@@ -70,7 +69,6 @@ struct InfostateTreeValuePropagator {
 
   static void CollectTreeStructure(
       CFRNode* node, int depth,
-      std::vector<std::vector<int>>* depth_branching,
       std::vector<std::vector<CFRNode*>>* nodes_at_depth);
 
  public:
