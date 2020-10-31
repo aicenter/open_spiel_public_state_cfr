@@ -111,8 +111,8 @@ class InfostateNode {
   InfostateNode(InfostateNode&&) = default;
   virtual ~InfostateNode() = default;
 
-  [[nodiscard]] const InfostateTree<Self>& Tree() const { return tree_; }
-  [[nodiscard]] Self* Parent() const { return parent_; }
+  const InfostateTree<Self>& Tree() const { return tree_; }
+  Self* Parent() const { return parent_; }
   int IncomingIndex() const { return incoming_index_; }
   const InfostateNodeType& Type() const { return type_; }
   bool IsLeafNode() const { return children_.empty(); }
@@ -145,20 +145,20 @@ class InfostateNode {
   const std::vector<double>& CorrespondingChanceReaches() const {
     return corresponding_ch_reaches_;
   }
-  [[nodiscard]] Self* AddChild(std::unique_ptr<Self> child) {
+  Self* AddChild(std::unique_ptr<Self> child) {
     SPIEL_CHECK_EQ(child->parent_, this);
     children_.push_back(std::move(child));
     return children_.back().get();
   }
-  [[nodiscard]] Self* GetChild(const std::string& infostate_string) const {
+  Self* GetChild(const std::string& infostate_string) const {
     for (const std::unique_ptr<Self>& child : children_) {
       if (child->InfostateString() == infostate_string) return child.get();
     }
     return nullptr;
   }
-  [[nodiscard]] Self* ChildAt(int i) const { return children_.at(i).get(); }
+  Self* ChildAt(int i) const { return children_.at(i).get(); }
   int NumChildren() const { return children_.size(); }
-  [[nodiscard]] const Self* FindNode(const std::string& infostate_lookup) const {
+  const Self* FindNode(const std::string& infostate_lookup) const {
     if (infostate_string_ == infostate_lookup)
       return open_spiel::down_cast<const Self*>(this);
     for (Self& child : *this) {
@@ -210,7 +210,7 @@ class InfostateNode {
     ChildIterator& operator++() { pos_++; return *this; }
     bool operator==(ChildIterator other) const { return pos_ == other.pos_; }
     bool operator!=(ChildIterator other) const { return !(*this == other); }
-    [[nodiscard]] Self& operator*() { return *children_[pos_]; }
+    Self& operator*() { return *children_[pos_]; }
     ChildIterator begin() const { return *this; }
     ChildIterator end() const {
       return ChildIterator(children_, children_.size());
@@ -363,8 +363,8 @@ class InfostateTree final {
     if (make_balanced && !IsBalanced()) Rebalance();
   }
 
-  [[nodiscard]] const Node& Root() const { return root_; }
-  [[nodiscard]] Node* MutableRoot() { return &root_; }
+  const Node& Root() const { return root_; }
+  Node* MutableRoot() { return &root_; }
   Player GetPlayer() const { return player_; }
   const Observer& GetObserver() const { return *infostate_observer_; }
   int TreeHeight() const { return tree_height_; }
@@ -372,7 +372,7 @@ class InfostateTree final {
 
   // Identify node that corresponds to this infostate string.
   // If the node is not found, returns a nullptr.
-  [[nodiscard]] const Node* FindNode(const std::string& infostate) const {
+  const Node* FindNode(const std::string& infostate) const {
     return root_.FindNode(infostate);
   }
 
@@ -423,7 +423,7 @@ class InfostateTree final {
       return current_ == other.current_;
     }
     bool operator!=(LeavesIterator other) const { return !(*this == other); }
-    [[nodiscard]] const Node& operator*() const { return *current_; }
+    const Node& operator*() const { return *current_; }
     LeavesIterator begin() const { return *this; }
     LeavesIterator end() const {
       return LeavesIterator(tree_, &(current_->Tree().Root()));
