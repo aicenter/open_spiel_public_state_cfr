@@ -149,7 +149,7 @@ class InfostateNode {
   void SwapParent(std::unique_ptr<Self> self, Self* target, int at_index);
 
  protected:
-  // Needed for adding corresponding_states_ during tree traversal.
+  // Needed for adding corresponding_states() during tree traversal.
   friend class InfostateTree<Self>;
 
   // Reference to the tree that this node belongs to. This reference has a valid
@@ -172,13 +172,15 @@ class InfostateNode {
   const std::string infostate_string_;
   // Utility of terminal state corresponding to a terminal infostate node.
   const double terminal_utility_;
+  // Cumulative product of chance probabilities leading up to a terminal node.
   const double terminal_chn_reach_prob_;
-  // Only for decision nodes.
+  // Stored only for decision nodes.
   std::vector<Action> legal_actions_;
   // Children infostate nodes. Notice the node owns its children.
   std::vector<std::unique_ptr<Self>> children_;
-  // Optionally store States that correspond to this infostate node.
+  // Store States that correspond to a leaf node.
   std::vector<std::unique_ptr<State>> corresponding_states_;
+  // Store chance reach probs for States that correspond to a leaf node.
   std::vector<double> corresponding_ch_reaches_;
 };
 
