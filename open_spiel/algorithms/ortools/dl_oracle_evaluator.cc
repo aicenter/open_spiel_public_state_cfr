@@ -46,7 +46,8 @@ std::array<absl::Span<const float>, 2> OracleEvaluator::EvaluatePublicState(
   const std::array<std::vector<const CFRNode*>, 2>& leaf_nodes =
       oracle_state->public_state.leaf_nodes;
 
-  std::array<ortools::ZeroSumSequentialGameSolution, 2> solutions;
+  std::array<std::unique_ptr<ortools::ZeroSumSequentialGameSolution>, 2>
+      solutions;
   std::unordered_map<std::string, std::array<float, 2>> history_ranges;
   for (int pl = 0; pl < 2; ++pl) {
     std::vector<const State*> start_states;
@@ -77,7 +78,7 @@ std::array<absl::Span<const float>, 2> OracleEvaluator::EvaluatePublicState(
       /*collect_tabular_policy=*/true);
   }
   const std::vector<const Policy*>& policy_profile = {
-      &solutions[0].policy, &solutions[1].policy
+      &solutions[0]->policy, &solutions[1]->policy
   };
 
   // Compute the root cfvs.

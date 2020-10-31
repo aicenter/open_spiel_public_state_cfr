@@ -312,7 +312,7 @@ void CollectTabularPolicy(TabularPolicy* policy, const SolverNode& node) {
 
 }  // namespace
 
-ZeroSumSequentialGameSolution SolveZeroSumSequentialGame(
+std::unique_ptr<ZeroSumSequentialGameSolution> SolveZeroSumSequentialGame(
     std::shared_ptr<Observer> infostate_observer,
     absl::Span<const State*> start_states,
     absl::Span<const float> chance_range,
@@ -347,23 +347,24 @@ ZeroSumSequentialGameSolution SolveZeroSumSequentialGame(
   }
 
   // 4. Collect the requested results.
-  ZeroSumSequentialGameSolution sol;
+  auto sol = std::make_unique<ZeroSumSequentialGameSolution>();
   // Always collect game value.
-  sol.game_value = solver_trees[0]->Root().sol_cf_value_;
+  sol->game_value = solver_trees[0]->Root().sol_cf_value_;
   if (collect_tabular_policy) {
     if (solve_only_player) {
       int pl = solve_only_player.value();
-      CollectTabularPolicy(&sol.policy, solver_trees[pl]->Root());
+      CollectTabularPolicy(&sol->policy, solver_trees[pl]->Root());
     } else {
       for (int pl = 0; pl < 2; ++pl) {
-        CollectTabularPolicy(&sol.policy, solver_trees[pl]->Root());
+        CollectTabularPolicy(&sol->policy, solver_trees[pl]->Root());
       }
     }
   }
   return sol;
 }
 
-ZeroSumSequentialGameSolution SolveZeroSumSequentialGame(const Game& game) {
+std::unique_ptr<ZeroSumSequentialGameSolution> SolveZeroSumSequentialGame(
+    const Game& game) {
   std::unique_ptr<State> state = game.NewInitialState();
   std::vector<const State*> starting_states;
   starting_states.push_back(state.get());

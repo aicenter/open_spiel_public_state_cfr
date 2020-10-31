@@ -27,48 +27,17 @@ constexpr double kErrorTolerance = 1e-14;
 void TestGameValueAndExploitability(const std::string& game_name,
                                     double expected_game_value) {
   std::shared_ptr<const Game> game = LoadGame(game_name);
-  ZeroSumSequentialGameSolution solution = SolveZeroSumSequentialGame(*game);
-  SPIEL_CHECK_FLOAT_NEAR(solution.game_value, expected_game_value,
+  std::unique_ptr<ZeroSumSequentialGameSolution> solution =
+      SolveZeroSumSequentialGame(*game);
+  SPIEL_CHECK_FLOAT_NEAR(solution->game_value, expected_game_value,
                          kErrorTolerance);
 
   if (game->GetType().dynamics == GameType::Dynamics::kSimultaneous)
     return;
-  SPIEL_CHECK_FLOAT_NEAR(Exploitability(*game, solution.policy), 0.,
+  SPIEL_CHECK_FLOAT_NEAR(Exploitability(*game, solution->policy), 0.,
                          kErrorTolerance);
 }
 
-void TestKuhnPokerRootCfvs() {
-  std::shared_ptr<const Game> game = LoadGame("kuhn_poker");
-  // Request the states after distributing a card to the first player.
-  std::unique_ptr<State> state = game->NewInitialState();
-  std::vector<const State*> starting_states;
-  std::unique_ptr<State> state_J = state->Child(0);
-  starting_states.push_back(state_J.get());
-  std::unique_ptr<State> state_Q = state->Child(1);
-  starting_states.push_back(state_Q.get());
-  std::unique_ptr<State> state_K = state->Child(2);
-  starting_states.push_back(state_K.get());
-  std::vector<float> chance_range = {1. / 3., 1. / 3., 1. / 3.};
-
-  ZeroSumSequentialGameSolution solution = SolveZeroSumSequentialGame(
-      game->MakeObserver(kInfoStateObsType, {}),
-      absl::MakeSpan(starting_states),
-      absl::MakeSpan(chance_range),
-      /*solve_only_player=*/{},
-      /*collect_tabular_policy=*/true,
-      /*collect_root_cfvs=*/true);
-
-  SPIEL_CHECK_FLOAT_NEAR(solution.game_value, -1 / 18., kErrorTolerance);
-  SPIEL_CHECK_FLOAT_NEAR(Exploitability(*game, solution.policy), 0.,
-                         kErrorTolerance);
-  // Check cf values of each individual subtree, i.e. after dealing a card
-  // for the player. Notice that these sum up to -1 / 18.
-  SPIEL_CHECK_FLOAT_NEAR(solution.root_cfvs[0]["0"], -1 / 3., kErrorTolerance);
-  SPIEL_CHECK_FLOAT_NEAR(solution.root_cfvs[0]["1"], -1 / 9., kErrorTolerance);
-  SPIEL_CHECK_FLOAT_NEAR(solution.root_cfvs[0]["2"], 7 / 18., kErrorTolerance);
-  // Second player didn't receive a card yet, so the utility is -game_value.
-  SPIEL_CHECK_FLOAT_NEAR(solution.root_cfvs[1][""], 1 / 18., kErrorTolerance);
-}
 
 }  // namespace
 }  // namespace ortools
@@ -84,6 +53,4 @@ int main(int argc, char** argv) {
       "leduc_poker", -0.085606424078);
   algorithms::ortools::TestGameValueAndExploitability(
       "goofspiel(players=2,num_cards=3,imp_info=True)", 0.);
-
-  algorithms::ortools::TestKuhnPokerRootCfvs();
 }

@@ -45,7 +45,8 @@ struct ZeroSumSequentialGameSolution {
 
 // A basic implementation: computes game value and tabular policy for both
 // players in the whole game.
-ZeroSumSequentialGameSolution SolveZeroSumSequentialGame(const Game& game);
+std::unique_ptr<ZeroSumSequentialGameSolution> SolveZeroSumSequentialGame(
+    const Game& game);
 
 // A more advanced implementation, where we can restrict the computation only
 // to a "subset" of the infostate tree (specified by the starting states and
@@ -55,7 +56,7 @@ ZeroSumSequentialGameSolution SolveZeroSumSequentialGame(const Game& game);
 //
 // [2]: Value Functions for Depth-Limited Solving in Imperfect-Information Games
 //      https://arxiv.org/abs/1906.06412
-ZeroSumSequentialGameSolution SolveZeroSumSequentialGame(
+std::unique_ptr<ZeroSumSequentialGameSolution> SolveZeroSumSequentialGame(
     std::shared_ptr<Observer> infostate_observer,
     absl::Span<const State*> starting_states,
     absl::Span<const float> chance_range,
