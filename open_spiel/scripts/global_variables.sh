@@ -68,3 +68,6 @@ export BUILD_WITH_GAMUT="${BUILD_WITH_GAMUT:-"OFF"}"
 # See algorithms/ortools/CMakeLists.txt for specific instructions.
 export BUILD_WITH_ORTOOLS="${BUILD_WITH_ORTOOLS:-"OFF"}"
 
+
+# Build experiments for reproduction of scientific papers.
+export BUILD_WITH_PAPERS="${BUILD_WITH_PAPERS:-OFF}"

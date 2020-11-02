@@ -118,6 +118,8 @@ openspiel_optional_dependency(BUILD_WITH_GAMUT          OFF
   "Build with GAMUT generator integration.")
 openspiel_optional_dependency(BUILD_WITH_ORTOOLS        OFF
   "Build with C++ optimization library OR-Tools.")
+openspiel_optional_dependency(BUILD_WITH_PAPERS         OFF
+  "Build papers with code.")
 
 # Needed to disable Abseil tests.
 set (BUILD_TESTING OFF)
@@ -246,7 +248,9 @@ if (BUILD_WITH_ORTOOLS)
   include_directories(${ORTOOLS_INC_DIRS})
   link_directories(${ORTOOLS_LIB_DIRS})
 endif()
-
+if (BUILD_WITH_PAPERS)
+  add_subdirectory(papers_with_code)
+endif()
 
 
 # We have the parent of this directory in the include path, so that we can
