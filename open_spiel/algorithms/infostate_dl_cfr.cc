@@ -212,13 +212,16 @@ void TerminalEvaluator::EvaluatePublicState(
   }
 }
 
+void DepthLimitedCFR::SimultaneousTopDownEvaluate() {
+  PrepareRootReachProbs();
+  propagators_[0].TopDown();
+  propagators_[1].TopDown();
+  EvaluateLeaves();
+}
+
 void DepthLimitedCFR::RunSimultaneousIterations(int iterations) {
   for (int t = 0; t < iterations; ++t) {
-    PrepareRootReachProbs();
-    propagators_[0].TopDown();
-    propagators_[1].TopDown();
-
-    EvaluateLeaves();
+    SimultaneousTopDownEvaluate();
     propagators_[0].BottomUp();
     propagators_[1].BottomUp();
     SPIEL_DCHECK_FLOAT_NEAR(
@@ -390,6 +393,41 @@ void CFREvaluator::EvaluatePublicState(LeafPublicState* public_state,
               resulting_values[pl].end(),
               public_state->values[pl].begin());
   }
+}
+
+// -- Counterfactul Best Response ----------------------------------------------
+
+float DepthLimitedCFR::TrunkExploitability() const {
+  return (CfBestResponse(0) + CfBestResponse(1)) / 2.;
+}
+
+float DepthLimitedCFR::CfBestResponse(
+    const CFRNode& node, Player pl, int* leaf_index) const {
+  if (node.is_leaf_node()) {
+    const std::vector<float>& values = propagators_[pl].leaves_cf_values();
+    return values[(*leaf_index)++];
+  }
+  if (node.type() == kObservationInfostateNode) {
+    double sum_value = 0.;
+    for (const CFRNode& child : node.child_iterator()) {
+      sum_value += CfBestResponse(child, pl, leaf_index);
+    }
+    return sum_value;
+  }
+  SPIEL_CHECK_EQ(node.type(), kDecisionInfostateNode);
+  double max_value = -std::numeric_limits<float>::infinity();
+  for (const CFRNode& child : node.child_iterator()) {
+    max_value = std::fmax(CfBestResponse(child, pl, leaf_index),
+                          max_value);
+  }
+  return max_value;
+}
+
+float DepthLimitedCFR::CfBestResponse(Player responding_player) const {
+  int leaf_index = 0;
+  const CFRNode& root_node = trees_[responding_player].root();
+  float v = CfBestResponse(root_node, responding_player, &leaf_index);
+  return v;
 }
 
 }  // namespace dlcfr

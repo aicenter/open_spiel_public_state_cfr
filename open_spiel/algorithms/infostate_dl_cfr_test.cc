@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "open_spiel/algorithms/infostate_cfr.h"
+#include "open_spiel/algorithms/infostate_dl_cfr.h"
 
 #include <cmath>
 #include <iostream>
@@ -25,17 +25,35 @@
 #include "open_spiel/games/leduc_poker.h"
 #include "open_spiel/spiel.h"
 #include "open_spiel/spiel_utils.h"
-#include "infostate_dl_cfr.h"
+#include "open_spiel/algorithms/infostate_cfr.h"
+#include "open_spiel/algorithms/cfr.h"
 
 namespace open_spiel {
 namespace algorithms {
 namespace dlcfr {
 namespace {
 
+void TestExploitabilityCalculation(const std::string& game_name) {
+  std::shared_ptr<const Game> game = LoadGame(game_name);
+
+  DepthLimitedCFR dl_solver(game, /*depth_limit=*/100,
+      /*leaf_evaluator=*/nullptr, MakeTerminalEvaluator());
+  dl_solver.SimultaneousTopDownEvaluate();
+  double actual_expl = dl_solver.TrunkExploitability();
+
+  if (game->GetType().dynamics == GameType::Dynamics::kSimultaneous) {
+    game = ConvertToTurnBased(*game);
+  }
+  CFRSolver str_solver(*game);
+  double expected_expl = Exploitability(*game, *str_solver.CurrentPolicy());
+
+  SPIEL_DCHECK_FLOAT_NEAR(expected_expl, actual_expl, 1e-6);
+}
+
 void CheckIterationConsistency(
     const CFRInfoStateValuesPtrTable& actual_table,
     const CFRInfoStateValuesPtrTable& expected_table) {
-  for (const auto& [infostate, actual_ptr] : actual_table) {
+  for (const auto&[infostate, actual_ptr] : actual_table) {
     const CFRInfoStateValues& actual_values = *actual_ptr;
     const CFRInfoStateValues& expected_values = *(expected_table.at(infostate));
     SPIEL_CHECK_EQ(actual_values.num_actions(), expected_values.num_actions());
@@ -43,7 +61,7 @@ void CheckIterationConsistency(
     // Check regrets.
     for (int j = 0; j < expected_values.num_actions(); ++j) {
       SPIEL_CHECK_TRUE(fabs(expected_values.cumulative_regrets[j]
-                            - actual_values.cumulative_regrets[j]) < 1e-6);
+                                - actual_values.cumulative_regrets[j]) < 1e-6);
     }
     // Cumulative policy is more tricky: we need to normalize it first.
     double act_cumul_sum = 0, exp_cumul_sum = 0;
@@ -54,7 +72,7 @@ void CheckIterationConsistency(
     for (int j = 0; j < expected_values.num_actions(); ++j) {
       SPIEL_CHECK_TRUE(fabs(
           expected_values.cumulative_policy[j] / exp_cumul_sum
-          - actual_values.cumulative_policy[j] / act_cumul_sum) < 1e-6);
+              - actual_values.cumulative_policy[j] / act_cumul_sum) < 1e-6);
     }
   }
 }
@@ -69,7 +87,7 @@ void TestTerminalEvaluatorHasSameIterations(const std::string& game_name) {
   // We use only the terminal evaluator.
   std::shared_ptr<LeafEvaluator> terminal_evaluator = MakeTerminalEvaluator();
   DepthLimitedCFR dl_solver(game, /*depth_limit=*/100,
-                            /*leaf_evaluator=*/nullptr, terminal_evaluator);
+      /*leaf_evaluator=*/nullptr, terminal_evaluator);
   CFRInfoStateValuesPtrTable dl_ptable = dl_solver.InfoStateValuesPtrTable();
 
   SPIEL_CHECK_EQ(vec_ptable.size(), dl_ptable.size());
@@ -150,6 +168,7 @@ int main(int argc, char** argv) {
   };
 
   for (const std::string& game_name : test_games) {
+    algorithms::TestExploitabilityCalculation(game_name);
     algorithms::TestTerminalEvaluatorHasSameIterations(game_name);
     algorithms::TestRecursiveDepthLimitedSolving(game_name);
   }

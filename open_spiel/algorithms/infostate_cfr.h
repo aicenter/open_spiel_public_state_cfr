@@ -109,7 +109,9 @@ class InfostateTreeValuePropagator {
                           /*size=*/root_branching_factor());
   }
   std::vector<float>& leaves_reach_probs() { return reach_probs; }
+  const std::vector<float>& leaves_reach_probs() const { return reach_probs; }
   std::vector<float>& leaves_cf_values() { return cf_values; }
+  const std::vector<float>& leaves_cf_values() const { return cf_values; }
 
   // Calculates the root cf value as weighted sum of the cf_values()
   // (the weights are the respective ranges). If the supplied range is empty,

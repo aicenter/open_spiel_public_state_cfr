@@ -125,6 +125,7 @@ class DepthLimitedCFR {
                   std::shared_ptr<Observer> public_observer);
 
   void RunSimultaneousIterations(int iterations);
+  void SimultaneousTopDownEvaluate();
 
   void SetPlayerRanges(const std::array<std::vector<float>, 2>& ranges);
   float RootCfValue() const {
@@ -146,6 +147,10 @@ class DepthLimitedCFR {
     return public_leaves_;
   }
 
+  // Trunk evaluation.
+  float CfBestResponse(Player responding_player) const;
+  float TrunkExploitability() const;
+
  private:
   const std::shared_ptr<const Game> game_;
   std::array<CFRTree, 2> trees_;
@@ -166,6 +171,7 @@ class DepthLimitedCFR {
   void CreateContexts();
   void EvaluateLeaves();
   LeafPublicState* GetPublicLeaf(absl::Span<float> public_tensor);
+  float CfBestResponse(const CFRNode& node, Player pl, int* leaf_index) const;
 
   // Internal checks.
   bool DoStatesProduceEqualPublicObservations(
