@@ -38,25 +38,22 @@ void TestOptimalValuesKuhnBettingPublicState() {
       dlcfr::MakeTerminalEvaluator();
   dlcfr::DepthLimitedCFR dl_solver(game, /*trunk_depth_limit=*/3,
                                    leaf_evaluator, terminal_evaluator);
-  dlcfr::EncodedPublicState* bet_state = dl_solver.GetEncodedLeaves()[1].get();
-  auto* oracle_state = open_spiel::down_cast<OraclePublicState*>(bet_state);
+  dlcfr::LeafPublicState& bet_state = dl_solver.GetPublicLeaves()[1];
 
   // Make sure there is no regression and infostates are properly arranged
   // as when writing this test.
-  const std::array<std::vector<const CFRNode*>, 2>& leaf_nodes =
-      oracle_state->public_state.leaf_nodes;
-  SPIEL_CHECK_EQ(leaf_nodes[0][0]->infostate_string(), "0b");
-  SPIEL_CHECK_EQ(leaf_nodes[0][1]->infostate_string(), "1b");
-  SPIEL_CHECK_EQ(leaf_nodes[0][2]->infostate_string(), "2b");
+  SPIEL_CHECK_EQ(bet_state.leaf_nodes[0][0]->infostate_string(), "0b");
+  SPIEL_CHECK_EQ(bet_state.leaf_nodes[0][1]->infostate_string(), "1b");
+  SPIEL_CHECK_EQ(bet_state.leaf_nodes[0][2]->infostate_string(), "2b");
   const int PL0_J = 0;
   const int PL0_Q = 1;
   const int PL0_K = 2;
   // This does not follow an intuitive order, because of the way how the tree
   // is constructed: we recurse through dealing card 0 to player 0, and player 1
   // receives cards 1 or 2, so we also build those infostates first.
-  SPIEL_CHECK_EQ(leaf_nodes[1][0]->infostate_string(), "1b");
-  SPIEL_CHECK_EQ(leaf_nodes[1][1]->infostate_string(), "2b");
-  SPIEL_CHECK_EQ(leaf_nodes[1][2]->infostate_string(), "0b");
+  SPIEL_CHECK_EQ(bet_state.leaf_nodes[1][0]->infostate_string(), "1b");
+  SPIEL_CHECK_EQ(bet_state.leaf_nodes[1][1]->infostate_string(), "2b");
+  SPIEL_CHECK_EQ(bet_state.leaf_nodes[1][2]->infostate_string(), "0b");
   const int PL1_J = 2;
   const int PL1_Q = 0;
   const int PL1_K = 1;
@@ -68,29 +65,28 @@ void TestOptimalValuesKuhnBettingPublicState() {
   std::vector<float> test_parametrizations = { 0., 0.1, 0.25, 0.5, 1. };
 
   for (float alpha : test_parametrizations) {
-    std::array<std::vector<float>, 2> ranges = {
+    bet_state.ranges = {
         // Player 0 bets with these probabilities when it has cards J, Q or K
         std::vector<float>({alpha, alpha, 1 - alpha}),
         // Player 1 did not act before this public state, so ranges are fixed.
         std::vector<float>({1., 1., 1.})
     };
-    std::array<absl::Span<const float>, 2> values =
-        leaf_evaluator->EvaluatePublicState(bet_state, {ranges[0], ranges[1]});
+    leaf_evaluator->EvaluatePublicState(&bet_state, /*context=*/nullptr);
     if (alpha < 0.25) {
       // PL1 passes
-      SPIEL_CHECK_FLOAT_NEAR(values[0][PL0_J], -1 / 6., 1e-10);
-      SPIEL_CHECK_FLOAT_NEAR(values[0][PL0_K], 1 / 3., 1e-10);
+      SPIEL_CHECK_FLOAT_NEAR(bet_state.values[0][PL0_J], -1 / 6., 1e-10);
+      SPIEL_CHECK_FLOAT_NEAR(bet_state.values[0][PL0_K], 1 / 3., 1e-10);
     } else {
       // PL1 bets
-      SPIEL_CHECK_FLOAT_NEAR(values[0][PL0_J], -2 / 3., 1e-10);
-      SPIEL_CHECK_FLOAT_NEAR(values[0][PL0_K], 1 / 2., 1e-10);
+      SPIEL_CHECK_FLOAT_NEAR(bet_state.values[0][PL0_J], -2 / 3., 1e-10);
+      SPIEL_CHECK_FLOAT_NEAR(bet_state.values[0][PL0_K], 1 / 2., 1e-10);
     }
-    SPIEL_CHECK_FLOAT_NEAR(values[0][PL0_Q], -1 / 6., 1e-10);
+    SPIEL_CHECK_FLOAT_NEAR(bet_state.values[0][PL0_Q], -1 / 6., 1e-10);
 
-    SPIEL_CHECK_FLOAT_NEAR(values[1][PL1_J], -1 / 6., 1e-6);
-    SPIEL_CHECK_FLOAT_NEAR(values[1][PL1_Q],
+    SPIEL_CHECK_FLOAT_NEAR(bet_state.values[1][PL1_J], -1 / 6., 1e-6);
+    SPIEL_CHECK_FLOAT_NEAR(bet_state.values[1][PL1_Q],
         std::fmax((2 * alpha - 1) / 3., -1/6.), 1e-6);
-    SPIEL_CHECK_FLOAT_NEAR(values[1][PL1_K], 2 * alpha / 3, 1e-6);
+    SPIEL_CHECK_FLOAT_NEAR(bet_state.values[1][PL1_K], 2 * alpha / 3, 1e-6);
   }
 }
 

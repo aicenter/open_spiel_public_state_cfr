@@ -34,13 +34,12 @@ DepthLimitedCFR::DepthLimitedCFR(
     leaf_evaluator_(std::move(leaf_evaluator)),
     terminal_evaluator_(std::move(terminal_evaluator)),
     player_ranges_({
-       std::vector<float>(trees_[0].root().num_children(), 1.),
-       std::vector<float>(trees_[1].root().num_children(), 1.)
-    }),
-    tracked_player_ranges_({ player_ranges_[0], player_ranges_[1] }) {
-  SPIEL_CHECK_TRUE(terminal_evaluator_);
-  PrepareLeafPublicStates();
-  EncodePublicStates();
+                       std::vector<float>(trees_[0].root().num_children(), 1.),
+                       std::vector<float>(trees_[1].root().num_children(), 1.)
+                   }) {
+  PrepareLeafNodesForPublicStates();
+  PrepareRangesAndValuesForPublicStates();
+  CreateContexts();
 }
 
 DepthLimitedCFR::DepthLimitedCFR(
@@ -48,8 +47,8 @@ DepthLimitedCFR::DepthLimitedCFR(
     std::shared_ptr<const LeafEvaluator> leaf_evaluator,
     std::shared_ptr<const LeafEvaluator> terminal_evaluator
 ) : DepthLimitedCFR(game,
-                    { CFRTree(*game, 0, max_depth_limit),
-                      CFRTree(*game, 1, max_depth_limit) },
+                    {CFRTree(*game, 0, max_depth_limit),
+                     CFRTree(*game, 1, max_depth_limit)},
                     std::move(leaf_evaluator),
                     std::move(terminal_evaluator),
                     game->MakeObserver(kPublicStateObsType, {})) {}
@@ -92,18 +91,12 @@ std::array<CFRTree, 2> CreateTrees(
   };
 }
 
-void DepthLimitedCFR::PrepareLeafPublicStates() {
+void DepthLimitedCFR::PrepareLeafNodesForPublicStates() {
   Observation public_observation(*game_, public_observer_);
 
   for (int pl = 0; pl < 2; ++pl) {
     int leaf_position = 0;
     for (CFRNode* leaf_node : propagators_[pl].leaf_nodes()) {
-// TODO: common parent branching invariant
-//      // The tree is balanced, therefore we should be iterating over leaves
-//      // in an ordered fashion.
-//      const int tree_depth = propagators_[pl].depth_branching.size();
-//      SPIEL_CHECK_EQ(propagators_[pl].depth_branching[tree_depth - 2].back())
-
       SPIEL_CHECK_FALSE(leaf_node->corresponding_states().empty());
       const std::unique_ptr<State>& some_state =
           leaf_node->corresponding_states()[0];
@@ -120,16 +113,24 @@ void DepthLimitedCFR::PrepareLeafPublicStates() {
   }
 }
 
-void DepthLimitedCFR::EncodePublicStates() {
+void DepthLimitedCFR::PrepareRangesAndValuesForPublicStates() {
+  for (LeafPublicState& s : public_leaves_) {
+    for (int pl = 0; pl < 2; ++pl) {
+      const int num_leaves = s.leaf_nodes[pl].size();
+      s.ranges[pl] = std::vector<float>(num_leaves, 0.);
+      s.values[pl] = std::vector<float>(num_leaves, 0.);
+    }
+  }
+}
+
+void DepthLimitedCFR::CreateContexts() {
   for (const LeafPublicState& public_leaf : public_leaves_) {
     SPIEL_DCHECK_TRUE(public_leaf.IsConsistent());
     if (public_leaf.IsTerminal()) {
-      encoded_leaves_.push_back(
-          terminal_evaluator_->EncodeLeafPublicState(public_leaf));
+      contexts_.push_back(terminal_evaluator_->CreateContext(public_leaf));
     } else {
       SPIEL_CHECK_TRUE(leaf_evaluator_);
-      encoded_leaves_.push_back(
-          leaf_evaluator_->EncodeLeafPublicState(public_leaf));
+      contexts_.push_back(leaf_evaluator_->CreateContext(public_leaf));
     }
   }
 }
@@ -160,14 +161,13 @@ std::shared_ptr<LeafEvaluator> MakeTerminalEvaluator() {
   return std::make_shared<TerminalEvaluator>();
 }
 
-TerminalPublicState::TerminalPublicState(const LeafPublicState& state) {
+TerminalPublicStateContext::TerminalPublicStateContext(
+    const LeafPublicState& state) {
   auto& leaf_nodes = state.leaf_nodes;
   SPIEL_CHECK_EQ(leaf_nodes[0].size(), leaf_nodes[1].size());
   const int num_terminals = leaf_nodes[0].size();
   utilities.reserve(num_terminals);
   permutation.reserve(num_terminals);
-  cfvs[0] = std::vector<float>(num_terminals);
-  cfvs[1] = std::vector<float>(num_terminals);
 
   using History = absl::Span<const Action>;
   std::map<History, int> player1_map;
@@ -188,30 +188,28 @@ TerminalPublicState::TerminalPublicState(const LeafPublicState& state) {
     utilities.push_back(v * chn);
     permutation.push_back(permutation_index);
   }
-  SPIEL_DCHECK_EQ(
+
   // A quick check to see if the permutation is ok
   // by computing the arithmetic sum.
+  SPIEL_DCHECK_EQ(
       std::accumulate(permutation.begin(),
                       permutation.end(), 0),
       num_terminals * (num_terminals - 1) / 2);
 }
 
-std::unique_ptr<EncodedPublicState> TerminalEvaluator::EncodeLeafPublicState(
+std::unique_ptr<PublicStateContext> TerminalEvaluator::CreateContext(
     const LeafPublicState& state) const {
-  return std::make_unique<TerminalPublicState>(state);
+  return std::make_unique<TerminalPublicStateContext>(state);
 }
 
-std::array<absl::Span<const float>, 2> TerminalEvaluator::EvaluatePublicState(
-    EncodedPublicState* state,
-    std::array<absl::Span<const float>, 2> ranges) const {
-  auto* terminal = open_spiel::down_cast<TerminalPublicState*>(state);
-
+void TerminalEvaluator::EvaluatePublicState(
+    LeafPublicState* state, PublicStateContext* context) const {
+  auto* terminal = open_spiel::down_cast<TerminalPublicStateContext*>(context);
   for (int i = 0; i < terminal->utilities.size(); ++i) {
     const int j = terminal->permutation[i];
-    terminal->cfvs[0][i] = terminal->utilities[i] * ranges[1][j];
-    terminal->cfvs[1][j] = -terminal->utilities[i] * ranges[0][i];
+    state->values[0][i] = terminal->utilities[i] * state->ranges[1][j];
+    state->values[1][j] = -terminal->utilities[i] * state->ranges[0][i];
   }
-  return {terminal->cfvs[0], terminal->cfvs[1]};
 }
 
 void DepthLimitedCFR::RunSimultaneousIterations(int iterations) {
@@ -224,71 +222,61 @@ void DepthLimitedCFR::RunSimultaneousIterations(int iterations) {
     propagators_[0].BottomUp();
     propagators_[1].BottomUp();
     SPIEL_DCHECK_FLOAT_NEAR(
-        propagators_[0].RootCfValue(tracked_player_ranges_[0]),
-        - propagators_[1].RootCfValue(tracked_player_ranges_[1]),
+        propagators_[0].RootCfValue(player_ranges_[0]),
+        -propagators_[1].RootCfValue(player_ranges_[1]),
         1e-6);
   }
 }
 
 void DepthLimitedCFR::PrepareRootReachProbs() {
   for (int pl = 0; pl < 2; ++pl) {
-    absl::Span<float> root_reaches = propagators_[pl].range();
-    SPIEL_CHECK_EQ(tracked_player_ranges_[pl].size(), root_reaches.size());
-    for (int i = 0; i < root_reaches.size(); ++i) {
-      root_reaches[i] = tracked_player_ranges_[pl][i];
-    }
+    SPIEL_CHECK_EQ(player_ranges_[pl].size(), propagators_[pl].range().size());
+    std::copy(player_ranges_[pl].begin(),
+              player_ranges_[pl].end(),
+              propagators_[pl].range().begin());
   }
 }
 
 void DepthLimitedCFR::EvaluateLeaves() {
-  SPIEL_CHECK_EQ(public_leaves_.size(), encoded_leaves_.size());
+  SPIEL_CHECK_EQ(public_leaves_.size(), contexts_.size());
   for (int i = 0; i < public_leaves_.size(); ++i) {
-    const LeafPublicState& public_leaf = public_leaves_[i];
-    EncodedPublicState* encoded_leaf = encoded_leaves_[i].get();
-
-    // TODO: similarly to tree Rebalance, we can do a "color-satisficing"
-    //  permutation of the infostate tree, which will result into an ordering of
-    //  CFRNodes such that they are properly grouped together in public states.
-    //  Then we can drop the whole leaf_positions_ encoding and just use spans
-    //  to communicate ranges and cfvs between the components efficiently.
-    //  Maybe it will not work because we might need to permute decision nodes
-    //  though...
+    LeafPublicState& state = public_leaves_[i];
+    PublicStateContext* context = contexts_[i].get();
 
     // 1. Prepare ranges
-    auto vec_ranges = std::array<std::vector<float>, 2>();
     for (int pl = 0; pl < 2; pl++) {
-      const int num_infostate_leafs = public_leaf.leaf_nodes[pl].size();
-      vec_ranges[pl].reserve(num_infostate_leafs);
-      for (const CFRNode* leaf_node : public_leaf.leaf_nodes[pl]) {
-        const int leaf_position = leaf_positions_.at(leaf_node);
-        SPIEL_DCHECK_GE(leaf_position, 0);
-        SPIEL_DCHECK_LT(leaf_position, propagators_[pl].num_leaves());
-        vec_ranges[pl].push_back(
-            propagators_[pl].leaves_reach_probs()[leaf_position]);
+      const int num_leaves = state.leaf_nodes[pl].size();
+      for (int j = 0; j < num_leaves; ++j) {
+        const CFRNode* leaf_node = state.leaf_nodes[pl][j];
+        const int trunk_position = leaf_positions_.at(leaf_node);
+        SPIEL_DCHECK_GE(trunk_position, 0);
+        SPIEL_DCHECK_LT(trunk_position, propagators_[pl].num_leaves());
+        // Copy range from the trunk to the leaf public state.
+        state.ranges[pl][j] =
+            propagators_[pl].leaves_reach_probs()[trunk_position];
       }
     }
 
     // 2. Evaluate: compute cfvs.
-    std::array<absl::Span<const float>, 2> cfvs;  // float due to neural nets
-    std::array<absl::Span<const float>, 2> ranges = {vec_ranges[0],
-                                                     vec_ranges[1]};
-    if (public_leaf.IsTerminal()) {
-      cfvs = terminal_evaluator_->EvaluatePublicState(encoded_leaf, ranges);
+    if (state.IsTerminal()) {
+      SPIEL_CHECK_TRUE(terminal_evaluator_);
+      terminal_evaluator_->EvaluatePublicState(&state, context);
     } else {
       SPIEL_CHECK_TRUE(leaf_evaluator_);
-      cfvs = leaf_evaluator_->EvaluatePublicState(encoded_leaf, ranges);
+      leaf_evaluator_->EvaluatePublicState(&state, context);
     }
 
     // 3. Update cfvs for propagators.
     for (int pl = 0; pl < 2; pl++) {
-      const int num_infostate_leafs = public_leaf.leaf_nodes[pl].size();
-      SPIEL_CHECK_EQ(cfvs[pl].size(), num_infostate_leafs);
-      for (int l = 0; l < num_infostate_leafs; ++l) {
-        const CFRNode* leaf_node = public_leaf.leaf_nodes[pl][l];
-        const int leaf_position = leaf_positions_.at(leaf_node);
-        SPIEL_DCHECK_GE(leaf_position, 0);
-        SPIEL_DCHECK_LT(leaf_position, propagators_[pl].num_leaves());
-        propagators_[pl].leaves_cf_values()[leaf_position] = cfvs[pl][l];
+      const int num_leaves = state.leaf_nodes[pl].size();
+      for (int j = 0; j < num_leaves; ++j) {
+        const CFRNode* leaf_node = state.leaf_nodes[pl][j];
+        const int trunk_position = leaf_positions_.at(leaf_node);
+        SPIEL_DCHECK_GE(trunk_position, 0);
+        SPIEL_DCHECK_LT(trunk_position, propagators_[pl].num_leaves());
+        // Copy value from the leaf public state to the trunk.
+        propagators_[pl].leaves_cf_values()[trunk_position] =
+            state.values[pl][j];
       }
     }
   }
@@ -300,14 +288,13 @@ CFRInfoStateValuesPtrTable DepthLimitedCFR::InfoStateValuesPtrTable() {
   CollectInfostateLookupTable(trees_[1].mutable_root(), &vec_ptable);
   return vec_ptable;
 }
-void DepthLimitedCFR::TrackPlayerRanges(
-    std::array<absl::Span<const float>, 2> track_source) {
-  tracked_player_ranges_ = track_source;
+void DepthLimitedCFR::SetPlayerRanges(
+    const std::array<std::vector<float>, 2>& ranges) {
+  player_ranges_ = ranges;
 }
-
-std::array<absl::Span<const float>, 2>
-DepthLimitedCFR::RootChildrenCfValues() const {
-  return {propagators_[0].values(), propagators_[1].values() };
+std::array<absl::Span<const float>, 2> DepthLimitedCFR::RootChildrenCfValues()
+const {
+  return {propagators_[0].values(), propagators_[1].values()};
 }
 
 bool LeafPublicState::IsConsistent() const {
@@ -344,6 +331,9 @@ bool LeafPublicState::IsConsistent() const {
   if (num_terminals % 2 != 0 && num_nonterminals % 2 != 0) return false;
   return true;
 }
+bool LeafPublicState::IsTerminal() const {
+  return leaf_nodes[0][0]->type() == kTerminalInfostateNode;
+}
 
 bool CheckChildPublicStateConsistency(
     const CFRPublicState& cfr_public_state, const LeafPublicState& leaf_state) {
@@ -359,9 +349,23 @@ bool CheckChildPublicStateConsistency(
   return true;
 }
 
-std::unique_ptr<EncodedPublicState> CFREvaluator::EncodeLeafPublicState(
-    const LeafPublicState& leaf_state) const {
+// -- CFR evaluator ------------------------------------------------------------
 
+CFREvaluator::CFREvaluator(std::shared_ptr<const Game> game, int depth_limit,
+                           std::shared_ptr<const LeafEvaluator> leaf_evaluator,
+                           std::shared_ptr<const LeafEvaluator> terminal_evaluator,
+                           std::shared_ptr<Observer> public_observer,
+                           std::shared_ptr<Observer> infostate_observer)
+    : game(std::move(game)), depth_limit(depth_limit),
+      leaf_evaluator(std::move(leaf_evaluator)),
+      terminal_evaluator(std::move(terminal_evaluator)),
+      public_observer(std::move(public_observer)),
+      infostate_observer(std::move(infostate_observer)) {
+  SPIEL_CHECK_GT(depth_limit, 0);
+}
+
+std::unique_ptr<PublicStateContext> CFREvaluator::CreateContext(
+    const LeafPublicState& leaf_state) const {
   auto dlcfr = std::make_unique<DepthLimitedCFR>(
       game, CreateTrees({leaf_state.leaf_nodes[0], leaf_state.leaf_nodes[1]},
                         infostate_observer, depth_limit),
@@ -372,13 +376,20 @@ std::unique_ptr<EncodedPublicState> CFREvaluator::EncodeLeafPublicState(
   return cfr_public_state;
 }
 
-std::array<absl::Span<const float>, 2> CFREvaluator::EvaluatePublicState(
-    EncodedPublicState* public_state,
-    std::array<absl::Span<const float>, 2> ranges) const {
-  auto* cfr_state = open_spiel::down_cast<CFRPublicState*>(public_state);
-  cfr_state->dlcfr->TrackPlayerRanges(ranges);
-  cfr_state->dlcfr->RunSimultaneousIterations(num_cfr_iterations);
-  return cfr_state->dlcfr->RootChildrenCfValues();
+void CFREvaluator::EvaluatePublicState(LeafPublicState* public_state,
+                                       PublicStateContext* context) const {
+  auto* cfr_state = open_spiel::down_cast<CFRPublicState*>(context);
+  DepthLimitedCFR* dlcfr = cfr_state->dlcfr.get();
+  dlcfr->SetPlayerRanges(public_state->ranges);
+  dlcfr->RunSimultaneousIterations(num_cfr_iterations);
+  std::array<absl::Span<const float>, 2> resulting_values =
+      dlcfr->RootChildrenCfValues();
+  // Copy the results.
+  for (int pl = 0; pl < 2; ++pl) {
+    std::copy(resulting_values[pl].begin(),
+              resulting_values[pl].end(),
+              public_state->values[pl].begin());
+  }
 }
 
 }  // namespace dlcfr
