@@ -38,16 +38,17 @@ std::string iigs3 = "goofspiel("
 
 std::unique_ptr<InfostateTree> MakeTree(const std::string& game_name,
                                         Player player_id,
-                                        int max_move_limit = 1000) {
+                                        int max_move_limit = 1000,
+                                        bool make_balanced = false) {
   return MakeInfostateTree(*LoadGame(game_name), player_id,
-                           max_move_limit, /*make_balanced=*/false);
+                           max_move_limit, make_balanced);
 }
 
 std::unique_ptr<InfostateTree> MakeTree(
     const std::string& game_name, Player player_id,
     const std::vector<std::vector<Action>>& start_histories,
     const std::vector<float>& start_reaches,
-    int max_move_limit = 1000) {
+    int max_move_limit = 1000, bool make_balanced = false) {
   const std::shared_ptr<const Game> game = LoadGame(game_name);
   std::vector<std::unique_ptr<State>> start_states;
   std::vector<const State*> start_state_ptrs;
@@ -63,7 +64,7 @@ std::unique_ptr<InfostateTree> MakeTree(
 
   return MakeInfostateTree(
       start_state_ptrs, start_reaches, infostate_observer,
-      player_id, max_move_limit, /*make_balanced=*/false);
+      player_id, max_move_limit, make_balanced);
 }
 
 bool IsNodeBalanced(const InfostateNode& node, int height, int current_depth = 0) {
@@ -266,81 +267,102 @@ void TestCertificatesFromStartHistories() {
 
 
 void TestTreeRebalancing() {
-  {  // Identity test -- no rebalancing is applied.
+  {  // Identity test -- no rebalancing is applied, but let's check if it works.
     std::string expected_certificate =
       "(["
         "({}{})"  // Play Heads: HH, HT
         "({}{})"  // Play Tails: TH, TT
       "])";
     for (int i = 0; i < 2; ++i) {
-      std::unique_ptr<InfostateTree> tree = MakeTree("matrix_mp", i);
-      SPIEL_CHECK_EQ(tree->root().ComputeCertificate(), expected_certificate);
-      SPIEL_CHECK_TRUE(RecomputeBalance(*tree));
-
-      tree->Rebalance();
-      SPIEL_CHECK_EQ(tree->root().ComputeCertificate(), expected_certificate);
-      SPIEL_CHECK_TRUE(RecomputeBalance(*tree));
+      {
+        std::unique_ptr<InfostateTree> tree = MakeTree(
+            "matrix_mp", i, /*max_move_limit=*/1000, /*make_balanced=*/false);
+        SPIEL_CHECK_EQ(tree->root().ComputeCertificate(), expected_certificate);
+        SPIEL_CHECK_TRUE(RecomputeBalance(*tree));
+      }
+      {
+        std::unique_ptr<InfostateTree> tree = MakeTree(
+            "matrix_mp", i, /*max_move_limit=*/1000, /*make_balanced=*/true);
+        SPIEL_CHECK_EQ(tree->root().ComputeCertificate(), expected_certificate);
+        SPIEL_CHECK_TRUE(RecomputeBalance(*tree));
+      }
     }
   }
   {  // Rebalance test: when 2nd player passes, we add dummy observation nodes.
-    std::unique_ptr<InfostateTree> tree = MakeTree("kuhn_poker", 0,
-                                                   {{0, 1, 0}}, {1/6.});
-    std::string expected_certificate =
-        "(("
-        "[({})({})]"  // 2nd player bets
-        "{}"          // 2nd player passes
-        "))";
-    SPIEL_CHECK_EQ(tree->root().ComputeCertificate(), expected_certificate);
-    SPIEL_CHECK_FALSE(tree->is_balanced());
-    SPIEL_CHECK_FALSE(RecomputeBalance(*tree));
-
-    tree->Rebalance();
-
-    // The order is swapped only in the certificate computation, but not in
-    // the actual tree.
-    std::string expected_rebalanced_certificate =
-        "(("
-        "(({}))"      // 2nd player passes
-        "[({})({})]"  // 2nd player bets
-        "))";
-    SPIEL_CHECK_EQ(tree->root().ComputeCertificate(),
-                   expected_rebalanced_certificate);
-    SPIEL_CHECK_TRUE(tree->is_balanced());
-    SPIEL_CHECK_TRUE(RecomputeBalance(*tree));
+    {
+      std::unique_ptr<InfostateTree> tree = MakeTree(
+          "kuhn_poker", 0, {{0, 1, 0}}, {1 / 6.},
+          /*max_move_limit=*/1000, /*make_balanced=*/false);
+      std::string expected_certificate =
+          "(("
+          "[({})({})]"  // 2nd player bets
+          "{}"          // 2nd player passes
+          "))";
+      SPIEL_CHECK_EQ(tree->root().ComputeCertificate(), expected_certificate);
+      SPIEL_CHECK_FALSE(tree->is_balanced());
+      SPIEL_CHECK_FALSE(RecomputeBalance(*tree));
+    }
+    {
+      std::unique_ptr<InfostateTree> tree = MakeTree(
+          "kuhn_poker", 0, {{0, 1, 0}}, {1 / 6.},
+          /*max_move_limit=*/1000, /*make_balanced=*/true);
+      // The order is swapped only in the certificate computation, but not in
+      // the actual tree.
+      std::string expected_rebalanced_certificate =
+          "(("
+          "(({}))"      // 2nd player passes
+          "[({})({})]"  // 2nd player bets
+          "))";
+      SPIEL_CHECK_EQ(tree->root().ComputeCertificate(),
+                     expected_rebalanced_certificate);
+      SPIEL_CHECK_TRUE(tree->is_balanced());
+      SPIEL_CHECK_TRUE(RecomputeBalance(*tree));
+    }
   }
   {  // Rebalance test: simultaneous move games.
-    std::unique_ptr<InfostateTree> tree = MakeTree(iigs3, 0,
-                                             /*start_histories=*/{
-                                              {0  /* = 0 0 */},
-                                              {1  /* = 1 0 */,
-                                               3  /* = 2 2 */}
-                                             },
-                                             /*start_reaches=*/{1., 1.});
-
-    std::string expected_certificate =
-        "("
+    {
+      std::unique_ptr<InfostateTree> tree =
+        MakeTree(iigs3, 0,
+          /*start_histories=*/{
+            {0  /* = 0 0 */},
+            {1  /* = 1 0 */, 3  /* = 2 2 */}
+          },
+          /*start_reaches=*/{1., 1.},
+          /*max_move_limit=*/1000,
+          /*make_balanced=*/false);
+      std::string expected_certificate =
+          "("
           "[({}{})({}{})]"
           "{}"
-        ")";
-    SPIEL_CHECK_EQ(tree->root().ComputeCertificate(), expected_certificate);
-    SPIEL_CHECK_FALSE(tree->is_balanced());
-    SPIEL_CHECK_FALSE(RecomputeBalance(*tree));
-
-    tree->Rebalance();
-    std::string expected_rebalanced_certificate =
-      "("
-        "(({}))"
-        "[({}{})({}{})]"
-      ")";
-    SPIEL_CHECK_EQ(tree->root().ComputeCertificate(),
-                   expected_rebalanced_certificate);
-    SPIEL_CHECK_TRUE(tree->is_balanced());
-    SPIEL_CHECK_TRUE(RecomputeBalance(*tree));
+          ")";
+      SPIEL_CHECK_EQ(tree->root().ComputeCertificate(), expected_certificate);
+      SPIEL_CHECK_FALSE(tree->is_balanced());
+      SPIEL_CHECK_FALSE(RecomputeBalance(*tree));
+    }
+    {
+      std::unique_ptr<InfostateTree> tree =
+        MakeTree(iigs3, 0,
+          /*start_histories=*/{
+            {0  /* = 0 0 */},
+            {1  /* = 1 0 */, 3  /* = 2 2 */}
+          },
+          /*start_reaches=*/{1., 1.},
+          /*max_move_limit=*/1000,
+          /*make_balanced=*/true);
+      std::string expected_rebalanced_certificate =
+          "("
+          "(({}))"
+          "[({}{})({}{})]"
+          ")";
+      SPIEL_CHECK_EQ(tree->root().ComputeCertificate(),
+                     expected_rebalanced_certificate);
+      SPIEL_CHECK_TRUE(tree->is_balanced());
+      SPIEL_CHECK_TRUE(RecomputeBalance(*tree));
+    }
   }
   {  // Full Kuhn rebalancing test.
-    std::unique_ptr<InfostateTree> tree = MakeTree("kuhn_poker", 0);
-    tree->Rebalance();
-
+    std::unique_ptr<InfostateTree> tree = MakeTree(
+        "kuhn_poker", 0, /*max_move_limit=*/1000, /*make_balanced=*/true);
     std::string expected_rebalanced_certificate =
       "(("
         "(["
@@ -411,12 +433,18 @@ void BuildAllDepths(const std::string& game_name) {
 
   for (int move_limit = 0; move_limit < max_moves; ++move_limit) {
     for (int pl = 0; pl < game->NumPlayers(); ++pl) {
-      std::unique_ptr<InfostateTree> tree = MakeTree(game_name, pl, move_limit);
-      SPIEL_CHECK_EQ(tree->is_balanced(), RecomputeBalance(*tree));
-      CheckTreeLeaves(*tree, move_limit);
-      tree->Rebalance();
-      SPIEL_CHECK_TRUE(RecomputeBalance(*tree));
-      CheckTreeLeaves(*tree, move_limit);
+      {
+        std::unique_ptr<InfostateTree> tree = MakeTree(
+            game_name, pl, move_limit, /*make_balanced=*/false);
+        SPIEL_CHECK_EQ(tree->is_balanced(), RecomputeBalance(*tree));
+        CheckTreeLeaves(*tree, move_limit);
+      }
+      {
+        std::unique_ptr<InfostateTree> tree = MakeTree(
+            game_name, pl, move_limit, /*make_balanced=*/true);
+        SPIEL_CHECK_TRUE(RecomputeBalance(*tree));
+        CheckTreeLeaves(*tree, move_limit);
+      }
     }
   }
 }

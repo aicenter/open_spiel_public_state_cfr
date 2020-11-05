@@ -198,12 +198,6 @@ class InfostateTree final {
   size_t num_sequences() const { return sequences_.size(); }
   size_t num_leaves() const { return nodes_at_depth_.back().size(); }
 
-  // Makes sure that all tree leaves are at the same height.
-  // It inserts a linked list of dummy observation nodes with appropriate length
-  // to balance all the leaves. In the worst case this makes the tree about 2x
-  // as large (in the number of nodes).
-  void Rebalance();
-
   // Returns the branching factor of the root node.
   int root_branching_factor() const;
   // Returns cached pointers to leaf nodes of the CFR tree. Unlike the
@@ -258,6 +252,12 @@ class InfostateTree final {
       double terminal_ch_reach_prob, const State* originating_state);
   std::unique_ptr<InfostateNode> MakeRootNode() const;
 
+  // Makes sure that all tree leaves are at the same height.
+  // It inserts a linked list of dummy observation nodes with appropriate length
+  // to balance all the leaves. In the worst case this makes the tree about 2x
+  // as large (in the number of nodes).
+  void Rebalance();
+
   // Track and update information about tree balance.
   void UpdateLeafNode(InfostateNode* node, const State& state,
                       int leaf_depth, double chance_reach_probs);
@@ -285,6 +285,7 @@ class InfostateNode final {
       const DecisionId& decision_id, double terminal_utility,
       double terminal_ch_reach_prob, const State* originating_state);
   friend class InfostateTree;
+
  public:
   InfostateNode(InfostateNode&&) noexcept = default;
   virtual ~InfostateNode() = default;
@@ -334,11 +335,11 @@ class InfostateNode final {
   };
   ChildIterator child_iterator() const { return ChildIterator(children_); }
 
+ private:
   // Make sure that the subtree ends at the requested target depth by inserting
   // dummy observation nodes with one outcome.
   void Rebalance(int target_depth, int current_depth);
 
- private:
   // Get the unique_ptr for this node. The usage is intended only for tree
   // balance manipulation.
   std::unique_ptr<InfostateNode> Release();
@@ -350,9 +351,6 @@ class InfostateNode final {
   void SwapParent(std::unique_ptr<InfostateNode> self, InfostateNode* target, int at_index);
 
  protected:
-  // Needed for adding corresponding_states() during tree traversal.
-  friend class InfostateTree;
-
   // Reference to the tree that this node belongs to. This reference has a valid
   // lifetime, as all the nodes are recursively owned by their parents, and the
   // root is owned by the tree.
