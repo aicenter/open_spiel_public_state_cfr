@@ -112,6 +112,27 @@ void TestValueOracle(const std::string& game_name) {
   }
 }
 
+void TestOracleConvergence() {
+  std::shared_ptr<const Game> game = LoadGame("leduc_poker");
+
+  std::shared_ptr<const dlcfr::LeafEvaluator> terminal_evaluator =
+      dlcfr::MakeTerminalEvaluator();
+  std::shared_ptr<Observer> public_observer =
+      game->MakeObserver(kPublicStateObsType, {});
+  std::shared_ptr<Observer> infostate_observer =
+      game->MakeObserver(kInfoStateObsType, {});
+
+  auto leaf_evaluator =
+      std::make_shared<OracleEvaluator>(game, infostate_observer);
+
+  dlcfr::DepthLimitedCFR dl_solver(game, 4,
+                                   leaf_evaluator, terminal_evaluator);
+  for (int i = 0; i < 5000; ++i) {
+    dl_solver.RunSimultaneousIterations(1);
+    std::cout << i << "," << dl_solver.TrunkExploitability() << std::endl;
+  }
+}
+
 }  // namespace
 }  // namespace ortools
 }  // namespace algorithms
@@ -120,14 +141,15 @@ void TestValueOracle(const std::string& game_name) {
 namespace algorithms = open_spiel::algorithms::ortools;
 
 int main(int argc, char** argv) {
-  algorithms::TestOptimalValuesKuhnBettingPublicState();
-
-  std::vector<std::string> test_games = {
-      "kuhn_poker",
-      "leduc_poker",
-      "goofspiel(players=2,num_cards=4,imp_info=True)",
-  };
-  for (const std::string& game_name : test_games) {
-    algorithms::TestValueOracle(game_name);
-  }
+  algorithms::TestOracleConvergence();
+//  algorithms::TestOptimalValuesKuhnBettingPublicState();
+//
+//  std::vector<std::string> test_games = {
+//      "kuhn_poker",
+//      "leduc_poker",
+//      "goofspiel(players=2,num_cards=4,imp_info=True)",
+//  };
+//  for (const std::string& game_name : test_games) {
+//    algorithms::TestValueOracle(game_name);
+//  }
 }

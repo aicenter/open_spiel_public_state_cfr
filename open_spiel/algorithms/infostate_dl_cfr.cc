@@ -29,14 +29,21 @@ DepthLimitedCFR::DepthLimitedCFR(
 ) :
     game_(std::move(game)),
     trees_(std::move(trees)),
-    propagators_({&trees_[0], &trees_[1]}),
+    cf_values_({
+      std::vector<float>(trees_[0].num_leaves(), 0.),
+      std::vector<float>(trees_[1].num_leaves(), 0.)
+    }),
+    reach_probs_({
+      std::vector<float>(trees_[0].num_leaves(), 0.),
+      std::vector<float>(trees_[1].num_leaves(), 0.)
+    }),
     public_observer_(std::move(public_observer)),
     leaf_evaluator_(std::move(leaf_evaluator)),
     terminal_evaluator_(std::move(terminal_evaluator)),
     player_ranges_({
-                       std::vector<float>(trees_[0].root().num_children(), 1.),
-                       std::vector<float>(trees_[1].root().num_children(), 1.)
-                   }) {
+      std::vector<float>(trees_[0].root_branching_factor(), 1.),
+      std::vector<float>(trees_[1].root_branching_factor(), 1.)
+    }) {
   PrepareLeafNodesForPublicStates();
   PrepareRangesAndValuesForPublicStates();
   CreateContexts();
@@ -96,7 +103,7 @@ void DepthLimitedCFR::PrepareLeafNodesForPublicStates() {
 
   for (int pl = 0; pl < 2; ++pl) {
     int leaf_position = 0;
-    for (CFRNode* leaf_node : propagators_[pl].leaf_nodes()) {
+    for (CFRNode* leaf_node : trees_[pl].leaf_nodes()) {
       SPIEL_CHECK_FALSE(leaf_node->corresponding_states().empty());
       const std::unique_ptr<State>& some_state =
           leaf_node->corresponding_states()[0];
@@ -109,7 +116,7 @@ void DepthLimitedCFR::PrepareLeafNodesForPublicStates() {
       leaf_position++;
     }
 
-    SPIEL_CHECK_EQ(leaf_position, propagators_[pl].num_leaves());
+    SPIEL_CHECK_EQ(leaf_position, trees_[pl].num_leaves());
   }
 }
 
@@ -214,29 +221,24 @@ void TerminalEvaluator::EvaluatePublicState(
 
 void DepthLimitedCFR::SimultaneousTopDownEvaluate() {
   PrepareRootReachProbs();
-  propagators_[0].TopDown();
-  propagators_[1].TopDown();
+  TopDown(trees_[0].nodes_at_depth(), absl::MakeSpan(reach_probs_[0]));
+  TopDown(trees_[1].nodes_at_depth(), absl::MakeSpan(reach_probs_[1]));
   EvaluateLeaves();
 }
 
 void DepthLimitedCFR::RunSimultaneousIterations(int iterations) {
   for (int t = 0; t < iterations; ++t) {
     SimultaneousTopDownEvaluate();
-    propagators_[0].BottomUp();
-    propagators_[1].BottomUp();
-    SPIEL_DCHECK_FLOAT_NEAR(
-        propagators_[0].RootCfValue(player_ranges_[0]),
-        -propagators_[1].RootCfValue(player_ranges_[1]),
-        1e-6);
+    BottomUp(trees_[0].nodes_at_depth(), absl::MakeSpan(cf_values_[0]));
+    BottomUp(trees_[1].nodes_at_depth(), absl::MakeSpan(cf_values_[1]));
+    SPIEL_DCHECK_FLOAT_NEAR(RootValue(/*pl=*/0), -RootValue(/*pl=*/1), 1e-6);
   }
 }
 
 void DepthLimitedCFR::PrepareRootReachProbs() {
   for (int pl = 0; pl < 2; ++pl) {
-    SPIEL_CHECK_EQ(player_ranges_[pl].size(), propagators_[pl].range().size());
-    std::copy(player_ranges_[pl].begin(),
-              player_ranges_[pl].end(),
-              propagators_[pl].range().begin());
+    std::copy(player_ranges_[pl].begin(), player_ranges_[pl].end(),
+              reach_probs_[pl].begin());
   }
 }
 
@@ -253,10 +255,9 @@ void DepthLimitedCFR::EvaluateLeaves() {
         const CFRNode* leaf_node = state.leaf_nodes[pl][j];
         const int trunk_position = leaf_positions_.at(leaf_node);
         SPIEL_DCHECK_GE(trunk_position, 0);
-        SPIEL_DCHECK_LT(trunk_position, propagators_[pl].num_leaves());
+        SPIEL_DCHECK_LT(trunk_position, trees_[pl].num_leaves());
         // Copy range from the trunk to the leaf public state.
-        state.ranges[pl][j] =
-            propagators_[pl].leaves_reach_probs()[trunk_position];
+        state.ranges[pl][j] = reach_probs_[pl][trunk_position];
       }
     }
 
@@ -276,10 +277,9 @@ void DepthLimitedCFR::EvaluateLeaves() {
         const CFRNode* leaf_node = state.leaf_nodes[pl][j];
         const int trunk_position = leaf_positions_.at(leaf_node);
         SPIEL_DCHECK_GE(trunk_position, 0);
-        SPIEL_DCHECK_LT(trunk_position, propagators_[pl].num_leaves());
+        SPIEL_DCHECK_LT(trunk_position, trees_[pl].num_leaves());
         // Copy value from the leaf public state to the trunk.
-        propagators_[pl].leaves_cf_values()[trunk_position] =
-            state.values[pl][j];
+        cf_values_[pl][trunk_position] = state.values[pl][j];
       }
     }
   }
@@ -297,7 +297,10 @@ void DepthLimitedCFR::SetPlayerRanges(
 }
 std::array<absl::Span<const float>, 2> DepthLimitedCFR::RootChildrenCfValues()
 const {
-  return {propagators_[0].values(), propagators_[1].values()};
+  return {
+      absl::MakeConstSpan(&cf_values_[0][0], trees_[0].root_branching_factor()),
+      absl::MakeConstSpan(&cf_values_[1][0], trees_[1].root_branching_factor())
+  };
 }
 
 bool LeafPublicState::IsConsistent() const {
@@ -368,14 +371,14 @@ CFREvaluator::CFREvaluator(std::shared_ptr<const Game> game, int depth_limit,
 }
 
 std::unique_ptr<PublicStateContext> CFREvaluator::CreateContext(
-    const LeafPublicState& leaf_state) const {
+    const LeafPublicState& state) const {
   auto dlcfr = std::make_unique<DepthLimitedCFR>(
-      game, CreateTrees({leaf_state.leaf_nodes[0], leaf_state.leaf_nodes[1]},
+      game, CreateTrees({state.leaf_nodes[0], state.leaf_nodes[1]},
                         infostate_observer, depth_limit),
       leaf_evaluator, terminal_evaluator, public_observer);
   auto cfr_public_state = std::make_unique<CFRPublicState>(std::move(dlcfr));
   SPIEL_DCHECK_TRUE(
-      CheckChildPublicStateConsistency(*cfr_public_state, leaf_state));
+      CheckChildPublicStateConsistency(*cfr_public_state, state));
   return cfr_public_state;
 }
 
@@ -404,8 +407,7 @@ float DepthLimitedCFR::TrunkExploitability() const {
 float DepthLimitedCFR::CfBestResponse(
     const CFRNode& node, Player pl, int* leaf_index) const {
   if (node.is_leaf_node()) {
-    const std::vector<float>& values = propagators_[pl].leaves_cf_values();
-    return values[(*leaf_index)++];
+    return cf_values_[pl][(*leaf_index)++];
   }
   if (node.type() == kObservationInfostateNode) {
     double sum_value = 0.;
@@ -426,8 +428,7 @@ float DepthLimitedCFR::CfBestResponse(
 float DepthLimitedCFR::CfBestResponse(Player responding_player) const {
   int leaf_index = 0;
   const CFRNode& root_node = trees_[responding_player].root();
-  float v = CfBestResponse(root_node, responding_player, &leaf_index);
-  return v;
+  return CfBestResponse(root_node, responding_player, &leaf_index);
 }
 
 }  // namespace dlcfr

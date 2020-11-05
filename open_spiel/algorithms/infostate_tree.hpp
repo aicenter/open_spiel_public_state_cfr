@@ -196,22 +196,6 @@ void InfostateNode<Self>::SwapParent(std::unique_ptr<Self> self, Self* target,
 }
 
 template<class Node>
-InfostateTree<Node>::InfostateTree(const Game& game, Player acting_player,
-                                   int max_move_limit, bool make_balanced)
-    : player_(acting_player),
-      infostate_observer_(game.MakeObserver(kInfoStateObsType, {})),
-      root_(CreateRootNode()) {
-  SPIEL_CHECK_GE(player_, 0);
-  SPIEL_CHECK_LT(player_, game.NumPlayers());
-  SPIEL_CHECK_TRUE(infostate_observer_->HasString());
-
-  std::unique_ptr<State> root_state = game.NewInitialState();
-  RecursivelyBuildTree(&root_, /*depth=*/1, *root_state,
-                       max_move_limit, /*chance_reach_prob=*/1.);
-  if (make_balanced && !is_balanced()) Rebalance();
-}
-
-template<class Node>
 InfostateTree<Node>::InfostateTree(
     const std::vector<const State*>& start_states,
     const std::vector<float>& chance_reach_probs,
@@ -239,11 +223,27 @@ InfostateTree<Node>::InfostateTree(
         chance_reach_probs[i]);
   }
   if (make_balanced && !is_balanced()) Rebalance();
+  nodes_at_depth_.resize(tree_height() + 1);
+  CollectTreeStructure(mutable_root(), 0);
 }
+
+template<class Node>
+InfostateTree<Node>::InfostateTree(const Game& game, Player acting_player,
+                                   int max_move_limit, bool make_balanced)
+    : InfostateTree({game.NewInitialState().get()}, /*chance_reach_probs=*/{1.},
+                    game.MakeObserver(kInfoStateObsType, {}),
+                    acting_player, max_move_limit, make_balanced) {}
 template<class Node>
 void InfostateTree<Node>::Rebalance() {
   root_.Rebalance(tree_height(), 0);
   is_tree_balanced_ = true;
+}
+
+template<class Node>
+void InfostateTree<Node>::CollectTreeStructure(Node* node, int depth) {
+  nodes_at_depth_[depth].push_back(node);
+  for (Node& child : node->child_iterator())
+    CollectTreeStructure(&child, depth + 1);
 }
 
 template<class Node>

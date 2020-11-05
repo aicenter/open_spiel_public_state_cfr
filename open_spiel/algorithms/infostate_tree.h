@@ -210,6 +210,23 @@ class InfostateTree final {
   // as large (in the number of nodes).
   void Rebalance();
 
+  // Returns the branching factor of the root node.
+  int root_branching_factor() const { return root_.num_children(); }
+  // Returns cached pointers to leaf nodes of the CFR tree. Unlike the
+  // CFRTree::leaves_iterator(), this does not need to recursively traverse
+  // the tree.
+  const std::vector<Node*>& leaf_nodes() const {
+    return nodes_at_depth_.back();
+  }
+  // Returns the number of leaf nodes.
+  int num_leaves() const {
+    return nodes_at_depth_.back().size();
+  }
+  const std::vector<std::vector<Node*>>& nodes_at_depth() const {
+    return nodes_at_depth_;
+  }
+
+  // TODO: remove leaves iterator.
   // Iterate over all leaves.
   class LeavesIterator {
     const InfostateTree* tree_;
@@ -238,6 +255,8 @@ class InfostateTree final {
   int tree_height_ = -1;
   // We call a tree balanced if all leaves are in the same depth.
   bool is_tree_balanced_ = true;
+  // Tree structure information. Pointers are collected after rebalancing.
+  std::vector<std::vector<Node*>> nodes_at_depth_;
 
   Node CreateRootNode() const;
 
@@ -260,6 +279,8 @@ class InfostateTree final {
                          int move_limit, double chance_reach_prob);
   void BuildObservationNode(Node* parent, int depth, const State& state,
                             int move_limit, double chance_reach_prob);
+
+  void CollectTreeStructure(Node* node, int depth);
 };
 
 // Provide convenient types for usage in CFR-based algorithms.

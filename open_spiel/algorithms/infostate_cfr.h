@@ -62,71 +62,33 @@ namespace algorithms {
 //
 // Before the calling the top-down and bottom-up passes, ranges and leaf values
 // must be provided externally.
-class InfostateTreeValuePropagator {
-  // Tree structure information.
-  std::vector<std::vector<CFRNode*>> nodes_at_depth;
 
-  // Mutable values to keep track of.
-  // These have the size of largest depth of the tree (i.e. leaf nodes).
-  std::vector<float> reach_probs;
-  std::vector<float> cf_values;
+// Construct the value propagator, so we can use vectorized top-down
+// and bottom-up passes.
+// We require the tree is balanced: we need to make sure that all terminals
+// are at the same depth so that we can propagate the computation of reach
+// probs / cf values in a single vector. This requirement is typically
+// satisfied by most domains already during the tree construction anyway.
 
- public:
-  // Construct the value propagator, so we can use vectorized top-down
-  // and bottom-up passes.
-  // We require the tree is balanced: we need to make sure that all terminals
-  // are at the same depth so that we can propagate the computation of reach
-  // probs / cf values in a single vector. This requirement is typically
-  // satisfied by most domains already during the tree construction anyway.
-  /*implicit*/ InfostateTreeValuePropagator(CFRTree* balanced_tree);
+// Make a top-down pass, using the current policy stored in the tree nodes.
+// This computes the reach_probs_ buffer for storing cumulative product
+// of reach probabilities for leaf nodes.
+// The starting values at depth 1 must be provided externally by writing
+// to range()
+void TopDown(const std::vector<std::vector<CFRNode*>>& nodes_at_depth,
+             absl::Span<float> reach_probs);
 
-  // Make a top-down pass, using the current policy stored in the tree nodes.
-  // This computes the reach_probs_ buffer for storing cumulative product
-  // of reach probabilities for leaf nodes.
-  // The starting values at depth 1 must be provided externally by writing
-  // to range()
-  void TopDown();
+// Make a bottom-up pass, starting with the current cf_values stored
+// in the buffer. This loopss over all depths from the bottom.
+// The leaf values must be provided externally by writing to leaves_cf_values().
+void BottomUp(const std::vector<std::vector<CFRNode*>>& nodes_at_depth,
+              absl::Span<float> cf_values);
 
-  // Make a bottom-up pass, starting with the current cf_values stored
-  // in the buffer. This loopss over all depths from the bottom.
-  // The leaf values must be provided externally by writing to leaves_cf_values().
-  void BottomUp();
-
-  // Returns the branching factor of the root node.
-  int root_branching_factor() const {
-    return nodes_at_depth[0][0]->num_children();
-  }
-  // Returns the (writable) range, i.e. the reach probabilities
-  // of the infostate tree's root children.
-  absl::Span<float> range() {
-    return absl::MakeSpan(/*ptr=*/&reach_probs[0],
-                          /*size=*/root_branching_factor());
-  }
-  // Returns the (read-only) counter-factual values of the infostate tree's
-  // root children. These values are valid only after a BottomUp() pass is made.
-  absl::Span<const float> values() const {
-    return absl::MakeSpan(/*ptr=*/&cf_values[0],
-                          /*size=*/root_branching_factor());
-  }
-  std::vector<float>& leaves_reach_probs() { return reach_probs; }
-  const std::vector<float>& leaves_reach_probs() const { return reach_probs; }
-  std::vector<float>& leaves_cf_values() { return cf_values; }
-  const std::vector<float>& leaves_cf_values() const { return cf_values; }
-
-  // Calculates the root cf value as weighted sum of the cf_values()
-  // (the weights are the respective ranges). If the supplied range is empty,
-  // it returns their sum (i.e. all weights have a value of 1).
-  float RootCfValue(absl::Span<const float> range = {}) const;
-
-  // Returns cached pointers to leaf nodes of the CFR tree. Unlike the
-  // CFRTree::leaves_iterator(), this does not need to recursively traverse
-  // the tree.
-  const std::vector<CFRNode*>& leaf_nodes() const {
-    return nodes_at_depth.back();
-  }
-  // Returns the number of leaf nodes.
-  int num_leaves() const { return nodes_at_depth.back().size(); }
-};
+// Calculates the root cf value as weighted sum of the cf_values()
+// (the weights are the respective ranges). If the supplied range is empty,
+// it returns their sum (i.e. all weights have a value of 1).
+float RootCfValue(int root_branching_factor, absl::Span<const float> cf_values,
+                  absl::Span<const float> range = {});
 
 // Run vectorized CFR on the whole game or on specified trees.
 class InfostateCFR {
@@ -141,7 +103,9 @@ class InfostateCFR {
 
   // Computes the root value. If the algorithm is running on the full trees
   // of the game, this converges to the game value.
-  float RootValue() const { return propagators_[0].RootCfValue(); }
+  float RootValue() const {
+    return RootCfValue(trees_[0].root_branching_factor(), cf_values_[0]);
+  }
 
   CFRInfoStateValuesPtrTable InfoStateValuesPtrTable();
   std::shared_ptr<Policy> AveragePolicy();
@@ -156,14 +120,17 @@ class InfostateCFR {
 
   // The trees which hold the strategies of the players.
   std::array<CFRTree, 2> trees_;
-  // The propagators that make the top-down bottom-up passed on each iteration.
-  std::array<InfostateTreeValuePropagator, 2> propagators_;
   // Map from player 0 index (key) to player 1 (value).
   std::vector<int> terminal_permutation_;
   // Chance reach probs.
   std::vector<float> terminal_ch_reaches_;
   // For the player 0 and already multiplied by chance reach probs.
   std::vector<float> terminal_values_;
+
+  // Mutable values to keep track of.
+  // These have the size of largest depth of the tree (i.e. leaf nodes).
+  std::array<std::vector<float>, 2> reach_probs_;
+  std::array<std::vector<float>, 2> cf_values_;
 };
 
 }  // namespace algorithms

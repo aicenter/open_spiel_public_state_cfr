@@ -146,7 +146,7 @@ void TestRecursiveDepthLimitedSolving(const std::string& game_name) {
         vec_solver.RunSimultaneousIterations(1);
         dl_solver->RunSimultaneousIterations(1);
         SPIEL_CHECK_FLOAT_NEAR(
-            vec_solver.RootValue(), dl_solver->RootCfValue(), 1e-6);
+            vec_solver.RootValue(), dl_solver->RootValue(), 1e-6);
         CheckIterationConsistency(dl_ptable, vec_ptable);
       }
     }

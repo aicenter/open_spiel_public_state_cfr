@@ -128,8 +128,11 @@ class DepthLimitedCFR {
   void SimultaneousTopDownEvaluate();
 
   void SetPlayerRanges(const std::array<std::vector<float>, 2>& ranges);
-  float RootCfValue() const {
-    return propagators_[0].RootCfValue(player_ranges_[0]);
+  float RootValue(Player pl = 0) const {
+    const int root_branching = trees_[pl].root_branching_factor();
+    return RootCfValue(
+        root_branching, absl::MakeConstSpan(&cf_values_[pl][0], root_branching),
+        player_ranges_[pl]);
   }
   std::array<absl::Span<const float>, 2> RootChildrenCfValues() const;
 
@@ -154,7 +157,6 @@ class DepthLimitedCFR {
  private:
   const std::shared_ptr<const Game> game_;
   std::array<CFRTree, 2> trees_;
-  std::array<InfostateTreeValuePropagator, 2> propagators_;
   const std::shared_ptr<Observer> public_observer_;
   const std::shared_ptr<const LeafEvaluator> leaf_evaluator_;
   const std::shared_ptr<const LeafEvaluator> terminal_evaluator_;
@@ -164,6 +166,11 @@ class DepthLimitedCFR {
   std::vector<LeafPublicState> public_leaves_;
   std::vector<std::unique_ptr<PublicStateContext>> contexts_;
   std::map<const CFRNode*, int> leaf_positions_;
+
+  // Mutable values to keep track of.
+  // These have the size of largest depth of the tree (i.e. leaf nodes).
+  std::array<std::vector<float>, 2> reach_probs_;
+  std::array<std::vector<float>, 2> cf_values_;
 
   void PrepareRootReachProbs();
   void PrepareLeafNodesForPublicStates();
@@ -203,7 +210,7 @@ struct CFREvaluator : public LeafEvaluator {
                std::shared_ptr<Observer> infostate_observer);
 
   std::unique_ptr<PublicStateContext> CreateContext(
-      const LeafPublicState& leaf_state) const override;
+      const LeafPublicState& state) const override;
   void EvaluatePublicState(LeafPublicState* public_state,
                            PublicStateContext* context) const override;
 };

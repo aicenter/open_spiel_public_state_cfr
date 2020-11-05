@@ -19,49 +19,8 @@
 namespace open_spiel {
 namespace algorithms {
 
-namespace {
-// Make sure we can get the average policy to compute expected values
-// and exploitability.
-class InfostateCFRAveragePolicy : public Policy {
-  const CFRInfoStateValuesPtrTable infostate_ptr_table_;
- public:
-  InfostateCFRAveragePolicy(const CFRInfoStateValuesPtrTable& ptable)
-      : infostate_ptr_table_(ptable) {}
-  ActionsAndProbs GetStatePolicy(const std::string& info_state) const override {
-    const CFRInfoStateValues& vs = *infostate_ptr_table_.at(info_state);
-    float sum_prob = 0.0;
-    for (int i = 0; i < vs.num_actions(); ++i) {
-      sum_prob += vs.cumulative_policy[i];
-    }
-
-    ActionsAndProbs out;
-    out.reserve(vs.num_actions());
-    for (int i = 0; i < vs.num_actions(); ++i) {
-      if (sum_prob > 0) {
-        out.push_back({vs.legal_actions[i],
-                       vs.cumulative_policy[i] / sum_prob});
-      } else {
-        // Return a uniform policy at this node
-        out.push_back({vs.legal_actions[i],
-                       vs.cumulative_policy[i] / vs.num_actions()});
-      }
-    }
-    return out;
-  }
-};
-
-void CollectTreeStructure(
-    CFRNode* node, int depth,
-    std::vector<std::vector<CFRNode*>>* nodes_at_depth) {
-  (*nodes_at_depth)[depth].push_back(node);
-
-  for (CFRNode& child : node->child_iterator())
-    CollectTreeStructure(&child, depth + 1, nodes_at_depth);
-}
-
-}  // namespace
-
-void InfostateTreeValuePropagator::TopDown() {
+void TopDown(const std::vector<std::vector<CFRNode*>>& nodes_at_depth,
+             absl::Span<float> reach_probs) {
   const int tree_depth = nodes_at_depth.size();
   // Loop over all depths, except for the first two depths:
   // - Depth 0: corresponds to the dummy observation node, which is used mainly
@@ -112,7 +71,9 @@ void InfostateTreeValuePropagator::TopDown() {
     SPIEL_DCHECK_EQ(right_offset, 0);
   }
 }
-void InfostateTreeValuePropagator::BottomUp() {
+
+void BottomUp(const std::vector<std::vector<CFRNode*>>& nodes_at_depth,
+              absl::Span<float> cf_values) {
   const int tree_depth = nodes_at_depth.size();
   // Loop over all depths, except for the last one, as it is already set
   // by calling the leaf evaluation.
@@ -175,35 +136,70 @@ void InfostateTreeValuePropagator::BottomUp() {
     SPIEL_DCHECK_EQ(left_offset, nodes_at_depth[d + 1].size());
   }
 }
-InfostateTreeValuePropagator::InfostateTreeValuePropagator(
-    CFRTree* balanced_tree) {
-  SPIEL_DCHECK_TRUE(balanced_tree->is_balanced());
-  nodes_at_depth.resize(balanced_tree->tree_height() + 1);
-  CollectTreeStructure(balanced_tree->mutable_root(), 0, &nodes_at_depth);
 
-  const int max_nodes_across_depths = nodes_at_depth.back().size();
-  cf_values = std::vector<float>(max_nodes_across_depths);
-  reach_probs = std::vector<float>(max_nodes_across_depths);
-}
-float InfostateTreeValuePropagator::RootCfValue(
-    absl::Span<const float> range) const {
+float RootCfValue(int root_branching_factor, absl::Span<const float> cf_values,
+                  absl::Span<const float> range) {
   SPIEL_CHECK_TRUE(range.empty() ||
-      range.size() == root_branching_factor());
+                   (range.size() == root_branching_factor
+                    && range.size() == cf_values.size()));
   float root_value = 0.;
   if (range.empty()) {
-    for (int i = 0; i < root_branching_factor(); ++i) {
+    for (int i = 0; i < root_branching_factor; ++i) {
       root_value += cf_values[i];
     }
   } else {
-    for (int i = 0; i < root_branching_factor(); ++i) {
+    for (int i = 0; i < root_branching_factor; ++i) {
       root_value += range[i] * cf_values[i];
     }
   }
   return root_value;
 }
 
+namespace {
+// Make sure we can get the average policy to compute expected values
+// and exploitability.
+class InfostateCFRAveragePolicy : public Policy {
+  const CFRInfoStateValuesPtrTable infostate_ptr_table_;
+ public:
+  InfostateCFRAveragePolicy(const CFRInfoStateValuesPtrTable& ptable)
+      : infostate_ptr_table_(ptable) {}
+  ActionsAndProbs GetStatePolicy(const std::string& info_state) const override {
+    const CFRInfoStateValues& vs = *infostate_ptr_table_.at(info_state);
+    double sum_prob = 0.0;
+    for (int i = 0; i < vs.num_actions(); ++i) {
+      sum_prob += vs.cumulative_policy[i];
+    }
+
+    ActionsAndProbs out;
+    out.reserve(vs.num_actions());
+    for (int i = 0; i < vs.num_actions(); ++i) {
+      if (sum_prob > 0) {
+        out.push_back({vs.legal_actions[i],
+                       vs.cumulative_policy[i] / sum_prob});
+      } else {
+        // Return a uniform policy at this node
+        out.push_back({vs.legal_actions[i],
+                       vs.cumulative_policy[i] / vs.num_actions()});
+      }
+    }
+    return out;
+  }
+};
+
+}  // namespace
+
 InfostateCFR::InfostateCFR(std::array<CFRTree, 2> cfr_trees)
-    : trees_(std::move(cfr_trees)), propagators_({&trees_[0], &trees_[1]}) {
+    : trees_(std::move(cfr_trees)),
+      cf_values_({
+        std::vector<float>(trees_[0].num_leaves(), 0.),
+        std::vector<float>(trees_[1].num_leaves(), 0.)
+      }),
+      reach_probs_({
+        std::vector<float>(trees_[0].num_leaves(), 0.),
+        std::vector<float>(trees_[1].num_leaves(), 0.)
+      }) {
+  SPIEL_CHECK_TRUE(trees_[0].is_balanced());
+  SPIEL_CHECK_TRUE(trees_[1].is_balanced());
   PrepareTerminals();
 }
 InfostateCFR::InfostateCFR(const Game& game)
@@ -212,30 +208,25 @@ InfostateCFR::InfostateCFR(const Game& game)
 void InfostateCFR::RunSimultaneousIterations(int iterations) {
   for (int t = 0; t < iterations; ++t) {
     PrepareRootReachProbs();
-    propagators_[0].TopDown();
-    propagators_[1].TopDown();
-    SPIEL_DCHECK_TRUE(fabs(TerminalReachProbSum() - 1.0) < 1e-3);
+    TopDown(trees_[0].nodes_at_depth(), absl::MakeSpan(reach_probs_[0]));
+    TopDown(trees_[1].nodes_at_depth(), absl::MakeSpan(reach_probs_[1]));
+    SPIEL_CHECK_FLOAT_NEAR(TerminalReachProbSum(), 1.0, 1e-3);
 
     EvaluateLeaves();
-    propagators_[0].BottomUp();
-    propagators_[1].BottomUp();
-    SPIEL_DCHECK_TRUE(
-        fabs(propagators_[0].RootCfValue() + propagators_[1].RootCfValue())
-            < 1e-6);
+    BottomUp(trees_[0].nodes_at_depth(), absl::MakeSpan(cf_values_[0]));
+    BottomUp(trees_[1].nodes_at_depth(), absl::MakeSpan(cf_values_[1]));
+    SPIEL_CHECK_FLOAT_NEAR(
+        RootCfValue(trees_[0].root_branching_factor(), cf_values_[0]),
+        - RootCfValue(trees_[1].root_branching_factor(), cf_values_[1]), 1e-6);
   }
 }
 void InfostateCFR::RunAlternatingIterations(int iterations) {
-  // Warm up reach probs buffers.
-  PrepareRootReachProbs();
-  propagators_[0].TopDown();
-  propagators_[1].TopDown();
-
   for (int t = 0; t < iterations; ++t) {
-    for (int i = 0; i < 2; ++i) {
-      PrepareRootReachProbs(1 - i);
-      propagators_[1 - i].TopDown();
-      EvaluateLeaves(i);
-      propagators_[i].BottomUp();
+    for (int pl = 0; pl < 2; ++pl) {
+      PrepareRootReachProbs(1 - pl);
+      TopDown(trees_[1 - pl].nodes_at_depth(), absl::MakeSpan(reach_probs_[1 - pl]));
+      EvaluateLeaves(pl);
+      BottomUp(trees_[pl].nodes_at_depth(), absl::MakeSpan(cf_values_[pl]));
     }
   }
 }
@@ -245,35 +236,28 @@ void InfostateCFR::PrepareRootReachProbs() {
 }
 
 void InfostateCFR::PrepareRootReachProbs(Player pl) {
-  absl::Span<float> root_reaches = propagators_[pl].range();
-  for (int i = 0; i < root_reaches.size(); ++i) {
-    root_reaches[i] = 1.;
+  for (int i = 0; i < trees_[pl].root_branching_factor(); ++i) {
+    reach_probs_[pl][i] = 1.;
   }
 }
 
 void InfostateCFR::EvaluateLeaves() {
-  auto& prop = propagators_;
-  auto& u = terminal_values_;
-  SPIEL_DCHECK_EQ(prop[0].num_leaves(), prop[1].num_leaves());
-  for (int i = 0; i < prop[0].num_leaves(); ++i) {
+  for (int i = 0; i < trees_[0].num_leaves(); ++i) {
     const int j = terminal_permutation_[i];
-    prop[0].leaves_cf_values()[i] =  u[i] * prop[1].leaves_reach_probs()[j];
-    prop[1].leaves_cf_values()[j] = -u[i] * prop[0].leaves_reach_probs()[i];
+    cf_values_[0][i] =  terminal_values_[i] * reach_probs_[1][j];
+    cf_values_[1][j] = -terminal_values_[i] * reach_probs_[0][i];
   }
 }
 void InfostateCFR::EvaluateLeaves(Player pl) {
-  auto& prop = propagators_;
-  auto& u = terminal_values_;
-  SPIEL_DCHECK_EQ(prop[0].num_leaves(), prop[1].num_leaves());
   if (pl == 0) {
-    for (int i = 0; i < prop[0].num_leaves(); ++i) {
+    for (int i = 0; i <  trees_[0].num_leaves(); ++i) {
       const int j = terminal_permutation_[i];
-      prop[0].leaves_reach_probs()[i] = u[i] * prop[1].leaves_reach_probs()[j];
+      cf_values_[0][i] =  terminal_values_[i] * reach_probs_[1][j];
     }
   } else {
-    for (int i = 0; i < prop[1].num_leaves(); ++i) {
+    for (int i = 0; i < trees_[1].num_leaves(); ++i) {
       const int j = terminal_permutation_[i];
-      prop[1].leaves_reach_probs()[j] = -u[i] * prop[0].leaves_reach_probs()[i];
+      cf_values_[1][j] = -terminal_values_[i] * reach_probs_[0][i];
     }
   }
 }
@@ -284,8 +268,8 @@ CFRInfoStateValuesPtrTable InfostateCFR::InfoStateValuesPtrTable() {
   return vec_ptable;
 }
 void InfostateCFR::PrepareTerminals() {
-  const std::vector<CFRNode*>& leaves_a = propagators_[0].leaf_nodes();
-  const std::vector<CFRNode*>& leaves_b = propagators_[1].leaf_nodes();
+  const std::vector<CFRNode*>& leaves_a = trees_[0].leaf_nodes();
+  const std::vector<CFRNode*>& leaves_b = trees_[1].leaf_nodes();
   SPIEL_CHECK_EQ(leaves_a.size(), leaves_b.size());
 
   const int num_terminals = leaves_a.size();
@@ -329,8 +313,7 @@ float InfostateCFR::TerminalReachProbSum() {
   for (int i = 0; i < num_terminals; ++i) {
     const int j = terminal_permutation_[i];
     const float leaf_reach = terminal_ch_reaches_[i]
-        * propagators_[0].leaves_reach_probs()[i]
-        * propagators_[1].leaves_reach_probs()[j];
+        * reach_probs_[0][i] * reach_probs_[1][j];
     SPIEL_CHECK_LE(leaf_reach, 1.0);
     reach_sum += leaf_reach;
   }
