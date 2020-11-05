@@ -309,8 +309,10 @@ class InfostateNode final {
 
   InfostateNode* child_at(int i) const { return children_.at(i).get(); }
   int num_children() const { return children_.size(); }
-  InfostateNode* AddChild(std::unique_ptr<InfostateNode> child);
-  InfostateNode* GetChild(const std::string& infostate_string) const;
+  VecWithUniquePtrsIterator<InfostateNode> child_iterator() const {
+    return VecWithUniquePtrsIterator(children_);
+  }
+
   const InfostateNode* FindNode(const std::string& infostate_lookup) const;
   const std::vector<Action>& TerminalHistory() const;
 
@@ -318,10 +320,6 @@ class InfostateNode final {
   std::string ToString() const;
   // Compute subtree certificate (string representation) for easy comparison.
   std::string ComputeCertificate() const;
-
-  VecWithUniquePtrsIterator<InfostateNode> child_iterator() const {
-    return VecWithUniquePtrsIterator(children_);
-  }
 
  private:
   // Make sure that the subtree ends at the requested target depth by inserting
@@ -338,15 +336,16 @@ class InfostateNode final {
   // undefined: the node we want to swap a parent for can be root of a subtree.
   void SwapParent(std::unique_ptr<InfostateNode> self, InfostateNode* target, int at_index);
 
+  InfostateNode* AddChild(std::unique_ptr<InfostateNode> child);
+  InfostateNode* GetChild(const std::string& infostate_string) const;
  protected:
   // Reference to the tree that this node belongs to. This reference has a valid
-  // lifetime, as all the nodes are recursively owned by their parents, and the
-  // root is owned by the tree.
+  // lifetime, as it is allocated once on heap and never moved.
   const InfostateTree& tree_;
   // Pointer to the parent node.
   // This is not const so that we can change it when we SwapParent().
   InfostateNode* parent_;
-  // Position of this node in the parent's children, i.e. it should hold that
+  // Position of this node in the parent's children, i.e. it holds that
   //   parent_->children_.at(incoming_index_).get() == this.
   // For decision nodes this corresponds also to the
   //   State::LegalActions(player_).at(incoming_index_)
@@ -357,7 +356,7 @@ class InfostateNode final {
   const InfostateNodeType type_;
   // Identifier of the infostate.
   const std::string infostate_string_;
-  // Identifier if this node is a decision node.
+  // Identifier of this node, if it is a decision node.
   const DecisionId decision_id_;
   // Utility of terminal state corresponding to a terminal infostate node.
   const double terminal_utility_;
