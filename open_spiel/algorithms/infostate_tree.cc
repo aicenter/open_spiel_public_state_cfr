@@ -107,8 +107,8 @@ InfostateNode* InfostateNode::GetChild(const std::string& infostate_string) cons
 const InfostateNode* InfostateNode::FindNode(const std::string& infostate_lookup) const {
   if (infostate_string_ == infostate_lookup)
     return open_spiel::down_cast<const InfostateNode*>(this);
-  for (InfostateNode& child : child_iterator()) {
-    if (const InfostateNode* node = child.FindNode(infostate_lookup)) {
+  for (InfostateNode* child : child_iterator()) {
+    if (const InfostateNode* node = child->FindNode(infostate_lookup)) {
       return node;
     }
   }
@@ -124,8 +124,8 @@ std::string InfostateNode::ComputeCertificate() const {
   if (type_ == kTerminalInfostateNode) return "{}";
 
   std::vector<std::string> certificates;
-  for (InfostateNode& child : child_iterator()) {
-    certificates.push_back(child.ComputeCertificate());
+  for (InfostateNode* child : child_iterator()) {
+    certificates.push_back(child->ComputeCertificate());
   }
   std::sort(certificates.begin(), certificates.end());
 
@@ -251,8 +251,8 @@ void InfostateTree::Rebalance() {
 
 void InfostateTree::CollectTreeStructure(InfostateNode* node, int depth) {
   nodes_at_depth_[depth].push_back(node);
-  for (InfostateNode& child : node->child_iterator())
-    CollectTreeStructure(&child, depth + 1);
+  for (InfostateNode* child : node->child_iterator())
+    CollectTreeStructure(child, depth + 1);
 }
 
 void InfostateTree::PrintStats() {

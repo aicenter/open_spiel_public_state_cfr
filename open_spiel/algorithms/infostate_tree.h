@@ -209,6 +209,7 @@ class InfostateTree final {
 
   // For debugging.
   void PrintStats();
+
  private:
   const Player player_;
   const std::shared_ptr<Observer> infostate_observer_;
@@ -254,6 +255,29 @@ class InfostateTree final {
   void CollectTreeStructure(InfostateNode* node, int depth);
 };
 
+// Iterate over a vector of unique pointers, but expose only the raw pointers.
+template<class T>
+class VecWithUniquePtrsIterator {
+  int pos_;
+  const std::vector<std::unique_ptr<T>>& vec_;
+ public:
+  explicit VecWithUniquePtrsIterator(
+      const std::vector<std::unique_ptr<T>>& vec, int pos = 0)
+      : pos_(pos), vec_(vec) {}
+  VecWithUniquePtrsIterator& operator++() { pos_++; return *this; }
+  bool operator==(VecWithUniquePtrsIterator other) const {
+    return pos_ == other.pos_;
+  }
+  bool operator!=(VecWithUniquePtrsIterator other) const {
+    return !(*this == other);
+  }
+  T* operator*() { return vec_[pos_].get(); }
+  VecWithUniquePtrsIterator begin() const { return *this; }
+  VecWithUniquePtrsIterator end() const {
+    return VecWithUniquePtrsIterator(vec_, vec_.size());
+  }
+};
+
 // TODO docs
 class InfostateNode final {
  private:
@@ -295,24 +319,9 @@ class InfostateNode final {
   // Compute subtree certificate (string representation) for easy comparison.
   std::string ComputeCertificate() const;
 
-  // Iterate over children and expose references to the children
-  // (instead of unique_ptrs).
-  class ChildIterator {
-    int pos_;
-    const std::vector<std::unique_ptr<InfostateNode>>& children_;
-   public:
-    ChildIterator(const std::vector<std::unique_ptr<InfostateNode>>& children,
-                  int pos = 0) : pos_(pos), children_(children) {}
-    ChildIterator& operator++() { pos_++; return *this; }
-    bool operator==(ChildIterator other) const { return pos_ == other.pos_; }
-    bool operator!=(ChildIterator other) const { return !(*this == other); }
-    InfostateNode& operator*() { return *children_[pos_]; }
-    ChildIterator begin() const { return *this; }
-    ChildIterator end() const {
-      return ChildIterator(children_, children_.size());
-    }
-  };
-  ChildIterator child_iterator() const { return ChildIterator(children_); }
+  VecWithUniquePtrsIterator<InfostateNode> child_iterator() const {
+    return VecWithUniquePtrsIterator(children_);
+  }
 
  private:
   // Make sure that the subtree ends at the requested target depth by inserting

@@ -90,15 +90,15 @@ void SpecifyReachProbs(opres::MPSolver* solver, std::unordered_map<const Infosta
   if (node->type() == kTerminalInfostateNode)
     return;  // Nothing to do.
   if (node->type() == kObservationInfostateNode) {
-    for (InfostateNode& child : node->child_iterator()) {
-      SpecifyReachProbs(solver, data_table, &child);
+    for (InfostateNode* child : node->child_iterator()) {
+      SpecifyReachProbs(solver, data_table, child);
 
       // Equality constraint: parent = child
       opres::MPConstraint* ct = solver->MakeRowConstraint(
           /*lb=*/0, /*ub=*/0,
-          absl::StrCat("rp_", node->ToString(), "_", child.ToString()));
+          absl::StrCat("rp_", node->ToString(), "_", child->ToString()));
       ct->SetCoefficient(data_table[node].var_reach_prob_, -1);
-      ct->SetCoefficient(data_table[&child].var_reach_prob_, 1);
+      ct->SetCoefficient(data_table[child].var_reach_prob_, 1);
     }
     return;
   }
@@ -107,9 +107,9 @@ void SpecifyReachProbs(opres::MPSolver* solver, std::unordered_map<const Infosta
     opres::MPConstraint* ct = solver->MakeRowConstraint(
         /*lb=*/0, /*ub=*/0, absl::StrCat("rp_", node->ToString()));
     ct->SetCoefficient(data_table[node].var_reach_prob_, -1);
-    for (InfostateNode& child : node->child_iterator()) {
-      SpecifyReachProbs(solver, data_table, &child);
-      ct->SetCoefficient(data_table[&child].var_reach_prob_, 1);
+    for (InfostateNode* child : node->child_iterator()) {
+      SpecifyReachProbs(solver, data_table, child);
+      ct->SetCoefficient(data_table[child].var_reach_prob_, 1);
     }
     return;
   }
@@ -126,13 +126,13 @@ void SpecifyCfValues(
              absl::StrCat("cf_", node->ToString()));
 
   if (node->type() == kDecisionInfostateNode) {
-    for (InfostateNode& child : node->child_iterator()) {
-      SpecifyCfValues(solver, data_table, &child, terminal_map);
+    for (InfostateNode* child : node->child_iterator()) {
+      SpecifyCfValues(solver, data_table, child, terminal_map);
       opres::MPConstraint* ct = solver->MakeRowConstraint(
-          absl::StrCat("cf_", node->ToString(), "_", child.ToString()));
+          absl::StrCat("cf_", node->ToString(), "_", child->ToString()));
       ct->SetUB(0.);
       ct->SetCoefficient(data_table[node].var_cf_value_, -1);
-      ct->SetCoefficient(data_table[&child].var_cf_value_, 1);
+      ct->SetCoefficient(data_table[child].var_cf_value_, 1);
     }
     return;
   }
@@ -153,9 +153,9 @@ void SpecifyCfValues(
   if (node->type() == kObservationInfostateNode) {
     // Value constraint: sum of children = parent
     ct->SetLB(0.);
-    for (InfostateNode& child : node->child_iterator()) {
-      SpecifyCfValues(solver, data_table, &child, terminal_map);
-      ct->SetCoefficient(data_table[&child].var_cf_value_, 1);
+    for (InfostateNode* child : node->child_iterator()) {
+      SpecifyCfValues(solver, data_table, child, terminal_map);
+      ct->SetCoefficient(data_table[child].var_cf_value_, 1);
     }
     return;
   }
@@ -165,15 +165,15 @@ void SpecifyCfValues(
 
 void CollectReachProbsSolutions(std::unordered_map<const InfostateNode*, SolverData>& data_table, InfostateNode* node) {
   data_table[node].sol_reach_prob_ = data_table[node].var_reach_prob_->solution_value();
-  for (InfostateNode& child : node->child_iterator()) {
-    CollectReachProbsSolutions(data_table, &child);
+  for (InfostateNode* child : node->child_iterator()) {
+    CollectReachProbsSolutions(data_table, child);
   }
 }
 
 void CollectCfValuesSolutions(std::unordered_map<const InfostateNode*, SolverData>& data_table, InfostateNode* node) {
   data_table[node].sol_cf_value_ = data_table[node].var_cf_value_->solution_value();
-  for (InfostateNode& child : node->child_iterator()) {
-    CollectCfValuesSolutions(data_table, &child);
+  for (InfostateNode* child : node->child_iterator()) {
+    CollectCfValuesSolutions(data_table, child);
   }
 }
 
@@ -282,8 +282,8 @@ void CollectTabularPolicy(TabularPolicy* policy, std::unordered_map<const Infost
     policy->SetStatePolicy(node.infostate_string(), state_policy);
   }
 
-  for (const InfostateNode& child : node.child_iterator()) {
-    CollectTabularPolicy(policy, data_table, child);
+  for (const InfostateNode* child : node.child_iterator()) {
+    CollectTabularPolicy(policy, data_table, *child);
   }
 }
 

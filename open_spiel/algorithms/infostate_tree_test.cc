@@ -70,8 +70,8 @@ std::unique_ptr<InfostateTree> MakeTree(
 bool IsNodeBalanced(const InfostateNode& node, int height, int current_depth = 0) {
   if (node.is_leaf_node()) return height == current_depth;
 
-  for (const InfostateNode& child : node.child_iterator())
-    if (!IsNodeBalanced(child, height, current_depth + 1))
+  for (const InfostateNode* child : node.child_iterator())
+    if (!IsNodeBalanced(*child, height, current_depth + 1))
       return false;
 
   return true;

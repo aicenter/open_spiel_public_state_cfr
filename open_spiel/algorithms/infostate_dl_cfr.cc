@@ -429,15 +429,15 @@ float DepthLimitedCFR::CfBestResponse(
   }
   if (node.type() == kObservationInfostateNode) {
     double sum_value = 0.;
-    for (const InfostateNode& child : node.child_iterator()) {
-      sum_value += CfBestResponse(child, pl, leaf_index);
+    for (const InfostateNode* child : node.child_iterator()) {
+      sum_value += CfBestResponse(*child, pl, leaf_index);
     }
     return sum_value;
   }
   SPIEL_CHECK_EQ(node.type(), kDecisionInfostateNode);
   double max_value = -std::numeric_limits<float>::infinity();
-  for (const InfostateNode& child : node.child_iterator()) {
-    max_value = std::fmax(CfBestResponse(child, pl, leaf_index),
+  for (const InfostateNode* child : node.child_iterator()) {
+    max_value = std::fmax(CfBestResponse(*child, pl, leaf_index),
                           max_value);
   }
   return max_value;
