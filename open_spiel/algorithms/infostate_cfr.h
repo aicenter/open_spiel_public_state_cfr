@@ -76,16 +76,16 @@ namespace algorithms {
 // The starting values at depth 1 must be provided externally by writing
 // to range()
 void TopDown(
-    const std::vector<std::vector<CFRNode*>>& nodes_at_depth,
-    std::unordered_map<const CFRNode*, CFRInfoStateValues>& node_values,
+    const std::vector<std::vector<InfostateNode*>>& nodes_at_depth,
+    std::unordered_map<const InfostateNode*, CFRInfoStateValues>& node_values,
     absl::Span<float> reach_probs);
 
 // Make a bottom-up pass, starting with the current cf_values stored
 // in the buffer. This loopss over all depths from the bottom.
 // The leaf values must be provided externally by writing to leaves_cf_values().
 void BottomUp(
-    const std::vector<std::vector<CFRNode*>>& nodes_at_depth,
-    std::unordered_map<const CFRNode*, CFRInfoStateValues>& node_values,
+    const std::vector<std::vector<InfostateNode*>>& nodes_at_depth,
+    std::unordered_map<const InfostateNode*, CFRInfoStateValues>& node_values,
     absl::Span<float> cf_values);
 
 // Calculates the root cf value as weighted sum of the cf_values()
@@ -100,7 +100,7 @@ class InfostateCFR {
   // Basic constructor for the whole game.
   explicit InfostateCFR(const Game& game);
   // Run CFR on the specified trees.
-  explicit InfostateCFR(std::array<CFRTree, 2> cfr_trees);
+  explicit InfostateCFR(std::array<InfostateTree, 2> cfr_trees);
 
   void RunSimultaneousIterations(int iterations);
   void RunAlternatingIterations(int iterations);
@@ -123,7 +123,7 @@ class InfostateCFR {
   float TerminalReachProbSum();
 
   // The trees which hold the strategies of the players.
-  std::array<CFRTree, 2> trees_;
+  std::array<InfostateTree, 2> trees_;
   // Map from player 0 index (key) to player 1 (value).
   std::vector<int> terminal_permutation_;
   // Chance reach probs.
@@ -136,7 +136,7 @@ class InfostateCFR {
   std::array<std::vector<float>, 2> reach_probs_;
   std::array<std::vector<float>, 2> cf_values_;
 
-  std::unordered_map<const CFRNode*, CFRInfoStateValues> node_values_;
+  std::unordered_map<const InfostateNode*, CFRInfoStateValues> node_values_;
 };
 
 }  // namespace algorithms

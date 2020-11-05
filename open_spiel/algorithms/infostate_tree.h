@@ -294,8 +294,6 @@ class InfostateTree final {
 using CFRInfoStateValuesPtrTable =
   std::unordered_map<std::string, CFRInfoStateValues*>;
 
-using CFRTree = InfostateTree;
-using CFRNode = InfostateNode;
 
 }  // namespace algorithms
 }  // namespace open_spiel

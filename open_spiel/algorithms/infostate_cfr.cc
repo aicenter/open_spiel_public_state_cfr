@@ -20,8 +20,8 @@ namespace open_spiel {
 namespace algorithms {
 
 void TopDown(
-    const std::vector<std::vector<CFRNode*>>& nodes_at_depth,
-    std::unordered_map<const CFRNode*, CFRInfoStateValues>& node_values,
+    const std::vector<std::vector<InfostateNode*>>& nodes_at_depth,
+    std::unordered_map<const InfostateNode*, CFRInfoStateValues>& node_values,
     absl::Span<float> reach_probs) {
   const int tree_depth = nodes_at_depth.size();
   // Loop over all depths, except for the first two depths:
@@ -44,7 +44,7 @@ void TopDown(
       const float current_reach = reach_probs[parent_idx];
       const int num_children = nodes_at_depth[d - 1][parent_idx]->num_children();
       right_offset -= num_children;
-      const CFRNode* node = nodes_at_depth[d - 1][parent_idx];
+      const InfostateNode* node = nodes_at_depth[d - 1][parent_idx];
       if (node->type() == kDecisionInfostateNode) {
         CFRInfoStateValues& values = node_values.at(node);
         const std::vector<double>& policy = values.current_policy;
@@ -76,8 +76,8 @@ void TopDown(
 }
 
 void BottomUp(
-    const std::vector<std::vector<CFRNode*>>& nodes_at_depth,
-    std::unordered_map<const CFRNode*, CFRInfoStateValues>& node_values,
+    const std::vector<std::vector<InfostateNode*>>& nodes_at_depth,
+    std::unordered_map<const InfostateNode*, CFRInfoStateValues>& node_values,
     absl::Span<float> cf_values) {
   const int tree_depth = nodes_at_depth.size();
   // Loop over all depths, except for the last one, as it is already set
@@ -93,7 +93,7 @@ void BottomUp(
     // Loop over all parents of current nodes.
     for (int parent_idx = 0; parent_idx < nodes_at_depth[d].size();
          parent_idx++) {
-      const CFRNode* node = nodes_at_depth[d][parent_idx];
+      const InfostateNode* node = nodes_at_depth[d][parent_idx];
       const int num_children = node->num_children();
       double node_sum = 0.;
       if (node->type() == kDecisionInfostateNode) {
@@ -194,13 +194,13 @@ class InfostateCFRAveragePolicy : public Policy {
 
 }  // namespace
 
-std::unordered_map<const CFRNode*, CFRInfoStateValues> CreateTable(
-    const std::array<CFRTree, 2>& trees) {
-  std::unordered_map<const CFRNode*, CFRInfoStateValues> map;
+std::unordered_map<const InfostateNode*, CFRInfoStateValues> CreateTable(
+    const std::array<InfostateTree, 2>& trees) {
+  std::unordered_map<const InfostateNode*, CFRInfoStateValues> map;
   for (int pl = 0; pl < 2; ++pl) {
-    const std::vector<std::vector<CFRNode*>>& nodes = trees[pl].nodes_at_depth();
+    const std::vector<std::vector<InfostateNode*>>& nodes = trees[pl].nodes_at_depth();
     for (int d = 0; d < nodes.size() - 1; ++d) {
-      for (const CFRNode* node : nodes[d]) {
+      for (const InfostateNode* node : nodes[d]) {
         if (node->type() != kDecisionInfostateNode) continue;
         map[node] = CFRInfoStateValues(node->legal_actions());
       }
@@ -209,7 +209,7 @@ std::unordered_map<const CFRNode*, CFRInfoStateValues> CreateTable(
   return map;
 }
 
-InfostateCFR::InfostateCFR(std::array<CFRTree, 2> cfr_trees)
+InfostateCFR::InfostateCFR(std::array<InfostateTree, 2> cfr_trees)
     : trees_(std::move(cfr_trees)),
       cf_values_({
         std::vector<float>(trees_[0].num_leaves(), 0.),
@@ -225,7 +225,7 @@ InfostateCFR::InfostateCFR(std::array<CFRTree, 2> cfr_trees)
   PrepareTerminals();
 }
 InfostateCFR::InfostateCFR(const Game& game)
-    : InfostateCFR({CFRTree(game, 0), CFRTree(game, 1)}) {}
+    : InfostateCFR({InfostateTree(game, 0), InfostateTree(game, 1)}) {}
 
 void InfostateCFR::RunSimultaneousIterations(int iterations) {
   for (int t = 0; t < iterations; ++t) {
@@ -291,8 +291,8 @@ CFRInfoStateValuesPtrTable InfostateCFR::InfoStateValuesPtrTable() {
   return vec_ptable;
 }
 void InfostateCFR::PrepareTerminals() {
-  const std::vector<CFRNode*>& leaves_a = trees_[0].leaf_nodes();
-  const std::vector<CFRNode*>& leaves_b = trees_[1].leaf_nodes();
+  const std::vector<InfostateNode*>& leaves_a = trees_[0].leaf_nodes();
+  const std::vector<InfostateNode*>& leaves_b = trees_[1].leaf_nodes();
   SPIEL_CHECK_EQ(leaves_a.size(), leaves_b.size());
 
   const int num_terminals = leaves_a.size();
@@ -309,14 +309,14 @@ void InfostateCFR::PrepareTerminals() {
 
   for (int i = 0; i < num_terminals; ++i) {
     // This CFR variant works only with leaf nodes being terminal nodes.
-    const CFRNode* const a = leaves_a[i];
+    const InfostateNode* const a = leaves_a[i];
     SPIEL_CHECK_TRUE(a->type() == kTerminalInfostateNode);
     const int permutation_index = player1_map.at(a->TerminalHistory());
-    const CFRNode* const b = leaves_b[permutation_index];
+    const InfostateNode* const b = leaves_b[permutation_index];
     SPIEL_CHECK_TRUE(b->type() == kTerminalInfostateNode);
     SPIEL_DCHECK_EQ(a->TerminalHistory(), b->TerminalHistory());
 
-    const CFRNode* const leaf = leaves_a[i];
+    const InfostateNode* const leaf = leaves_a[i];
     const double v = leaf->terminal_utility();
     const double chn = leaf->terminal_chance_reach_prob();
     terminal_values_.push_back(v * chn);

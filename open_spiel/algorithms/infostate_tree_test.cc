@@ -36,14 +36,14 @@ std::string iigs3 = "goofspiel("
                       "points_order=ascending"
                     ")";
 
-std::unique_ptr<CFRTree> MakeTree(const std::string& game_name,
-                                  Player player_id,
-                                  int max_move_limit = 1000) {
-  return std::make_unique<CFRTree>(*LoadGame(game_name), player_id,
-                                   max_move_limit, /*make_balanced=*/false);
+std::unique_ptr<InfostateTree> MakeTree(const std::string& game_name,
+                                        Player player_id,
+                                        int max_move_limit = 1000) {
+  return std::make_unique<InfostateTree>(*LoadGame(game_name), player_id,
+                                         max_move_limit, /*make_balanced=*/false);
 }
 
-std::unique_ptr<CFRTree> MakeTree(
+std::unique_ptr<InfostateTree> MakeTree(
     const std::string& game_name, Player player_id,
     const std::vector<std::vector<Action>>& start_histories,
     const std::vector<float>& start_reaches,
@@ -61,22 +61,22 @@ std::unique_ptr<CFRTree> MakeTree(
   std::shared_ptr<Observer> infostate_observer =
       game->MakeObserver(kInfoStateObsType, {});
 
-  return std::make_unique<CFRTree>(
+  return std::make_unique<InfostateTree>(
       start_state_ptrs, start_reaches, infostate_observer,
       player_id, max_move_limit, /*make_balanced=*/false);
 }
 
-bool IsNodeBalanced(const CFRNode& node, int height, int current_depth = 0) {
+bool IsNodeBalanced(const InfostateNode& node, int height, int current_depth = 0) {
   if (node.is_leaf_node()) return height == current_depth;
 
-  for (const CFRNode& child : node.child_iterator())
+  for (const InfostateNode& child : node.child_iterator())
     if (!IsNodeBalanced(child, height, current_depth + 1))
       return false;
 
   return true;
 }
 
-bool RecomputeBalance(const CFRTree& tree) {
+bool RecomputeBalance(const InfostateTree& tree) {
   return IsNodeBalanced(tree.root(), tree.tree_height());
 }
 
@@ -109,7 +109,7 @@ void TestRootCertificates() {
           "([(([({}{})({}{})]{}{}))(({}{}{}{}))])"
         ")"
       ")";  // </dummy>
-    std::unique_ptr<CFRTree> tree = MakeTree("kuhn_poker", 0);
+    std::unique_ptr<InfostateTree> tree = MakeTree("kuhn_poker", 0);
     SPIEL_CHECK_EQ(tree->root().ComputeCertificate(), expected_certificate);
     SPIEL_CHECK_FALSE(tree->is_balanced());
     SPIEL_CHECK_FALSE(RecomputeBalance(*tree));
@@ -130,7 +130,7 @@ void TestRootCertificates() {
         "([(({}{}{}{}))({}{})][({}{})({}{})])"
         "([(({}{}{}{}))({}{})][({}{})({}{})])"
       ")))";
-    std::unique_ptr<CFRTree> tree = MakeTree("kuhn_poker", 1);
+    std::unique_ptr<InfostateTree> tree = MakeTree("kuhn_poker", 1);
     SPIEL_CHECK_EQ(tree->root().ComputeCertificate(), expected_certificate);
     SPIEL_CHECK_FALSE(tree->is_balanced());
     SPIEL_CHECK_FALSE(RecomputeBalance(*tree));
@@ -142,7 +142,7 @@ void TestRootCertificates() {
         "({}{})"  // Play 2: win  2,1  draw 2,2
       "])";
     for (int i = 0; i < 2; ++i) {
-      std::unique_ptr<CFRTree> tree = MakeTree(iigs2, i);
+      std::unique_ptr<InfostateTree> tree = MakeTree(iigs2, i);
       SPIEL_CHECK_EQ(tree->root().ComputeCertificate(), expected_certificate);
       SPIEL_CHECK_TRUE(tree->is_balanced());
       SPIEL_CHECK_TRUE(RecomputeBalance(*tree));
@@ -166,7 +166,7 @@ void TestRootCertificates() {
         ")"
       "])";
     for (int i = 0; i < 2; ++i) {
-      std::unique_ptr<CFRTree> tree = MakeTree(iigs3, i);
+      std::unique_ptr<InfostateTree> tree = MakeTree(iigs3, i);
       SPIEL_CHECK_EQ(tree->root().ComputeCertificate(), expected_certificate);
       SPIEL_CHECK_TRUE(tree->is_balanced());
       SPIEL_CHECK_TRUE(RecomputeBalance(*tree));
@@ -179,7 +179,7 @@ void TestRootCertificates() {
         "({}{})"  // Play Tails: TH, TT
       "])";
     for (int i = 0; i < 2; ++i) {
-      std::unique_ptr<CFRTree> tree = MakeTree("matrix_mp", i);
+      std::unique_ptr<InfostateTree> tree = MakeTree("matrix_mp", i);
       SPIEL_CHECK_EQ(tree->root().ComputeCertificate(), expected_certificate);
       SPIEL_CHECK_TRUE(tree->is_balanced());
       SPIEL_CHECK_TRUE(RecomputeBalance(*tree));
@@ -194,8 +194,8 @@ void TestCertificatesFromStartHistories() {
         "([(([({}{})({}{})]{}{}))(({}{}{}{}))])"
         "([(([({}{})({}{})]{}{}))(({}{}{}{}))])"
       ")";
-    std::unique_ptr<CFRTree> tree = MakeTree("kuhn_poker", 0,
-                                             {{0}, {2}}, {1/3., 1/3.});
+    std::unique_ptr<InfostateTree> tree = MakeTree("kuhn_poker", 0,
+                                                   {{0}, {2}}, {1/3., 1/3.});
     SPIEL_CHECK_EQ(tree->root().ComputeCertificate(), expected_certificate);
     SPIEL_CHECK_FALSE(tree->is_balanced());
     SPIEL_CHECK_FALSE(RecomputeBalance(*tree));
@@ -206,8 +206,8 @@ void TestCertificatesFromStartHistories() {
         "([(({}{}))({})][({})({})])"
         "([(({}{}))({})][({})({})])"
       ")";
-    std::unique_ptr<CFRTree> tree = MakeTree("kuhn_poker", 1,
-                                             {{1, 0}, {1, 2}}, {1/6., 1/6.});
+    std::unique_ptr<InfostateTree> tree = MakeTree("kuhn_poker", 1,
+                                                   {{1, 0}, {1, 2}}, {1/6., 1/6.});
     SPIEL_CHECK_EQ(tree->root().ComputeCertificate(), expected_certificate);
     SPIEL_CHECK_FALSE(tree->is_balanced());
     SPIEL_CHECK_FALSE(RecomputeBalance(*tree));
@@ -218,8 +218,8 @@ void TestCertificatesFromStartHistories() {
         "([(([({}{})({}{})]{}{}))(({}{}{}{}))])"
         "[({})({})]"
       ")";
-    std::unique_ptr<CFRTree> tree = MakeTree("kuhn_poker", 0,
-                                             {{0}, {2, 1, 0, 1}}, {1/3., 1/6.});
+    std::unique_ptr<InfostateTree> tree = MakeTree("kuhn_poker", 0,
+                                                   {{0}, {2, 1, 0, 1}}, {1/3., 1/6.});
     SPIEL_CHECK_EQ(tree->root().ComputeCertificate(), expected_certificate);
     SPIEL_CHECK_FALSE(tree->is_balanced());
     SPIEL_CHECK_FALSE(RecomputeBalance(*tree));
@@ -230,9 +230,9 @@ void TestCertificatesFromStartHistories() {
         "([(({}{}))({})][({})({})])"
         "({}{})"
       ")";
-    std::unique_ptr<CFRTree> tree = MakeTree("kuhn_poker", 1,
-                                             {{1, 0}, {1, 2, 0, 1}},
-                                             {1/6., 1/6.});
+    std::unique_ptr<InfostateTree> tree = MakeTree("kuhn_poker", 1,
+                                                   {{1, 0}, {1, 2, 0, 1}},
+                                                   {1/6., 1/6.});
     SPIEL_CHECK_EQ(tree->root().ComputeCertificate(), expected_certificate);
     SPIEL_CHECK_FALSE(tree->is_balanced());
     SPIEL_CHECK_FALSE(RecomputeBalance(*tree));
@@ -242,9 +242,9 @@ void TestCertificatesFromStartHistories() {
       "("
         "[({}{})({}{})]"
       ")";
-    std::unique_ptr<CFRTree> tree = MakeTree("kuhn_poker", 0,
-                                             {{0, 1, 0, 1}, {0, 2, 0, 1}},
-                                             {1/6., 1/6.});
+    std::unique_ptr<InfostateTree> tree = MakeTree("kuhn_poker", 0,
+                                                   {{0, 1, 0, 1}, {0, 2, 0, 1}},
+                                                   {1/6., 1/6.});
     SPIEL_CHECK_EQ(tree->root().ComputeCertificate(), expected_certificate);
     SPIEL_CHECK_TRUE(tree->is_balanced());
     SPIEL_CHECK_TRUE(RecomputeBalance(*tree));
@@ -255,9 +255,9 @@ void TestCertificatesFromStartHistories() {
         "({}{})"
         "({}{})"
       ")";
-    std::unique_ptr<CFRTree> tree = MakeTree("kuhn_poker", 1,
-                                             {{0, 1, 0, 1}, {0, 2, 0, 1}},
-                                             {1/6., 1/6.});
+    std::unique_ptr<InfostateTree> tree = MakeTree("kuhn_poker", 1,
+                                                   {{0, 1, 0, 1}, {0, 2, 0, 1}},
+                                                   {1/6., 1/6.});
     SPIEL_CHECK_EQ(tree->root().ComputeCertificate(), expected_certificate);
     SPIEL_CHECK_TRUE(tree->is_balanced());
     SPIEL_CHECK_TRUE(RecomputeBalance(*tree));
@@ -273,7 +273,7 @@ void TestTreeRebalancing() {
         "({}{})"  // Play Tails: TH, TT
       "])";
     for (int i = 0; i < 2; ++i) {
-      std::unique_ptr<CFRTree> tree = MakeTree("matrix_mp", i);
+      std::unique_ptr<InfostateTree> tree = MakeTree("matrix_mp", i);
       SPIEL_CHECK_EQ(tree->root().ComputeCertificate(), expected_certificate);
       SPIEL_CHECK_TRUE(RecomputeBalance(*tree));
 
@@ -283,8 +283,8 @@ void TestTreeRebalancing() {
     }
   }
   {  // Rebalance test: when 2nd player passes, we add dummy observation nodes.
-    std::unique_ptr<CFRTree> tree = MakeTree("kuhn_poker", 0,
-                                             {{0, 1, 0}}, {1/6.});
+    std::unique_ptr<InfostateTree> tree = MakeTree("kuhn_poker", 0,
+                                                   {{0, 1, 0}}, {1/6.});
     std::string expected_certificate =
         "(("
         "[({})({})]"  // 2nd player bets
@@ -309,7 +309,7 @@ void TestTreeRebalancing() {
     SPIEL_CHECK_TRUE(RecomputeBalance(*tree));
   }
   {  // Rebalance test: simultaneous move games.
-    std::unique_ptr<CFRTree> tree = MakeTree(iigs3, 0,
+    std::unique_ptr<InfostateTree> tree = MakeTree(iigs3, 0,
                                              /*start_histories=*/{
                                               {0  /* = 0 0 */},
                                               {1  /* = 1 0 */,
@@ -338,7 +338,7 @@ void TestTreeRebalancing() {
     SPIEL_CHECK_TRUE(RecomputeBalance(*tree));
   }
   {  // Full Kuhn rebalancing test.
-    std::unique_ptr<CFRTree> tree = MakeTree("kuhn_poker", 0);
+    std::unique_ptr<InfostateTree> tree = MakeTree("kuhn_poker", 0);
     tree->Rebalance();
 
     std::string expected_rebalanced_certificate =
@@ -371,8 +371,8 @@ void TestTreeRebalancing() {
   }
 }
 
-void CheckTreeLeaves(const CFRTree& tree, int move_limit) {
-  for (const CFRNode& leaf_node : tree.leaves_iterator()) {
+void CheckTreeLeaves(const InfostateTree& tree, int move_limit) {
+  for (const InfostateNode& leaf_node : tree.leaves_iterator()) {
     SPIEL_CHECK_TRUE(leaf_node.is_leaf_node());
     SPIEL_CHECK_TRUE(leaf_node.has_infostate_string());
     SPIEL_CHECK_FALSE(leaf_node.corresponding_states().empty());
@@ -411,7 +411,7 @@ void BuildAllDepths(const std::string& game_name) {
 
   for (int move_limit = 0; move_limit < max_moves; ++move_limit) {
     for (int pl = 0; pl < game->NumPlayers(); ++pl) {
-      std::unique_ptr<CFRTree> tree = MakeTree(game_name, pl, move_limit);
+      std::unique_ptr<InfostateTree> tree = MakeTree(game_name, pl, move_limit);
       SPIEL_CHECK_EQ(tree->is_balanced(), RecomputeBalance(*tree));
       CheckTreeLeaves(*tree, move_limit);
       tree->Rebalance();
@@ -436,12 +436,12 @@ void TestDepthLimitedTrees() {
           "([])" // Node K
         ")"
       ")";  // </dummy>
-    std::unique_ptr<CFRTree> tree = MakeTree("kuhn_poker", 0, 2);
+    std::unique_ptr<InfostateTree> tree = MakeTree("kuhn_poker", 0, 2);
     SPIEL_CHECK_EQ(tree->root().ComputeCertificate(), expected_certificate);
     SPIEL_CHECK_TRUE(tree->is_balanced());
     SPIEL_CHECK_TRUE(RecomputeBalance(*tree));
 
-    for (const CFRNode& acting : tree->leaves_iterator()) {
+    for (const InfostateNode& acting : tree->leaves_iterator()) {
       SPIEL_CHECK_TRUE(acting.is_leaf_node());
       SPIEL_CHECK_EQ(acting.type(), kDecisionInfostateNode);
       SPIEL_CHECK_EQ(acting.corresponding_states().size(), 2);
@@ -478,7 +478,7 @@ void TestDepthLimitedSubgames() {
     std::array<int, 4> expected_leaf_counts = {3, 6, 21, 30};
 
     for (int move_limit = 0; move_limit < 4; ++move_limit) {
-      std::unique_ptr<CFRTree> tree = MakeTree(
+      std::unique_ptr<InfostateTree> tree = MakeTree(
           "kuhn_poker", /*player_id=*/1,
           {{0, 1}, {0, 2}, {1, 0}, {1, 2}, {2, 0}, {2, 1}},
           {1/6., 1/6., 1/6., 1/6., 1/6., 1/6.},

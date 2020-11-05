@@ -57,7 +57,7 @@ struct LeafPublicState final {
   // For each player, store a pointer to a leaf node for this public state,
   // within the depth-limited infostate tree. If needed, you can get access
   // to its `State`s via `CFRNode::CorrespondingStates()`.
-  std::array<std::vector<const CFRNode*>, 2> leaf_nodes;
+  std::array<std::vector<const InfostateNode*>, 2> leaf_nodes;
   // For each player, store ranges for the top-most infostates.
   std::array<std::vector<float>, 2> ranges;
   // For each player, store counterfactual values for the top-most infostates.
@@ -119,7 +119,7 @@ class DepthLimitedCFR {
                   std::shared_ptr<const LeafEvaluator> terminal_evaluator);
 
   DepthLimitedCFR(std::shared_ptr<const Game> game,
-                  std::array<CFRTree, 2> trees,
+                  std::array<InfostateTree, 2> trees,
                   std::shared_ptr<const LeafEvaluator> leaf_evaluator,
                   std::shared_ptr<const LeafEvaluator> terminal_evaluator,
                   std::shared_ptr<Observer> public_observer);
@@ -136,10 +136,10 @@ class DepthLimitedCFR {
   }
   std::array<absl::Span<const float>, 2> RootChildrenCfValues() const;
 
-  std::array<const CFRNode*, 2> Roots() const {
+  std::array<const InfostateNode*, 2> Roots() const {
     return {&trees_[0].root(), &trees_[1].root()};
   }
-  std::array<CFRTree, 2>& Trees() { return trees_; }
+  std::array<InfostateTree, 2>& Trees() { return trees_; }
 
   CFRInfoStateValuesPtrTable InfoStateValuesPtrTable();
 
@@ -156,7 +156,7 @@ class DepthLimitedCFR {
 
  private:
   const std::shared_ptr<const Game> game_;
-  std::array<CFRTree, 2> trees_;
+  std::array<InfostateTree, 2> trees_;
   const std::shared_ptr<Observer> public_observer_;
   const std::shared_ptr<const LeafEvaluator> leaf_evaluator_;
   const std::shared_ptr<const LeafEvaluator> terminal_evaluator_;
@@ -165,14 +165,14 @@ class DepthLimitedCFR {
   // Allocated based on propagator / cfr tree construction.
   std::vector<LeafPublicState> public_leaves_;
   std::vector<std::unique_ptr<PublicStateContext>> contexts_;
-  std::map<const CFRNode*, int> leaf_positions_;
+  std::map<const InfostateNode*, int> leaf_positions_;
 
   // Mutable values to keep track of.
   // These have the size of largest depth of the tree (i.e. leaf nodes).
   std::array<std::vector<float>, 2> reach_probs_;
   std::array<std::vector<float>, 2> cf_values_;
 
-  std::unordered_map<const CFRNode*, CFRInfoStateValues> node_values_;
+  std::unordered_map<const InfostateNode*, CFRInfoStateValues> node_values_;
 
   void PrepareRootReachProbs();
   void PrepareLeafNodesForPublicStates();
@@ -180,11 +180,11 @@ class DepthLimitedCFR {
   void CreateContexts();
   void EvaluateLeaves();
   LeafPublicState* GetPublicLeaf(absl::Span<float> public_tensor);
-  float CfBestResponse(const CFRNode& node, Player pl, int* leaf_index) const;
+  float CfBestResponse(const InfostateNode& node, Player pl, int* leaf_index) const;
 
   // Internal checks.
   bool DoStatesProduceEqualPublicObservations(
-      const CFRNode& node, absl::Span<float> expected_observation);
+      const InfostateNode& node, absl::Span<float> expected_observation);
 };
 
 

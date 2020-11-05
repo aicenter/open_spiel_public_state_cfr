@@ -20,13 +20,13 @@ namespace open_spiel {
 namespace algorithms {
 namespace dlcfr {
 
-std::unordered_map<const CFRNode*, CFRInfoStateValues> CreateTable(
-    const std::array<CFRTree, 2>& trees) {
-  std::unordered_map<const CFRNode*, CFRInfoStateValues> map;
+std::unordered_map<const InfostateNode*, CFRInfoStateValues> CreateTable(
+    const std::array<InfostateTree, 2>& trees) {
+  std::unordered_map<const InfostateNode*, CFRInfoStateValues> map;
   for (int pl = 0; pl < 2; ++pl) {
-    const std::vector<std::vector<CFRNode*>>& nodes = trees[pl].nodes_at_depth();
+    const std::vector<std::vector<InfostateNode*>>& nodes = trees[pl].nodes_at_depth();
     for (int d = 0; d < nodes.size() - 1; ++d) {
-      for (const CFRNode* node : nodes[d]) {
+      for (const InfostateNode* node : nodes[d]) {
         if (node->type() != kDecisionInfostateNode) continue;
         map[node] = CFRInfoStateValues(node->legal_actions());
       }
@@ -37,7 +37,7 @@ std::unordered_map<const CFRNode*, CFRInfoStateValues> CreateTable(
 
 DepthLimitedCFR::DepthLimitedCFR(
     std::shared_ptr<const Game> game,
-    std::array<CFRTree, 2> trees,
+    std::array<InfostateTree, 2> trees,
     std::shared_ptr<const LeafEvaluator> leaf_evaluator,
     std::shared_ptr<const LeafEvaluator> terminal_evaluator,
     std::shared_ptr<Observer> public_observer
@@ -70,19 +70,19 @@ DepthLimitedCFR::DepthLimitedCFR(
     std::shared_ptr<const LeafEvaluator> leaf_evaluator,
     std::shared_ptr<const LeafEvaluator> terminal_evaluator
 ) : DepthLimitedCFR(game,
-                    {CFRTree(*game, 0, max_depth_limit),
-                     CFRTree(*game, 1, max_depth_limit)},
+                    {InfostateTree(*game, 0, max_depth_limit),
+                     InfostateTree(*game, 1, max_depth_limit)},
                     std::move(leaf_evaluator),
                     std::move(terminal_evaluator),
                     game->MakeObserver(kPublicStateObsType, {})) {}
 
 void FillStatesAndChanceRange(std::vector<const State*>* start_states,
                               std::vector<float>* chance_reach_probs,
-                              absl::Span<const CFRNode* const> start_nodes) {
+                              absl::Span<const InfostateNode* const> start_nodes) {
   // Collect pointers to starting states, along with their reach probs.
   // It's enough to do this just through one player, as the other player
   // has just a permutation of these states.
-  for (const CFRNode* cfr_node : start_nodes) {
+  for (const InfostateNode* cfr_node : start_nodes) {
     SPIEL_CHECK_EQ(cfr_node->corresponding_states().size(),
                    cfr_node->corresponding_chance_reach_probs().size());
     for (int i = 0; i < cfr_node->corresponding_states().size(); ++i) {
@@ -94,8 +94,8 @@ void FillStatesAndChanceRange(std::vector<const State*>* start_states,
   }
 }
 
-std::array<CFRTree, 2> CreateTrees(
-    std::array<absl::Span<const CFRNode* const>, 2> start_nodes,
+std::array<InfostateTree, 2> CreateTrees(
+    std::array<absl::Span<const InfostateNode* const>, 2> start_nodes,
     const std::shared_ptr<Observer>& infostate_observer,
     int max_move_limit) {
   std::array<std::vector<const State*>, 2> start_states;
@@ -107,10 +107,10 @@ std::array<CFRTree, 2> CreateTrees(
                            start_nodes[1]);
 
   return {
-      CFRTree(start_states[0], chance_reach_probs[0],
-              infostate_observer, /*acting_player=*/0, max_move_limit),
-      CFRTree(start_states[1], chance_reach_probs[1],
-              infostate_observer, /*acting_player=*/1, max_move_limit)
+      InfostateTree(start_states[0], chance_reach_probs[0],
+                    infostate_observer, /*acting_player=*/0, max_move_limit),
+      InfostateTree(start_states[1], chance_reach_probs[1],
+                    infostate_observer, /*acting_player=*/1, max_move_limit)
   };
 }
 
@@ -119,7 +119,7 @@ void DepthLimitedCFR::PrepareLeafNodesForPublicStates() {
 
   for (int pl = 0; pl < 2; ++pl) {
     int leaf_position = 0;
-    for (CFRNode* leaf_node : trees_[pl].leaf_nodes()) {
+    for (InfostateNode* leaf_node : trees_[pl].leaf_nodes()) {
       SPIEL_CHECK_FALSE(leaf_node->corresponding_states().empty());
       const std::unique_ptr<State>& some_state =
           leaf_node->corresponding_states()[0];
@@ -169,7 +169,7 @@ LeafPublicState* DepthLimitedCFR::GetPublicLeaf(
 }
 
 bool DepthLimitedCFR::DoStatesProduceEqualPublicObservations(
-    const CFRNode& node, absl::Span<float> expected_observation) {
+    const InfostateNode& node, absl::Span<float> expected_observation) {
   Observation public_observation(*game_, public_observer_);
 
   // Check that indeed all states produce the same public observations.
@@ -200,12 +200,12 @@ TerminalPublicStateContext::TerminalPublicStateContext(
   SPIEL_CHECK_EQ(player1_map.size(), leaf_nodes[1].size());
 
   for (int i = 0; i < num_terminals; ++i) {
-    const CFRNode const* a = leaf_nodes[0][i];
+    const InfostateNode const* a = leaf_nodes[0][i];
     const int permutation_index = player1_map.at(a->TerminalHistory());
-    const CFRNode const* b = leaf_nodes[1][permutation_index];
+    const InfostateNode const* b = leaf_nodes[1][permutation_index];
     SPIEL_DCHECK_EQ(a->TerminalHistory(), b->TerminalHistory());
 
-    const CFRNode const* leaf = leaf_nodes[0][i];
+    const InfostateNode const* leaf = leaf_nodes[0][i];
     const double v = leaf->terminal_utility();
     const double chn = leaf->terminal_chance_reach_prob();
     utilities.push_back(v * chn);
@@ -268,7 +268,7 @@ void DepthLimitedCFR::EvaluateLeaves() {
     for (int pl = 0; pl < 2; pl++) {
       const int num_leaves = state.leaf_nodes[pl].size();
       for (int j = 0; j < num_leaves; ++j) {
-        const CFRNode* leaf_node = state.leaf_nodes[pl][j];
+        const InfostateNode* leaf_node = state.leaf_nodes[pl][j];
         const int trunk_position = leaf_positions_.at(leaf_node);
         SPIEL_DCHECK_GE(trunk_position, 0);
         SPIEL_DCHECK_LT(trunk_position, trees_[pl].num_leaves());
@@ -290,7 +290,7 @@ void DepthLimitedCFR::EvaluateLeaves() {
     for (int pl = 0; pl < 2; pl++) {
       const int num_leaves = state.leaf_nodes[pl].size();
       for (int j = 0; j < num_leaves; ++j) {
-        const CFRNode* leaf_node = state.leaf_nodes[pl][j];
+        const InfostateNode* leaf_node = state.leaf_nodes[pl][j];
         const int trunk_position = leaf_positions_.at(leaf_node);
         SPIEL_DCHECK_GE(trunk_position, 0);
         SPIEL_DCHECK_LT(trunk_position, trees_[pl].num_leaves());
@@ -329,7 +329,7 @@ bool LeafPublicState::IsConsistent() const {
   using History = std::vector<Action>;
   std::unordered_set<History, absl::Hash<History>> state_histories;
   for (int pl = 0; pl < 2; ++pl) {
-    for (const CFRNode* node : leaf_nodes[pl]) {
+    for (const InfostateNode* node : leaf_nodes[pl]) {
       if (!node->is_leaf_node()) return false;
       if (node->tree().acting_player() != pl) return false;
       if (node->type() == kTerminalInfostateNode) num_terminals++;
@@ -360,12 +360,12 @@ bool LeafPublicState::IsTerminal() const {
 
 bool CheckChildPublicStateConsistency(
     const CFRPublicState& cfr_public_state, const LeafPublicState& leaf_state) {
-  std::array<const CFRNode*, 2> roots = cfr_public_state.dlcfr->Roots();
+  std::array<const InfostateNode*, 2> roots = cfr_public_state.dlcfr->Roots();
   for (int pl = 0; pl < 2; ++pl) {
     SPIEL_CHECK_EQ(leaf_state.leaf_nodes[pl].size(), roots[pl]->num_children());
     for (int i = 0; i < roots[pl]->num_children(); ++i) {
-      const CFRNode& actual = *roots[pl]->child_at(i);
-      const CFRNode& expected = *leaf_state.leaf_nodes[pl][i];
+      const InfostateNode& actual = *roots[pl]->child_at(i);
+      const InfostateNode& expected = *leaf_state.leaf_nodes[pl][i];
       SPIEL_CHECK_EQ(actual.infostate_string(), expected.infostate_string());
     }
   }
@@ -422,20 +422,20 @@ float DepthLimitedCFR::TrunkExploitability() const {
 }
 
 float DepthLimitedCFR::CfBestResponse(
-    const CFRNode& node, Player pl, int* leaf_index) const {
+    const InfostateNode& node, Player pl, int* leaf_index) const {
   if (node.is_leaf_node()) {
     return cf_values_[pl][(*leaf_index)++];
   }
   if (node.type() == kObservationInfostateNode) {
     double sum_value = 0.;
-    for (const CFRNode& child : node.child_iterator()) {
+    for (const InfostateNode& child : node.child_iterator()) {
       sum_value += CfBestResponse(child, pl, leaf_index);
     }
     return sum_value;
   }
   SPIEL_CHECK_EQ(node.type(), kDecisionInfostateNode);
   double max_value = -std::numeric_limits<float>::infinity();
-  for (const CFRNode& child : node.child_iterator()) {
+  for (const InfostateNode& child : node.child_iterator()) {
     max_value = std::fmax(CfBestResponse(child, pl, leaf_index),
                           max_value);
   }
@@ -444,7 +444,7 @@ float DepthLimitedCFR::CfBestResponse(
 
 float DepthLimitedCFR::CfBestResponse(Player responding_player) const {
   int leaf_index = 0;
-  const CFRNode& root_node = trees_[responding_player].root();
+  const InfostateNode& root_node = trees_[responding_player].root();
   return CfBestResponse(root_node, responding_player, &leaf_index);
 }
 

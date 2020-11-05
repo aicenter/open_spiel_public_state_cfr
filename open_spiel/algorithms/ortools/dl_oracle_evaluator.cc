@@ -44,7 +44,7 @@ void OracleEvaluator::EvaluatePublicState(
 
     SPIEL_CHECK_EQ(s->leaf_nodes[1 - pl].size(), s->ranges[1 - pl].size());
     for (int i = 0; i < s->leaf_nodes[1 - pl].size(); ++i) {
-      const CFRNode* cfr_node = s->leaf_nodes[1 - pl][i];
+      const InfostateNode* cfr_node = s->leaf_nodes[1 - pl][i];
       const double opponent_prob = s->ranges[1 - pl][i];
       SPIEL_DCHECK_TRUE(cfr_node->is_leaf_node());
       SPIEL_CHECK_EQ(cfr_node->corresponding_states().size(),
@@ -74,7 +74,7 @@ void OracleEvaluator::EvaluatePublicState(
     SPIEL_CHECK_EQ(s->values[pl].size(), s->ranges[pl].size());
 
     for (int i = 0; i < s->leaf_nodes[pl].size(); ++i) {
-      const CFRNode* cfr_node = s->leaf_nodes[pl][i];
+      const InfostateNode* cfr_node = s->leaf_nodes[pl][i];
       double infostate_value = 0.;
       for (int j = 0; j < cfr_node->corresponding_states().size(); ++j) {
         const State* state = cfr_node->corresponding_states()[j].get();
