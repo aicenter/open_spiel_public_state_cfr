@@ -121,6 +121,7 @@ class EFCCETabularPolicy : public TabularPolicy {
     return TabularPolicy::GetStatePolicy(info_state);
   }
   ActionsAndProbs GetStatePolicy(const State& state, Player pl) const override {
+    SPIEL_CHECK_EQ(state.CurrentPlayer(), pl);
     return GetStatePolicy(state);
   }
   ActionsAndProbs GetStatePolicy(const State& state) const override;
