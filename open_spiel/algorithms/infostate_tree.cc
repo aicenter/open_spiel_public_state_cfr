@@ -19,13 +19,14 @@ namespace algorithms {
 
 
 InfostateNode::InfostateNode(
-    const InfostateTree & tree, InfostateNode* parent,
-    int incoming_index, InfostateNodeType type,
-    const std::string& infostate_string, double terminal_utility,
+    const InfostateTree& tree, InfostateNode* parent, int incoming_index,
+    InfostateNodeType type, const std::string& infostate_string,
+    const DecisionId& decision_id, double terminal_utility,
     double terminal_ch_reach_prob, const State* originating_state)
     : tree_(tree), parent_(parent),
       incoming_index_(incoming_index), type_(type),
       infostate_string_(infostate_string),
+      decision_id_(decision_id),
       terminal_utility_(terminal_utility),
       terminal_chn_reach_prob_(terminal_ch_reach_prob) {
 
@@ -155,7 +156,9 @@ void InfostateNode::Rebalance(int target_depth, int current_depth) {
             /*tree=*/tree_, /*parent=*/nullptr,
             /*incoming_index=*/position_in_leaf_parent,
                      kObservationInfostateNode,
-            /*infostate_string=*/kFillerInfostate, /*terminal_utility=*/NAN,
+            /*infostate_string=*/kFillerInfostate,
+            /*decision_id=*/kUndefinedDecisionId,
+            /*terminal_utility=*/NAN,
             /*terminal_ch_reach_prob=*/NAN, /*originating_state=*/nullptr));
     InfostateNode* chain_tail = chain_head.get();
     for (int i = 1; i < target_depth - current_depth; ++i) {
@@ -163,7 +166,9 @@ void InfostateNode::Rebalance(int target_depth, int current_depth) {
           std::unique_ptr<InfostateNode>(new InfostateNode(
               /*tree=*/tree_, /*parent=*/chain_tail,
               /*incoming_index=*/0, kObservationInfostateNode,
-              /*infostate_string=*/kFillerInfostate, /*terminal_utility=*/NAN,
+              /*infostate_string=*/kFillerInfostate,
+              /*decision_id=*/kUndefinedDecisionId,
+              /*terminal_utility=*/NAN,
               /*terminal_ch_reach_prob=*/NAN,
               /*originating_state=*/nullptr)));
     }
@@ -207,7 +212,7 @@ InfostateTree::InfostateTree(
     int max_move_ahead_limit, bool make_balanced)
     : player_(acting_player),
       infostate_observer_(std::move(infostate_observer)),
-      root_(CreateRootNode()) {
+      root_(MakeRootNode()) {
   SPIEL_CHECK_FALSE(start_states.empty());
   SPIEL_CHECK_EQ(start_states.size(), chance_reach_probs.size());
   SPIEL_CHECK_GE(player_, 0);
@@ -222,7 +227,7 @@ InfostateTree::InfostateTree(
 
   for (int i = 0; i < start_states.size(); ++i) {
     RecursivelyBuildTree(
-        &root_, /*depth=*/1, *start_states[i],
+        root_.get(), /*depth=*/1, *start_states[i],
         start_max_move_number + max_move_ahead_limit,
         chance_reach_probs[i]);
   }
@@ -239,7 +244,7 @@ InfostateTree::InfostateTree(const Game& game, Player acting_player,
                     acting_player, max_move_limit, make_balanced) {}
 
 void InfostateTree::Rebalance() {
-  root_.Rebalance(tree_height(), 0);
+  root_->Rebalance(tree_height(), 0);
   is_tree_balanced_ = true;
 }
 
@@ -308,7 +313,7 @@ InfostateTree::LeavesIterator::end() const {
 typename InfostateTree::LeavesIterator
 InfostateTree::leaves_iterator() const {
   // Find the first leaf.
-  const InfostateNode* node = &root_;
+  const InfostateNode* node = root_.get();
   while (!node->is_leaf_node()) node = node->child_at(0);
   return LeavesIterator(this, node);
 }
@@ -344,23 +349,28 @@ const std::vector<Action>& InfostateNode::TerminalHistory() const {
 }
 
 
-InfostateNode InfostateTree::CreateRootNode() const {
-  return InfostateNode(
-      /*tree=*/*this, /*parent=*/nullptr, /*incoming_index=*/0,
-      /*type=*/kObservationInfostateNode,
-      /*infostate_string=*/kDummyRootNodeInfostate,
-      /*terminal_utility=*/NAN, /*chance_reach_prob=*/NAN,
-      /*originating_state=*/nullptr);
-}
-
 std::unique_ptr<InfostateNode> InfostateTree::MakeNode(
     InfostateNode* parent, InfostateNodeType type, const std::string& infostate_string,
     double terminal_utility, double terminal_ch_reach_prob,
     const State* originating_state) {
-  return std::make_unique<InfostateNode>(
-      *this, parent, parent->num_children(), type,
-      infostate_string, terminal_utility, terminal_ch_reach_prob,
-      originating_state);
+  // Instantiate node using new to make sure that we can call
+  // the private constructor.
+  auto node = std::unique_ptr<InfostateNode>(new InfostateNode(
+      *this, parent, parent->num_children(), type,infostate_string,
+      DecisionId(decision_infostates_.size(), this),
+      terminal_utility, terminal_ch_reach_prob, originating_state));
+  decision_infostates_.push_back(node.get());
+  return node;
+}
+
+std::unique_ptr<InfostateNode> InfostateTree::MakeRootNode() const {
+  return std::unique_ptr<InfostateNode>(new InfostateNode(
+      /*tree=*/*this, /*parent=*/nullptr, /*incoming_index=*/0,
+      /*type=*/kObservationInfostateNode,
+      /*infostate_string=*/kDummyRootNodeInfostate,
+      /*decision_id=*/kUndefinedDecisionId,
+      /*terminal_utility=*/NAN, /*chance_reach_prob=*/NAN,
+      /*originating_state=*/nullptr));
 }
 
 void InfostateTree::UpdateLeafNode(
@@ -521,6 +531,9 @@ void InfostateTree::BuildObservationNode(
                            move_limit, chance_reach_prob);
     }
   }
+}
+int InfostateTree::root_branching_factor() const {
+  return root_->num_children();
 }
 
 }  // namespace algorithms
