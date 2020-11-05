@@ -73,22 +73,21 @@ constexpr char* kDummyRootNodeInfostate = "(dummy root)";
 constexpr char* kFillerInfostate = "(filler node)";
 
 // Forward declarations.
-template<class Node> class InfostateTree;
-template<class Self> class InfostateNode;
+class InfostateTree;
+class InfostateNode;
 
-template<class Self>
 class InfostateNode {
  public:
   InfostateNode(
-      const InfostateTree<Self>& tree, Self* parent, int incoming_index,
+      const InfostateTree& tree, InfostateNode* parent, int incoming_index,
       InfostateNodeType type, const std::string& infostate_string,
       double terminal_utility, double terminal_ch_reach_prob,
       const State* originating_state);
   InfostateNode(InfostateNode&&) noexcept = default;
   virtual ~InfostateNode() = default;
 
-  const InfostateTree<Self>& tree() const { return tree_; }
-  Self* parent() const { return parent_; }
+  const InfostateTree& tree() const { return tree_; }
+  InfostateNode* parent() const { return parent_; }
   int incoming_index() const { return incoming_index_; }
   const InfostateNodeType& type() const { return type_; }
   bool is_leaf_node() const { return children_.empty(); }
@@ -101,11 +100,11 @@ class InfostateNode {
   const std::vector<std::unique_ptr<State>>& corresponding_states() const;
   const std::vector<double>& corresponding_chance_reach_probs() const;
 
-  Self* child_at(int i) const { return children_.at(i).get(); }
+  InfostateNode* child_at(int i) const { return children_.at(i).get(); }
   int num_children() const { return children_.size(); }
-  Self* AddChild(std::unique_ptr<Self> child);
-  Self* GetChild(const std::string& infostate_string) const;
-  const Self* FindNode(const std::string& infostate_lookup) const;
+  InfostateNode* AddChild(std::unique_ptr<InfostateNode> child);
+  InfostateNode* GetChild(const std::string& infostate_string) const;
+  const InfostateNode* FindNode(const std::string& infostate_lookup) const;
   const std::vector<Action>& TerminalHistory() const;
 
   // Intended only for debug purposes.
@@ -117,14 +116,14 @@ class InfostateNode {
   // (instead of unique_ptrs).
   class ChildIterator {
     int pos_;
-    const std::vector<std::unique_ptr<Self>>& children_;
+    const std::vector<std::unique_ptr<InfostateNode>>& children_;
    public:
-    ChildIterator(const std::vector<std::unique_ptr<Self>>& children,
+    ChildIterator(const std::vector<std::unique_ptr<InfostateNode>>& children,
                   int pos = 0) : pos_(pos), children_(children) {}
     ChildIterator& operator++() { pos_++; return *this; }
     bool operator==(ChildIterator other) const { return pos_ == other.pos_; }
     bool operator!=(ChildIterator other) const { return !(*this == other); }
-    Self& operator*() { return *children_[pos_]; }
+    InfostateNode& operator*() { return *children_[pos_]; }
     ChildIterator begin() const { return *this; }
     ChildIterator end() const {
       return ChildIterator(children_, children_.size());
@@ -139,25 +138,25 @@ class InfostateNode {
  private:
   // Get the unique_ptr for this node. The usage is intended only for tree
   // balance manipulation.
-  std::unique_ptr<Self> Release();
+  std::unique_ptr<InfostateNode> Release();
 
   // Change the parent of this node by inserting it at at index
   // of the new parent. The node at the existing position will be freed.
   // We pass the unique ptr of itself, because calling Release might be
   // undefined: the node we want to swap a parent for can be root of a subtree.
-  void SwapParent(std::unique_ptr<Self> self, Self* target, int at_index);
+  void SwapParent(std::unique_ptr<InfostateNode> self, InfostateNode* target, int at_index);
 
  protected:
   // Needed for adding corresponding_states() during tree traversal.
-  friend class InfostateTree<Self>;
+  friend class InfostateTree;
 
   // Reference to the tree that this node belongs to. This reference has a valid
   // lifetime, as all the nodes are recursively owned by their parents, and the
   // root is owned by the tree.
-  const InfostateTree<Self>& tree_;
+  const InfostateTree& tree_;
   // Pointer to the parent node.
   // This is not const so that we can change it when we SwapParent().
-  Self* parent_;
+  InfostateNode* parent_;
   // Position of this node in the parent's children, i.e. it should hold that
   //   parent_->children_.at(incoming_index_).get() == this.
   // For decision nodes this corresponds also to the
@@ -176,7 +175,7 @@ class InfostateNode {
   // Stored only for decision nodes.
   std::vector<Action> legal_actions_;
   // Children infostate nodes. Notice the node owns its children.
-  std::vector<std::unique_ptr<Self>> children_;
+  std::vector<std::unique_ptr<InfostateNode>> children_;
   // Store States that correspond to a leaf node.
   std::vector<std::unique_ptr<State>> corresponding_states_;
   // Store chance reach probs for States that correspond to a leaf node.
@@ -185,7 +184,6 @@ class InfostateNode {
   std::vector<Action> terminal_history_;
 };
 
-template<class Node>
 class InfostateTree final {
  public:
   // Creates an infostate tree for a player based on the initial state
@@ -201,8 +199,8 @@ class InfostateTree final {
       std::shared_ptr<Observer> infostate_observer, Player acting_player,
       int max_move_ahead_limit = 1000, bool make_balanced = true);
 
-  const Node& root() const { return root_; }
-  Node* mutable_root() { return &root_; }
+  const InfostateNode& root() const { return root_; }
+  InfostateNode* mutable_root() { return &root_; }
   Player acting_player() const { return player_; }
   int tree_height() const { return tree_height_; }
   bool is_balanced() const { return is_tree_balanced_; }
@@ -218,14 +216,14 @@ class InfostateTree final {
   // Returns cached pointers to leaf nodes of the CFR tree. Unlike the
   // CFRTree::leaves_iterator(), this does not need to recursively traverse
   // the tree.
-  const std::vector<Node*>& leaf_nodes() const {
+  const std::vector<InfostateNode*>& leaf_nodes() const {
     return nodes_at_depth_.back();
   }
   // Returns the number of leaf nodes.
   int num_leaves() const {
     return nodes_at_depth_.back().size();
   }
-  const std::vector<std::vector<Node*>>& nodes_at_depth() const {
+  const std::vector<std::vector<InfostateNode*>>& nodes_at_depth() const {
     return nodes_at_depth_;
   }
 
@@ -233,13 +231,13 @@ class InfostateTree final {
   // Iterate over all leaves.
   class LeavesIterator {
     const InfostateTree* tree_;
-    const Node* current_;
+    const InfostateNode* current_;
    public:
-    LeavesIterator(const InfostateTree* tree, const Node* current);
+    LeavesIterator(const InfostateTree* tree, const InfostateNode* current);
     LeavesIterator& operator++();
     bool operator==(LeavesIterator other) const;
     bool operator!=(LeavesIterator other) const;
-    const Node& operator*() const;
+    const InfostateNode& operator*() const;
     LeavesIterator begin() const;
     LeavesIterator end() const;
   };
@@ -252,50 +250,38 @@ class InfostateTree final {
  private:
   const Player player_;
   const std::shared_ptr<Observer> infostate_observer_;
-  Node root_;
+  InfostateNode root_;
 
   // A value that helps to determine if the tree is balanced.
   int tree_height_ = -1;
   // We call a tree balanced if all leaves are in the same depth.
   bool is_tree_balanced_ = true;
   // Tree structure information. Pointers are collected after rebalancing.
-  std::vector<std::vector<Node*>> nodes_at_depth_;
+  std::vector<std::vector<InfostateNode*>> nodes_at_depth_;
 
-  Node CreateRootNode() const;
+  InfostateNode CreateRootNode() const;
 
   // Utility function whenever we create a new node for the tree.
-  std::unique_ptr<Node> MakeNode(
-      Node* parent, InfostateNodeType type, const std::string& infostate_string,
+  std::unique_ptr<InfostateNode> MakeNode(
+      InfostateNode* parent, InfostateNodeType type, const std::string& infostate_string,
       double terminal_utility, double terminal_ch_reach_prob,
       const State* originating_state);
 
   // Track and update information about tree balance.
-  void UpdateLeafNode(Node* node, const State& state,
+  void UpdateLeafNode(InfostateNode* node, const State& state,
                       int leaf_depth, double chance_reach_probs);
 
   // Build the tree.
-  void RecursivelyBuildTree(Node* parent, int depth, const State& state,
+  void RecursivelyBuildTree(InfostateNode* parent, int depth, const State& state,
                             int move_limit, double chance_reach_prob);
-  void BuildTerminalNode(Node* parent, int depth, const State& state,
+  void BuildTerminalNode(InfostateNode* parent, int depth, const State& state,
                          double chance_reach_prob);
-  void BuildDecisionNode(Node* parent, int depth, const State& state,
+  void BuildDecisionNode(InfostateNode* parent, int depth, const State& state,
                          int move_limit, double chance_reach_prob);
-  void BuildObservationNode(Node* parent, int depth, const State& state,
+  void BuildObservationNode(InfostateNode* parent, int depth, const State& state,
                             int move_limit, double chance_reach_prob);
 
-  void CollectTreeStructure(Node* node, int depth);
-};
-
-// Provide convenient types for usage in CFR-based algorithms.
-class CFRNode;
-using CFRTree = InfostateTree<CFRNode>;
-
-class CFRNode : public InfostateNode</*Self=*/CFRNode> {
- public:
-  CFRNode(const CFRTree& tree, CFRNode* parent, int incoming_index,
-          InfostateNodeType type, const std::string& infostate_string,
-          double terminal_utility, double terminal_chn_reach_prob,
-          const State* originating_state);
+  void CollectTreeStructure(InfostateNode* node, int depth);
 };
 
 // A type for tables holding pointers to CFR values.
@@ -308,11 +294,11 @@ class CFRNode : public InfostateNode</*Self=*/CFRNode> {
 using CFRInfoStateValuesPtrTable =
   std::unordered_map<std::string, CFRInfoStateValues*>;
 
+using CFRTree = InfostateTree;
+using CFRNode = InfostateNode;
 
 }  // namespace algorithms
 }  // namespace open_spiel
 
-// Template implementation.
-#include "open_spiel/algorithms/infostate_tree.hpp"
 
 #endif  // OPEN_SPIEL_ALGORITHMS_INFOSTATE_TREE_H_

@@ -31,19 +31,8 @@ namespace {
 
 constexpr double kErrorTolerance = 1e-10;
 
-class SolverNode;
-using SolverTree = InfostateTree<SolverNode>;
-
-class SolverNode : public InfostateNode</*Self=*/SolverNode> {
- public:
-  SolverNode(const SolverTree& tree, SolverNode* parent, int incoming_index,
-          InfostateNodeType type, const std::string& infostate_string,
-          double terminal_utility, double terminal_chn_reach_prob,
-          const State* originating_state)
-    : InfostateNode<SolverNode>(
-      tree, parent, incoming_index, type, infostate_string,
-      terminal_utility, terminal_chn_reach_prob, originating_state)  {}
-};
+using SolverNode = InfostateNode;
+using SolverTree = InfostateTree;
 
 struct SolverData {
   // Variables needed for solving the LP. We will create these later.
@@ -79,19 +68,18 @@ struct BijectiveContainer {
   }
 };
 
-template<class Node>
-BijectiveContainer<const Node*> ConnectTerminals(
-    const InfostateTree<Node>& tree_a, const InfostateTree<Node>& tree_b) {
-  BijectiveContainer<const Node*> out;
+BijectiveContainer<const InfostateNode*> ConnectTerminals(
+    const InfostateTree& tree_a, const InfostateTree& tree_b) {
+  BijectiveContainer<const InfostateNode*> out;
 
   using History = absl::Span<const Action>;
-  std::map<History, const Node*> history_map;
-  for (const Node& node_b : tree_b.leaves_iterator()) {
+  std::map<History, const InfostateNode*> history_map;
+  for (const InfostateNode& node_b : tree_b.leaves_iterator()) {
     history_map[node_b.TerminalHistory()] = &node_b;
   }
 
-  for (const Node& node_a : tree_a.leaves_iterator()) {
-    const Node* node_b = history_map[node_a.TerminalHistory()];
+  for (const InfostateNode& node_a : tree_a.leaves_iterator()) {
+    const InfostateNode* node_b = history_map[node_a.TerminalHistory()];
     out.put({&node_a, node_b});
   }
   return out;
