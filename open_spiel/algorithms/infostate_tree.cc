@@ -43,9 +43,6 @@ CFRNode::CFRNode(const CFRTree& tree, CFRNode* parent, int incoming_index,
       values_ = CFRInfoStateValues(
           originating_state->LegalActions(tree.acting_player()));
     }
-    if (type_ == kTerminalInfostateNode) {
-      terminal_history_ = originating_state->History();
-    }
   }
 }
 
@@ -60,11 +57,6 @@ const CFRInfoStateValues& CFRNode::values() const {
 CFRInfoStateValues& CFRNode::values() {
   SPIEL_CHECK_EQ(type_, kDecisionInfostateNode);
   return values_;
-}
-
-const std::vector<Action>& CFRNode::TerminalHistory() const {
-  SPIEL_DCHECK_EQ(type_, kTerminalInfostateNode);
-  return terminal_history_;
 }
 
 }  // namespace algorithms

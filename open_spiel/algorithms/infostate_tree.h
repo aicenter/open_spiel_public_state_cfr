@@ -106,6 +106,7 @@ class InfostateNode {
   Self* AddChild(std::unique_ptr<Self> child);
   Self* GetChild(const std::string& infostate_string) const;
   const Self* FindNode(const std::string& infostate_lookup) const;
+  const std::vector<Action>& TerminalHistory() const;
 
   // Intended only for debug purposes.
   std::string ToString() const;
@@ -180,6 +181,8 @@ class InfostateNode {
   std::vector<std::unique_ptr<State>> corresponding_states_;
   // Store chance reach probs for States that correspond to a leaf node.
   std::vector<double> corresponding_ch_reaches_;
+
+  std::vector<Action> terminal_history_;
 };
 
 template<class Node>
@@ -290,7 +293,6 @@ using CFRTree = InfostateTree<CFRNode>;
 class CFRNode : public InfostateNode</*Self=*/CFRNode> {
  public:
   CFRInfoStateValues values_;
-  std::vector<Action> terminal_history_;
   CFRNode(const CFRTree& tree, CFRNode* parent, int incoming_index,
           InfostateNodeType type, const std::string& infostate_string,
           double terminal_utility, double terminal_chn_reach_prob,
@@ -301,8 +303,6 @@ class CFRNode : public InfostateNode</*Self=*/CFRNode> {
   // Provide getters as well.
   const CFRInfoStateValues& values() const;
   CFRInfoStateValues& values();
-
-  const std::vector<Action>& TerminalHistory() const;
 };
 
 // A type for tables holding pointers to CFR values.

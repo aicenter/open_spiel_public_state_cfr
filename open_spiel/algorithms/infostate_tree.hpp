@@ -44,6 +44,9 @@ InfostateNode<Self>::InfostateNode(
   if (type == kDecisionInfostateNode) {
     legal_actions_ = originating_state->LegalActions(tree_.acting_player());
   }
+  if (type_ == kTerminalInfostateNode) {
+    terminal_history_ = originating_state->History();
+  }
 }
 
 template<class Self>
@@ -331,6 +334,12 @@ void InfostateTree<Node>::PrintStats() {
             << CountLeafCorrespondingHistories() << "\n"
             << "Tree certificate: " << std::endl;
   std::cout << root().ComputeCertificate() << std::endl;
+}
+
+template<class Node>
+const std::vector<Action>& InfostateNode<Node>::TerminalHistory() const {
+  SPIEL_DCHECK_EQ(type_, kTerminalInfostateNode);
+  return terminal_history_;
 }
 
 template<class Node>
