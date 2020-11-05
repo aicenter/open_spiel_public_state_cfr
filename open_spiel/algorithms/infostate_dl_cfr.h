@@ -119,7 +119,7 @@ class DepthLimitedCFR {
                   std::shared_ptr<const LeafEvaluator> terminal_evaluator);
 
   DepthLimitedCFR(std::shared_ptr<const Game> game,
-                  std::array<InfostateTree, 2> trees,
+                  std::array<std::unique_ptr<InfostateTree>, 2> trees,
                   std::shared_ptr<const LeafEvaluator> leaf_evaluator,
                   std::shared_ptr<const LeafEvaluator> terminal_evaluator,
                   std::shared_ptr<Observer> public_observer);
@@ -128,27 +128,16 @@ class DepthLimitedCFR {
   void SimultaneousTopDownEvaluate();
 
   void SetPlayerRanges(const std::array<std::vector<float>, 2>& ranges);
-  float RootValue(Player pl = 0) const {
-    const int root_branching = trees_[pl].root_branching_factor();
-    return RootCfValue(
-        root_branching, absl::MakeConstSpan(&cf_values_[pl][0], root_branching),
-        player_ranges_[pl]);
-  }
+  float RootValue(Player pl = 0) const;
   std::array<absl::Span<const float>, 2> RootChildrenCfValues() const;
 
-  std::array<const InfostateNode*, 2> Roots() const {
-    return {&trees_[0].root(), &trees_[1].root()};
-  }
-  std::array<InfostateTree, 2>& Trees() { return trees_; }
+  std::array<const InfostateNode*, 2> Roots() const;
+  std::array<std::unique_ptr<InfostateTree>, 2>& Trees();
 
   CFRInfoStateValuesPtrTable InfoStateValuesPtrTable();
 
-  std::vector<std::unique_ptr<PublicStateContext>>& GetContexts() {
-    return contexts_;
-  }
-  std::vector<LeafPublicState>& GetPublicLeaves() {
-    return public_leaves_;
-  }
+  std::vector<std::unique_ptr<PublicStateContext>>& GetContexts();
+  std::vector<LeafPublicState>& GetPublicLeaves();
 
   // Trunk evaluation.
   float CfBestResponse(Player responding_player) const;
@@ -156,7 +145,7 @@ class DepthLimitedCFR {
 
  private:
   const std::shared_ptr<const Game> game_;
-  std::array<InfostateTree, 2> trees_;
+  std::array<std::unique_ptr<InfostateTree>, 2> trees_;
   const std::shared_ptr<Observer> public_observer_;
   const std::shared_ptr<const LeafEvaluator> leaf_evaluator_;
   const std::shared_ptr<const LeafEvaluator> terminal_evaluator_;

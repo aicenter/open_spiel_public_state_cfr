@@ -39,8 +39,8 @@ std::string iigs3 = "goofspiel("
 std::unique_ptr<InfostateTree> MakeTree(const std::string& game_name,
                                         Player player_id,
                                         int max_move_limit = 1000) {
-  return std::make_unique<InfostateTree>(*LoadGame(game_name), player_id,
-                                         max_move_limit, /*make_balanced=*/false);
+  return MakeInfostateTree(*LoadGame(game_name), player_id,
+                           max_move_limit, /*make_balanced=*/false);
 }
 
 std::unique_ptr<InfostateTree> MakeTree(
@@ -61,7 +61,7 @@ std::unique_ptr<InfostateTree> MakeTree(
   std::shared_ptr<Observer> infostate_observer =
       game->MakeObserver(kInfoStateObsType, {});
 
-  return std::make_unique<InfostateTree>(
+  return MakeInfostateTree(
       start_state_ptrs, start_reaches, infostate_observer,
       player_id, max_move_limit, /*make_balanced=*/false);
 }

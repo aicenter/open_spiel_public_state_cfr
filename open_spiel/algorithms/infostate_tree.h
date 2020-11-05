@@ -39,19 +39,19 @@
 // between leaf nodes and non-leaf nodes. All terminal nodes are leaf nodes.
 //
 // The identification of infostates is based on strings from an information
-// state observer.
+// state observer, i.e. one that is constructed using kInfoStateObsType.
 //
-// As algorithms need to store information associated to nodes of the tree,
-// we provide following addressing mechanisms:
-// - `DecisionInfostateId` refers to an infostate where the player acts.
-// - `SequenceId` refers to a _sequence_ of actions player has done so far.
+// As algorithms typically need to store information associated to the nodes
+// of the tree, we provide following addressing mechanisms:
+// - `DecisionId` refers to an infostate where the player acts.
+// - `SequenceId` refers to a sequence of actions player has done so far.
 // - `LeafId` refers to an infostate node which is a leaf.
-// All of these can be used to get a pointer to the infostate node.
+// All of these ids can be used to get a pointer to the infostate node.
 //
 // To enable some very specific algorithmic optimizations we construct the trees
 // "balanced" by default. We call a _balanced_ tree one which has all leaf nodes
 // at the same depth. To ensure the tree is balanced, we may need to pad "dummy"
-// observation nodes before the (too shallow) leafs.
+// observation nodes as prefixes for the (previously too shallow) leafs.
 //
 // [1]: Smoothing Techniques for Computing Nash Equilibria of Sequential Games
 
@@ -102,6 +102,7 @@ namespace {
 //        boilerplate code.
 
 // An implementation detail - Not to be used directly.
+// Creates indexing of specific infostate nodes.
 //
 // We use CRTP as it allows us to reuse the implementation for indexing various
 // nodes in the tree. Most importantly it allows to make debug-time checks to
@@ -152,20 +153,39 @@ constexpr LeafId kUndefinedLeafId = LeafId();
 
 class InfostateNode;
 
+// Creates an infostate tree for a player based on the initial state
+// of the game, up to some move limit.
+std::unique_ptr<InfostateTree> MakeInfostateTree(
+    const Game& game, Player acting_player,
+    int max_move_limit = 1000, bool make_balanced = true);
+
+// Creates an infostate tree for a player based on some start states,
+// up to some move limit from the deepest start state.
+std::unique_ptr<InfostateTree> MakeInfostateTree(
+    const std::vector<const State*>& start_states,
+    const std::vector<float>& chance_reach_probs,
+    std::shared_ptr<Observer> infostate_observer, Player acting_player,
+    int max_move_ahead_limit = 1000, bool make_balanced = true);
 
 class InfostateTree final {
-  // Creates an infostate tree for a player based on the initial state
-  // of the game, up to some move limit.
+  // Note that only MakeInfostateTree is allowed to call the constructor
+  // to ensure the trees are always allocated on heap. We do this so that all
+  // the collected pointers are valid throughout the tree's lifetime even if
+  // they are moved around.
+ private:
   InfostateTree(const Game& game, Player acting_player,
                 int max_move_limit = 1000, bool make_balanced = true);
-
-  // Creates an infostate tree for a player based on some start states,
-  // up to some move limit from the deepest start state.
   InfostateTree(
       const std::vector<const State*>& start_states,
       const std::vector<float>& chance_reach_probs,
       std::shared_ptr<Observer> infostate_observer, Player acting_player,
       int max_move_ahead_limit = 1000, bool make_balanced = true);
+  // Friend factories.
+  friend std::unique_ptr<InfostateTree> MakeInfostateTree(
+      const Game&, Player, int, bool);
+  friend std::unique_ptr<InfostateTree> MakeInfostateTree(
+      const std::vector<const State*>&, const std::vector<float>&,
+      std::shared_ptr<Observer>, Player, int, bool);
 
  public:
   const InfostateNode& root() const { return *root_; }

@@ -21,10 +21,11 @@ namespace algorithms {
 namespace dlcfr {
 
 std::unordered_map<const InfostateNode*, CFRInfoStateValues> CreateTable(
-    const std::array<InfostateTree, 2>& trees) {
+    const std::array<std::unique_ptr<InfostateTree>, 2>& trees) {
   std::unordered_map<const InfostateNode*, CFRInfoStateValues> map;
   for (int pl = 0; pl < 2; ++pl) {
-    const std::vector<std::vector<InfostateNode*>>& nodes = trees[pl].nodes_at_depth();
+    const std::vector<std::vector<InfostateNode*>>& nodes = 
+        trees[pl]->nodes_at_depth();
     for (int d = 0; d < nodes.size() - 1; ++d) {
       for (const InfostateNode* node : nodes[d]) {
         if (node->type() != kDecisionInfostateNode) continue;
@@ -37,7 +38,7 @@ std::unordered_map<const InfostateNode*, CFRInfoStateValues> CreateTable(
 
 DepthLimitedCFR::DepthLimitedCFR(
     std::shared_ptr<const Game> game,
-    std::array<InfostateTree, 2> trees,
+    std::array<std::unique_ptr<InfostateTree>, 2> trees,
     std::shared_ptr<const LeafEvaluator> leaf_evaluator,
     std::shared_ptr<const LeafEvaluator> terminal_evaluator,
     std::shared_ptr<Observer> public_observer
@@ -45,19 +46,19 @@ DepthLimitedCFR::DepthLimitedCFR(
     game_(std::move(game)),
     trees_(std::move(trees)),
     cf_values_({
-      std::vector<float>(trees_[0].num_leaves(), 0.),
-      std::vector<float>(trees_[1].num_leaves(), 0.)
+      std::vector<float>(trees_[0]->num_leaves(), 0.),
+      std::vector<float>(trees_[1]->num_leaves(), 0.)
     }),
     reach_probs_({
-      std::vector<float>(trees_[0].num_leaves(), 0.),
-      std::vector<float>(trees_[1].num_leaves(), 0.)
+      std::vector<float>(trees_[0]->num_leaves(), 0.),
+      std::vector<float>(trees_[1]->num_leaves(), 0.)
     }),
     public_observer_(std::move(public_observer)),
     leaf_evaluator_(std::move(leaf_evaluator)),
     terminal_evaluator_(std::move(terminal_evaluator)),
     player_ranges_({
-      std::vector<float>(trees_[0].root_branching_factor(), 1.),
-      std::vector<float>(trees_[1].root_branching_factor(), 1.)
+      std::vector<float>(trees_[0]->root_branching_factor(), 1.),
+      std::vector<float>(trees_[1]->root_branching_factor(), 1.)
     }),
     node_values_(CreateTable(trees_)) {
   PrepareLeafNodesForPublicStates();
@@ -70,8 +71,8 @@ DepthLimitedCFR::DepthLimitedCFR(
     std::shared_ptr<const LeafEvaluator> leaf_evaluator,
     std::shared_ptr<const LeafEvaluator> terminal_evaluator
 ) : DepthLimitedCFR(game,
-                    {InfostateTree(*game, 0, max_depth_limit),
-                     InfostateTree(*game, 1, max_depth_limit)},
+                    {MakeInfostateTree(*game, 0, max_depth_limit),
+                     MakeInfostateTree(*game, 1, max_depth_limit)},
                     std::move(leaf_evaluator),
                     std::move(terminal_evaluator),
                     game->MakeObserver(kPublicStateObsType, {})) {}
@@ -94,7 +95,7 @@ void FillStatesAndChanceRange(std::vector<const State*>* start_states,
   }
 }
 
-std::array<InfostateTree, 2> CreateTrees(
+std::array<std::unique_ptr<InfostateTree>, 2> CreateTrees(
     std::array<absl::Span<const InfostateNode* const>, 2> start_nodes,
     const std::shared_ptr<Observer>& infostate_observer,
     int max_move_limit) {
@@ -107,10 +108,10 @@ std::array<InfostateTree, 2> CreateTrees(
                            start_nodes[1]);
 
   return {
-      InfostateTree(start_states[0], chance_reach_probs[0],
-                    infostate_observer, /*acting_player=*/0, max_move_limit),
-      InfostateTree(start_states[1], chance_reach_probs[1],
-                    infostate_observer, /*acting_player=*/1, max_move_limit)
+      MakeInfostateTree(start_states[0], chance_reach_probs[0],
+                        infostate_observer, /*acting_player=*/0, max_move_limit),
+      MakeInfostateTree(start_states[1], chance_reach_probs[1],
+                        infostate_observer, /*acting_player=*/1, max_move_limit)
   };
 }
 
@@ -119,7 +120,7 @@ void DepthLimitedCFR::PrepareLeafNodesForPublicStates() {
 
   for (int pl = 0; pl < 2; ++pl) {
     int leaf_position = 0;
-    for (InfostateNode* leaf_node : trees_[pl].leaf_nodes()) {
+    for (InfostateNode* leaf_node : trees_[pl]->leaf_nodes()) {
       SPIEL_CHECK_FALSE(leaf_node->corresponding_states().empty());
       const std::unique_ptr<State>& some_state =
           leaf_node->corresponding_states()[0];
@@ -132,7 +133,7 @@ void DepthLimitedCFR::PrepareLeafNodesForPublicStates() {
       leaf_position++;
     }
 
-    SPIEL_CHECK_EQ(leaf_position, trees_[pl].num_leaves());
+    SPIEL_CHECK_EQ(leaf_position, trees_[pl]->num_leaves());
   }
 }
 
@@ -237,16 +238,16 @@ void TerminalEvaluator::EvaluatePublicState(
 
 void DepthLimitedCFR::SimultaneousTopDownEvaluate() {
   PrepareRootReachProbs();
-  TopDown(trees_[0].nodes_at_depth(), node_values_, absl::MakeSpan(reach_probs_[0]));
-  TopDown(trees_[1].nodes_at_depth(), node_values_, absl::MakeSpan(reach_probs_[1]));
+  TopDown(trees_[0]->nodes_at_depth(), node_values_, absl::MakeSpan(reach_probs_[0]));
+  TopDown(trees_[1]->nodes_at_depth(), node_values_, absl::MakeSpan(reach_probs_[1]));
   EvaluateLeaves();
 }
 
 void DepthLimitedCFR::RunSimultaneousIterations(int iterations) {
   for (int t = 0; t < iterations; ++t) {
     SimultaneousTopDownEvaluate();
-    BottomUp(trees_[0].nodes_at_depth(), node_values_, absl::MakeSpan(cf_values_[0]));
-    BottomUp(trees_[1].nodes_at_depth(), node_values_, absl::MakeSpan(cf_values_[1]));
+    BottomUp(trees_[0]->nodes_at_depth(), node_values_, absl::MakeSpan(cf_values_[0]));
+    BottomUp(trees_[1]->nodes_at_depth(), node_values_, absl::MakeSpan(cf_values_[1]));
     SPIEL_DCHECK_FLOAT_NEAR(RootValue(/*pl=*/0), -RootValue(/*pl=*/1), 1e-6);
   }
 }
@@ -271,7 +272,7 @@ void DepthLimitedCFR::EvaluateLeaves() {
         const InfostateNode* leaf_node = state.leaf_nodes[pl][j];
         const int trunk_position = leaf_positions_.at(leaf_node);
         SPIEL_DCHECK_GE(trunk_position, 0);
-        SPIEL_DCHECK_LT(trunk_position, trees_[pl].num_leaves());
+        SPIEL_DCHECK_LT(trunk_position, trees_[pl]->num_leaves());
         // Copy range from the trunk to the leaf public state.
         state.ranges[pl][j] = reach_probs_[pl][trunk_position];
       }
@@ -293,7 +294,7 @@ void DepthLimitedCFR::EvaluateLeaves() {
         const InfostateNode* leaf_node = state.leaf_nodes[pl][j];
         const int trunk_position = leaf_positions_.at(leaf_node);
         SPIEL_DCHECK_GE(trunk_position, 0);
-        SPIEL_DCHECK_LT(trunk_position, trees_[pl].num_leaves());
+        SPIEL_DCHECK_LT(trunk_position, trees_[pl]->num_leaves());
         // Copy value from the leaf public state to the trunk.
         cf_values_[pl][trunk_position] = state.values[pl][j];
       }
@@ -315,8 +316,8 @@ void DepthLimitedCFR::SetPlayerRanges(
 std::array<absl::Span<const float>, 2> DepthLimitedCFR::RootChildrenCfValues()
 const {
   return {
-      absl::MakeConstSpan(&cf_values_[0][0], trees_[0].root_branching_factor()),
-      absl::MakeConstSpan(&cf_values_[1][0], trees_[1].root_branching_factor())
+      absl::MakeConstSpan(&cf_values_[0][0], trees_[0]->root_branching_factor()),
+      absl::MakeConstSpan(&cf_values_[1][0], trees_[1]->root_branching_factor())
   };
 }
 
@@ -444,8 +445,24 @@ float DepthLimitedCFR::CfBestResponse(
 
 float DepthLimitedCFR::CfBestResponse(Player responding_player) const {
   int leaf_index = 0;
-  const InfostateNode& root_node = trees_[responding_player].root();
+  const InfostateNode& root_node = trees_[responding_player]->root();
   return CfBestResponse(root_node, responding_player, &leaf_index);
+}
+float DepthLimitedCFR::RootValue(Player pl) const {
+  const int root_branching = trees_[pl]->root_branching_factor();
+  return RootCfValue(
+      root_branching, absl::MakeConstSpan(&cf_values_[pl][0], root_branching),
+      player_ranges_[pl]);
+}
+std::array<const InfostateNode*, 2> DepthLimitedCFR::Roots() const {
+  return {&trees_[0]->root(), &trees_[1]->root()};
+}
+std::array<std::unique_ptr<InfostateTree>, 2>& DepthLimitedCFR::Trees() { return trees_; }
+std::vector<std::unique_ptr<PublicStateContext>>& DepthLimitedCFR::GetContexts() {
+  return contexts_;
+}
+std::vector<LeafPublicState>& DepthLimitedCFR::GetPublicLeaves() {
+  return public_leaves_;
 }
 
 }  // namespace dlcfr

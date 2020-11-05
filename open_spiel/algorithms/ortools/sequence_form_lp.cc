@@ -299,7 +299,7 @@ std::unique_ptr<ZeroSumSequentialGameSolution> SolveZeroSumSequentialGame(
   // 1. Construct infoset trees for the game.
   std::array<std::unique_ptr<InfostateTree>, 2> solver_trees;
   for (int pl = 0; pl < 2; ++pl) {
-    solver_trees[pl] = std::make_unique<InfostateTree>(
+    solver_trees[pl] = MakeInfostateTree(
         start_states, chance_reach_probs, infostate_observer, pl);
   }
   std::unordered_map<const InfostateNode*, SolverData> data_table;

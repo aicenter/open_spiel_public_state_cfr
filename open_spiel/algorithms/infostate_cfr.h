@@ -100,16 +100,14 @@ class InfostateCFR {
   // Basic constructor for the whole game.
   explicit InfostateCFR(const Game& game);
   // Run CFR on the specified trees.
-  explicit InfostateCFR(std::array<InfostateTree, 2> cfr_trees);
+  explicit InfostateCFR(std::array<std::unique_ptr<InfostateTree>, 2> trees);
 
   void RunSimultaneousIterations(int iterations);
   void RunAlternatingIterations(int iterations);
 
   // Computes the root value. If the algorithm is running on the full trees
   // of the game, this converges to the game value.
-  float RootValue() const {
-    return RootCfValue(trees_[0].root_branching_factor(), cf_values_[0]);
-  }
+  float RootValue() const;
 
   CFRInfoStateValuesPtrTable InfoStateValuesPtrTable();
   std::shared_ptr<Policy> AveragePolicy();
@@ -123,7 +121,7 @@ class InfostateCFR {
   float TerminalReachProbSum();
 
   // The trees which hold the strategies of the players.
-  std::array<InfostateTree, 2> trees_;
+  std::array<std::unique_ptr<InfostateTree>, 2> trees_;
   // Map from player 0 index (key) to player 1 (value).
   std::vector<int> terminal_permutation_;
   // Chance reach probs.
