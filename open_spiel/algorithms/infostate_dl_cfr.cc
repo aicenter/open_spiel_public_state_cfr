@@ -20,6 +20,21 @@ namespace open_spiel {
 namespace algorithms {
 namespace dlcfr {
 
+std::unordered_map<const CFRNode*, CFRInfoStateValues> CreateTable(
+    const std::array<CFRTree, 2>& trees) {
+  std::unordered_map<const CFRNode*, CFRInfoStateValues> map;
+  for (int pl = 0; pl < 2; ++pl) {
+    const std::vector<std::vector<CFRNode*>>& nodes = trees[pl].nodes_at_depth();
+    for (int d = 0; d < nodes.size() - 1; ++d) {
+      for (const CFRNode* node : nodes[d]) {
+        if (node->type() != kDecisionInfostateNode) continue;
+        map[node] = CFRInfoStateValues(node->legal_actions());
+      }
+    }
+  }
+  return map;
+}
+
 DepthLimitedCFR::DepthLimitedCFR(
     std::shared_ptr<const Game> game,
     std::array<CFRTree, 2> trees,
@@ -43,7 +58,8 @@ DepthLimitedCFR::DepthLimitedCFR(
     player_ranges_({
       std::vector<float>(trees_[0].root_branching_factor(), 1.),
       std::vector<float>(trees_[1].root_branching_factor(), 1.)
-    }) {
+    }),
+    node_values_(CreateTable(trees_)) {
   PrepareLeafNodesForPublicStates();
   PrepareRangesAndValuesForPublicStates();
   CreateContexts();
@@ -221,16 +237,16 @@ void TerminalEvaluator::EvaluatePublicState(
 
 void DepthLimitedCFR::SimultaneousTopDownEvaluate() {
   PrepareRootReachProbs();
-  TopDown(trees_[0].nodes_at_depth(), absl::MakeSpan(reach_probs_[0]));
-  TopDown(trees_[1].nodes_at_depth(), absl::MakeSpan(reach_probs_[1]));
+  TopDown(trees_[0].nodes_at_depth(), node_values_, absl::MakeSpan(reach_probs_[0]));
+  TopDown(trees_[1].nodes_at_depth(), node_values_, absl::MakeSpan(reach_probs_[1]));
   EvaluateLeaves();
 }
 
 void DepthLimitedCFR::RunSimultaneousIterations(int iterations) {
   for (int t = 0; t < iterations; ++t) {
     SimultaneousTopDownEvaluate();
-    BottomUp(trees_[0].nodes_at_depth(), absl::MakeSpan(cf_values_[0]));
-    BottomUp(trees_[1].nodes_at_depth(), absl::MakeSpan(cf_values_[1]));
+    BottomUp(trees_[0].nodes_at_depth(), node_values_, absl::MakeSpan(cf_values_[0]));
+    BottomUp(trees_[1].nodes_at_depth(), node_values_, absl::MakeSpan(cf_values_[1]));
     SPIEL_DCHECK_FLOAT_NEAR(RootValue(/*pl=*/0), -RootValue(/*pl=*/1), 1e-6);
   }
 }
@@ -287,8 +303,9 @@ void DepthLimitedCFR::EvaluateLeaves() {
 
 CFRInfoStateValuesPtrTable DepthLimitedCFR::InfoStateValuesPtrTable() {
   CFRInfoStateValuesPtrTable vec_ptable;
-  CollectInfostateLookupTable(trees_[0].mutable_root(), &vec_ptable);
-  CollectInfostateLookupTable(trees_[1].mutable_root(), &vec_ptable);
+  for (auto& [ptr, value] : node_values_) {
+    vec_ptable[ptr->infostate_string()] = &value;
+  }
   return vec_ptable;
 }
 void DepthLimitedCFR::SetPlayerRanges(

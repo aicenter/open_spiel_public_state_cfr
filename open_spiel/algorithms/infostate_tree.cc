@@ -17,17 +17,6 @@
 namespace open_spiel {
 namespace algorithms {
 
-void CollectInfostateLookupTable(CFRNode* node,
-                                 CFRInfoStateValuesPtrTable* out) {
-  if (node->is_leaf_node()) return;
-  if (node->type() == kDecisionInfostateNode) {
-    (*out)[node->infostate_string()] = &node->values();
-  }
-  for (CFRNode& child : node->child_iterator()) {
-    CollectInfostateLookupTable(&child, out);
-  }
-}
-
 CFRNode::CFRNode(const CFRTree& tree, CFRNode* parent, int incoming_index,
                  InfostateNodeType type, const std::string& infostate_string,
                  double terminal_utility, double terminal_chn_reach_prob,
@@ -35,28 +24,6 @@ CFRNode::CFRNode(const CFRTree& tree, CFRNode* parent, int incoming_index,
     InfostateNode<CFRNode>(
         tree, parent, incoming_index, type, infostate_string,
         terminal_utility, terminal_chn_reach_prob, originating_state)  {
-  SPIEL_DCHECK_TRUE(
-      !(originating_state && type == kDecisionInfostateNode)
-          || originating_state->IsPlayerActing(tree.acting_player()));
-  if (originating_state) {
-    if (type_ == kDecisionInfostateNode) {
-      values_ = CFRInfoStateValues(
-          originating_state->LegalActions(tree.acting_player()));
-    }
-  }
-}
-
-CFRInfoStateValues* CFRNode::operator->() {
-  SPIEL_CHECK_EQ(type_, kDecisionInfostateNode);
-  return &values_;
-}
-const CFRInfoStateValues& CFRNode::values() const {
-  SPIEL_CHECK_EQ(type_, kDecisionInfostateNode);
-  return values_;
-}
-CFRInfoStateValues& CFRNode::values() {
-  SPIEL_CHECK_EQ(type_, kDecisionInfostateNode);
-  return values_;
 }
 
 }  // namespace algorithms

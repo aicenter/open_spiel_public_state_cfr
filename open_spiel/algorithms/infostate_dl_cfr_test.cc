@@ -60,8 +60,9 @@ void CheckIterationConsistency(
 
     // Check regrets.
     for (int j = 0; j < expected_values.num_actions(); ++j) {
-      SPIEL_CHECK_TRUE(fabs(expected_values.cumulative_regrets[j]
-                                - actual_values.cumulative_regrets[j]) < 1e-6);
+      SPIEL_CHECK_FLOAT_NEAR(
+        expected_values.cumulative_regrets[j],
+        actual_values.cumulative_regrets[j], 1e-6);
     }
     // Cumulative policy is more tricky: we need to normalize it first.
     double act_cumul_sum = 0, exp_cumul_sum = 0;
@@ -70,9 +71,9 @@ void CheckIterationConsistency(
       exp_cumul_sum += expected_values.cumulative_policy[j];
     }
     for (int j = 0; j < expected_values.num_actions(); ++j) {
-      SPIEL_CHECK_TRUE(fabs(
-          expected_values.cumulative_policy[j] / exp_cumul_sum
-              - actual_values.cumulative_policy[j] / act_cumul_sum) < 1e-6);
+      SPIEL_CHECK_FLOAT_NEAR(
+        expected_values.cumulative_policy[j] / exp_cumul_sum,
+        actual_values.cumulative_policy[j] / act_cumul_sum, 1e-6);
     }
   }
 }

@@ -172,6 +172,8 @@ class DepthLimitedCFR {
   std::array<std::vector<float>, 2> reach_probs_;
   std::array<std::vector<float>, 2> cf_values_;
 
+  std::unordered_map<const CFRNode*, CFRInfoStateValues> node_values_;
+
   void PrepareRootReachProbs();
   void PrepareLeafNodesForPublicStates();
   void PrepareRangesAndValuesForPublicStates();

@@ -75,14 +75,18 @@ namespace algorithms {
 // of reach probabilities for leaf nodes.
 // The starting values at depth 1 must be provided externally by writing
 // to range()
-void TopDown(const std::vector<std::vector<CFRNode*>>& nodes_at_depth,
-             absl::Span<float> reach_probs);
+void TopDown(
+    const std::vector<std::vector<CFRNode*>>& nodes_at_depth,
+    std::unordered_map<const CFRNode*, CFRInfoStateValues>& node_values,
+    absl::Span<float> reach_probs);
 
 // Make a bottom-up pass, starting with the current cf_values stored
 // in the buffer. This loopss over all depths from the bottom.
 // The leaf values must be provided externally by writing to leaves_cf_values().
-void BottomUp(const std::vector<std::vector<CFRNode*>>& nodes_at_depth,
-              absl::Span<float> cf_values);
+void BottomUp(
+    const std::vector<std::vector<CFRNode*>>& nodes_at_depth,
+    std::unordered_map<const CFRNode*, CFRInfoStateValues>& node_values,
+    absl::Span<float> cf_values);
 
 // Calculates the root cf value as weighted sum of the cf_values()
 // (the weights are the respective ranges). If the supplied range is empty,
@@ -131,6 +135,8 @@ class InfostateCFR {
   // These have the size of largest depth of the tree (i.e. leaf nodes).
   std::array<std::vector<float>, 2> reach_probs_;
   std::array<std::vector<float>, 2> cf_values_;
+
+  std::unordered_map<const CFRNode*, CFRInfoStateValues> node_values_;
 };
 
 }  // namespace algorithms

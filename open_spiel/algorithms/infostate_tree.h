@@ -292,17 +292,10 @@ using CFRTree = InfostateTree<CFRNode>;
 
 class CFRNode : public InfostateNode</*Self=*/CFRNode> {
  public:
-  CFRInfoStateValues values_;
   CFRNode(const CFRTree& tree, CFRNode* parent, int incoming_index,
           InfostateNodeType type, const std::string& infostate_string,
           double terminal_utility, double terminal_chn_reach_prob,
           const State* originating_state);
-
-  // Provide a convenient operator to access the values.
-  CFRInfoStateValues* operator->();
-  // Provide getters as well.
-  const CFRInfoStateValues& values() const;
-  CFRInfoStateValues& values();
 };
 
 // A type for tables holding pointers to CFR values.
@@ -315,8 +308,6 @@ class CFRNode : public InfostateNode</*Self=*/CFRNode> {
 using CFRInfoStateValuesPtrTable =
   std::unordered_map<std::string, CFRInfoStateValues*>;
 
-void CollectInfostateLookupTable(CFRNode* node,
-                                 CFRInfoStateValuesPtrTable* out);
 
 }  // namespace algorithms
 }  // namespace open_spiel
