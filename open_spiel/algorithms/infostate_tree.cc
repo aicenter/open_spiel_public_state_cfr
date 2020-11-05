@@ -255,89 +255,11 @@ void InfostateTree::CollectTreeStructure(InfostateNode* node, int depth) {
     CollectTreeStructure(&child, depth + 1);
 }
 
-
-InfostateTree::LeavesIterator::LeavesIterator(const InfostateTree* tree,
-                                              const InfostateNode* current)
-    : tree_(tree), current_(current) {
-  SPIEL_CHECK_TRUE(current_);
-  SPIEL_CHECK_TRUE(current_->is_leaf_node() || current_->is_root_node());
-}
-
-typename InfostateTree::LeavesIterator&
-InfostateTree::LeavesIterator::operator++() {
-  if (!current_->parent())
-    SpielFatalError("All leaves have been iterated!");
-  SPIEL_CHECK_TRUE(current_->is_leaf_node());
-  int child_idx;
-  do {  // Find some parent that was not fully traversed.
-    SPIEL_DCHECK_LT(current_->incoming_index(),
-                    current_->parent()->num_children());
-    SPIEL_DCHECK_EQ(current_->parent()->child_at(current_->incoming_index()),
-                    current_);
-    child_idx = current_->incoming_index();
-    current_ = current_->parent();
-  } while (current_->parent()
-      && child_idx + 1 == current_->num_children());
-  // We traversed the whole tree and we got the root node.
-  if (!current_->parent() && child_idx + 1 == current_->num_children())
-    return *this;
-  // Choose the next sibling node.
-  current_ = current_->child_at(child_idx + 1);
-  // Find the first leaf.
-  while (!current_->is_leaf_node()) {
-    current_ = current_->child_at(0);
-  }
-  return *this;
-}
-
-bool InfostateTree::LeavesIterator::operator==(
-    LeavesIterator other) const {
-  return current_ == other.current_;
-}
-
-bool InfostateTree::LeavesIterator::operator!=(
-    LeavesIterator other) const { return !(*this == other); }
-
-const InfostateNode&
-InfostateTree::LeavesIterator::operator*() const { return *current_; }
-
-
-typename InfostateTree::LeavesIterator
-InfostateTree::LeavesIterator::begin() const { return *this; }
-
-typename InfostateTree::LeavesIterator
-InfostateTree::LeavesIterator::end() const {
-  return LeavesIterator(tree_, &(current_->tree().root()));
-}
-
-typename InfostateTree::LeavesIterator
-InfostateTree::leaves_iterator() const {
-  // Find the first leaf.
-  const InfostateNode* node = root_.get();
-  while (!node->is_leaf_node()) node = node->child_at(0);
-  return LeavesIterator(this, node);
-}
-
-int InfostateTree::CountLeaves() const {
-  int cnt = 0;
-  for (const InfostateNode& n : leaves_iterator()) cnt++;
-  return cnt;
-}
-
-int InfostateTree::CountLeafCorrespondingHistories() const {
-  int cnt = 0;
-  for (const InfostateNode& n : leaves_iterator())
-    cnt += n.corresponding_states().size();
-  return cnt;
-}
-
 void InfostateTree::PrintStats() {
   std::cout << "Infostate tree for player " << player_ << ".\n"
             << "Tree height: " << tree_height_ << "\n"
             << "Root branching: " << root().num_children() << "\n"
-            << "Number of leaves: " << CountLeaves() << "\n"
-            << "Number of leaf corresponding states: "
-            << CountLeafCorrespondingHistories() << "\n"
+            << "Number of leaves: " << num_leaves() << "\n"
             << "Tree certificate: " << std::endl;
   std::cout << root().ComputeCertificate() << std::endl;
 }

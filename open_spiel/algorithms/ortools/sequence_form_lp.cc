@@ -72,13 +72,13 @@ BijectiveContainer<const InfostateNode*> ConnectTerminals(
 
   using History = absl::Span<const Action>;
   std::map<History, const InfostateNode*> history_map;
-  for (const InfostateNode& node_b : tree_b.leaves_iterator()) {
-    history_map[node_b.TerminalHistory()] = &node_b;
+  for (InfostateNode* node_b : tree_b.leaf_nodes()) {
+    history_map[node_b->TerminalHistory()] = node_b;
   }
 
-  for (const InfostateNode& node_a : tree_a.leaves_iterator()) {
-    const InfostateNode* node_b = history_map[node_a.TerminalHistory()];
-    out.put({&node_a, node_b});
+  for (InfostateNode* node_a : tree_a.leaf_nodes()) {
+    const InfostateNode* node_b = history_map[node_a->TerminalHistory()];
+    out.put({node_a, node_b});
   }
   return out;
 }

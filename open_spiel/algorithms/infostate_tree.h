@@ -197,12 +197,9 @@ class InfostateTree final {
   size_t num_decision_infostates() const { return decision_infostates_.size(); }
   size_t num_sequences() const { return sequences_.size(); }
   size_t num_leaves() const { return nodes_at_depth_.back().size(); }
-
-  // Returns the branching factor of the root node.
   int root_branching_factor() const;
-  // Returns cached pointers to leaf nodes of the CFR tree. Unlike the
-  // CFRTree::leaves_iterator(), this does not need to recursively traverse
-  // the tree.
+
+  // Returns cached pointers to leaf nodes of the CFR tree.
   const std::vector<InfostateNode*>& leaf_nodes() const {
     return nodes_at_depth_.back();
   }
@@ -210,26 +207,8 @@ class InfostateTree final {
     return nodes_at_depth_;
   }
 
-  // TODO: remove leaves iterator.
-  // Iterate over all leaves.
-  class LeavesIterator {
-    const InfostateTree* tree_;
-    const InfostateNode* current_;
-   public:
-    LeavesIterator(const InfostateTree* tree, const InfostateNode* current);
-    LeavesIterator& operator++();
-    bool operator==(LeavesIterator other) const;
-    bool operator!=(LeavesIterator other) const;
-    const InfostateNode& operator*() const;
-    LeavesIterator begin() const;
-    LeavesIterator end() const;
-  };
-  LeavesIterator leaves_iterator() const;
-  // Expensive. Use only for debugging.
-  int CountLeaves() const;
-  int CountLeafCorrespondingHistories() const;
+  // For debugging.
   void PrintStats();
-
  private:
   const Player player_;
   const std::shared_ptr<Observer> infostate_observer_;

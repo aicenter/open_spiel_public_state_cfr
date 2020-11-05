@@ -394,10 +394,10 @@ void TestTreeRebalancing() {
 }
 
 void CheckTreeLeaves(const InfostateTree& tree, int move_limit) {
-  for (const InfostateNode& leaf_node : tree.leaves_iterator()) {
-    SPIEL_CHECK_TRUE(leaf_node.is_leaf_node());
-    SPIEL_CHECK_TRUE(leaf_node.has_infostate_string());
-    SPIEL_CHECK_FALSE(leaf_node.corresponding_states().empty());
+  for (InfostateNode* leaf_node : tree.leaf_nodes()) {
+    SPIEL_CHECK_TRUE(leaf_node->is_leaf_node());
+    SPIEL_CHECK_TRUE(leaf_node->has_infostate_string());
+    SPIEL_CHECK_FALSE(leaf_node->corresponding_states().empty());
 
     // Check MoveNumber() for all corresponding states.
     //
@@ -406,12 +406,12 @@ void CheckTreeLeaves(const InfostateTree& tree, int move_limit) {
     //   is less or equal to move_limit,
     // - or all states are non-terminal and the MoveNumber() == move_limit.
 
-    const int num_states = leaf_node.corresponding_states().size();
+    const int num_states = leaf_node->corresponding_states().size();
     int terminal_cnt = 0;
     int max_move_number = std::numeric_limits<int>::min();
     int min_move_number = std::numeric_limits<int>::max();
     for (const std::unique_ptr<State>
-          & state : leaf_node.corresponding_states()) {
+          & state : leaf_node->corresponding_states()) {
       if (state->IsTerminal()) terminal_cnt++;
       max_move_number = std::max(max_move_number, state->MoveNumber());
       min_move_number = std::min(min_move_number, state->MoveNumber());
@@ -469,11 +469,11 @@ void TestDepthLimitedTrees() {
     SPIEL_CHECK_TRUE(tree->is_balanced());
     SPIEL_CHECK_TRUE(RecomputeBalance(*tree));
 
-    for (const InfostateNode& acting : tree->leaves_iterator()) {
-      SPIEL_CHECK_TRUE(acting.is_leaf_node());
-      SPIEL_CHECK_EQ(acting.type(), kDecisionInfostateNode);
-      SPIEL_CHECK_EQ(acting.corresponding_states().size(), 2);
-      SPIEL_CHECK_TRUE(acting.has_infostate_string());
+    for (InfostateNode* acting : tree->leaf_nodes()) {
+      SPIEL_CHECK_TRUE(acting->is_leaf_node());
+      SPIEL_CHECK_EQ(acting->type(), kDecisionInfostateNode);
+      SPIEL_CHECK_EQ(acting->corresponding_states().size(), 2);
+      SPIEL_CHECK_TRUE(acting->has_infostate_string());
     }
   }
 
@@ -498,9 +498,9 @@ void TestDepthLimitedSubgames() {
         "([(())({}{})][({}{})({}{})])"
       ")",
       "("
-        "([(({}{}{}{}))({}{})][({}{})({}{})])"
-        "([(({}{}{}{}))({}{})][({}{})({}{})])"
-        "([(({}{}{}{}))({}{})][({}{})({}{})])"
+        "([(({})({}))(({})({}))][(({})({}))(({}{}{}{}))])"
+        "([(({})({}))(({})({}))][(({})({}))(({}{}{}{}))])"
+        "([(({})({}))(({})({}))][(({})({}))(({}{}{}{}))])"
       ")"
     };
     std::array<int, 4> expected_leaf_counts = {3, 6, 21, 30};
@@ -510,10 +510,10 @@ void TestDepthLimitedSubgames() {
           "kuhn_poker", /*player_id=*/1,
           {{0, 1}, {0, 2}, {1, 0}, {1, 2}, {2, 0}, {2, 1}},
           {1/6., 1/6., 1/6., 1/6., 1/6., 1/6.},
-          /*max_move_limit=*/move_limit);
+          /*max_move_limit=*/move_limit, /*make_balanced=*/true);
       SPIEL_CHECK_EQ(tree->root().ComputeCertificate(),
                      expected_certificates[move_limit]);
-      SPIEL_CHECK_EQ(tree->CountLeaves(), expected_leaf_counts[move_limit]);
+      SPIEL_CHECK_EQ(tree->num_leaves(), expected_leaf_counts[move_limit]);
     }
   }
 }
