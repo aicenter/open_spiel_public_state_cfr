@@ -141,15 +141,15 @@ void TestOracleConvergence() {
 namespace algorithms = open_spiel::algorithms::ortools;
 
 int main(int argc, char** argv) {
-  algorithms::TestOracleConvergence();
-//  algorithms::TestOptimalValuesKuhnBettingPublicState();
-//
-//  std::vector<std::string> test_games = {
-//      "kuhn_poker",
-//      "leduc_poker",
-//      "goofspiel(players=2,num_cards=4,imp_info=True)",
-//  };
-//  for (const std::string& game_name : test_games) {
-//    algorithms::TestValueOracle(game_name);
-//  }
+//  algorithms::TestOracleConvergence();
+  algorithms::TestOptimalValuesKuhnBettingPublicState();
+
+  std::vector<std::string> test_games = {
+      "kuhn_poker",
+      "leduc_poker",
+      "goofspiel(players=2,num_cards=4,imp_info=True)",
+  };
+  for (const std::string& game_name : test_games) {
+    algorithms::TestValueOracle(game_name);
+  }
 }

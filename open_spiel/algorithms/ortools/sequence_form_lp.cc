@@ -36,6 +36,16 @@ using SolverTree = InfostateTree<SolverNode>;
 
 class SolverNode : public InfostateNode</*Self=*/SolverNode> {
  public:
+  SolverNode(const SolverTree& tree, SolverNode* parent, int incoming_index,
+          InfostateNodeType type, const std::string& infostate_string,
+          double terminal_utility, double terminal_chn_reach_prob,
+          const State* originating_state)
+    : InfostateNode<SolverNode>(
+      tree, parent, incoming_index, type, infostate_string,
+      terminal_utility, terminal_chn_reach_prob, originating_state)  {}
+};
+
+struct SolverData {
   // Variables needed for solving the LP. We will create these later.
   // Doing this in the constructor would require dependecy injection of the
   // solver through the tree, which is unnecessarily complicated.
@@ -46,29 +56,6 @@ class SolverNode : public InfostateNode</*Self=*/SolverNode> {
   // Store the solver solutions for use once the solver goes out of scope.
   double sol_cf_value_;
   double sol_reach_prob_;
-
-  std::vector<Action> terminal_history_;
- public:
-  SolverNode(const SolverTree& tree, SolverNode* parent, int incoming_index,
-             InfostateNodeType type, const std::string& infostate_string,
-             double terminal_value, double terminal_chn_reach_prob,
-             const State* originating_state) :
-      InfostateNode<SolverNode>(
-          tree, parent, incoming_index, type, infostate_string, terminal_value,
-          terminal_chn_reach_prob, originating_state) {
-    SPIEL_DCHECK_TRUE(
-        !(originating_state && type == kDecisionInfostateNode)
-            || originating_state->IsPlayerActing(tree.acting_player()));
-    if (originating_state) {
-      if (type_ == kTerminalInfostateNode) {
-        terminal_history_ = originating_state->History();
-      }
-    }
-  }
-  absl::Span<const Action> TerminalHistory() const {
-    SPIEL_DCHECK_EQ(type_, kTerminalInfostateNode);
-    return absl::MakeSpan(terminal_history_);
-  }
 };
 
 template<class T>
@@ -110,22 +97,22 @@ BijectiveContainer<const Node*> ConnectTerminals(
   return out;
 }
 
-void SpecifyReachProbs(opres::MPSolver* solver, SolverNode* node) {
-  node->var_reach_prob_ = solver->MakeNumVar(
+void SpecifyReachProbs(opres::MPSolver* solver, std::unordered_map<const SolverNode*, SolverData>& data_table, SolverNode* node) {
+  data_table[node].var_reach_prob_ = solver->MakeNumVar(
       /*lb=*/0.0, /*ub=*/1.0, absl::StrCat("rp_", node->ToString()));
 
   if (node->type() == kTerminalInfostateNode)
     return;  // Nothing to do.
   if (node->type() == kObservationInfostateNode) {
     for (SolverNode& child : node->child_iterator()) {
-      SpecifyReachProbs(solver, &child);
+      SpecifyReachProbs(solver, data_table, &child);
 
       // Equality constraint: parent = child
       opres::MPConstraint* ct = solver->MakeRowConstraint(
           /*lb=*/0, /*ub=*/0,
           absl::StrCat("rp_", node->ToString(), "_", child.ToString()));
-      ct->SetCoefficient(node->var_reach_prob_, -1);
-      ct->SetCoefficient(child.var_reach_prob_, 1);
+      ct->SetCoefficient(data_table[node].var_reach_prob_, -1);
+      ct->SetCoefficient(data_table[&child].var_reach_prob_, 1);
     }
     return;
   }
@@ -133,10 +120,10 @@ void SpecifyReachProbs(opres::MPSolver* solver, SolverNode* node) {
     // Equality constraint: parent = sum of children
     opres::MPConstraint* ct = solver->MakeRowConstraint(
         /*lb=*/0, /*ub=*/0, absl::StrCat("rp_", node->ToString()));
-    ct->SetCoefficient(node->var_reach_prob_, -1);
+    ct->SetCoefficient(data_table[node].var_reach_prob_, -1);
     for (SolverNode& child : node->child_iterator()) {
-      SpecifyReachProbs(solver, &child);
-      ct->SetCoefficient(child.var_reach_prob_, 1);
+      SpecifyReachProbs(solver, data_table, &child);
+      ct->SetCoefficient(data_table[&child].var_reach_prob_, 1);
     }
     return;
   }
@@ -145,21 +132,21 @@ void SpecifyReachProbs(opres::MPSolver* solver, SolverNode* node) {
 }
 
 void SpecifyCfValues(
-    opres::MPSolver* solver, SolverNode* node,
+    opres::MPSolver* solver, std::unordered_map<const SolverNode*, SolverData>& data_table, SolverNode* node,
     const std::map<const SolverNode*, const SolverNode*>& terminal_map) {
-  node->var_cf_value_ = solver->MakeNumVar(
+  data_table[node].var_cf_value_ = solver->MakeNumVar(
       /*lb=*/-opres::MPSolver::infinity(),
       /*ub=*/opres::MPSolver::infinity(),
              absl::StrCat("cf_", node->ToString()));
 
   if (node->type() == kDecisionInfostateNode) {
     for (SolverNode& child : node->child_iterator()) {
-      SpecifyCfValues(solver, &child, terminal_map);
+      SpecifyCfValues(solver, data_table, &child, terminal_map);
       opres::MPConstraint* ct = solver->MakeRowConstraint(
           absl::StrCat("cf_", node->ToString(), "_", child.ToString()));
       ct->SetUB(0.);
-      ct->SetCoefficient(node->var_cf_value_, -1);
-      ct->SetCoefficient(child.var_cf_value_, 1);
+      ct->SetCoefficient(data_table[node].var_cf_value_, -1);
+      ct->SetCoefficient(data_table[&child].var_cf_value_, 1);
     }
     return;
   }
@@ -167,22 +154,22 @@ void SpecifyCfValues(
   opres::MPConstraint* ct = solver->MakeRowConstraint(
       absl::StrCat("cf_", node->ToString()));
   ct->SetUB(0.);
-  ct->SetCoefficient(node->var_cf_value_, -1);
+  ct->SetCoefficient(data_table[node].var_cf_value_, -1);
 
   if (node->type() == kTerminalInfostateNode) {
     const SolverNode* opponent_node = terminal_map.at(node);
     const double value =
         node->terminal_utility() * node->terminal_chance_reach_prob();
     // Terminal value constraint comes from the opponent.
-    ct->SetCoefficient(opponent_node->var_reach_prob_, value);
+    ct->SetCoefficient(data_table[opponent_node].var_reach_prob_, value);
     return;
   }
   if (node->type() == kObservationInfostateNode) {
     // Value constraint: sum of children = parent
     ct->SetLB(0.);
     for (SolverNode& child : node->child_iterator()) {
-      SpecifyCfValues(solver, &child, terminal_map);
-      ct->SetCoefficient(child.var_cf_value_, 1);
+      SpecifyCfValues(solver, data_table, &child, terminal_map);
+      ct->SetCoefficient(data_table[&child].var_cf_value_, 1);
     }
     return;
   }
@@ -190,17 +177,17 @@ void SpecifyCfValues(
   SpielFatalError("Exhausted pattern match!");
 }
 
-void CollectReachProbsSolutions(SolverNode* node) {
-  node->sol_reach_prob_ = node->var_reach_prob_->solution_value();
+void CollectReachProbsSolutions(std::unordered_map<const SolverNode*, SolverData>& data_table, SolverNode* node) {
+  data_table[node].sol_reach_prob_ = data_table[node].var_reach_prob_->solution_value();
   for (SolverNode& child : node->child_iterator()) {
-    CollectReachProbsSolutions(&child);
+    CollectReachProbsSolutions(data_table, &child);
   }
 }
 
-void CollectCfValuesSolutions(SolverNode* node) {
-  node->sol_cf_value_ = node->var_cf_value_->solution_value();
+void CollectCfValuesSolutions(std::unordered_map<const SolverNode*, SolverData>& data_table, SolverNode* node) {
+  data_table[node].sol_cf_value_ = data_table[node].var_cf_value_->solution_value();
   for (SolverNode& child : node->child_iterator()) {
-    CollectCfValuesSolutions(&child);
+    CollectCfValuesSolutions(data_table, &child);
   }
 }
 
@@ -250,22 +237,25 @@ void PrintProblemSpecification(const opres::MPSolver& solver) {
 void SolveForPlayer(
     Player pl,
     const std::array<std::unique_ptr<SolverTree>, 2>& solver_trees,
+    std::unordered_map<const SolverNode*, SolverData>& data_table,
     const std::map<const SolverNode*, const SolverNode*>& terminal_map) {
   // 1. Create the linear solver (with the GLOP backend).
   opres::MPSolver solver("sf_lp", opres::MPSolver::GLOP_LINEAR_PROGRAMMING);
 
   // 2. Recursively create variables and constraints.
-  SpecifyReachProbs(&solver, solver_trees[pl]->mutable_root());
-  SpecifyCfValues(&solver, solver_trees[1 - pl]->mutable_root(), terminal_map);
+  SpecifyReachProbs(&solver, data_table, solver_trees[pl]->mutable_root());
+  SpecifyCfValues(&solver, data_table, solver_trees[1 - pl]->mutable_root(),
+                  terminal_map);
   // Add constraints for root node.
   SolverNode* root_node = solver_trees[pl]->mutable_root();
-  root_node->var_reach_prob_->SetLB(1.);
-  root_node->var_reach_prob_->SetUB(1.);
+  SolverData& root_data = data_table.at(root_node);
+  root_data.var_reach_prob_->SetLB(1.);
+  root_data.var_reach_prob_->SetUB(1.);
 
   // 3. Solve the problem.
   opres::MPObjective* const objective = solver.MutableObjective();
   objective->SetCoefficient(
-      solver_trees[1 - pl]->mutable_root()->var_cf_value_, 1);
+      data_table[solver_trees[1 - pl]->mutable_root()].var_cf_value_, 1);
   objective->SetMinimization();
 
   // Keeping this around for debugging.
@@ -274,13 +264,14 @@ void SolveForPlayer(
   SPIEL_CHECK_EQ(status, opres::MPSolver::ResultStatus::OPTIMAL);
 
   // 4. Save the solved values - solver will go out of scope.
-  CollectReachProbsSolutions(solver_trees[pl]->mutable_root());
-  CollectCfValuesSolutions(solver_trees[1 - pl]->mutable_root());
-  SPIEL_CHECK_EQ(objective->Value(),
-                 solver_trees[1 - pl]->root().sol_cf_value_);
+  CollectReachProbsSolutions(data_table, solver_trees[pl]->mutable_root());
+  CollectCfValuesSolutions(data_table, solver_trees[1 - pl]->mutable_root());
+  SPIEL_CHECK_EQ(
+      objective->Value(),
+      data_table[solver_trees[1 - pl]->mutable_root()].sol_cf_value_);
 }
 
-void CollectTabularPolicy(TabularPolicy* policy, const SolverNode& node) {
+void CollectTabularPolicy(TabularPolicy* policy, std::unordered_map<const SolverNode*, SolverData>& data_table, const SolverNode& node) {
   if (node.type() == kDecisionInfostateNode) {
     absl::Span<const Action> actions = node.legal_actions();
     SPIEL_CHECK_EQ(actions.size(), node.num_children());
@@ -288,12 +279,12 @@ void CollectTabularPolicy(TabularPolicy* policy, const SolverNode& node) {
     state_policy.reserve(node.num_children());
     double rp_sum = 0.;
     for (int i = 0; i < actions.size(); ++i) {
-      rp_sum += node.child_at(i)->sol_reach_prob_;
+      rp_sum += data_table[node.child_at(i)].sol_reach_prob_;
     }
     for (int i = 0; i < actions.size(); ++i) {
       double prob;
       if (rp_sum) {
-        prob = node.child_at(i)->sol_reach_prob_ / rp_sum;
+        prob = data_table[node.child_at(i)].sol_reach_prob_ / rp_sum;
       } else {
         // If the infostate is unreachable, the strategy is not defined.
         // However some code in the library may require having the strategy,
@@ -306,7 +297,7 @@ void CollectTabularPolicy(TabularPolicy* policy, const SolverNode& node) {
   }
 
   for (const SolverNode& child : node.child_iterator()) {
-    CollectTabularPolicy(policy, child);
+    CollectTabularPolicy(policy, data_table, child);
   }
 }
 
@@ -325,6 +316,7 @@ std::unique_ptr<ZeroSumSequentialGameSolution> SolveZeroSumSequentialGame(
     solver_trees[pl] = std::make_unique<SolverTree>(
         start_states, chance_reach_probs, infostate_observer, pl);
   }
+  std::unordered_map<const SolverNode*, SolverData> data_table;
 
   // 2. Connect the terminals - now we can go from one tree to the other
   //    via pointers.
@@ -334,29 +326,29 @@ std::unique_ptr<ZeroSumSequentialGameSolution> SolveZeroSumSequentialGame(
   // 3. Solve for players.
   if (solve_only_player) {
     int pl = solve_only_player.value();
-    SolveForPlayer(pl, solver_trees, terminal_map.association(1 - pl));
+    SolveForPlayer(pl, solver_trees, data_table, terminal_map.association(1 - pl));
   } else {
     for (int pl = 0; pl < 2; ++pl) {
-      SolveForPlayer(pl, solver_trees, terminal_map.association(1 - pl));
+      SolveForPlayer(pl, solver_trees, data_table, terminal_map.association(1 - pl));
     }
     // Check zero-sum-ness of the root values.
     SPIEL_CHECK_FLOAT_NEAR(
-        solver_trees[0]->root().sol_cf_value_,
-        -solver_trees[1]->root().sol_cf_value_,
+        data_table[solver_trees[0]->mutable_root()].sol_cf_value_,
+        -data_table[solver_trees[1]->mutable_root()].sol_cf_value_,
         kErrorTolerance);
   }
 
   // 4. Collect the requested results.
   auto sol = std::make_unique<ZeroSumSequentialGameSolution>();
   // Always collect game value.
-  sol->game_value = solver_trees[0]->root().sol_cf_value_;
+  sol->game_value = data_table[solver_trees[0]->mutable_root()].sol_cf_value_;
   if (collect_tabular_policy) {
     if (solve_only_player) {
       int pl = solve_only_player.value();
-      CollectTabularPolicy(&sol->policy, solver_trees[pl]->root());
+      CollectTabularPolicy(&sol->policy, data_table, solver_trees[pl]->root());
     } else {
       for (int pl = 0; pl < 2; ++pl) {
-        CollectTabularPolicy(&sol->policy, solver_trees[pl]->root());
+        CollectTabularPolicy(&sol->policy, data_table, solver_trees[pl]->root());
       }
     }
   }
