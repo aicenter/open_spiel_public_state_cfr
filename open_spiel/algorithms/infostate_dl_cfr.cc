@@ -24,8 +24,8 @@ std::unordered_map<const InfostateNode*, CFRInfoStateValues> CreateTable(
     const std::array<std::unique_ptr<InfostateTree>, 2>& trees) {
   std::unordered_map<const InfostateNode*, CFRInfoStateValues> map;
   for (int pl = 0; pl < 2; ++pl) {
-    const std::vector<std::vector<InfostateNode*>>& nodes = 
-        trees[pl]->nodes_at_depth();
+    const std::vector<std::vector<InfostateNode*>>& nodes =
+        trees[pl]->nodes_at_depths();
     for (int d = 0; d < nodes.size() - 1; ++d) {
       for (const InfostateNode* node : nodes[d]) {
         if (node->type() != kDecisionInfostateNode) continue;
@@ -238,16 +238,16 @@ void TerminalEvaluator::EvaluatePublicState(
 
 void DepthLimitedCFR::SimultaneousTopDownEvaluate() {
   PrepareRootReachProbs();
-  TopDown(trees_[0]->nodes_at_depth(), node_values_, absl::MakeSpan(reach_probs_[0]));
-  TopDown(trees_[1]->nodes_at_depth(), node_values_, absl::MakeSpan(reach_probs_[1]));
+  TopDown(trees_[0]->nodes_at_depths(), node_values_, absl::MakeSpan(reach_probs_[0]));
+  TopDown(trees_[1]->nodes_at_depths(), node_values_, absl::MakeSpan(reach_probs_[1]));
   EvaluateLeaves();
 }
 
 void DepthLimitedCFR::RunSimultaneousIterations(int iterations) {
   for (int t = 0; t < iterations; ++t) {
     SimultaneousTopDownEvaluate();
-    BottomUp(trees_[0]->nodes_at_depth(), node_values_, absl::MakeSpan(cf_values_[0]));
-    BottomUp(trees_[1]->nodes_at_depth(), node_values_, absl::MakeSpan(cf_values_[1]));
+    BottomUp(trees_[0]->nodes_at_depths(), node_values_, absl::MakeSpan(cf_values_[0]));
+    BottomUp(trees_[1]->nodes_at_depths(), node_values_, absl::MakeSpan(cf_values_[1]));
     SPIEL_DCHECK_FLOAT_NEAR(RootValue(/*pl=*/0), -RootValue(/*pl=*/1), 1e-6);
   }
 }

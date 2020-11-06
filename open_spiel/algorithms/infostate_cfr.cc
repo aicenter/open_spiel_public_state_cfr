@@ -199,7 +199,7 @@ std::unordered_map<const InfostateNode*, CFRInfoStateValues> CreateTable(
   std::unordered_map<const InfostateNode*, CFRInfoStateValues> map;
   for (int pl = 0; pl < 2; ++pl) {
     const std::vector<std::vector<InfostateNode*>>& nodes =
-        trees[pl]->nodes_at_depth();
+        trees[pl]->nodes_at_depths();
     for (int d = 0; d < nodes.size() - 1; ++d) {
       for (const InfostateNode* node : nodes[d]) {
         if (node->type() != kDecisionInfostateNode) continue;
@@ -231,13 +231,13 @@ InfostateCFR::InfostateCFR(const Game& game)
 void InfostateCFR::RunSimultaneousIterations(int iterations) {
   for (int t = 0; t < iterations; ++t) {
     PrepareRootReachProbs();
-    TopDown(trees_[0]->nodes_at_depth(), node_values_, absl::MakeSpan(reach_probs_[0]));
-    TopDown(trees_[1]->nodes_at_depth(), node_values_, absl::MakeSpan(reach_probs_[1]));
+    TopDown(trees_[0]->nodes_at_depths(), node_values_, absl::MakeSpan(reach_probs_[0]));
+    TopDown(trees_[1]->nodes_at_depths(), node_values_, absl::MakeSpan(reach_probs_[1]));
     SPIEL_CHECK_FLOAT_NEAR(TerminalReachProbSum(), 1.0, 1e-3);
 
     EvaluateLeaves();
-    BottomUp(trees_[0]->nodes_at_depth(), node_values_, absl::MakeSpan(cf_values_[0]));
-    BottomUp(trees_[1]->nodes_at_depth(), node_values_, absl::MakeSpan(cf_values_[1]));
+    BottomUp(trees_[0]->nodes_at_depths(), node_values_, absl::MakeSpan(cf_values_[0]));
+    BottomUp(trees_[1]->nodes_at_depths(), node_values_, absl::MakeSpan(cf_values_[1]));
     SPIEL_CHECK_FLOAT_NEAR(
         RootCfValue(trees_[0]->root_branching_factor(), cf_values_[0]),
         - RootCfValue(trees_[1]->root_branching_factor(), cf_values_[1]), 1e-6);
@@ -247,9 +247,9 @@ void InfostateCFR::RunAlternatingIterations(int iterations) {
   for (int t = 0; t < iterations; ++t) {
     for (int pl = 0; pl < 2; ++pl) {
       PrepareRootReachProbs(1 - pl);
-      TopDown(trees_[1 - pl]->nodes_at_depth(), node_values_,  absl::MakeSpan(reach_probs_[1 - pl]));
+      TopDown(trees_[1 - pl]->nodes_at_depths(), node_values_, absl::MakeSpan(reach_probs_[1 - pl]));
       EvaluateLeaves(pl);
-      BottomUp(trees_[pl]->nodes_at_depth(), node_values_, absl::MakeSpan(cf_values_[pl]));
+      BottomUp(trees_[pl]->nodes_at_depths(), node_values_, absl::MakeSpan(cf_values_[pl]));
     }
   }
 }
