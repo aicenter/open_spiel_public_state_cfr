@@ -470,19 +470,19 @@ int InfostateTree::root_branching_factor() const {
   return root_->num_children();
 }
 
-std::unique_ptr<InfostateTree> MakeInfostateTree(
+std::shared_ptr<InfostateTree> MakeInfostateTree(
     const Game& game, Player acting_player,
     int max_move_limit, bool make_balanced) {
-  return std::unique_ptr<InfostateTree>(new InfostateTree(
+  return std::shared_ptr<InfostateTree>(new InfostateTree(
       game, acting_player, max_move_limit, make_balanced));
 }
 
-std::unique_ptr<InfostateTree> MakeInfostateTree(
+std::shared_ptr<InfostateTree> MakeInfostateTree(
     const std::vector<const State*>& start_states,
     const std::vector<float>& chance_reach_probs,
     std::shared_ptr<Observer> infostate_observer, Player acting_player,
     int max_move_ahead_limit, bool make_balanced) {
-  return std::unique_ptr<InfostateTree>(new InfostateTree(
+  return std::shared_ptr<InfostateTree>(new InfostateTree(
       start_states, chance_reach_probs, infostate_observer, acting_player,
       max_move_ahead_limit, make_balanced));
 }

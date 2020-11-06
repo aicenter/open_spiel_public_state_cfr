@@ -222,7 +222,7 @@ void PrintProblemSpecification(const opres::MPSolver& solver) {
 
 void SolveForPlayer(
     Player pl,
-    const std::array<std::unique_ptr<InfostateTree>, 2>& solver_trees,
+    const std::array<std::shared_ptr<InfostateTree>, 2>& solver_trees,
     std::unordered_map<const InfostateNode*, SolverData>& data_table,
     const std::map<const InfostateNode*, const InfostateNode*>& terminal_map) {
   // 1. Create the linear solver (with the GLOP backend).
@@ -297,7 +297,7 @@ std::unique_ptr<ZeroSumSequentialGameSolution> SolveZeroSumSequentialGame(
     bool collect_tabular_policy) {
 
   // 1. Construct infoset trees for the game.
-  std::array<std::unique_ptr<InfostateTree>, 2> solver_trees;
+  std::array<std::shared_ptr<InfostateTree>, 2> solver_trees;
   for (int pl = 0; pl < 2; ++pl) {
     solver_trees[pl] = MakeInfostateTree(
         start_states, chance_reach_probs, infostate_observer, pl);

@@ -100,7 +100,7 @@ class InfostateCFR {
   // Basic constructor for the whole game.
   explicit InfostateCFR(const Game& game);
   // Run CFR on the specified trees.
-  explicit InfostateCFR(std::array<std::unique_ptr<InfostateTree>, 2> trees);
+  explicit InfostateCFR(std::array<std::shared_ptr<InfostateTree>, 2> trees);
 
   void RunSimultaneousIterations(int iterations);
   void RunAlternatingIterations(int iterations);
@@ -121,7 +121,7 @@ class InfostateCFR {
   float TerminalReachProbSum();
 
   // The trees which hold the strategies of the players.
-  std::array<std::unique_ptr<InfostateTree>, 2> trees_;
+  std::array<std::shared_ptr<InfostateTree>, 2> trees_;
   // Map from player 0 index (key) to player 1 (value).
   std::vector<int> terminal_permutation_;
   // Chance reach probs.

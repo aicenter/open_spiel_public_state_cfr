@@ -21,7 +21,7 @@ namespace algorithms {
 namespace dlcfr {
 
 std::unordered_map<const InfostateNode*, CFRInfoStateValues> CreateTable(
-    const std::array<std::unique_ptr<InfostateTree>, 2>& trees) {
+    const std::array<std::shared_ptr<InfostateTree>, 2>& trees) {
   std::unordered_map<const InfostateNode*, CFRInfoStateValues> map;
   for (int pl = 0; pl < 2; ++pl) {
     const std::vector<std::vector<InfostateNode*>>& nodes =
@@ -38,7 +38,7 @@ std::unordered_map<const InfostateNode*, CFRInfoStateValues> CreateTable(
 
 DepthLimitedCFR::DepthLimitedCFR(
     std::shared_ptr<const Game> game,
-    std::array<std::unique_ptr<InfostateTree>, 2> trees,
+    std::array<std::shared_ptr<InfostateTree>, 2> trees,
     std::shared_ptr<const LeafEvaluator> leaf_evaluator,
     std::shared_ptr<const LeafEvaluator> terminal_evaluator,
     std::shared_ptr<Observer> public_observer
@@ -95,7 +95,7 @@ void FillStatesAndChanceRange(std::vector<const State*>* start_states,
   }
 }
 
-std::array<std::unique_ptr<InfostateTree>, 2> CreateTrees(
+std::array<std::shared_ptr<InfostateTree>, 2> CreateTrees(
     std::array<absl::Span<const InfostateNode* const>, 2> start_nodes,
     const std::shared_ptr<Observer>& infostate_observer,
     int max_move_limit) {
@@ -457,7 +457,7 @@ float DepthLimitedCFR::RootValue(Player pl) const {
 std::array<const InfostateNode*, 2> DepthLimitedCFR::Roots() const {
   return {&trees_[0]->root(), &trees_[1]->root()};
 }
-std::array<std::unique_ptr<InfostateTree>, 2>& DepthLimitedCFR::Trees() { return trees_; }
+std::array<std::shared_ptr<InfostateTree>, 2>& DepthLimitedCFR::Trees() { return trees_; }
 std::vector<std::unique_ptr<PublicStateContext>>& DepthLimitedCFR::GetContexts() {
   return contexts_;
 }

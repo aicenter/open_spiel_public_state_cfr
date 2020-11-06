@@ -119,7 +119,7 @@ class DepthLimitedCFR {
                   std::shared_ptr<const LeafEvaluator> terminal_evaluator);
 
   DepthLimitedCFR(std::shared_ptr<const Game> game,
-                  std::array<std::unique_ptr<InfostateTree>, 2> trees,
+                  std::array<std::shared_ptr<InfostateTree>, 2> trees,
                   std::shared_ptr<const LeafEvaluator> leaf_evaluator,
                   std::shared_ptr<const LeafEvaluator> terminal_evaluator,
                   std::shared_ptr<Observer> public_observer);
@@ -132,7 +132,7 @@ class DepthLimitedCFR {
   std::array<absl::Span<const float>, 2> RootChildrenCfValues() const;
 
   std::array<const InfostateNode*, 2> Roots() const;
-  std::array<std::unique_ptr<InfostateTree>, 2>& Trees();
+  std::array<std::shared_ptr<InfostateTree>, 2>& Trees();
 
   CFRInfoStateValuesPtrTable InfoStateValuesPtrTable();
 
@@ -145,7 +145,7 @@ class DepthLimitedCFR {
 
  private:
   const std::shared_ptr<const Game> game_;
-  std::array<std::unique_ptr<InfostateTree>, 2> trees_;
+  std::array<std::shared_ptr<InfostateTree>, 2> trees_;
   const std::shared_ptr<Observer> public_observer_;
   const std::shared_ptr<const LeafEvaluator> leaf_evaluator_;
   const std::shared_ptr<const LeafEvaluator> terminal_evaluator_;

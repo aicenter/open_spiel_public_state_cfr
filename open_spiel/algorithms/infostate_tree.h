@@ -191,13 +191,13 @@ class InfostateNode;
 
 // Creates an infostate tree for a player based on the initial state
 // of the game, up to some move limit.
-std::unique_ptr<InfostateTree> MakeInfostateTree(
+std::shared_ptr<InfostateTree> MakeInfostateTree(
     const Game& game, Player acting_player,
     int max_move_limit = 1000, bool make_balanced = true);
 
 // Creates an infostate tree for a player based on some start states,
 // up to some move limit from the deepest start state.
-std::unique_ptr<InfostateTree> MakeInfostateTree(
+std::shared_ptr<InfostateTree> MakeInfostateTree(
     const std::vector<const State*>& start_states,
     const std::vector<float>& chance_reach_probs,
     std::shared_ptr<Observer> infostate_observer, Player acting_player,
@@ -217,9 +217,9 @@ class InfostateTree final {
       std::shared_ptr<Observer> infostate_observer, Player acting_player,
       int max_move_ahead_limit = 1000, bool make_balanced = true);
   // Friend factories.
-  friend std::unique_ptr<InfostateTree> MakeInfostateTree(
+  friend std::shared_ptr<InfostateTree> MakeInfostateTree(
       const Game&, Player, int, bool);
-  friend std::unique_ptr<InfostateTree> MakeInfostateTree(
+  friend std::shared_ptr<InfostateTree> MakeInfostateTree(
       const std::vector<const State*>&, const std::vector<float>&,
       std::shared_ptr<Observer>, Player, int, bool);
 

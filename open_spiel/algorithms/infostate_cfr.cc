@@ -195,7 +195,7 @@ class InfostateCFRAveragePolicy : public Policy {
 }  // namespace
 
 std::unordered_map<const InfostateNode*, CFRInfoStateValues> CreateTable(
-    const std::array<std::unique_ptr<InfostateTree>, 2>& trees) {
+    const std::array<std::shared_ptr<InfostateTree>, 2>& trees) {
   std::unordered_map<const InfostateNode*, CFRInfoStateValues> map;
   for (int pl = 0; pl < 2; ++pl) {
     const std::vector<std::vector<InfostateNode*>>& nodes =
@@ -210,7 +210,7 @@ std::unordered_map<const InfostateNode*, CFRInfoStateValues> CreateTable(
   return map;
 }
 
-InfostateCFR::InfostateCFR(std::array<std::unique_ptr<InfostateTree>, 2> trees)
+InfostateCFR::InfostateCFR(std::array<std::shared_ptr<InfostateTree>, 2> trees)
     : trees_(std::move(trees)),
       cf_values_({
         std::vector<float>(trees_[0]->num_leaves(), 0.),
