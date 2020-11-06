@@ -344,14 +344,16 @@ class InfostateTree final {
                       int leaf_depth, double chance_reach_probs);
 
   // Build the tree.
-  void RecursivelyBuildTree(InfostateNode* parent, int depth, const State& state,
-                            int move_limit, double chance_reach_prob);
+  void RecursivelyBuildTree(InfostateNode* parent, int depth,
+                            const State& state, int move_limit,
+                            double chance_reach_prob);
   void BuildTerminalNode(InfostateNode* parent, int depth, const State& state,
                          double chance_reach_prob);
   void BuildDecisionNode(InfostateNode* parent, int depth, const State& state,
                          int move_limit, double chance_reach_prob);
-  void BuildObservationNode(InfostateNode* parent, int depth, const State& state,
-                            int move_limit, double chance_reach_prob);
+  void BuildObservationNode(InfostateNode* parent, int depth,
+                            const State& state, int move_limit,
+                            double chance_reach_prob);
 
   void CollectNodesAtDepth(InfostateNode* node, int depth);
   void LabelSequenceIds();
@@ -472,9 +474,7 @@ class InfostateNode final {
   // Children accessors.
   InfostateNode* child_at(int i) const { return children_.at(i).get(); }
   int num_children() const { return children_.size(); }
-  VecWithUniquePtrsIterator<InfostateNode> child_iterator() const {
-    return VecWithUniquePtrsIterator(children_);
-  }
+  VecWithUniquePtrsIterator<InfostateNode> child_iterator() const;
 
   // Sequence operations.
   const SequenceId sequence_id() const;
@@ -496,9 +496,9 @@ class InfostateNode final {
 
   // For debugging.
   std::ostream& operator<<(std::ostream& os) const;
-  // Compute subtree certificate (string representation) for easy
-  // comparison of (isomorphic) trees.
-  std::string ComputeCertificate() const;
+  // Make subtree certificate (string representation) for easy comparison
+  // of (isomorphic) trees.
+  std::string MakeCertificate() const;
 
  private:
   // Make sure that the subtree ends at the requested target depth by inserting
@@ -513,7 +513,8 @@ class InfostateNode final {
   // of the new parent. The node at the existing position will be freed.
   // We pass the unique ptr of itself, because calling Release might be
   // undefined: the node we want to swap a parent for can be root of a subtree.
-  void SwapParent(std::unique_ptr<InfostateNode> self, InfostateNode* target, int at_index);
+  void SwapParent(std::unique_ptr<InfostateNode> self,
+                  InfostateNode* target, int at_index);
 
   InfostateNode* AddChild(std::unique_ptr<InfostateNode> child);
   InfostateNode* GetChild(const std::string& infostate_string) const;

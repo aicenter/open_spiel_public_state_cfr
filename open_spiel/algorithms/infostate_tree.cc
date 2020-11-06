@@ -44,7 +44,8 @@ InfostateNode::InfostateNode(
   SPIEL_DCHECK_TRUE(
       !(type_ == kObservationInfostateNode
             && parent_ && parent_->type() == kDecisionInfostateNode)
-      || (incoming_index_ >= 0 && incoming_index_ < parent_->legal_actions().size())
+      || (incoming_index_ >= 0
+            && incoming_index_ < parent_->legal_actions().size())
   );
 }
 
@@ -123,12 +124,12 @@ std::ostream& InfostateNode::operator<<(std::ostream& os) const {
   return os << parent_ << ',' <<  incoming_index_;
 }
 
-std::string InfostateNode::ComputeCertificate() const {
+std::string InfostateNode::MakeCertificate() const {
   if (type_ == kTerminalInfostateNode) return "{}";
 
   std::vector<std::string> certificates;
   for (InfostateNode* child : child_iterator()) {
-    certificates.push_back(child->ComputeCertificate());
+    certificates.push_back(child->MakeCertificate());
   }
   std::sort(certificates.begin(), certificates.end());
 
@@ -272,7 +273,7 @@ std::ostream& InfostateTree::operator<<(std::ostream& os) const {
             << "Number of sequences: " << num_sequences() << '\n'
             << "Number of leaves: " << num_leaves() << '\n'
             << "Tree certificate: " << '\n'
-            << root().ComputeCertificate() << '\n';
+            << root().MakeCertificate() << '\n';
 }
 
 const std::vector<Action>& InfostateNode::TerminalHistory() const {
@@ -281,6 +282,9 @@ const std::vector<Action>& InfostateNode::TerminalHistory() const {
 }
 Range<SequenceId> InfostateNode::AllSequenceIds() const {
   return Range<SequenceId>(start_sequence_id_, end_sequence_id_, &tree_);
+}
+VecWithUniquePtrsIterator<InfostateNode> InfostateNode::child_iterator() const {
+  return VecWithUniquePtrsIterator(children_);
 }
 
 std::unique_ptr<InfostateNode> InfostateTree::MakeNode(
