@@ -294,7 +294,7 @@ std::unique_ptr<InfostateNode> InfostateTree::MakeNode(
     size_t depth, const State* originating_state) {
   auto legal_actions =
       originating_state && originating_state->IsPlayerActing(acting_player_)
-      ? originating_state->LegalActions()
+      ? originating_state->LegalActions(acting_player_)
       : std::vector<Action>();
   auto terminal_history =
       originating_state && originating_state->IsTerminal()
