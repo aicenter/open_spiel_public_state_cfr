@@ -112,22 +112,30 @@ constexpr size_t kUndefinedNodeId = -1;
 // to index opponents' trees.
 template<class Self>
 class NodeId {
-  const size_t identifier_ = kUndefinedNodeId;
+  size_t identifier_ = kUndefinedNodeId;
 #ifndef NDEBUG  // Allow additional automatic debug-time checks.
-  const InfostateTree* tree = nullptr;
+  const InfostateTree* tree_ = nullptr;
  public:
   explicit constexpr NodeId() {}
   NodeId(size_t id_value, const InfostateTree* tree_ptr)
-      : identifier_(id_value), tree(tree_ptr) {}
+      : identifier_(id_value), tree_(tree_ptr) {}
   bool operator==(const Self& rhs) const {
-    SPIEL_CHECK_EQ(tree, rhs.tree);
+    SPIEL_CHECK_EQ(tree_, rhs.tree_);
     return id() == rhs.id();
   }
-  bool BelongsToTree(const InfostateTree* other) const { return tree == other; }
+  Self& operator=(Self&& rhs) {
+    SPIEL_CHECK_TRUE(tree_ == rhs.tree_
+                  || tree_ == nullptr && rhs.tree_ != nullptr);
+    identifier_ = rhs.id();
+    tree_ == rhs.tree_;
+    return this;
+  }
+  bool BelongsToTree(const InfostateTree* other) const { return tree_ == other; }
 #else
  public:
   explicit constexpr NodeId() {}
   NodeId<Self>(size_t id_value, const InfostateTree*) : identifier_(id_value) {}
+  NodeId(NodeId& other) : identifier_(other.id()) {}
   bool operator==(const Self & rhs) const { return id() == rhs.id(); }
   bool BelongsToTree(const InfostateTree* other) const {
     SpielFatalError("Must not be called in release mode!");
@@ -151,17 +159,22 @@ class NodeId {
 class SequenceId final : public NodeId<SequenceId> {
   using NodeId<SequenceId>::NodeId;
 };
+// When the tree is still under construction and a node doesn't have assigned
+// a final sequence id, we use this value instead.
 constexpr SequenceId kUndefinedSequenceId = SequenceId();
 // TODO docs
 class DecisionId final : public NodeId<DecisionId> {
   using NodeId<DecisionId>::NodeId;
 };
+// When a node isn't a decision infostate, we use this value instead.
 constexpr DecisionId kUndefinedDecisionId = DecisionId();
 // TODO docs
 class LeafId final : public NodeId<LeafId> {
   using NodeId<LeafId>::NodeId;
 };
+// When a node isn't a leaf, we use this value instead.
 constexpr LeafId kUndefinedLeafId = LeafId();
+
 
 // Provide a convenience iterator over node ids within a given range.
 template<class Id>
@@ -308,6 +321,8 @@ class InfostateTree final {
                             int move_limit, double chance_reach_prob);
 
   void CollectNodesAtDepth(InfostateNode* node, int depth);
+  void LabelSequenceIds();
+  std::pair<size_t,size_t> CollectStartEndSequenceIds(InfostateNode* node);
 };
 
 // Iterate over a vector of unique pointers, but expose only the raw pointers.
@@ -419,7 +434,10 @@ class InfostateNode final {
   // Sequence identifier of this node.
   // It may be undefined if this node is not an observation node that follows
   // after an action in a parent decision node.
-  const SequenceId sequence_id_;
+  SequenceId sequence_id_;
+  SequenceId start_sequence_id_;
+  SequenceId end_sequence_id_;
+  LeafId leaf_id_;
   // Utility of terminal state corresponding to a terminal infostate node.
   const double terminal_utility_;
   // Cumulative product of chance probabilities leading up to a terminal node.
