@@ -53,6 +53,16 @@
 namespace open_spiel {
 namespace algorithms {
 
+// A type for tables holding pointers to CFR values.
+//
+// It is similar to what CFRSolver uses, i.e. the InfoStateValuesTable.
+// However, this table has pointers to the values, not the actual values,
+// because they are stored within the infostate tree.
+//
+// It makes looking up the strategies / regrets for players easier to do.
+using CFRInfoStateValuesPtrTable =
+std::unordered_map<std::string, CFRInfoStateValues*>;
+
 // A helper class that allows to propagate reach probs / cf values
 // up and down the tree. It modifies the contents of CFRInfoStateValues saved
 // in the supplied tree to save the player's regrets and strategy.

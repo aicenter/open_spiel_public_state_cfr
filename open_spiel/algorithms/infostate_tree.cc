@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <stack>
 #include "open_spiel/algorithms/infostate_tree.h"
+
+#include <stack>
 
 namespace open_spiel {
 namespace algorithms {

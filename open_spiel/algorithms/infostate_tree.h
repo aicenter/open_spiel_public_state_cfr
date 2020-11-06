@@ -17,7 +17,6 @@
 
 #include <memory>
 #include <string>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -97,6 +96,7 @@ class InfostateTree;
 
 namespace {
 
+// TODO comment
 constexpr size_t kUndefinedNodeId = -1;
 
 // FIXME I know anonymous namespaces in headers go against the google's
@@ -104,53 +104,55 @@ constexpr size_t kUndefinedNodeId = -1;
 //        boilerplate code.
 
 // An implementation detail - Not to be used directly.
-// Creates indexing of specific infostate nodes.
+// Create an indexing of specific infostate nodes.
 //
-// We use CRTP as it allows us to reuse the implementation for indexing various
-// nodes in the tree. Most importantly it allows to make debug-time checks to
-// make sure that we are using the ids on appropriate trees and we do not try
-// to index opponents' trees.
+// In release-mode the implementation is as cheap as the underlying identifier.
+// Most importantly it allows us to make debug-time checks to make sure that we
+// are using the ids on appropriate trees and we do not try to index opponents'
+// trees.
+//
+// We use CRTP as it allows us to reuse the implementation for derived classes.
 template<class Self>
 class NodeId {
   size_t identifier_ = kUndefinedNodeId;
 #ifndef NDEBUG  // Allow additional automatic debug-time checks.
   const InfostateTree* tree_ = nullptr;
+
  public:
-  explicit constexpr NodeId() {}
   NodeId(size_t id_value, const InfostateTree* tree_ptr)
       : identifier_(id_value), tree_(tree_ptr) {}
-  bool operator==(const Self& rhs) const {
-    SPIEL_CHECK_EQ(tree_, rhs.tree_);
-    return id() == rhs.id();
-  }
   Self& operator=(Self&& rhs) {
-    SPIEL_CHECK_TRUE(tree_ == rhs.tree_
-                  || tree_ == nullptr && rhs.tree_ != nullptr);
+    SPIEL_CHECK_TRUE(tree_ == rhs.tree_ ||
+        // The NodeId may be uninitialized, so allow to copy the rhs tree.
+        tree_ == nullptr && rhs.tree_ != nullptr);
     identifier_ = rhs.id();
     tree_ == rhs.tree_;
     return this;
   }
+  bool operator==(const Self& rhs) const {
+    SPIEL_CHECK_EQ(tree_, rhs.tree_);
+    return id() == rhs.id();
+  }
   bool BelongsToTree(const InfostateTree* other) const { return tree_ == other; }
 #else
+
  public:
-  explicit constexpr NodeId() {}
-  NodeId<Self>(size_t id_value, const InfostateTree*) : identifier_(id_value) {}
-  NodeId(NodeId& other) : identifier_(other.id()) {}
+  // Do not save the tree pointer, but expose the same interface
+  // so it's easy to use.
+  NodeId(size_t id_value, const InfostateTree*) : identifier_(id_value) {}
+  Self& operator=(Self&& rhs) { identifier_ = rhs.id(); return this; }
   bool operator==(const Self & rhs) const { return id() == rhs.id(); }
-  bool BelongsToTree(const InfostateTree* other) const {
-    SpielFatalError("Must not be called in release mode!");
-  }
+  // BelongsToTree is not implemented on purpose:
+  // It must not be called in release mode -- used only DCHECK statements.
 #endif
+  constexpr NodeId() {}
   size_t id() const {
     SPIEL_CHECK_NE(identifier_, kUndefinedNodeId);
     return identifier_;
   }
   bool is_undefined() const { return identifier_ == kUndefinedNodeId; }
   bool operator!=(const Self& rhs) const { return !(rhs == *this); }
-  operator size_t() const { return id(); }
-//  std::ostream& operator<<(std::ostream& os) const {
-//    return os << typeid(Self).name() << '{' << id() << '}';
-//  }
+  operator size_t() const { return id(); }  // Implicit conversion to size_t.
 };
 
 }  // namespace
@@ -445,10 +447,10 @@ class InfostateNode final {
   // Sequence identifier of this node.
   // It may be undefined if this node is not an observation node that follows
   // after an action in a parent decision node.
-  SequenceId sequence_id_;
-  SequenceId start_sequence_id_;
-  SequenceId end_sequence_id_;
-  LeafId leaf_id_;
+  SequenceId sequence_id_ = kUndefinedSequenceId;
+  SequenceId start_sequence_id_ = kUndefinedSequenceId;
+  SequenceId end_sequence_id_ = kUndefinedSequenceId;
+  LeafId leaf_id_ = kUndefinedLeafId;
   // Utility of terminal state corresponding to a terminal infostate node.
   const double terminal_utility_;
   // Cumulative product of chance probabilities leading up to a terminal node.
@@ -479,15 +481,6 @@ class TreeplexVector {
   double operator[](const SequenceId& sequence_id) const;
 };
 
-// A type for tables holding pointers to CFR values.
-//
-// It is similar to what CFRSolver uses, i.e. the InfoStateValuesTable.
-// However, this table has pointers to the values, not the actual values,
-// because they are stored within the infostate tree.
-//
-// It makes looking up the strategies / regrets for players easier to do.
-using CFRInfoStateValuesPtrTable =
-  std::unordered_map<std::string, CFRInfoStateValues*>;
 
 
 }  // namespace algorithms
