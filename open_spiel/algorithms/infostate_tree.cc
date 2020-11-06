@@ -24,35 +24,28 @@ InfostateNode::InfostateNode(
     const InfostateTree& tree, InfostateNode* parent, int incoming_index,
     InfostateNodeType type, const std::string& infostate_string,
     const DecisionId& decision_id, double terminal_utility,
-    double terminal_ch_reach_prob, size_t depth, const State* originating_state)
+    double terminal_ch_reach_prob, size_t depth,
+    std::vector<Action> legal_actions, std::vector<Action> terminal_history)
     : tree_(tree), parent_(parent),
       incoming_index_(incoming_index), type_(type),
       infostate_string_(infostate_string),
       decision_id_(decision_id),
       depth_(depth),
       terminal_utility_(terminal_utility),
-      terminal_chn_reach_prob_(terminal_ch_reach_prob) {
+      terminal_chn_reach_prob_(terminal_ch_reach_prob),
+      legal_actions_(std::move(legal_actions)),
+      terminal_history_(std::move(terminal_history)) {
 
   // Implications for kTerminalNode
-  SPIEL_DCHECK_TRUE(type != kTerminalInfostateNode || originating_state);
-  SPIEL_DCHECK_TRUE(type != kTerminalInfostateNode || parent);
+  SPIEL_DCHECK_TRUE(type_ != kTerminalInfostateNode || parent_);
   // Implications for kDecisionNode
-  SPIEL_DCHECK_TRUE(type != kDecisionInfostateNode || originating_state);
-  SPIEL_DCHECK_TRUE(type != kDecisionInfostateNode || parent);
+  SPIEL_DCHECK_TRUE(type_ != kDecisionInfostateNode || parent_);
   // Implications for kObservationNode
   SPIEL_DCHECK_TRUE(
-      !(type == kObservationInfostateNode && parent
-          && parent->type() == kDecisionInfostateNode)
-          || (incoming_index >= 0
-              && incoming_index < parent->legal_actions().size())
+      !(type_ == kObservationInfostateNode
+            && parent_ && parent_->type() == kDecisionInfostateNode)
+      || (incoming_index_ >= 0 && incoming_index_ < parent_->legal_actions().size())
   );
-
-  if (type == kDecisionInfostateNode) {
-    legal_actions_ = originating_state->LegalActions(tree_.acting_player());
-  }
-  if (type_ == kTerminalInfostateNode) {
-    terminal_history_ = originating_state->History();
-  }
 }
 
 
@@ -125,21 +118,9 @@ InfostateNode* InfostateNode::GetChild(
   return nullptr;
 }
 
-const InfostateNode* InfostateNode::FindNode(
-    const std::string& infostate_lookup) const {
-  if (infostate_string_ == infostate_lookup)
-    return open_spiel::down_cast<const InfostateNode*>(this);
-  for (InfostateNode* child : child_iterator()) {
-    if (const InfostateNode* node = child->FindNode(infostate_lookup)) {
-      return node;
-    }
-  }
-  return nullptr;
-}
-
-std::string InfostateNode::ToString() const {
-  if (!parent_) return "x";
-  return absl::StrCat(parent_->ToString(), ",", incoming_index_);
+std::ostream& InfostateNode::operator<<(std::ostream& os) const {
+  if (!parent_) return os << 'x';
+  return os << parent_ << ',' <<  incoming_index_;
 }
 
 std::string InfostateNode::ComputeCertificate() const {
@@ -184,7 +165,7 @@ void InfostateNode::Rebalance(int target_depth, int current_depth) {
             /*infostate_string=*/kFillerInfostate,
             /*decision_id=*/kUndefinedDecisionId,
             /*terminal_utility=*/NAN, /*terminal_ch_reach_prob=*/NAN,
-            current_depth, /*originating_state=*/nullptr));
+            current_depth, /*legal_actions=*/{}, /*terminal_history=*/{}));
     InfostateNode* chain_tail = chain_head.get();
     for (int i = 1; i < target_depth - current_depth; ++i) {
       chain_tail = chain_tail->AddChild(
@@ -194,7 +175,8 @@ void InfostateNode::Rebalance(int target_depth, int current_depth) {
               /*infostate_string=*/kFillerInfostate,
               /*decision_id=*/kUndefinedDecisionId,
               /*terminal_utility=*/NAN, /*terminal_ch_reach_prob=*/NAN,
-              current_depth + i, /*originating_state=*/nullptr)));
+              current_depth + i, /*legal_actions=*/{},
+              /*terminal_history=*/{})));
     }
     chain_tail->children_.push_back(nullptr);
 
@@ -282,15 +264,16 @@ void InfostateTree::CollectNodesAtDepth(InfostateNode* node, int depth) {
     CollectNodesAtDepth(child, depth + 1);
 }
 
-void InfostateTree::PrintStats() {
-  std::cout << "Infostate tree for player " << acting_player_ << ".\n"
-            << "Tree height: " << tree_height_ << "\n"
-            << "Root branching: " << root().num_children() << "\n"
-            << "Number of leaves: " << num_leaves() << "\n"
-            << "Tree certificate: " << std::endl;
-  std::cout << root().ComputeCertificate() << std::endl;
+std::ostream& InfostateTree::operator<<(std::ostream& os) const {
+  return os << "Infostate tree for player " << acting_player_ << ".\n"
+            << "Tree height: " << tree_height_ << '\n'
+            << "Root branching: " << root_branching_factor() << '\n'
+            << "Number of decision infostate nodes: " << num_decisions() << '\n'
+            << "Number of sequences: " << num_sequences() << '\n'
+            << "Number of leaves: " << num_leaves() << '\n'
+            << "Tree certificate: " << '\n'
+            << root().ComputeCertificate() << '\n';
 }
-
 
 const std::vector<Action>& InfostateNode::TerminalHistory() const {
   SPIEL_DCHECK_EQ(type_, kTerminalInfostateNode);
@@ -305,12 +288,21 @@ std::unique_ptr<InfostateNode> InfostateTree::MakeNode(
     const std::string& infostate_string,
     double terminal_utility, double terminal_ch_reach_prob,
     size_t depth, const State* originating_state) {
+  auto legal_actions =
+      originating_state && originating_state->IsPlayerActing(acting_player_)
+      ? originating_state->LegalActions()
+      : std::vector<Action>();
+  auto terminal_history =
+      originating_state && originating_state->IsTerminal()
+      ? originating_state->History()
+      : std::vector<Action>();
   // Instantiate node using new to make sure that we can call
   // the private constructor.
   auto node = std::unique_ptr<InfostateNode>(new InfostateNode(
       *this, parent, parent->num_children(), type, infostate_string,
       DecisionId(decision_infostates_.size(), this),
-      terminal_utility, terminal_ch_reach_prob, depth, originating_state));
+      terminal_utility, terminal_ch_reach_prob, depth,
+      std::move(legal_actions), std::move(terminal_history)));
   decision_infostates_.push_back(node.get());
   return node;
 }
@@ -322,7 +314,7 @@ std::unique_ptr<InfostateNode> InfostateTree::MakeRootNode() const {
       /*infostate_string=*/kDummyRootNodeInfostate,
       /*decision_id=*/kUndefinedDecisionId,
       /*terminal_utility=*/NAN, /*chance_reach_prob=*/NAN,
-      /*depth=*/0, /*originating_state=*/nullptr));
+      /*depth=*/0, /*legal_actions=*/{}, /*terminal_history=*/{}));
 }
 
 void InfostateTree::UpdateLeafNode(InfostateNode* node, const State& state,
@@ -510,7 +502,7 @@ std::shared_ptr<InfostateTree> MakeInfostateTree(
       start_states, chance_reach_probs, infostate_observer, acting_player,
       max_move_ahead_limit, make_balanced));
 }
-SequenceId InfostateTree::empty_sequence_id() const {
+SequenceId InfostateTree::empty_sequence() const {
   return root().sequence_id();
 }
 Range<SequenceId> InfostateTree::AllSequenceIds() const {
@@ -552,8 +544,8 @@ InfostateNode* InfostateTree::observation_infostate(
 Range<DecisionId> InfostateTree::AllDecisionIds() const {
   return Range<DecisionId>(0, decision_infostates_.size(), this);
 }
-std::optional<DecisionId>
-InfostateTree::DecisionIdForSequence(const SequenceId& sequence_id) const {
+absl::optional<DecisionId> InfostateTree::DecisionIdForSequence(
+    const SequenceId& sequence_id) const {
   SPIEL_DCHECK_TRUE(sequence_id.BelongsToTree(this));
   InfostateNode* node = sequences_.at(sequence_id);
   SPIEL_DCHECK_TRUE(node);
@@ -563,8 +555,8 @@ InfostateTree::DecisionIdForSequence(const SequenceId& sequence_id) const {
     return node->parent_->decision_id();
   }
 }
-std::optional<InfostateNode*>
-InfostateTree::DecisionForSequence(const SequenceId& sequence_id) {
+absl::optional<InfostateNode*> InfostateTree::DecisionForSequence(
+    const SequenceId& sequence_id) {
   SPIEL_DCHECK_TRUE(sequence_id.BelongsToTree(this));
   InfostateNode* node = sequences_.at(sequence_id);
   SPIEL_DCHECK_TRUE(node);
