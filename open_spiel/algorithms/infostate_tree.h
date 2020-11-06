@@ -148,9 +148,9 @@ class NodeId {
   bool is_undefined() const { return identifier_ == kUndefinedNodeId; }
   bool operator!=(const Self& rhs) const { return !(rhs == *this); }
   operator size_t() const { return id(); }
-  std::ostream& operator<<(std::ostream& os) const {
-    return os << typeid(Self).name() << '{' << id() << '}';
-  }
+//  std::ostream& operator<<(std::ostream& os) const {
+//    return os << typeid(Self).name() << '{' << id() << '}';
+//  }
 };
 
 }  // namespace
@@ -184,8 +184,12 @@ class Range {
   const InfostateTree* tree_ = nullptr;
   size_t pos_;
  public:
-  explicit Range(size_t start, size_t end,
-                 const InfostateTree* tree, size_t pos = 0)
+  Range(size_t start, size_t end, const InfostateTree* tree)
+      : start_(start), end_(end), tree_(tree), pos_(start) {
+    SPIEL_CHECK_LE(start_, pos_);
+    SPIEL_CHECK_LE(pos_, end_);  // LE not LT so we can have an end() iterator.
+  }
+  Range(size_t start, size_t end, size_t pos, const InfostateTree* tree)
       : start_(start), end_(end), tree_(tree), pos_(pos) {
     SPIEL_CHECK_LE(start_, pos_);
     SPIEL_CHECK_LE(pos_, end_);  // LE not LT so we can have an end() iterator.
@@ -244,8 +248,8 @@ class InfostateTree final {
 
   // Tree information.
   Player acting_player() const { return acting_player_; }
-  int tree_height() const { return tree_height_; }
   bool is_balanced() const { return is_tree_balanced_; }
+  int tree_height() const;
 
   // General statistics.
   size_t num_decision_infostates() const { return decision_infostates_.size(); }
@@ -274,6 +278,7 @@ class InfostateTree final {
   const std::vector<InfostateNode*>& leaf_nodes() const;
   InfostateNode* leaf_node(const LeafId& leaf_id) const;
   const std::vector<std::vector<InfostateNode*>>& nodes_at_depths() const;
+  const std::vector<InfostateNode*>& nodes_at_depth(int depth) const;
 
   // For debugging.
   void PrintStats();
@@ -297,7 +302,7 @@ class InfostateTree final {
   std::unique_ptr<InfostateNode> MakeNode(
       InfostateNode* parent, InfostateNodeType type,
       const std::string& infostate_string, double terminal_utility,
-      double terminal_ch_reach_prob, const State* originating_state);
+      double terminal_ch_reach_prob, size_t depth, const State* originating_state);
   std::unique_ptr<InfostateNode> MakeRootNode() const;
 
   // Makes sure that all tree leaves are at the same height.
@@ -322,7 +327,8 @@ class InfostateTree final {
 
   void CollectNodesAtDepth(InfostateNode* node, int depth);
   void LabelSequenceIds();
-  std::pair<size_t,size_t> CollectStartEndSequenceIds(InfostateNode* node);
+  std::pair<size_t,size_t> CollectStartEndSequenceIds(
+      InfostateNode* node, const SequenceId parent_sequence);
 };
 
 // Iterate over a vector of unique pointers, but expose only the raw pointers.
@@ -356,7 +362,8 @@ class InfostateNode final {
       const InfostateTree& tree, InfostateNode* parent, int incoming_index,
       InfostateNodeType type, const std::string& infostate_string,
       const DecisionId& decision_id, double terminal_utility,
-      double terminal_ch_reach_prob, const State* originating_state);
+      double terminal_ch_reach_prob, size_t depth,
+      const State* originating_state);
   friend class InfostateTree;
 
  public:
@@ -367,6 +374,7 @@ class InfostateNode final {
   InfostateNode* parent() const { return parent_; }
   int incoming_index() const { return incoming_index_; }
   const InfostateNodeType& type() const { return type_; }
+  size_t depth() const { return depth_; }
   bool is_leaf_node() const { return children_.empty(); }
   bool is_root_node() const { return !parent_; }
   const std::string& infostate_string() const;
@@ -377,6 +385,9 @@ class InfostateNode final {
   const std::vector<std::unique_ptr<State>>& corresponding_states() const;
   const std::vector<double>& corresponding_chance_reach_probs() const;
   const SequenceId sequence_id() const;
+  const SequenceId start_sequence_id() const;
+  const SequenceId end_sequence_id() const;
+  Range<SequenceId> AllSequenceIds() const;
   const DecisionId decision_id() const;
 
   InfostateNode* child_at(int i) const { return children_.at(i).get(); }
@@ -442,6 +453,11 @@ class InfostateNode final {
   const double terminal_utility_;
   // Cumulative product of chance probabilities leading up to a terminal node.
   const double terminal_chn_reach_prob_;
+  // Depth of the node, i.e. number of edges up to the root of the tree.
+  // Note that depth does not necessarily correspond to the MoveNumber()
+  // of corresponding states. This is not const because tree rebalancing
+  // can change this value.
+  size_t depth_;
   // Stored only for decision nodes.
   std::vector<Action> legal_actions_;
   // Children infostate nodes. Notice the node owns its children.

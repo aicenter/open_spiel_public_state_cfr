@@ -291,13 +291,13 @@ void TestTreeRebalancing() {
   {  // Rebalance test: when 2nd player passes, we add dummy observation nodes.
     {
       std::shared_ptr<InfostateTree> tree = MakeTree(
-          "kuhn_poker", 0, {{0, 1, 0}}, {1 / 6.},
-          /*max_move_limit=*/1000, /*make_balanced=*/false);
+        "kuhn_poker", 0, {{0, 1, 0}}, {1 / 6.},
+        /*max_move_limit=*/1000, /*make_balanced=*/false);
       std::string expected_certificate =
-          "(("
+        "(("
           "[({})({})]"  // 2nd player bets
           "{}"          // 2nd player passes
-          "))";
+        "))";
       SPIEL_CHECK_EQ(tree->root().ComputeCertificate(), expected_certificate);
       SPIEL_CHECK_FALSE(tree->is_balanced());
       SPIEL_CHECK_FALSE(RecomputeBalance(*tree));
@@ -309,10 +309,10 @@ void TestTreeRebalancing() {
       // The order is swapped only in the certificate computation, but not in
       // the actual tree.
       std::string expected_rebalanced_certificate =
-          "(("
+        "(("
           "(({}))"      // 2nd player passes
           "[({})({})]"  // 2nd player bets
-          "))";
+        "))";
       SPIEL_CHECK_EQ(tree->root().ComputeCertificate(),
                      expected_rebalanced_certificate);
       SPIEL_CHECK_TRUE(tree->is_balanced());
@@ -331,10 +331,10 @@ void TestTreeRebalancing() {
           /*max_move_limit=*/1000,
           /*make_balanced=*/false);
       std::string expected_certificate =
-          "("
+        "("
           "[({}{})({}{})]"
           "{}"
-          ")";
+        ")";
       SPIEL_CHECK_EQ(tree->root().ComputeCertificate(), expected_certificate);
       SPIEL_CHECK_FALSE(tree->is_balanced());
       SPIEL_CHECK_FALSE(RecomputeBalance(*tree));
@@ -350,10 +350,10 @@ void TestTreeRebalancing() {
           /*max_move_limit=*/1000,
           /*make_balanced=*/true);
       std::string expected_rebalanced_certificate =
-          "("
+        "("
           "(({}))"
           "[({}{})({}{})]"
-          ")";
+        ")";
       SPIEL_CHECK_EQ(tree->root().ComputeCertificate(),
                      expected_rebalanced_certificate);
       SPIEL_CHECK_TRUE(tree->is_balanced());
@@ -423,7 +423,6 @@ void CheckTreeLeaves(const InfostateTree& tree, int move_limit) {
     } else {
       SPIEL_CHECK_LE(max_move_number, move_limit);
     }
-
   }
 }
 
@@ -514,6 +513,39 @@ void TestDepthLimitedSubgames() {
       SPIEL_CHECK_EQ(tree->root().ComputeCertificate(),
                      expected_certificates[move_limit]);
       SPIEL_CHECK_EQ(tree->num_leaves(), expected_leaf_counts[move_limit]);
+
+      for (InfostateNode* leaf : tree->leaf_nodes()) {
+        SPIEL_CHECK_EQ(leaf->depth(), tree->tree_height());
+      }
+    }
+  }
+}
+
+void TestSequenceIdLabeling() {
+  for (int pl = 0; pl < 2; ++pl) {
+    std::shared_ptr<InfostateTree> tree = MakeTree(
+        "kuhn_poker", /*player_id=*/pl,
+        /*max_move_limit=*/100, /*make_balanced=*/true);
+
+    for (int depth = 0; depth <= tree->tree_height(); ++depth) {
+      for (InfostateNode* node : tree->nodes_at_depth(depth)) {
+        SPIEL_CHECK_LE(node->start_sequence_id(), node->sequence_id());
+        SPIEL_CHECK_LE(node->end_sequence_id(), node->sequence_id());
+      }
+    }
+
+    // Check labeling was done from the deepest nodes.
+    size_t depth = -1;  // Some large number.
+    for (SequenceId id : tree->AllSequenceIds()) {
+      InfostateNode* node = tree->observation_infostate(id);
+      SPIEL_CHECK_LE(node->depth(), depth);
+      depth = node->depth();
+      // Longer sequences (extensions) must have the corresponding
+      // infostate nodes placed deeper.
+      for (SequenceId extension : node->AllSequenceIds()) {
+        InfostateNode* child = tree->observation_infostate(extension);
+        SPIEL_CHECK_LT(node->depth(), child->depth());
+      }
     }
   }
 }
@@ -528,4 +560,5 @@ int main(int argc, char** argv) {
   open_spiel::algorithms::TestTreeRebalancing();
   open_spiel::algorithms::TestDepthLimitedTrees();
   open_spiel::algorithms::TestDepthLimitedSubgames();
+  open_spiel::algorithms::TestSequenceIdLabeling();
 }
