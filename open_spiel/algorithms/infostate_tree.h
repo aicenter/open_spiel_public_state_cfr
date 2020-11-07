@@ -27,37 +27,40 @@
 #include "open_spiel/utils/action_view.h"
 
 // This file contains data structures used in imperfect information games.
-// Specifically, we implement an infostate tree, a representation of how a game
-// looks like from the perspective of an acting player.
+// Specifically, we implement an infostate tree, a representation of a game
+// from the perspective of an acting player.
 //
-// The infostate tree contains infostate nodes, which describe where the player
-// is acting, getting observations or receiving terminal utilities (and
-// finishing the game). See `InfostateNodeType` for more details.
+// The information-state tree contains information states [1], which describe
+// where the player is a) acting, b) getting observations, or c) receiving
+// terminal utilities (when the game ends). See `InfostateNodeType` for more
+// details.
 //
-// As the tree can be constructed with a depth limit, we make a distinction
+// The tree can be constructed with a depth limit, so we make a distinction
 // between leaf nodes and non-leaf nodes. All terminal nodes are leaf nodes.
 //
 // The identification of infostates is based on strings from an information
 // state observer, i.e. one that is constructed using kInfoStateObsType.
 //
-// As algorithms typically need to store information associated to the nodes
-// of the tree, we provide following addressing mechanisms (see the classes
+// As algorithms typically need to store information associated to specific
+// nodes of the tree, we provide following indexing mechanisms (see the classes
 // below for more details):
-// - `DecisionId` refers to an infostate where the player acts.
+//
+// - `DecisionId` refers to a decision infostate where the player acts.
 // - `SequenceId` refers to an observation infostate that follows the decision
 //    infostate after following some action.
 // - `LeafId` refers to an infostate node which is a leaf.
+//
 // All of these ids are very cheap (they are just typed `size_t`s) and they can
 // be used to get a pointer to the corresponding infostate node.
 //
-// To enable some very specific algorithmic optimizations we construct the trees
-// "balanced". We call a _balanced_ tree one which has all leaf nodes at the
-// same depth. To ensure the tree is balanced, we may need to pad "dummy"
-// observation nodes as prefixes for the (previously too shallow) leafs.
-// This is not too expensive, as most games are balanced by default.
+// To enable some algorithmic optimizations we construct the trees "balanced".
+// We call a _balanced_ tree one which has all leaf nodes at the same depth.
+// To make the tree balanced, we may need to pad "dummy" observation nodes as
+// prefixes for the (previously too shallow) leafs. This is not too expensive,
+// as most games are balanced by default due to game rules.
 //
-// [1]: Smoothing Techniques for Computing Nash Equilibria of Sequential Games
-//      http://www.cs.cmu.edu/~sandholm/proxtreeplex.MathOfOR.pdf
+// [1]: Rethinking Formal Models of Partially Observable Multiagent Decision
+//      Making https://arxiv.org/pdf/1906.11110.pdf
 
 namespace open_spiel {
 namespace algorithms {
@@ -65,10 +68,12 @@ namespace algorithms {
 // To categorize infostate nodes we use nomenclature from [2]:
 //
 // - In _decision nodes_, the acting player selects actions.
-// - The _observation nodes_ can correspond to State that is a chance node,
-//   or opponent's node. Importantly they can correspond also to the acting
-//   player's node, as the player may have discovered something as a result
-//   of its action in the previous decision node.
+// - In _observation nodes_ the acting player receives observations.
+//   They can correspond to State that is a chance node, or opponent's node.
+//   Importantly, they can correspond also to the acting player's node,
+//   as the player may have discovered something as a result of its action
+//   in the previous decision node. (This is especially important for the tree
+//   construction in simultaneous-move games).
 // - Additionally, we introduce _terminal nodes_, which correspond to a single
 //   terminal history.
 //
@@ -96,7 +101,7 @@ constexpr char* kDummyRootNodeInfostate = "(root)";
 // Sometimes we need to create infostate nodes that do not have a corresponding
 // game State, and therefore we cannot retrieve their string representations.
 // This happens in simultaneous move games or if we rebalance game trees.
-constexpr char* kFillerInfostate = "(filler)";
+constexpr char* kFillerInfostate = "(fill)";
 
 // Forward declaration.
 class InfostateTree;
@@ -111,18 +116,19 @@ namespace {
 //
 // We use various indexing schemes (SequenceId, DecisionId, LeafId) to access
 // specific nodes in the tree. Not all nodes can have an Id defined, for example
-// a DecisionId if they are not decision nodes. In this case they will default
-// to the following value. We use this approach rather than std::optional as
-// that would create pointers to the values, which would render following
-// optimizations meaningless.
+// a DecisionId is not defined for decision nodes. In this case they will
+// default to the following value. We use this approach rather than
+// std::optional as optional creates pointers to the values, which would render
+// the following optimizations meaningless.
 constexpr size_t kUndefinedNodeId = -1;  // This is a large number.
 
 // An implementation detail - Not to be used directly.
+//
 // Create an indexing of specific infostate nodes.
 //
 // In release-mode the implementation is as cheap as the underlying size_t
 // identifier. Therefore it is preferable to pass the Ids by copy and not
-// as pointers / references.
+// by pointers / references.
 // Most importantly in debug-mode we add checks to make sure that we are using
 // the ids on appropriate trees and we do not try to index any opponents' trees.
 //
@@ -178,13 +184,13 @@ class NodeId {
 // infostate after following some action. It indexes the decision space of
 // an agent, and its strategy can formulated in terms of values associated with
 // the agent's sequences. See `TreeplexVector` for more details.
-// The smallest sequence ids correspond to the deepest nodes, the highest value
-// corresponds to the empty sequence.
+// The smallest sequence ids correspond to the deepest nodes and the highest
+// value corresponds to the empty sequence.
 class SequenceId final : public NodeId<SequenceId> {
   using NodeId<SequenceId>::NodeId;
 };
 // When the tree is still under construction and a node doesn't
-// have assigned a final sequence id, we use this value.
+// have a final sequence id assigned yet, we use this value.
 constexpr SequenceId kUndefinedSequenceId = SequenceId();
 
 // `DecisionId` refers to an infostate node where the player acts,
@@ -196,7 +202,7 @@ class DecisionId final : public NodeId<DecisionId> {
 constexpr DecisionId kUndefinedDecisionId = DecisionId();
 
 // `LeafId` refers to an infostate node which is a leaf. Note that this can be
-// an arbitrary type of infostate note. A kTerminalInfostateNode is always
+// an arbitrary infostate node type. A kTerminalInfostateNode is always
 // a leaf node.
 // Note that leaf decision nodes do not have assigned any `DecisionId`, and
 // similarly leaf observation nodes do not have assigned any `SequenceId`.
@@ -208,30 +214,27 @@ constexpr LeafId kUndefinedLeafId = LeafId();
 
 // A convenience iterator over a contiguous range of node ids.
 template<class Id>
+class RangeIterator {
+  size_t id_;
+  const InfostateTree* tree_;
+ public:
+  RangeIterator(size_t id, const InfostateTree* tree) : id_(id), tree_(tree) {}
+  RangeIterator& operator++() { ++id_; return *this; }
+  bool operator!=(const RangeIterator& other) const {
+    return id_ != other.id_ || tree_ != other.tree_;
+  }
+  Id operator*() { return Id(id_, tree_); }
+};
+template<class Id>
 class Range {
   const size_t start_;
   const size_t end_;
   const InfostateTree* tree_;
-  size_t id_;
  public:
   Range(size_t start, size_t end, const InfostateTree* tree)
-      : start_(start), end_(end), tree_(tree), id_(start) {
-    SPIEL_CHECK_LE(start_, id_);
-    SPIEL_CHECK_LE(id_, end_);  // LE not LT so we can have an end() iterator.
-  }
-  Range(size_t start, size_t end, size_t pos, const InfostateTree* tree)
-      : start_(start), end_(end), tree_(tree), id_(pos) {
-    SPIEL_CHECK_LE(start_, id_);
-    SPIEL_CHECK_LE(id_, end_);  // LE not LT so we can have an end() iterator.
-  }
-  Range& operator++() { id_++; return *this; }
-  bool operator!=(Range other) const {
-    return id_ != other.id_ || start_ != other.start_
-        || end_ != other.end_ || tree_ != other.tree_;
-  }
-  Id operator*() { return Id(id_, tree_); }
-  Range begin() const { return Range(start_, end_, start_, tree_); }
-  Range end() const { return Range(start_, end_, end_, tree_); }
+      : start_(start), end_(end), tree_(tree) { SPIEL_CHECK_LE(start_, end_); }
+  RangeIterator<Id> begin() const { return RangeIterator<Id>(start_, tree_); }
+  RangeIterator<Id> end() const { return RangeIterator<Id>(end_, tree_); }
 };
 
 // Creates an infostate tree for a player based on the initial state
@@ -385,12 +388,12 @@ class VecWithUniquePtrsIterator {
 };
 
 class InfostateNode final {
-  // Note that all of the following members are const or they should be,
-  // however we can't make them const during the node construction because
-  // they might be computed only after the whole tree is built.
+  // Note that all of the following members are const or they should be const.
+  // However we can't make all of  them const during the node construction
+  // because they might be computed only after the whole tree is built.
  private:
-  // Reference to the tree that this node belongs to. This reference has
-  // a valid lifetime, as it is allocated once on heap and never moved.
+  // Reference to the tree this node belongs to. This reference has a valid
+  // lifetime, as it is allocated once on the heap and never moved.
   const InfostateTree& tree_;
   // Pointer to the parent node. Null for the root node.
   // This is not const so that we can change it when we rebalance the tree.
@@ -520,12 +523,16 @@ class InfostateNode final {
   InfostateNode* GetChild(const std::string& infostate_string) const;
 };
 
-// Arrays that can be easily indexed by SequenceIds.
-class TreeplexVector {
+// Arrays that can be easily indexed by SequenceIds. The space of all such
+// arrays forms a treeplex [3].
+//
+// [3]: Smoothing Techniques for Computing Nash Equilibria of Sequential Games
+//      http://www.cs.cmu.edu/~sandholm/proxtreeplex.MathOfOR.pdf
+class TreeplexVector final {
   const InfostateTree* tree_;
   std::vector<double> vec_;
  public:
-  TreeplexVector(const InfostateTree* tree);
+  explicit TreeplexVector(const InfostateTree* tree);
   double operator[](const SequenceId& sequence_id) const;
 };
 
