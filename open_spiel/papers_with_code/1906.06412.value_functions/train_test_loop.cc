@@ -129,8 +129,8 @@ void TrainEvalLoop(
       game->MakeObserver(kInfoStateObsType, {});
   std::shared_ptr<Observer> public_observer =
       game->MakeObserver(kPublicStateObsType, {});
-  std::shared_ptr<Observer> private_observer =
-      game->MakeObserver(kPrivateObsType, {});
+  std::shared_ptr<Observer> hand_observer =
+      game->MakeObserver(kHandObsType, {});
   std::array<std::shared_ptr<InfostateTree>, 2> trunk_trees = {
       MakeInfostateTree(*game, 0, trunk_depth),
       MakeInfostateTree(*game, 1, trunk_depth)
@@ -148,7 +148,7 @@ void TrainEvalLoop(
 
   // 3. Make a Batch of data that encompasses all leaf public states.
   std::array<RangeTable, 2> tables = CreateRangeTables(
-      *game, private_observer, trunk_with_oracle->GetPublicLeaves());
+      *game, hand_observer, trunk_with_oracle->GetPublicLeaves());
   const dlcfr::LeafPublicState& some_leaf =
       trunk_with_oracle->GetPublicLeaves().at(0);
   const size_t encoding_size = some_leaf.public_tensor.size();

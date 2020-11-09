@@ -202,8 +202,9 @@ inline constexpr IIGObservationType kPublicStateObsType{
     .perfect_recall = true,
     .private_info = PrivateInfoType::kNone};
 
-// Complete public observation, mainly used for imperfect information games.
-inline constexpr IIGObservationType kPrivateObsType{
+// Current private observation of a player.
+// In a card game like Poker this would be what it sees in its hand.
+inline constexpr IIGObservationType kHandObsType{
     .public_info = false,
     .perfect_recall = false,
     .private_info = PrivateInfoType::kSinglePlayer};

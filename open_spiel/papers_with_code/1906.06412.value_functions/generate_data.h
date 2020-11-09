@@ -69,7 +69,7 @@ struct RangeTable {
 
 std::array<RangeTable, 2> CreateRangeTables(
     const Game& game,
-    const std::shared_ptr<Observer>& private_observer,
+    const std::shared_ptr<Observer>& hand_observer,
     const std::vector<dlcfr::LeafPublicState>& public_leaves);
 
 // Copy non-contiguous vectors using a permutation map.

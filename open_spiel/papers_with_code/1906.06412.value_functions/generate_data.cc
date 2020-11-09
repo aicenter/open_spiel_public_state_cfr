@@ -96,11 +96,10 @@ int RangeTable::hand_index(const Observation& obs) {
 }
 
 std::array<RangeTable, 2> CreateRangeTables(
-    const Game& game,
-    const std::shared_ptr<Observer>& private_observer,
+    const Game& game, const std::shared_ptr<Observer>& hand_observer,
     const std::vector<dlcfr::LeafPublicState>& public_leaves) {
   std::array<RangeTable, 2> tables{public_leaves.size(), public_leaves.size()};
-  Observation hand(game, private_observer);
+  Observation hand(game, hand_observer);
   for (int i = 0; i < public_leaves.size(); ++i) {
     const dlcfr::LeafPublicState& state = public_leaves[i];
     for (int pl = 0; pl < 2; ++pl) {
