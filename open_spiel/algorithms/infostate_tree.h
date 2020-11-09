@@ -523,17 +523,56 @@ class InfostateNode final {
   InfostateNode* GetChild(const std::string& infostate_string) const;
 };
 
-// Arrays that can be easily indexed by SequenceIds. The space of all such
-// arrays forms a treeplex [3].
+// Arrays that can be easily indexed by SequenceIds.
+// The space of all such arrays forms a treeplex [3].
 //
 // [3]: Smoothing Techniques for Computing Nash Equilibria of Sequential Games
 //      http://www.cs.cmu.edu/~sandholm/proxtreeplex.MathOfOR.pdf
+template<typename T>
 class TreeplexVector final {
   const InfostateTree* tree_;
-  std::vector<double> vec_;
+  std::vector<T> vec_;
  public:
-  explicit TreeplexVector(const InfostateTree* tree);
-  double operator[](const SequenceId& sequence_id) const;
+  explicit TreeplexVector(const InfostateTree* tree)
+      : tree_(tree), vec_(tree_->num_sequences()) {}
+  T operator[](const SequenceId& sequence_id) const {
+    SPIEL_DCHECK_TRUE(sequence_id.BelongsToTree(tree_));
+    SPIEL_DCHECK_LE(0, sequence_id.id());
+    SPIEL_DCHECK_LT(sequence_id.id(), vec_.size());
+    return vec_[sequence_id];
+  }
+};
+
+// Arrays that can be easily indexed by LeafIds.
+template<typename T>
+class LeafVector final {
+  const InfostateTree* tree_;
+  std::vector<T> vec_;
+ public:
+  explicit LeafVector(const InfostateTree* tree)
+      : tree_(tree), vec_(tree_->num_leaves()) {}
+  T operator[](const LeafId& leaf_id) const {
+    SPIEL_DCHECK_TRUE(leaf_id.BelongsToTree(tree_));
+    SPIEL_DCHECK_LE(0, leaf_id.id());
+    SPIEL_DCHECK_LT(leaf_id.id(), vec_.size());
+    return vec_[leaf_id];
+  }
+};
+
+// Arrays that can be easily indexed by DecisionIds.
+template<typename T>
+class DecisionVector final {
+  const InfostateTree* tree_;
+  std::vector<T> vec_;
+ public:
+  explicit DecisionVector(const InfostateTree* tree)
+      : tree_(tree), vec_(tree_->num_decisions()) {}
+  T operator[](const DecisionId& decision_id) const {
+    SPIEL_DCHECK_TRUE(decision_id.BelongsToTree(tree_));
+    SPIEL_DCHECK_LE(0, decision_id.id());
+    SPIEL_DCHECK_LT(decision_id.id(), vec_.size());
+    return vec_[decision_id];
+  }
 };
 
 }  // namespace algorithms

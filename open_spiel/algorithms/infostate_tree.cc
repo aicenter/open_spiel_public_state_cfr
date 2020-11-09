@@ -663,15 +663,5 @@ int InfostateTree::tree_height() const {
   return tree_height_;
 }
 
-TreeplexVector::TreeplexVector(const InfostateTree* tree)
-    : tree_(tree), vec_(tree_->num_sequences()) {}
-
-double TreeplexVector::operator[](const SequenceId& sequence_id) const {
-  SPIEL_DCHECK_TRUE(sequence_id.BelongsToTree(tree_));
-  SPIEL_DCHECK_LE(0, sequence_id.id());
-  SPIEL_DCHECK_LT(sequence_id.id(), vec_.size());
-  return vec_[sequence_id];
-}
-
 }  // namespace algorithms
 }  // namespace open_spiel
