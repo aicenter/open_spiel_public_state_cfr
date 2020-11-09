@@ -62,6 +62,8 @@ struct LeafPublicState final {
   std::array<std::vector<float>, 2> ranges;
   // For each player, store counterfactual values for the top-most infostates.
   std::array<std::vector<float>, 2> values;
+  // Position in the vector of DepthLimitedCFR::public_leaves_
+  size_t public_id;
 
   explicit LeafPublicState(absl::Span<float> tensor)
       : public_tensor(tensor.begin(), tensor.end()) {}

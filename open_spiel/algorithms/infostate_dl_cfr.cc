@@ -169,7 +169,9 @@ LeafPublicState* DepthLimitedCFR::GetPublicLeaf(
   }
   // None found: create and return the pointer.
   public_leaves_.emplace_back(public_tensor);
-  return &public_leaves_.back();
+  LeafPublicState* state = &public_leaves_.back();
+  state->public_id = public_leaves_.size() - 1;
+  return state;
 }
 
 bool DepthLimitedCFR::DoStatesProduceEqualPublicObservations(
@@ -251,7 +253,7 @@ void DepthLimitedCFR::RunSimultaneousIterations(int iterations) {
     SimultaneousTopDownEvaluate();
     BottomUp(trees_[0]->nodes_at_depths(), node_values_[0], absl::MakeSpan(cf_values_[0]));
     BottomUp(trees_[1]->nodes_at_depths(), node_values_[1], absl::MakeSpan(cf_values_[1]));
-    SPIEL_DCHECK_FLOAT_NEAR(RootValue(/*pl=*/0), -RootValue(/*pl=*/1), 1e-6);
+//    SPIEL_DCHECK_FLOAT_NEAR(RootValue(/*pl=*/0), -RootValue(/*pl=*/1), 1e-6);
   }
 }
 
