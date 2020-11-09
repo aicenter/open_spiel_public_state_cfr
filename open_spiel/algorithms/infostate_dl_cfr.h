@@ -82,7 +82,8 @@ struct PublicStateContext {
 // Leaf evaluator can create appropriate contexts for later evaluation of public
 // states. The derived classes should down_cast the context as needed.
 // Ranges and values are saved within the public state.
-struct LeafEvaluator {
+class LeafEvaluator {
+ public:
   virtual std::unique_ptr<PublicStateContext> CreateContext(
       const LeafPublicState& leaf_state) const { return nullptr; };
   virtual void EvaluatePublicState(
@@ -91,7 +92,7 @@ struct LeafEvaluator {
 
 // -- Terminal evaluator -------------------------------------------------------
 
-struct TerminalPublicStateContext : public PublicStateContext {
+struct TerminalPublicStateContext final : public PublicStateContext {
   // Map from player 0 index (key) to player 1 (value).
   std::vector<int> permutation;
   // For the player 0 and already multiplied by chance reach probs.
@@ -99,7 +100,8 @@ struct TerminalPublicStateContext : public PublicStateContext {
   explicit TerminalPublicStateContext(const LeafPublicState& state);
 };
 
-struct TerminalEvaluator : public LeafEvaluator {
+class TerminalEvaluator final : public LeafEvaluator {
+ public:
   std::unique_ptr<PublicStateContext> CreateContext(
       const LeafPublicState& state) const override;
   void EvaluatePublicState(
@@ -133,6 +135,9 @@ class DepthLimitedCFR {
 
   std::array<const InfostateNode*, 2> Roots() const;
   std::array<std::shared_ptr<InfostateTree>, 2>& Trees();
+  std::array<DecisionVector<CFRInfoStateValues>, 2>& node_values() {
+    return node_values_;
+  };
 
   CFRInfoStateValuesPtrTable InfoStateValuesPtrTable();
 

@@ -28,6 +28,9 @@ struct OracleEvaluator : public dlcfr::LeafEvaluator {
                            dlcfr::PublicStateContext* context) const override;
 };
 
+double TrunkExploitability(
+    dlcfr::DepthLimitedCFR* trunk, ortools::OracleEvaluator* oracle_evaluator);
+
 }  // namespace ortools
 }  // namespace algorithms
 }  // namespace open_spiel

@@ -250,9 +250,6 @@ if (BUILD_WITH_ORTOOLS)
   # Use following to link your_target_executable with OrTools libraries:
   # target_link_libraries(your_target_executable ${ORTOOLS_LIBS})
 endif()
-if (BUILD_WITH_PAPERS)
-  add_subdirectory(papers_with_code)
-endif()
 
 
 # We have the parent of this directory in the include path, so that we can
@@ -310,3 +307,7 @@ if (BUILD_SHARED_LIB)
 endif()
 
 add_subdirectory (tests)
+
+if (BUILD_WITH_PAPERS)
+  add_subdirectory(papers_with_code)
+endif()

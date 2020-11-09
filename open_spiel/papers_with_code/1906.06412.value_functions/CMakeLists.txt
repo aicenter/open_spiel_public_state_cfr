@@ -1,0 +1,9 @@
+add_library(paper_value_functions OBJECT
+  generate_data.h
+  generate_data.cc
+)
+
+add_executable(value_functions_train_test_loop train_test_loop.cc
+  $<TARGET_OBJECTS:paper_value_functions> $<TARGET_OBJECTS:open_spiel_ortools> ${OPEN_SPIEL_OBJECTS})
+target_link_libraries(value_functions_train_test_loop
+  ${ORTOOLS_LIBS} ${TORCH_LIBRARIES})

@@ -93,6 +93,11 @@ void OracleEvaluator::EvaluatePublicState(
   SPIEL_DCHECK_FLOAT_NEAR(public_state_utility, 0., 1e-6);
 }
 
+double TrunkExploitability(dlcfr::DepthLimitedCFR* trunk,
+                           ortools::OracleEvaluator* oracle_evaluator) {
+  return 0;
+}
+
 }  // namespace ortools
 }  // namespace algorithms
 }  // namespace open_spiel

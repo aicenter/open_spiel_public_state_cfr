@@ -71,6 +71,8 @@ class DecisionVector<CFRInfoStateValues> {
     SPIEL_DCHECK_LT(decision_id.id(), vec_.size());
     return vec_[decision_id];
   }
+  auto begin() { return vec_.begin(); }
+  auto end() { return vec_.end(); }
 };
 
 // A type for tables holding pointers to CFR values.

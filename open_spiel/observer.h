@@ -202,6 +202,12 @@ inline constexpr IIGObservationType kPublicStateObsType{
     .perfect_recall = true,
     .private_info = PrivateInfoType::kNone};
 
+// Complete public observation, mainly used for imperfect information games.
+inline constexpr IIGObservationType kPrivateObsType{
+    .public_info = false,
+    .perfect_recall = false,
+    .private_info = PrivateInfoType::kSinglePlayer};
+
 // An Observer is something which can produce an observation of a State,
 // e.g. a Tensor or collection of Tensors or a string.
 // Observers are game-specific. They are created by a Game object, and
@@ -242,6 +248,9 @@ struct TensorInfo {
     return absl::StrCat("TensorInfo(name='", name, "', shape=(",
                         absl::StrJoin(shape, ","), ")");
   }
+  bool operator==(const TensorInfo& other) const {
+    return name == other.name && shape == other.shape;
+  }
 };
 
 // Holds an Observer and a vector for it to write values into.
@@ -278,6 +287,11 @@ class Observation {
   // TODO(author11) Remove when all games support both types of observations
   bool HasString() const { return observer_->HasString(); }
   bool HasTensor() const { return observer_->HasTensor(); }
+
+  bool operator==(const Observation& other) const {
+    return buffer_ == other.buffer_
+        && tensors_ == other.tensors_;
+  }
 
  private:
   std::shared_ptr<Observer> observer_;
