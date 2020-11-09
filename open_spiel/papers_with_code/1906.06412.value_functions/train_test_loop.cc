@@ -123,16 +123,20 @@ void TrainEvalLoop(
     const std::string& game_name,
     int trunk_depth, int train_batches, int num_loops, int trunk_iterations) {
 
-  // 1. Data generation.
+  // 1. Prepare the game, observers and depth-limited (trunk) trees.
   std::shared_ptr<const Game> game = LoadGame(game_name);
   std::shared_ptr<Observer> infostate_observer =
       game->MakeObserver(kInfoStateObsType, {});
   std::shared_ptr<Observer> public_observer =
       game->MakeObserver(kPublicStateObsType, {});
+  std::shared_ptr<Observer> private_observer =
+      game->MakeObserver(kPrivateObsType, {});
   std::array<std::shared_ptr<InfostateTree>, 2> trunk_trees = {
       MakeInfostateTree(*game, 0, trunk_depth),
       MakeInfostateTree(*game, 1, trunk_depth)
   };
+
+  // 2. Create value oracle for the trunk.
   std::shared_ptr<const dlcfr::LeafEvaluator> terminal_evaluator =
       dlcfr::MakeTerminalEvaluator();
   auto oracle_evaluator = std::make_shared<ortools::OracleEvaluator>(
@@ -142,11 +146,9 @@ void TrainEvalLoop(
           game, trunk_trees, oracle_evaluator, terminal_evaluator,
           public_observer);
 
-  std::shared_ptr<Observer> private_observer =
-      game->MakeObserver(kPrivateObsType, {});
+  // 3. Make a Batch of data that encompasses all leaf public states.
   std::array<RangeTable, 2> tables = CreateRangeTables(
       *game, private_observer, trunk_with_oracle->GetPublicLeaves());
-
   const dlcfr::LeafPublicState& some_leaf =
       trunk_with_oracle->GetPublicLeaves().at(0);
   const size_t encoding_size = some_leaf.public_tensor.size();
@@ -155,11 +157,10 @@ void TrainEvalLoop(
   const size_t range_size_sum = ranges_size[0] + ranges_size[1];
   const size_t input_size = encoding_size + range_size_sum;
   const size_t output_size = range_size_sum;
-  // A single batch encompasses all public states.
   BatchData batch(trunk_with_oracle->GetPublicLeaves(),
                   input_size, output_size, encoding_size, ranges_size);
 
-  // 2. Network preparation.
+  // 4. Create network and optimizer.
   torch::manual_seed(kSeed);
   torch::Device device = FindDevice();
   Net model(input_size, output_size, input_size*3);
@@ -167,14 +168,15 @@ void TrainEvalLoop(
   torch::optim::SGD optimizer(model.parameters(),
                               torch::optim::SGDOptions(0.01).momentum(0.5));
 
+  // 5. Create trunk net evaluator.
   auto net_evaluator = std::make_shared<NetEvaluator>(
       &model, &device, game, infostate_observer, tables, &batch);
   auto trunk_with_net = std::make_unique<dlcfr::DepthLimitedCFR>(
       game, trunk_trees, net_evaluator, terminal_evaluator, public_observer);
 //  absl::BitGen bitgen(kSeed);
-  absl::BitGen bitgen;
 
-  // 3. The train-eval loop.
+  // 6. The train-eval loop.
+  absl::BitGen bitgen;
   for (int loop = 0; loop < num_loops; ++loop) {
     // Train.
     double avg_loss = 0.;
