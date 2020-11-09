@@ -24,11 +24,15 @@ namespace papers_with_code {
 
 constexpr size_t kSeed = 0;
 
+// A simple 3-layer MLP neural network.
 struct Net : torch::nn::Module {
+  torch::nn::Linear fc1;
+  torch::nn::Linear fc2;
+  torch::nn::Linear fc3;
   Net(size_t inputs_size, size_t outputs_size, size_t hidden_size) :
-        fc1(inputs_size, hidden_size),
-        fc2(hidden_size, hidden_size),
-        fc3(hidden_size, outputs_size) {
+      fc1(inputs_size, hidden_size),
+      fc2(hidden_size, hidden_size),
+      fc3(hidden_size, outputs_size) {
     register_module("fc1", fc1);
     register_module("fc2", fc2);
     register_module("fc3", fc3);
@@ -39,10 +43,6 @@ struct Net : torch::nn::Module {
     x = torch::relu(fc2->forward(x));
     return torch::relu(fc3->forward(x));
   }
-
-  torch::nn::Linear fc1;
-  torch::nn::Linear fc2;
-  torch::nn::Linear fc3;
 };
 
 torch::Tensor TrainNetwork(Net& model, torch::Device device,
@@ -59,33 +59,47 @@ torch::Tensor TrainNetwork(Net& model, torch::Device device,
   return loss;
 }
 
-class NetEvaluator : public dlcfr::LeafEvaluator {
+class NetEvaluator final : public dlcfr::LeafEvaluator {
   Net* model_;
+  torch::Device* device_;
   std::shared_ptr<const Game> game_;
   std::shared_ptr<Observer> infostate_observer_;
+  const std::array<RangeTable, 2>& tables_;
+  BatchData* batch_;
+
  public:
-  NetEvaluator(Net* model, std::shared_ptr<const Game> game,
-               std::shared_ptr<Observer> infostate_observer)
-      : model_(model), game_(std::move(game)),
-        infostate_observer_(std::move(infostate_observer)) {}
-  void EvaluatePublicState(dlcfr::LeafPublicState* s,
+  NetEvaluator(Net* model, torch::Device* device,
+               std::shared_ptr<const Game> game,
+               std::shared_ptr<Observer> infostate_observer,
+               const std::array<RangeTable, 2>& tables,
+               BatchData* batch)
+      : model_(model), device_(device), game_(std::move(game)),
+        infostate_observer_(std::move(infostate_observer)),
+        tables_(tables), batch_(batch) {}
+
+
+  void EvaluatePublicState(dlcfr::LeafPublicState* state,
                            dlcfr::PublicStateContext* context) const override {
-    // TODO.
+    for (int pl = 0; pl < 2; ++pl) {
+      PlacementCopy(
+          absl::MakeSpan(state->ranges[pl]),
+          batch_->ranges_at(state->public_id, pl),
+          tables_[pl].bijections[state->public_id].forward());
+    }
+
+    torch::Tensor data = batch_->data_tensor_at(state->public_id).to(*device_);
+    torch::Tensor output = model_->forward(data);
+
+//    std::cout << state->public_id << " " << data << " " << output << std::endl;
+
+    for (int pl = 0; pl < 2; ++pl) {
+      PlacementCopy(
+          absl::MakeSpan((float*) output.data_ptr(), batch_->ranges_size[pl]),
+          absl::MakeSpan(state->values[pl]),
+          tables_[pl].bijections[state->public_id].backward());
+    }
   }
 };
-
-std::unique_ptr<dlcfr::DepthLimitedCFR> MakeTrunkWithNetEvaluator(
-    Net* model, std::shared_ptr<const Game> game, int trunk_depth) {
-
-  std::shared_ptr<const dlcfr::LeafEvaluator> terminal_evaluator =
-      dlcfr::MakeTerminalEvaluator();
-  std::shared_ptr<Observer> infostate_observer =
-      game->MakeObserver(kInfoStateObsType, {});
-  auto leaf_evaluator = std::make_shared<NetEvaluator>(model, game, infostate_observer);
-
-  return std::make_unique<dlcfr::DepthLimitedCFR>(
-      game, trunk_depth, leaf_evaluator, terminal_evaluator);
-}
 
 double EvaluateNetwork(
     dlcfr::DepthLimitedCFR* trunk_with_net,
@@ -97,10 +111,10 @@ double EvaluateNetwork(
 
 torch::Device FindDevice() {
   if (torch::cuda::is_available()) {
-    std::cout << "CUDA available! Training on GPU." << std::endl;
+    std::cerr << "CUDA available! Training on GPU." << std::endl;
     return torch::Device(torch::kCUDA);
   } else {
-    std::cout << "Training on CPU." << std::endl;
+    std::cerr << "Training on CPU." << std::endl;
     return torch::Device(torch::kCPU);
   }
 }
@@ -129,13 +143,14 @@ void TrainEvalLoop(
   const dlcfr::LeafPublicState& some_leaf =
       trunk_with_oracle->GetPublicLeaves().at(0);
   const size_t encoding_size = some_leaf.public_tensor.size();
-  const size_t range_size_sum =
-      tables[0].largest_range() + tables[1].largest_range();
+  std::array<size_t, 2> ranges_size = {tables[0].largest_range(),
+                                       tables[1].largest_range()};
+  const size_t range_size_sum = ranges_size[0] + ranges_size[1];
   const size_t input_size = encoding_size + range_size_sum;
   const size_t output_size = range_size_sum;
-  BatchData batch(
-      trunk_with_oracle->GetPublicLeaves(), input_size, output_size, encoding_size,
-      {tables[0].largest_range(), tables[1].largest_range()});
+  // A single batch encompasses all public states.
+  BatchData batch(trunk_with_oracle->GetPublicLeaves(),
+                  input_size, output_size, encoding_size, ranges_size);
 
   // 2. Network preparation.
   torch::manual_seed(kSeed);
@@ -144,20 +159,28 @@ void TrainEvalLoop(
   model.to(device);
   torch::optim::SGD optimizer(model.parameters(),
                               torch::optim::SGDOptions(0.01).momentum(0.5));
-  std::unique_ptr<dlcfr::DepthLimitedCFR> trunk_with_net =
-      MakeTrunkWithNetEvaluator(&model, game, trunk_depth);
 
+  auto net_evaluator = std::make_shared<NetEvaluator>(
+      &model, &device, game, infostate_observer,
+      tables, &batch);
+  auto trunk_with_net = std::make_unique<dlcfr::DepthLimitedCFR>(
+        game, trunk_depth, net_evaluator, terminal_evaluator);
 //  absl::BitGen bitgen(kSeed);
   absl::BitGen bitgen;
+
+  // 3. The train-eval loop.
   for (int loop = 0; loop < num_loops; ++loop) {
+    // Train.
     double avg_loss = 0.;
     for (int i = 0; i < train_batches; ++i) {
       GenerateData(tables, trunk_with_oracle.get(), &batch, &bitgen);
       torch::Tensor loss = TrainNetwork(model, device, optimizer, batch);
       avg_loss += loss.item().to<double>();
     }
+    // Eval.
     const double exploitability = EvaluateNetwork(
         trunk_with_net.get(), oracle_evaluator.get(), trunk_iterations);
+    // Print.
     std::cout << loop << ','
               << avg_loss / train_batches << ','
               << exploitability << std::endl;
@@ -168,9 +191,9 @@ void TrainEvalLoop(
 }  // namespace open_spiel
 
 int main(int argc, char** argv) {
-  open_spiel::papers_with_code::TrainEvalLoop("leduc_poker",
+  open_spiel::papers_with_code::TrainEvalLoop("kuhn_poker",
       /*trunk_depth=*/3,
       /*train_batches=*/8,
       /*num_loops=*/10,
-      /*trunk_iterations=*/200);
+      /*trunk_iterations=*/2);
 }

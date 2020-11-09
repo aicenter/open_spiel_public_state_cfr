@@ -32,9 +32,6 @@ namespace papers_with_code {
 
 using namespace open_spiel::algorithms;
 
-std::unique_ptr<dlcfr::DepthLimitedCFR> MakeTrunkWithOracleEvaluator(
-    std::shared_ptr<const Game> game,std::shared_ptr<ortools::OracleEvaluator> leaf_evaluator, int trunk_depth);
-
 template<class T>
 struct BijectiveContainer {
   std::map<T, T> x2y;
@@ -48,18 +45,17 @@ struct BijectiveContainer {
     x2y[x] = y;
     y2x[y] = x;
   }
-
-  const std::map<T, T>& association(int direction) const {
-    SPIEL_CHECK_TRUE(direction == 0 || direction == 1);
-    if (direction == 0) return x2y;
-    else return y2x;
-  }
+  const std::map<T, T>& forward() const { return x2y; }
+  const std::map<T, T>& backward() const { return y2x; }
 };
 
 
 struct RangeTable {
   // Bijection between ranges coming from infostate tree (x)
   // and the input position (y), called also hand, for each public state.
+  // This is used for encoding NN inputs (resp. outputs).
+  // Forward:  tree  -> input positions
+  // Backward: output positions -> tree
   std::vector<BijectiveContainer<int>> bijections;
 
   // List all possible private observations ("hands") for each player.
@@ -76,6 +72,10 @@ std::array<RangeTable, 2> CreateRangeTables(
     const std::shared_ptr<Observer>& private_observer,
     const std::vector<dlcfr::LeafPublicState>& public_leaves);
 
+// Copy non-contiguous vectors using a permutation map.
+void PlacementCopy(absl::Span<const float> from, absl::Span<float> to,
+                   std::map<int, int> from_to);
+
 struct BatchData {
   const size_t batch_size;
   const size_t input_size;
@@ -86,31 +86,36 @@ struct BatchData {
   std::vector<float> data;
   std::vector<float> targets;
 
-  BatchData(std::vector<dlcfr::LeafPublicState>& states,
+  BatchData(const std::vector<dlcfr::LeafPublicState>& states,
             size_t input_size, size_t output_size,
             size_t public_features_size, std::array<size_t, 2> ranges_size)
       : batch_size(states.size()),
-        input_size(input_size),
-        output_size(output_size),
-        public_features_size(public_features_size),
-        ranges_size(ranges_size),
+        input_size(input_size), output_size(output_size),
+        public_features_size(public_features_size), ranges_size(ranges_size),
         // Pre-allocate all vectors.
         data(batch_size * input_size, 0.),
         targets(batch_size * output_size, 0.) {
     for (int i = 0; i < states.size(); ++i) {
-      // Copy public state features
-      std::copy(states[i].public_tensor.begin(),
-                states[i].public_tensor.end(),
-                data.begin() + i * input_size);
+      CopyFeatures(i, states[i]);
     }
   }
+  // Copy public state features
+  void CopyFeatures(int batch_index, const dlcfr::LeafPublicState& state) {
+    std::copy(state.public_tensor.begin(),
+              state.public_tensor.end(),
+              data.begin() + batch_index * input_size);
+  }
   torch::Tensor data_tensor() {
-      return at::from_blob((void*) this->data.data(),
-                           {batch_size, input_size}, at::kFloat);
+    return at::from_blob((void*) data.data(),
+                         {batch_size, input_size}, at::kFloat);
   }
   torch::Tensor targets_tensor() {
-    return at::from_blob(
-        (void*) this->targets.data(), {batch_size, output_size}, at::kFloat);
+    return at::from_blob((void*) targets.data(),
+                         {batch_size, output_size}, at::kFloat);
+  }
+  torch::Tensor data_tensor_at(int batch_index) {
+    return at::from_blob((void*) &data[batch_index * input_size],
+                         {input_size}, at::kFloat);
   }
   absl::Span<float> data_at(int batch_index) {
     return absl::MakeSpan(&data[batch_index * input_size], input_size);

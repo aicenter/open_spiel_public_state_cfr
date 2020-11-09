@@ -56,7 +56,10 @@ void RandomizeTrunkStrategy(
     }
   }
 }
-void PlacementCopy(const std::vector<float>& from, absl::Span<float> to,
+
+} // namespace
+
+void PlacementCopy(absl::Span<const float> from, absl::Span<float> to,
                    std::map<int, int> from_to) {
   SPIEL_CHECK_EQ(from.size(), from_to.size());
   for (int i = 0; i < from.size(); ++i) {
@@ -65,19 +68,17 @@ void PlacementCopy(const std::vector<float>& from, absl::Span<float> to,
   }
 }
 
-} // namespace
-
-
 void CopyRangesAndValues(dlcfr::DepthLimitedCFR* trunk,
                          const std::array<RangeTable, 2>& tables,
                          BatchData* batch) {
   const std::vector<dlcfr::LeafPublicState>& leaves = trunk->GetPublicLeaves();
   for (int i = 0; i < leaves.size(); ++i) {
     for (int pl = 0; pl < 2; ++pl) {
-      PlacementCopy(leaves[i].ranges[pl], batch->ranges_at(i, pl),
-                    tables[pl].bijections[i].association(0));
+      PlacementCopy(absl::MakeSpan(leaves[i].ranges[pl]),
+                    batch->ranges_at(i, pl),
+                    tables[pl].bijections[i].forward());
       PlacementCopy(leaves[i].values[pl], batch->values_at(i, pl),
-                    tables[pl].bijections[i].association(0));
+                    tables[pl].bijections[i].forward());
     }
   }
 }
@@ -121,7 +122,7 @@ void GenerateData(const std::array<RangeTable, 2>& tables,
   CopyRangesAndValues(trunk, tables, batch);
 //  for (int i = 0; i < batch->batch_size; ++i) {
 //    std::cout << "Inputs: " << batch->data_at(i) << std::endl;
-//    std::cout << "Ouputs: " << batch->targets_at(i) << std::endl;
+//    std::cout << "Outputs: " << batch->targets_at(i) << std::endl;
 //  }
 }
 
