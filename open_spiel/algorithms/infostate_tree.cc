@@ -23,13 +23,12 @@ namespace algorithms {
 InfostateNode::InfostateNode(
     const InfostateTree& tree, InfostateNode* parent, int incoming_index,
     InfostateNodeType type, const std::string& infostate_string,
-    const DecisionId& decision_id, double terminal_utility,
+    double terminal_utility,
     double terminal_ch_reach_prob, size_t depth,
     std::vector<Action> legal_actions, std::vector<Action> terminal_history)
     : tree_(tree), parent_(parent),
       incoming_index_(incoming_index), type_(type),
       infostate_string_(infostate_string),
-      decision_id_(decision_id),
       depth_(depth),
       terminal_utility_(terminal_utility),
       terminal_chn_reach_prob_(terminal_ch_reach_prob),
@@ -164,7 +163,6 @@ void InfostateNode::Rebalance(int target_depth, int current_depth) {
             /*incoming_index=*/position_in_leaf_parent,
             kObservationInfostateNode,
             /*infostate_string=*/kFillerInfostate,
-            /*decision_id=*/kUndefinedDecisionId,
             /*terminal_utility=*/NAN, /*terminal_ch_reach_prob=*/NAN,
             current_depth, /*legal_actions=*/{}, /*terminal_history=*/{}));
     InfostateNode* chain_tail = chain_head.get();
@@ -174,7 +172,6 @@ void InfostateNode::Rebalance(int target_depth, int current_depth) {
               /*tree=*/tree_, /*parent=*/chain_tail,
               /*incoming_index=*/0, kObservationInfostateNode,
               /*infostate_string=*/kFillerInfostate,
-              /*decision_id=*/kUndefinedDecisionId,
               /*terminal_utility=*/NAN, /*terminal_ch_reach_prob=*/NAN,
               current_depth + i, /*legal_actions=*/{},
               /*terminal_history=*/{})));
@@ -304,10 +301,8 @@ std::unique_ptr<InfostateNode> InfostateTree::MakeNode(
   // the private constructor.
   auto node = std::unique_ptr<InfostateNode>(new InfostateNode(
       *this, parent, parent->num_children(), type, infostate_string,
-      DecisionId(decision_infostates_.size(), this),
       terminal_utility, terminal_ch_reach_prob, depth,
       std::move(legal_actions), std::move(terminal_history)));
-  decision_infostates_.push_back(node.get());
   return node;
 }
 
@@ -316,7 +311,6 @@ std::unique_ptr<InfostateNode> InfostateTree::MakeRootNode() const {
       /*tree=*/*this, /*parent=*/nullptr, /*incoming_index=*/0,
       /*type=*/kObservationInfostateNode,
       /*infostate_string=*/kDummyRootNodeInfostate,
-      /*decision_id=*/kUndefinedDecisionId,
       /*terminal_utility=*/NAN, /*chance_reach_prob=*/NAN,
       /*depth=*/0, /*legal_actions=*/{}, /*terminal_history=*/{}));
 }
@@ -538,6 +532,13 @@ InfostateNode* InfostateTree::decision_infostate(
                   kDecisionInfostateNode);
   return decision_infostates_.at(decision_id);
 }
+const InfostateNode* InfostateTree::decision_infostate(
+    const DecisionId& decision_id) const {
+  SPIEL_DCHECK_TRUE(decision_id.BelongsToTree(this));
+  SPIEL_DCHECK_EQ(decision_infostates_.at(decision_id)->type(),
+                  kDecisionInfostateNode);
+  return decision_infostates_.at(decision_id);
+}
 InfostateNode* InfostateTree::observation_infostate(
     const SequenceId& sequence_id) {
   SPIEL_DCHECK_TRUE(sequence_id.BelongsToTree(this));
@@ -596,6 +597,7 @@ std::vector<DecisionId> InfostateTree::DecisionIdsWithParentSeq(
 void InfostateTree::LabelSequenceIds() {
   // Idea of labeling: label the leaf sequences first, and continue up the tree.
   size_t sequence_index = 0;
+  size_t decision_index = 0;
 
   // Do not label leaf nodes with sequences.
   const int start_depth = nodes_at_depths_.size() - 2;
@@ -603,6 +605,9 @@ void InfostateTree::LabelSequenceIds() {
   for (int depth = start_depth; depth >= 0; --depth) {
     for (InfostateNode* node : nodes_at_depths_[depth]) {
       if (node->type() != kDecisionInfostateNode) continue;
+      decision_infostates_.push_back(node);
+      node->decision_id_ = DecisionId(decision_index++, this);
+
       for (InfostateNode* child : node->child_iterator()) {
         sequences_.push_back(child);
         child->sequence_id_ = SequenceId(sequence_index++, this);

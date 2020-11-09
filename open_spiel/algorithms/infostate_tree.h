@@ -302,6 +302,7 @@ class InfostateTree final {
 
   // Decision operations.
   InfostateNode* decision_infostate(const DecisionId& decision_id);
+  const InfostateNode* decision_infostate(const DecisionId& decision_id) const;
   const std::vector<InfostateNode*>& AllDecisionInfostates() const;
   Range<DecisionId> AllDecisionIds() const;
 
@@ -411,8 +412,8 @@ class InfostateNode final {
   // Identifier of the infostate.
   const std::string infostate_string_;
   // Decision identifier of this node.
-  // It may be undefined if this node is not a decision node.
-  const DecisionId decision_id_;
+  // This is not const as the ids are assigned after the tree is built.
+  /*const*/ DecisionId decision_id_ = kUndefinedDecisionId;
   // Sequence identifier of this node.
   // The first is the parent sequence of the infostate, while the last
   // two sequence IDs represent the sequence id of the first and last action
@@ -455,8 +456,7 @@ class InfostateNode final {
   InfostateNode(
       const InfostateTree& tree, InfostateNode* parent, int incoming_index,
       InfostateNodeType type, const std::string& infostate_string,
-      const DecisionId& decision_id, double terminal_utility,
-      double terminal_ch_reach_prob, size_t depth,
+      double terminal_utility, double terminal_ch_reach_prob, size_t depth,
       std::vector<Action> legal_actions, std::vector<Action> terminal_history);
   friend class InfostateTree;
 
@@ -535,7 +535,7 @@ class TreeplexVector final {
  public:
   explicit TreeplexVector(const InfostateTree* tree)
       : tree_(tree), vec_(tree_->num_sequences()) {}
-  T operator[](const SequenceId& sequence_id) const {
+  T& operator[](const SequenceId& sequence_id) {
     SPIEL_DCHECK_TRUE(sequence_id.BelongsToTree(tree_));
     SPIEL_DCHECK_LE(0, sequence_id.id());
     SPIEL_DCHECK_LT(sequence_id.id(), vec_.size());
@@ -551,7 +551,7 @@ class LeafVector final {
  public:
   explicit LeafVector(const InfostateTree* tree)
       : tree_(tree), vec_(tree_->num_leaves()) {}
-  T operator[](const LeafId& leaf_id) const {
+  T& operator[](const LeafId& leaf_id) {
     SPIEL_DCHECK_TRUE(leaf_id.BelongsToTree(tree_));
     SPIEL_DCHECK_LE(0, leaf_id.id());
     SPIEL_DCHECK_LT(leaf_id.id(), vec_.size());
@@ -567,7 +567,7 @@ class DecisionVector final {
  public:
   explicit DecisionVector(const InfostateTree* tree)
       : tree_(tree), vec_(tree_->num_decisions()) {}
-  T operator[](const DecisionId& decision_id) const {
+  T& operator[](const DecisionId& decision_id) {
     SPIEL_DCHECK_TRUE(decision_id.BelongsToTree(tree_));
     SPIEL_DCHECK_LE(0, decision_id.id());
     SPIEL_DCHECK_LT(decision_id.id(), vec_.size());

@@ -53,6 +53,26 @@
 namespace open_spiel {
 namespace algorithms {
 
+template<>
+class DecisionVector<CFRInfoStateValues> {
+  const InfostateTree* tree_;
+  std::vector<CFRInfoStateValues> vec_;
+ public:
+  explicit DecisionVector(const InfostateTree* tree)
+      : tree_(tree), vec_() {
+    vec_.reserve(tree_->num_decisions());
+    for (DecisionId id : tree_->AllDecisionIds()) {
+      vec_.push_back(tree_->decision_infostate(id)->legal_actions());
+    }
+  }
+  CFRInfoStateValues& operator[](const DecisionId& decision_id) {
+    SPIEL_DCHECK_TRUE(decision_id.BelongsToTree(tree_));
+    SPIEL_DCHECK_LE(0, decision_id.id());
+    SPIEL_DCHECK_LT(decision_id.id(), vec_.size());
+    return vec_[decision_id];
+  }
+};
+
 // A type for tables holding pointers to CFR values.
 //
 // It is similar to what CFRSolver uses, i.e. the InfoStateValuesTable.
@@ -87,7 +107,7 @@ std::unordered_map<std::string, CFRInfoStateValues*>;
 // to range()
 void TopDown(
     const std::vector<std::vector<InfostateNode*>>& nodes_at_depth,
-    std::unordered_map<const InfostateNode*, CFRInfoStateValues>& node_values,
+    DecisionVector<CFRInfoStateValues>& node_values,
     absl::Span<float> reach_probs);
 
 // Make a bottom-up pass, starting with the current cf_values stored
@@ -95,7 +115,7 @@ void TopDown(
 // The leaf values must be provided externally by writing to leaves_cf_values().
 void BottomUp(
     const std::vector<std::vector<InfostateNode*>>& nodes_at_depth,
-    std::unordered_map<const InfostateNode*, CFRInfoStateValues>& node_values,
+    DecisionVector<CFRInfoStateValues>& node_values,
     absl::Span<float> cf_values);
 
 // Calculates the root cf value as weighted sum of the cf_values()
@@ -144,7 +164,7 @@ class InfostateCFR {
   std::array<std::vector<float>, 2> reach_probs_;
   std::array<std::vector<float>, 2> cf_values_;
 
-  std::unordered_map<const InfostateNode*, CFRInfoStateValues> node_values_;
+  std::array<DecisionVector<CFRInfoStateValues>, 2> node_values_;
 };
 
 }  // namespace algorithms

@@ -17,6 +17,7 @@
 #include <cmath>
 #include <iostream>
 
+#include "open_spiel/algorithms/infostate_tree.h"
 #include "open_spiel/algorithms/expected_returns.h"
 #include "open_spiel/algorithms/tabular_exploitability.h"
 #include "open_spiel/game_transforms/turn_based_simultaneous_game.h"

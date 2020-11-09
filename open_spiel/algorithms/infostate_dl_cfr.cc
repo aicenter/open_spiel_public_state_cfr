@@ -60,7 +60,10 @@ DepthLimitedCFR::DepthLimitedCFR(
       std::vector<float>(trees_[0]->root_branching_factor(), 1.),
       std::vector<float>(trees_[1]->root_branching_factor(), 1.)
     }),
-    node_values_(CreateTable(trees_)) {
+    node_values_({
+      DecisionVector<CFRInfoStateValues>(trees_[0].get()),
+      DecisionVector<CFRInfoStateValues>(trees_[1].get())
+    }) {
   PrepareLeafNodesForPublicStates();
   PrepareRangesAndValuesForPublicStates();
   CreateContexts();
@@ -238,16 +241,16 @@ void TerminalEvaluator::EvaluatePublicState(
 
 void DepthLimitedCFR::SimultaneousTopDownEvaluate() {
   PrepareRootReachProbs();
-  TopDown(trees_[0]->nodes_at_depths(), node_values_, absl::MakeSpan(reach_probs_[0]));
-  TopDown(trees_[1]->nodes_at_depths(), node_values_, absl::MakeSpan(reach_probs_[1]));
+  TopDown(trees_[0]->nodes_at_depths(), node_values_[0], absl::MakeSpan(reach_probs_[0]));
+  TopDown(trees_[1]->nodes_at_depths(), node_values_[1], absl::MakeSpan(reach_probs_[1]));
   EvaluateLeaves();
 }
 
 void DepthLimitedCFR::RunSimultaneousIterations(int iterations) {
   for (int t = 0; t < iterations; ++t) {
     SimultaneousTopDownEvaluate();
-    BottomUp(trees_[0]->nodes_at_depths(), node_values_, absl::MakeSpan(cf_values_[0]));
-    BottomUp(trees_[1]->nodes_at_depths(), node_values_, absl::MakeSpan(cf_values_[1]));
+    BottomUp(trees_[0]->nodes_at_depths(), node_values_[0], absl::MakeSpan(cf_values_[0]));
+    BottomUp(trees_[1]->nodes_at_depths(), node_values_[1], absl::MakeSpan(cf_values_[1]));
     SPIEL_DCHECK_FLOAT_NEAR(RootValue(/*pl=*/0), -RootValue(/*pl=*/1), 1e-6);
   }
 }
@@ -304,8 +307,11 @@ void DepthLimitedCFR::EvaluateLeaves() {
 
 CFRInfoStateValuesPtrTable DepthLimitedCFR::InfoStateValuesPtrTable() {
   CFRInfoStateValuesPtrTable vec_ptable;
-  for (auto& [ptr, value] : node_values_) {
-    vec_ptable[ptr->infostate_string()] = &value;
+  for (int pl = 0; pl < 2; ++pl) {
+    for (DecisionId id : trees_[pl]->AllDecisionIds()) {
+      vec_ptable[trees_[pl]->decision_infostate(id)->infostate_string()]
+          = &node_values_[pl][id];
+    }
   }
   return vec_ptable;
 }

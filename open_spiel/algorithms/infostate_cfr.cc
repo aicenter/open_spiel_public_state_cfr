@@ -21,7 +21,7 @@ namespace algorithms {
 
 void TopDown(
     const std::vector<std::vector<InfostateNode*>>& nodes_at_depth,
-    std::unordered_map<const InfostateNode*, CFRInfoStateValues>& node_values,
+    DecisionVector<CFRInfoStateValues>& node_values,
     absl::Span<float> reach_probs) {
   const int tree_depth = nodes_at_depth.size();
   // Loop over all depths, except for the first two depths:
@@ -46,7 +46,7 @@ void TopDown(
       right_offset -= num_children;
       const InfostateNode* node = nodes_at_depth[d - 1][parent_idx];
       if (node->type() == kDecisionInfostateNode) {
-        CFRInfoStateValues& values = node_values.at(node);
+        CFRInfoStateValues& values = node_values[node->decision_id()];
         const std::vector<double>& policy = values.current_policy;
         const std::vector<double>& regrets = values.cumulative_regrets;
         std::vector<double>& avg_policy = values.cumulative_policy;
@@ -77,7 +77,7 @@ void TopDown(
 
 void BottomUp(
     const std::vector<std::vector<InfostateNode*>>& nodes_at_depth,
-    std::unordered_map<const InfostateNode*, CFRInfoStateValues>& node_values,
+    DecisionVector<CFRInfoStateValues>& node_values,
     absl::Span<float> cf_values) {
   const int tree_depth = nodes_at_depth.size();
   // Loop over all depths, except for the last one, as it is already set
@@ -97,7 +97,7 @@ void BottomUp(
       const int num_children = node->num_children();
       double node_sum = 0.;
       if (node->type() == kDecisionInfostateNode) {
-        CFRInfoStateValues& values = node_values.at(node);
+        CFRInfoStateValues& values = node_values[node->decision_id()];
         std::vector<double>& regrets = values.cumulative_regrets;
         std::vector<double>& policy = values.current_policy;
         SPIEL_DCHECK_EQ(policy.size(), num_children);
@@ -220,24 +220,28 @@ InfostateCFR::InfostateCFR(std::array<std::shared_ptr<InfostateTree>, 2> trees)
         std::vector<float>(trees_[0]->num_leaves(), 0.),
         std::vector<float>(trees_[1]->num_leaves(), 0.)
       }),
-      node_values_(CreateTable(trees_)) {
+      node_values_({
+        DecisionVector<CFRInfoStateValues>(trees_[0].get()),
+        DecisionVector<CFRInfoStateValues>(trees_[1].get())
+      }) {
   SPIEL_CHECK_TRUE(trees_[0]->is_balanced());
   SPIEL_CHECK_TRUE(trees_[1]->is_balanced());
   PrepareTerminals();
 }
+
 InfostateCFR::InfostateCFR(const Game& game)
     : InfostateCFR({MakeInfostateTree(game, 0), MakeInfostateTree(game, 1)}) {}
 
 void InfostateCFR::RunSimultaneousIterations(int iterations) {
   for (int t = 0; t < iterations; ++t) {
     PrepareRootReachProbs();
-    TopDown(trees_[0]->nodes_at_depths(), node_values_, absl::MakeSpan(reach_probs_[0]));
-    TopDown(trees_[1]->nodes_at_depths(), node_values_, absl::MakeSpan(reach_probs_[1]));
+    TopDown(trees_[0]->nodes_at_depths(), node_values_[0], absl::MakeSpan(reach_probs_[0]));
+    TopDown(trees_[1]->nodes_at_depths(), node_values_[1], absl::MakeSpan(reach_probs_[1]));
     SPIEL_CHECK_FLOAT_NEAR(TerminalReachProbSum(), 1.0, 1e-3);
 
     EvaluateLeaves();
-    BottomUp(trees_[0]->nodes_at_depths(), node_values_, absl::MakeSpan(cf_values_[0]));
-    BottomUp(trees_[1]->nodes_at_depths(), node_values_, absl::MakeSpan(cf_values_[1]));
+    BottomUp(trees_[0]->nodes_at_depths(), node_values_[0], absl::MakeSpan(cf_values_[0]));
+    BottomUp(trees_[1]->nodes_at_depths(), node_values_[1], absl::MakeSpan(cf_values_[1]));
     SPIEL_CHECK_FLOAT_NEAR(
         RootCfValue(trees_[0]->root_branching_factor(), cf_values_[0]),
         - RootCfValue(trees_[1]->root_branching_factor(), cf_values_[1]), 1e-6);
@@ -247,9 +251,9 @@ void InfostateCFR::RunAlternatingIterations(int iterations) {
   for (int t = 0; t < iterations; ++t) {
     for (int pl = 0; pl < 2; ++pl) {
       PrepareRootReachProbs(1 - pl);
-      TopDown(trees_[1 - pl]->nodes_at_depths(), node_values_, absl::MakeSpan(reach_probs_[1 - pl]));
+      TopDown(trees_[1 - pl]->nodes_at_depths(), node_values_[1 - pl], absl::MakeSpan(reach_probs_[1 - pl]));
       EvaluateLeaves(pl);
-      BottomUp(trees_[pl]->nodes_at_depths(), node_values_, absl::MakeSpan(cf_values_[pl]));
+      BottomUp(trees_[pl]->nodes_at_depths(), node_values_[pl], absl::MakeSpan(cf_values_[pl]));
     }
   }
 }
@@ -286,8 +290,11 @@ void InfostateCFR::EvaluateLeaves(Player pl) {
 }
 CFRInfoStateValuesPtrTable InfostateCFR::InfoStateValuesPtrTable() {
   CFRInfoStateValuesPtrTable vec_ptable;
-  for (auto& [ptr, value] : node_values_) {
-    vec_ptable[ptr->infostate_string()] = &value;
+  for (int pl = 0; pl < 2; ++pl) {
+    for (DecisionId id : trees_[pl]->AllDecisionIds()) {
+      vec_ptable[trees_[pl]->decision_infostate(id)->infostate_string()]
+        = &node_values_[pl][id];
+    }
   }
   return vec_ptable;
 }
