@@ -45,17 +45,17 @@ struct Net : torch::nn::Module {
   }
 };
 
-torch::Tensor TrainNetwork(Net& model, torch::Device device,
-                           torch::optim::Optimizer& optimizer,
-                           BatchData& batch) {
-  torch::Tensor data = batch.data_tensor().to(device);
-  torch::Tensor targets = batch.targets_tensor().to(device);
-  optimizer.zero_grad();
-  torch::Tensor output = model.forward(data);
+torch::Tensor TrainNetwork(Net* model, torch::Device* device,
+                           torch::optim::Optimizer* optimizer,
+                           BatchData* batch) {
+  torch::Tensor data = batch->data_tensor().to(*device);
+  torch::Tensor targets = batch->targets_tensor().to(*device);
+  optimizer->zero_grad();
+  torch::Tensor output = model->forward(data);
   torch::Tensor loss = torch::mse_loss(output, targets);
   AT_ASSERT(!std::isnan(loss.template item<float>()));
   loss.backward();
-  optimizer.step();
+  optimizer->step();
   return loss;
 }
 
@@ -125,15 +125,22 @@ void TrainEvalLoop(
 
   // 1. Data generation.
   std::shared_ptr<const Game> game = LoadGame(game_name);
-  std::shared_ptr<const dlcfr::LeafEvaluator> terminal_evaluator =
-      dlcfr::MakeTerminalEvaluator();
   std::shared_ptr<Observer> infostate_observer =
       game->MakeObserver(kInfoStateObsType, {});
+  std::shared_ptr<Observer> public_observer =
+      game->MakeObserver(kPublicStateObsType, {});
+  std::array<std::shared_ptr<InfostateTree>, 2> trunk_trees = {
+      MakeInfostateTree(*game, 0, trunk_depth),
+      MakeInfostateTree(*game, 1, trunk_depth)
+  };
+  std::shared_ptr<const dlcfr::LeafEvaluator> terminal_evaluator =
+      dlcfr::MakeTerminalEvaluator();
   auto oracle_evaluator = std::make_shared<ortools::OracleEvaluator>(
       game, infostate_observer);
   std::unique_ptr<dlcfr::DepthLimitedCFR> trunk_with_oracle =
       std::make_unique<dlcfr::DepthLimitedCFR>(
-          game, trunk_depth, oracle_evaluator, terminal_evaluator);
+          game, trunk_trees, oracle_evaluator, terminal_evaluator,
+          public_observer);
 
   std::shared_ptr<Observer> private_observer =
       game->MakeObserver(kPrivateObsType, {});
@@ -161,10 +168,9 @@ void TrainEvalLoop(
                               torch::optim::SGDOptions(0.01).momentum(0.5));
 
   auto net_evaluator = std::make_shared<NetEvaluator>(
-      &model, &device, game, infostate_observer,
-      tables, &batch);
+      &model, &device, game, infostate_observer, tables, &batch);
   auto trunk_with_net = std::make_unique<dlcfr::DepthLimitedCFR>(
-        game, trunk_depth, net_evaluator, terminal_evaluator);
+      game, trunk_trees, net_evaluator, terminal_evaluator, public_observer);
 //  absl::BitGen bitgen(kSeed);
   absl::BitGen bitgen;
 
@@ -174,7 +180,7 @@ void TrainEvalLoop(
     double avg_loss = 0.;
     for (int i = 0; i < train_batches; ++i) {
       GenerateData(tables, trunk_with_oracle.get(), &batch, &bitgen);
-      torch::Tensor loss = TrainNetwork(model, device, optimizer, batch);
+      torch::Tensor loss = TrainNetwork(&model, &device, &optimizer, &batch);
       avg_loss += loss.item().to<double>();
     }
     // Eval.
