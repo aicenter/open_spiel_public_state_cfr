@@ -138,7 +138,7 @@ struct BatchData {
 
 void GenerateData(const std::array<RangeTable, 2>& tables,
                   dlcfr::DepthLimitedCFR* trunk, BatchData* batch,
-                  absl::BitGen* bitgen);
+                  std::mt19937 rnd_gen);
 
 }  // papers_with_code
 }  // open_spiel

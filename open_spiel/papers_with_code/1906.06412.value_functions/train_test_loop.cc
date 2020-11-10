@@ -13,9 +13,10 @@
 // limitations under the License.
 
 
+#include <random>
+
 #include "open_spiel/papers_with_code/1906.06412.value_functions/generate_data.h"
 #include "absl/random/random.h"
-
 #include "torch/torch.h"
 
 
@@ -141,10 +142,8 @@ void TrainEvalLoop(
       dlcfr::MakeTerminalEvaluator();
   auto oracle_evaluator = std::make_shared<ortools::OracleEvaluator>(
       game, infostate_observer);
-  std::unique_ptr<dlcfr::DepthLimitedCFR> trunk_with_oracle =
-      std::make_unique<dlcfr::DepthLimitedCFR>(
-          game, trunk_trees, oracle_evaluator, terminal_evaluator,
-          public_observer);
+  auto trunk_with_oracle = std::make_unique<dlcfr::DepthLimitedCFR>(
+      game, trunk_trees, oracle_evaluator, terminal_evaluator, public_observer);
 
   // 3. Make a Batch of data that encompasses all leaf public states.
   std::array<RangeTable, 2> tables = CreateRangeTables(
@@ -173,25 +172,23 @@ void TrainEvalLoop(
       &model, &device, game, infostate_observer, tables, &batch);
   auto trunk_with_net = std::make_unique<dlcfr::DepthLimitedCFR>(
       game, trunk_trees, net_evaluator, terminal_evaluator, public_observer);
-//  absl::BitGen bitgen(kSeed);
 
   // 6. The train-eval loop.
-  absl::BitGen bitgen;
+  std::mt19937 rnd_gen(kSeed);
   for (int loop = 0; loop < num_loops; ++loop) {
     // Train.
-    double avg_loss = 0.;
+    double cumul_loss = 0.;
     for (int i = 0; i < train_batches; ++i) {
-      GenerateData(tables, trunk_with_oracle.get(), &batch, &bitgen);
+      GenerateData(tables, trunk_with_oracle.get(), &batch, rnd_gen);
       torch::Tensor loss = TrainNetwork(&model, &device, &optimizer, &batch);
-      avg_loss += loss.item().to<double>();
+      cumul_loss += loss.item().to<double>();
     }
+    const double avg_loss = cumul_loss / train_batches;
     // Eval.
     const double exploitability = EvaluateNetwork(
         trunk_with_net.get(), oracle_evaluator.get(), trunk_iterations);
     // Print.
-    std::cout << loop << ','
-              << avg_loss / train_batches << ','
-              << exploitability << std::endl;
+    std::cout << loop << ',' << avg_loss << ',' << exploitability << std::endl;
   }
 }
 

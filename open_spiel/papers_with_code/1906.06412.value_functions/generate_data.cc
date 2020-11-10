@@ -31,23 +31,23 @@ namespace {
 
 void RandomizeTrunkStrategy(
     std::array<DecisionVector<CFRInfoStateValues>, 2> node_values,
-    absl::BitGen* bitgen, double prob_pure_strat) {
+    std::mt19937 rnd_gen, double prob_pure_strat) {
   for (int pl = 0; pl < 2; ++pl) {
     for (CFRInfoStateValues& values : node_values[pl]) {
       // Randomize current policy
       std::vector<double>& policy = values.current_policy;
 
       const bool single_pure_strategy =
-          absl::Bernoulli(*bitgen, prob_pure_strat);
+          std::bernoulli_distribution(prob_pure_strat)(rnd_gen);
       if (single_pure_strategy) {
-        const int
-            which_action = absl::Uniform(*bitgen, 0, values.num_actions());
+        const int which_action =
+            std::uniform_int_distribution<>(0, values.num_actions())(rnd_gen);
         std::fill(policy.begin(), policy.end(), 0.);
         policy[which_action] = 1.;
       } else {
         for (int i = 0; i < values.num_actions(); ++i) {
-          if (absl::Bernoulli(*bitgen, prob_pure_strat)) {
-            policy[i] = absl::Uniform(*bitgen, 0., 1.);
+          if (std::bernoulli_distribution(prob_pure_strat)(rnd_gen)) {
+            policy[i] = std::uniform_real_distribution<>(0., 1.)(rnd_gen);
           } else {
             policy[i] = 0.;
           }
@@ -115,8 +115,8 @@ std::array<RangeTable, 2> CreateRangeTables(
 }
 void GenerateData(const std::array<RangeTable, 2>& tables,
                   dlcfr::DepthLimitedCFR* trunk, BatchData* batch,
-                  absl::BitGen* bitgen) {
-  RandomizeTrunkStrategy(trunk->node_values(), bitgen, /*prob_pure_strat=*/0.9);
+                  std::mt19937 rnd_gen) {
+  RandomizeTrunkStrategy(trunk->node_values(), rnd_gen, /*prob_pure_strat=*/0.9);
   trunk->RunSimultaneousIterations(1);
   CopyRangesAndValues(trunk, tables, batch);
 //  for (int i = 0; i < batch->batch_size; ++i) {
