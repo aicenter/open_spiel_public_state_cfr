@@ -28,6 +28,44 @@ namespace algorithms {
 namespace ortools {
 namespace {
 
+void SetKuhnParametricPolicy(dlcfr::DepthLimitedCFR* dl_solver, double a) {
+  // Set strategy as described in https://en.wikipedia.org/wiki/Kuhn_poker
+
+  // Player 0
+  const std::shared_ptr<InfostateTree> tree0 = dl_solver->Trees()[0];
+  DecisionId jack     = tree0->DecisionIdFromInfostateString("0");
+  DecisionId jack_pb  = tree0->DecisionIdFromInfostateString("0pb");
+  DecisionId queen    = tree0->DecisionIdFromInfostateString("1");
+  DecisionId queen_pb = tree0->DecisionIdFromInfostateString("1pb");
+  DecisionId king     = tree0->DecisionIdFromInfostateString("2");
+  DecisionId king_pb  = tree0->DecisionIdFromInfostateString("2pb");
+
+  DecisionVector<CFRInfoStateValues>& vec0 = dl_solver->node_values()[0];
+  if (jack)     vec0[jack    ].cumulative_policy = { 1. - a      , a          };
+  if (jack_pb)  vec0[jack_pb ].cumulative_policy = { 1           , 0.         };
+  if (queen)    vec0[queen   ].cumulative_policy = { 1.          , 0.         };
+  if (queen_pb) vec0[queen_pb].cumulative_policy = { 2 / 3. - a  , a + 1 / 3. };
+  if (king)     vec0[king    ].cumulative_policy = { 1. - 3. * a , 3. * a     };
+  if (king_pb)  vec0[king_pb ].cumulative_policy = { 0.          , 1.         };
+
+  // Player 1
+  const std::shared_ptr<InfostateTree> tree1 = dl_solver->Trees()[1];
+  DecisionId jack_p  = tree0->DecisionIdFromInfostateString("0p");
+  DecisionId jack_b  = tree0->DecisionIdFromInfostateString("0b");
+  DecisionId queen_p = tree0->DecisionIdFromInfostateString("1p");
+  DecisionId queen_b = tree0->DecisionIdFromInfostateString("1b");
+  DecisionId king_p  = tree0->DecisionIdFromInfostateString("2p");
+  DecisionId king_b  = tree0->DecisionIdFromInfostateString("2b");
+
+  DecisionVector<CFRInfoStateValues>& vec1 = dl_solver->node_values()[1];
+  if (jack_p)  vec1[jack_p ].cumulative_policy = { 2 / 3. , 1 / 3. };
+  if (jack_b)  vec1[jack_b ].cumulative_policy = { 1      , 0.     };
+  if (queen_p) vec1[queen_p].cumulative_policy = { 1.     , 0.     };
+  if (queen_b) vec1[queen_b].cumulative_policy = { 2 / 3. , 1 / 3. };
+  if (king_p)  vec1[king_p ].cumulative_policy = { 0.     , 1.     };
+  if (king_b)  vec1[king_b ].cumulative_policy = { 0      , 1.     };
+}
+
 void TestOptimalValuesKuhnBettingPublicState() {
   std::shared_ptr<const Game> game = LoadGame("kuhn_poker");
   std::shared_ptr<Observer> infostate_observer =

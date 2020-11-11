@@ -175,6 +175,8 @@ class NodeId {
   bool operator!=(const Self& rhs) const { return !(rhs == *this); }
   // Implicit conversion to size_t, so we can use NodeId to index vectors etc.
   operator size_t() const { return id(); }
+  // Implicit conversion to bool, so we can use if(my_id) conditions.
+  operator bool() const { return !is_undefined(); }
 };
 
 }  // namespace
@@ -305,6 +307,8 @@ class InfostateTree final {
   const InfostateNode* decision_infostate(const DecisionId& decision_id) const;
   const std::vector<InfostateNode*>& AllDecisionInfostates() const;
   Range<DecisionId> AllDecisionIds() const;
+  DecisionId DecisionIdFromInfostateString(
+      const std::string& infostate_string) const;
 
   // Leaf operations.
   const std::vector<InfostateNode*>& leaf_nodes() const;

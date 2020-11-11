@@ -667,6 +667,14 @@ int InfostateTree::tree_height() const {
   // TODO: off by one errors -- not equal to nodes_at_depths_.size()
   return tree_height_;
 }
+DecisionId InfostateTree::DecisionIdFromInfostateString(
+    const std::string& infostate_string) const {
+  for (InfostateNode* node : decision_infostates_) {
+    if (node->infostate_string() == infostate_string)
+      return node->decision_id();
+  }
+  return kUndefinedDecisionId;
+}
 
 }  // namespace algorithms
 }  // namespace open_spiel
