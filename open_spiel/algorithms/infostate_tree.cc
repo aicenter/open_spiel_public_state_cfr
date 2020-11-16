@@ -147,7 +147,7 @@ std::string InfostateNode::MakeCertificate() const {
       close);
 }
 
-void InfostateNode::Rebalance(int target_depth, int current_depth) {
+void InfostateNode::RebalanceSubtree(int target_depth, int current_depth) {
   SPIEL_DCHECK_LE(current_depth, target_depth);
   depth_ = current_depth;
 
@@ -187,7 +187,7 @@ void InfostateNode::Rebalance(int target_depth, int current_depth) {
   }
 
   for (std::unique_ptr<InfostateNode>& child : children_) {
-    child->Rebalance(target_depth, current_depth + 1);
+    child->RebalanceSubtree(target_depth, current_depth + 1);
   }
 }
 
@@ -213,7 +213,7 @@ InfostateTree::InfostateTree(
     const std::vector<const State*>& start_states,
     const std::vector<float>& chance_reach_probs,
     std::shared_ptr<Observer> infostate_observer, Player acting_player,
-    int max_move_ahead_limit, bool make_balanced)
+    int max_move_ahead_limit)
     : acting_player_(acting_player),
       infostate_observer_(std::move(infostate_observer)),
       root_(MakeRootNode()) {
@@ -237,24 +237,21 @@ InfostateTree::InfostateTree(
   }
 
   // Operations to make after building the tree.
-  if (make_balanced && !is_balanced()) Rebalance();
+  if (!is_tree_balanced_) RebalanceTree();
   nodes_at_depths_.resize(tree_height() + 1);
   CollectNodesAtDepth(mutable_root(), 0);
-  if (is_balanced()) LabelSequenceIds();
+  LabelNodesWithIds();
 }
-
 
 InfostateTree::InfostateTree(const Game& game, Player acting_player,
-                             int max_move_limit, bool make_balanced)
+                             int max_move_limit)
     : InfostateTree({game.NewInitialState().get()}, /*chance_reach_probs=*/{1.},
                     game.MakeObserver(kInfoStateObsType, {}),
-                    acting_player, max_move_limit, make_balanced) {}
+                    acting_player, max_move_limit) {}
 
-void InfostateTree::Rebalance() {
-  root_->Rebalance(tree_height(), 0);
-  is_tree_balanced_ = true;
+void InfostateTree::RebalanceTree() {
+  root_->RebalanceSubtree(tree_height(), 0);
 }
-
 
 void InfostateTree::CollectNodesAtDepth(InfostateNode* node, int depth) {
   nodes_at_depths_[depth].push_back(node);
@@ -486,19 +483,19 @@ int InfostateTree::root_branching_factor() const {
 
 std::shared_ptr<InfostateTree> MakeInfostateTree(
     const Game& game, Player acting_player,
-    int max_move_limit, bool make_balanced) {
+    int max_move_limit) {
   return std::shared_ptr<InfostateTree>(new InfostateTree(
-      game, acting_player, max_move_limit, make_balanced));
+      game, acting_player, max_move_limit));
 }
 
 std::shared_ptr<InfostateTree> MakeInfostateTree(
     const std::vector<const State*>& start_states,
     const std::vector<float>& chance_reach_probs,
     std::shared_ptr<Observer> infostate_observer, Player acting_player,
-    int max_move_ahead_limit, bool make_balanced) {
+    int max_move_ahead_limit) {
   return std::shared_ptr<InfostateTree>(new InfostateTree(
       start_states, chance_reach_probs, infostate_observer, acting_player,
-      max_move_ahead_limit, make_balanced));
+      max_move_ahead_limit));
 }
 SequenceId InfostateTree::empty_sequence() const {
   return root().sequence_id();
@@ -594,7 +591,7 @@ std::vector<DecisionId> InfostateTree::DecisionIdsWithParentSeq(
   return out;
 }
 
-void InfostateTree::LabelSequenceIds() {
+void InfostateTree::LabelNodesWithIds() {
   // Idea of labeling: label the leaf sequences first, and continue up the tree.
   size_t sequence_index = 0;
   size_t decision_index = 0;

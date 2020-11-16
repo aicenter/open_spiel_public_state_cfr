@@ -224,8 +224,6 @@ InfostateCFR::InfostateCFR(std::array<std::shared_ptr<InfostateTree>, 2> trees)
         DecisionVector<CFRInfoStateValues>(trees_[0].get()),
         DecisionVector<CFRInfoStateValues>(trees_[1].get())
       }) {
-  SPIEL_CHECK_TRUE(trees_[0]->is_balanced());
-  SPIEL_CHECK_TRUE(trees_[1]->is_balanced());
   PrepareTerminals();
 }
 

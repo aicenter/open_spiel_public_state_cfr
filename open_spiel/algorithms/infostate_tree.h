@@ -243,7 +243,7 @@ class Range {
 // of the game, up to some move limit.
 std::shared_ptr<InfostateTree> MakeInfostateTree(
     const Game& game, Player acting_player,
-    int max_move_limit = 1000, bool make_balanced = true);
+    int max_move_limit = 1000);
 
 // Creates an infostate tree for a player based on some start states,
 // up to some move limit from the deepest start state.
@@ -251,7 +251,7 @@ std::shared_ptr<InfostateTree> MakeInfostateTree(
     const std::vector<const State*>& start_states,
     const std::vector<float>& chance_reach_probs,
     std::shared_ptr<Observer> infostate_observer, Player acting_player,
-    int max_move_ahead_limit = 1000, bool make_balanced = true);
+    int max_move_ahead_limit = 1000);
 
 // Forward declaration.
 class InfostateNode;
@@ -263,18 +263,18 @@ class InfostateTree final {
   // they are moved around.
  private:
   InfostateTree(const Game& game, Player acting_player,
-                int max_move_limit = 1000, bool make_balanced = true);
+                int max_move_limit = 1000);
   InfostateTree(
       const std::vector<const State*>& start_states,
       const std::vector<float>& chance_reach_probs,
       std::shared_ptr<Observer> infostate_observer, Player acting_player,
-      int max_move_ahead_limit = 1000, bool make_balanced = true);
+      int max_move_ahead_limit = 1000);
   // Friend factories.
   friend std::shared_ptr<InfostateTree> MakeInfostateTree(
-      const Game&, Player, int, bool);
+      const Game&, Player, int);
   friend std::shared_ptr<InfostateTree> MakeInfostateTree(
       const std::vector<const State*>&, const std::vector<float>&,
-      std::shared_ptr<Observer>, Player, int, bool);
+      std::shared_ptr<Observer>, Player, int);
 
  public:
   // Root accessors.
@@ -284,7 +284,6 @@ class InfostateTree final {
 
   // Tree information.
   Player acting_player() const { return acting_player_; }
-  bool is_balanced() const { return is_tree_balanced_; }
   int tree_height() const;
 
   // General statistics.
@@ -330,11 +329,6 @@ class InfostateTree final {
   // The last vector corresponds to the leaf nodes.
   std::vector<std::vector<InfostateNode*>> nodes_at_depths_;
 
-  // A value that helps to determine if the tree is balanced.
-  int tree_height_ = -1;
-  // We call a tree balanced if all leaves are in the same depth.
-  bool is_tree_balanced_ = true;
-
   // Utility functions whenever we create a new node for the tree.
   std::unique_ptr<InfostateNode> MakeNode(
       InfostateNode* parent, InfostateNodeType type,
@@ -343,10 +337,15 @@ class InfostateTree final {
       const State* originating_state);
   std::unique_ptr<InfostateNode> MakeRootNode() const;
 
+  // A value that helps to determine if the tree is balanced.
+  int tree_height_ = -1;
+  // We call a tree balanced if all leaves are in the same depth.
+  bool is_tree_balanced_ = true;
+
   // Makes sure that all tree leaves are at the same height.
   // It inserts a linked list of dummy observation nodes with appropriate length
   // to balance all the leaves.
-  void Rebalance();
+  void RebalanceTree();
 
   void UpdateLeafNode(InfostateNode* node, const State& state,
                       int leaf_depth, double chance_reach_probs);
@@ -364,7 +363,7 @@ class InfostateTree final {
                             double chance_reach_prob);
 
   void CollectNodesAtDepth(InfostateNode* node, int depth);
-  void LabelSequenceIds();
+  void LabelNodesWithIds();
   std::pair<size_t,size_t> CollectStartEndSequenceIds(
       InfostateNode* node, const SequenceId parent_sequence);
 };
@@ -510,7 +509,7 @@ class InfostateNode final {
  private:
   // Make sure that the subtree ends at the requested target depth by inserting
   // dummy observation nodes with one outcome.
-  void Rebalance(int target_depth, int current_depth);
+  void RebalanceSubtree(int target_depth, int current_depth);
 
   // Get the unique_ptr for this node. The usage is intended only for tree
   // balance manipulation.
