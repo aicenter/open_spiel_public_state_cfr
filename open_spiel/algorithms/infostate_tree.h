@@ -15,16 +15,7 @@
 #ifndef OPEN_SPIEL_ALGORITHMS_INFOSTATE_TREE_H_
 #define OPEN_SPIEL_ALGORITHMS_INFOSTATE_TREE_H_
 
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include "open_spiel/algorithms/cfr.h"
-#include "open_spiel/policy.h"
 #include "open_spiel/spiel.h"
-#include "open_spiel/spiel_utils.h"
-#include "open_spiel/utils/action_view.h"
 
 // This file contains data structures used in imperfect information games.
 // Specifically, we implement an infostate tree, a representation of a game
@@ -106,10 +97,6 @@ constexpr char* kFillerInfostate = "(fill)";
 // Forward declaration.
 class InfostateTree;
 
-// FIXME I know anonymous namespaces in headers go against the  c++ guidelines,
-//       but I'd rather not expose arbitrary NodeIds. They are tightly coupled
-//       with the infostate tree which manages them and so they should not be
-//       instantiated by other code.
 namespace {
 
 // An implementation detail - Not to be used directly.

@@ -16,6 +16,7 @@
 
 #include <algorithm>
 
+
 #include "open_spiel/games/goofspiel.h"
 #include "open_spiel/games/kuhn_poker.h"
 #include "open_spiel/spiel.h"

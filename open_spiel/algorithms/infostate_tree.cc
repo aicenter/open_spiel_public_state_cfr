@@ -14,7 +14,13 @@
 
 #include "open_spiel/algorithms/infostate_tree.h"
 
+#include <memory>
+#include <string>
 #include <stack>
+#include <utility>
+#include <vector>
+
+#include "open_spiel/utils/action_view.h"
 
 namespace open_spiel {
 namespace algorithms {
