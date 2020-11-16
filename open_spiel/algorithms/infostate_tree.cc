@@ -243,7 +243,7 @@ InfostateTree::InfostateTree(
   }
 
   // Operations to make after building the tree.
-  if (!is_tree_balanced_) RebalanceTree();
+  RebalanceTree();
   nodes_at_depths_.resize(tree_height() + 1);
   CollectNodesAtDepth(mutable_root(), 0);
   LabelNodesWithIds();
@@ -259,7 +259,7 @@ void InfostateTree::RebalanceTree() {
   root_->RebalanceSubtree(tree_height(), 0);
 }
 
-void InfostateTree::CollectNodesAtDepth(InfostateNode* node, int depth) {
+void InfostateTree::CollectNodesAtDepth(InfostateNode* node, size_t depth) {
   nodes_at_depths_[depth].push_back(node);
   for (InfostateNode* child : node->child_iterator())
     CollectNodesAtDepth(child, depth + 1);
@@ -319,17 +319,14 @@ std::unique_ptr<InfostateNode> InfostateTree::MakeRootNode() const {
 }
 
 void InfostateTree::UpdateLeafNode(InfostateNode* node, const State& state,
-                                   int leaf_depth, double chance_reach_probs) {
-  if (tree_height_ != -1 && is_tree_balanced_) {
-    is_tree_balanced_ = tree_height_ == leaf_depth;
-  }
+                                   size_t leaf_depth, double chance_reach_probs) {
   tree_height_ = std::max(tree_height_, leaf_depth);
   node->corresponding_states_.push_back(state.Clone());
   node->corresponding_ch_reaches_.push_back(chance_reach_probs);
 }
 
 void InfostateTree::RecursivelyBuildTree(
-    InfostateNode* parent, int depth, const State& state,
+    InfostateNode* parent, size_t depth, const State& state,
     int move_limit, double chance_reach_prob) {
   if (state.IsTerminal())
     return BuildTerminalNode(parent, depth, state, chance_reach_prob);
@@ -342,7 +339,7 @@ void InfostateTree::RecursivelyBuildTree(
 }
 
 void InfostateTree::BuildTerminalNode(
-    InfostateNode* parent, int depth,
+    InfostateNode* parent, size_t depth,
     const State& state, double chance_reach_prob) {
   const double terminal_utility = state.Returns()[acting_player_];
   InfostateNode* terminal_node = parent->AddChild(MakeNode(
@@ -353,7 +350,7 @@ void InfostateTree::BuildTerminalNode(
 }
 
 void InfostateTree::BuildDecisionNode(
-    InfostateNode* parent, int depth, const State& state,
+    InfostateNode* parent, size_t depth, const State& state,
     int move_limit, double chance_reach_prob) {
   SPIEL_DCHECK_EQ(parent->type(), kObservationInfostateNode);
   std::string info_state =
@@ -449,7 +446,7 @@ void InfostateTree::BuildDecisionNode(
 }
 
 void InfostateTree::BuildObservationNode(
-    InfostateNode* parent, int depth, const State& state,
+    InfostateNode* parent, size_t depth, const State& state,
     int move_limit, double chance_reach_prob) {
   SPIEL_DCHECK_TRUE(state.IsChanceNode()
                  || !state.IsPlayerActing(acting_player_));
@@ -514,7 +511,7 @@ const {
   return nodes_at_depths_;
 }
 const std::vector<InfostateNode*>& InfostateTree::nodes_at_depth(
-    int depth) const {
+    size_t depth) const {
   return nodes_at_depths_.at(depth);
 }
 const std::vector<InfostateNode*>& InfostateTree::leaf_nodes() const {
@@ -666,10 +663,18 @@ std::pair<size_t, size_t> InfostateTree::CollectStartEndSequenceIds(
     return {node->sequence_id_, node->sequence_id_};
   }
 }
-int InfostateTree::tree_height() const {
-  // TODO: off by one errors -- not equal to nodes_at_depths_.size()
+size_t InfostateTree::tree_height() const {
   return tree_height_;
 }
+
+std::pair<double, TreeplexVector<double>> InfostateTree::BestResponse(
+    TreeplexVector<double> gradient /* consumed */) const {
+
+}
+double InfostateTree::BestResponse(LeafVector<double> gradient /* consumed */) const {
+
+}
+
 DecisionId InfostateTree::DecisionIdFromInfostateString(
     const std::string& infostate_string) const {
   for (InfostateNode* node : decision_infostates_) {

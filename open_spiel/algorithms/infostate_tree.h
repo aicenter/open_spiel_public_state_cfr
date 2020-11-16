@@ -201,6 +201,12 @@ class LeafId final : public NodeId<LeafId> {
 // When a node isn't a leaf, we use this value instead.
 constexpr LeafId kUndefinedLeafId = LeafId();
 
+// Each of the Ids can be used to index an appropriate vector.
+// See below for an implementation.
+template<typename T> class TreeplexVector;
+template<typename T> class LeafVector;
+template<typename T> class DecisionVector;
+
 // A convenience iterator over a contiguous range of node ids.
 template<class Id>
 class RangeIterator {
@@ -264,31 +270,34 @@ class InfostateTree final {
       std::shared_ptr<Observer>, Player, int);
 
  public:
-  // Root accessors.
+  // -- Root accessors ---------------------------------------------------------
   const InfostateNode& root() const { return *root_; }
   InfostateNode* mutable_root() { return root_.get(); }
   int root_branching_factor() const;
 
-  // Tree information.
+  // -- Tree information -------------------------------------------------------
   Player acting_player() const { return acting_player_; }
-  int tree_height() const;
+  // Zero-based height.
+  // (the height of a tree that contains only root node is zero.)
+  size_t tree_height() const;
 
-  // General statistics.
+  // -- General statistics -----------------------------------------------------
   size_t num_decisions() const { return decision_infostates_.size(); }
   size_t num_sequences() const { return sequences_.size(); }
   size_t num_leaves() const { return nodes_at_depths_.back().size(); }
 
-  // Sequence operations.
+  // -- Sequence operations ----------------------------------------------------
   SequenceId empty_sequence() const;
   InfostateNode* observation_infostate(const SequenceId& sequence_id);
   Range<SequenceId> AllSequenceIds() const;
+  // Returns all DecisionIds which can be found in a subtree of given sequence.
   std::vector<DecisionId> DecisionIdsWithParentSeq(const SequenceId&) const;
   // Returns `None` if the sequence is the empty sequence.
   absl::optional<DecisionId> DecisionIdForSequence(const SequenceId&) const;
   // Returns `None` if the sequence is the empty sequence.
   absl::optional<InfostateNode*> DecisionForSequence(const SequenceId&);
 
-  // Decision operations.
+  // -- Decision operations ----------------------------------------------------
   InfostateNode* decision_infostate(const DecisionId& decision_id);
   const InfostateNode* decision_infostate(const DecisionId& decision_id) const;
   const std::vector<InfostateNode*>& AllDecisionInfostates() const;
@@ -296,19 +305,25 @@ class InfostateTree final {
   DecisionId DecisionIdFromInfostateString(
       const std::string& infostate_string) const;
 
-  // Leaf operations.
+  // -- Leaf operations --------------------------------------------------------
   const std::vector<InfostateNode*>& leaf_nodes() const;
   InfostateNode* leaf_node(const LeafId& leaf_id) const;
   const std::vector<std::vector<InfostateNode*>>& nodes_at_depths() const;
-  const std::vector<InfostateNode*>& nodes_at_depth(int depth) const;
+  const std::vector<InfostateNode*>& nodes_at_depth(size_t depth) const;
 
-  // For debugging.
+  // -- Tree operations --------------------------------------------------------
+  std::pair<double, TreeplexVector<double>> BestResponse(
+      TreeplexVector<double> gradient /* consumed */) const;
+  double BestResponse(LeafVector<double> gradient /* consumed */) const;
+
+  // -- For debugging ----------------------------------------------------------
   std::ostream& operator<<(std::ostream& os) const;
 
  private:
   const Player acting_player_;
   const std::shared_ptr<Observer> infostate_observer_;
   const std::unique_ptr<InfostateNode> root_;
+  /*const*/ size_t tree_height_ = 0;
 
   // Tree structure collections that index the respective NodeIds.
   std::vector<InfostateNode*> decision_infostates_;
@@ -324,32 +339,27 @@ class InfostateTree final {
       const State* originating_state);
   std::unique_ptr<InfostateNode> MakeRootNode() const;
 
-  // A value that helps to determine if the tree is balanced.
-  int tree_height_ = -1;
-  // We call a tree balanced if all leaves are in the same depth.
-  bool is_tree_balanced_ = true;
-
   // Makes sure that all tree leaves are at the same height.
   // It inserts a linked list of dummy observation nodes with appropriate length
   // to balance all the leaves.
   void RebalanceTree();
 
   void UpdateLeafNode(InfostateNode* node, const State& state,
-                      int leaf_depth, double chance_reach_probs);
+                      size_t leaf_depth, double chance_reach_probs);
 
   // Build the tree.
-  void RecursivelyBuildTree(InfostateNode* parent, int depth,
+  void RecursivelyBuildTree(InfostateNode* parent, size_t depth,
                             const State& state, int move_limit,
                             double chance_reach_prob);
-  void BuildTerminalNode(InfostateNode* parent, int depth, const State& state,
+  void BuildTerminalNode(InfostateNode* parent, size_t depth, const State& state,
                          double chance_reach_prob);
-  void BuildDecisionNode(InfostateNode* parent, int depth, const State& state,
+  void BuildDecisionNode(InfostateNode* parent, size_t depth, const State& state,
                          int move_limit, double chance_reach_prob);
-  void BuildObservationNode(InfostateNode* parent, int depth,
+  void BuildObservationNode(InfostateNode* parent, size_t depth,
                             const State& state, int move_limit,
                             double chance_reach_prob);
 
-  void CollectNodesAtDepth(InfostateNode* node, int depth);
+  void CollectNodesAtDepth(InfostateNode* node, size_t depth);
   void LabelNodesWithIds();
   std::pair<size_t,size_t> CollectStartEndSequenceIds(
       InfostateNode* node, const SequenceId parent_sequence);
@@ -454,7 +464,7 @@ class InfostateNode final {
   InfostateNode(InfostateNode&&) noexcept = default;
   virtual ~InfostateNode() = default;
 
-  // Node accessors.
+  // -- Node accessors. --------------------------------------------------------
   const InfostateTree& tree() const { return tree_; }
   InfostateNode* parent() const { return parent_; }
   int incoming_index() const { return incoming_index_; }
@@ -464,22 +474,22 @@ class InfostateNode final {
   bool has_infostate_string() const;
   const std::string& infostate_string() const;
 
-  // Children accessors.
+  // -- Children accessors. ----------------------------------------------------
   InfostateNode* child_at(int i) const { return children_.at(i).get(); }
   int num_children() const { return children_.size(); }
   VecWithUniquePtrsIterator<InfostateNode> child_iterator() const;
 
-  // Sequence operations.
+  // -- Sequence operations. ---------------------------------------------------
   const SequenceId sequence_id() const;
   const SequenceId start_sequence_id() const;
   const SequenceId end_sequence_id() const;
   Range<SequenceId> AllSequenceIds() const;
 
-  // Decision operations.
+  // -- Decision operations. ---------------------------------------------------
   const DecisionId decision_id() const;
   const std::vector<Action>& legal_actions() const;
 
-  // Leaf operations.
+  // -- Leaf operations. -------------------------------------------------------
   bool is_leaf_node() const { return children_.empty(); }
   double terminal_utility() const;
   double terminal_chance_reach_prob() const;
@@ -487,7 +497,7 @@ class InfostateNode final {
   const std::vector<double>& corresponding_chance_reach_probs() const;
   const std::vector<Action>& TerminalHistory() const;
 
-  // For debugging.
+  // -- For debugging. ---------------------------------------------------------
   std::ostream& operator<<(std::ostream& os) const;
   // Make subtree certificate (string representation) for easy comparison
   // of (isomorphic) trees.
