@@ -15,6 +15,7 @@
 #include "open_spiel/algorithms/infostate_tree.h"
 
 #include <algorithm>
+#include <utility>
 
 
 #include "open_spiel/games/goofspiel.h"
@@ -418,6 +419,30 @@ void TestSequenceIdLabeling() {
   }
 }
 
+void TestBestResponse() {
+  std::shared_ptr<InfostateTree> tree0 = MakeTree("matrix_mp", /*player_id=*/0);
+  std::shared_ptr<InfostateTree> tree1 = MakeTree("matrix_mp", /*player_id=*/1);
+  for (double alpha = 0; alpha < 1.; alpha += 0.1) {
+    const double br_value = std::fmax(2*alpha - 1, -2*alpha + 1);
+    {
+      LeafVector<double> grad(tree0.get());
+      grad[0] = -1. * alpha;         // Head, Head
+      grad[1] =  1. * (1. - alpha);  // Tail, Head
+      grad[2] =  1. * alpha;         // Head, Tail
+      grad[3] = -1. * (1. - alpha);  // Tail, Tail
+      SPIEL_CHECK_FLOAT_EQ(tree1->BestResponseValue(std::move(grad)), br_value);
+    }
+    {
+      LeafVector<double> grad(tree1.get());
+      grad[0] =  1. * alpha;         // Head, Head
+      grad[1] = -1. * (1. - alpha);  // Head, Tail
+      grad[2] = -1. *  alpha;        // Tail, Head
+      grad[3] =  1. * (1. - alpha);  // Tail, Tail
+      SPIEL_CHECK_FLOAT_EQ(tree0->BestResponseValue(std::move(grad)), br_value);
+    }
+  }
+}
+
 }  // namespace
 }  // namespace algorithms
 }  // namespace open_spiel
@@ -428,4 +453,5 @@ int main(int argc, char** argv) {
   open_spiel::algorithms::TestDepthLimitedTrees();
   open_spiel::algorithms::TestDepthLimitedSubgames();
   open_spiel::algorithms::TestSequenceIdLabeling();
+  open_spiel::algorithms::TestBestResponse();
 }

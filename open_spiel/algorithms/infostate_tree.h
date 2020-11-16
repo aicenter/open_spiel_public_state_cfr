@@ -313,8 +313,10 @@ class InfostateTree final {
 
   // -- Tree operations --------------------------------------------------------
   std::pair<double, TreeplexVector<double>> BestResponse(
-      TreeplexVector<double> gradient /* consumed */) const;
-  double BestResponse(LeafVector<double> gradient /* consumed */) const;
+      TreeplexVector<double>&& gradient) const;
+  // Compute best response value based on gradient from opponents over leaves.
+  // This consumes the gradient vector, as it uses it to compute the value.
+  double BestResponseValue(LeafVector<double>&& gradient) const;
 
   // -- For debugging ----------------------------------------------------------
   std::ostream& operator<<(std::ostream& os) const;
@@ -541,6 +543,7 @@ class TreeplexVector final {
     SPIEL_DCHECK_LT(sequence_id.id(), vec_.size());
     return vec_[sequence_id];
   }
+  size_t size() const { return vec_.size(); }
 };
 
 // Arrays that can be easily indexed by LeafIds.
@@ -557,6 +560,8 @@ class LeafVector final {
     SPIEL_DCHECK_LT(leaf_id.id(), vec_.size());
     return vec_[leaf_id];
   }
+  T& operator[](size_t pos) { return vec_[pos]; }
+  size_t size() const { return vec_.size(); }
 };
 
 // Arrays that can be easily indexed by DecisionIds.
@@ -573,6 +578,7 @@ class DecisionVector final {
     SPIEL_DCHECK_LT(decision_id.id(), vec_.size());
     return vec_[decision_id];
   }
+  size_t size() const { return vec_.size(); }
 };
 
 }  // namespace algorithms

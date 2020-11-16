@@ -14,6 +14,7 @@
 
 #include "open_spiel/algorithms/infostate_tree.h"
 
+#include <limits>
 #include <memory>
 #include <string>
 #include <stack>
@@ -668,11 +669,39 @@ size_t InfostateTree::tree_height() const {
 }
 
 std::pair<double, TreeplexVector<double>> InfostateTree::BestResponse(
-    TreeplexVector<double> gradient /* consumed */) const {
-
+    TreeplexVector<double>&& gradient) const {
+  // TODO.
 }
-double InfostateTree::BestResponse(LeafVector<double> gradient /* consumed */) const {
 
+double InfostateTree::BestResponseValue(LeafVector<double>&& gradient) const {
+  // Loop over all heights.
+  for (int d = tree_height_ - 1; d >= 0; d--) {
+    int left_offset = 0;
+    // Loop over all parents of current nodes.
+    for (int parent_idx = 0; parent_idx < nodes_at_depths_[d].size();
+         parent_idx++) {
+      const InfostateNode* node = nodes_at_depths_[d][parent_idx];
+      const int num_children = node->num_children();
+      if (node->type() == kDecisionInfostateNode) {
+        double max_value = std::numeric_limits<double>::min();
+        for (int i = 0; i < num_children; i++) {
+          max_value = std::fmax(max_value, gradient[left_offset + i]);
+        }
+        gradient[parent_idx] = max_value;
+      } else {
+        SPIEL_DCHECK_EQ(node->type(), kObservationInfostateNode);
+        double sum_value = 0.;
+        for (int i = 0; i < num_children; i++) {
+          sum_value += gradient[left_offset + i];
+        }
+        gradient[parent_idx] = sum_value;
+      }
+      left_offset += num_children;
+    }
+    // Check that we passed over all of the children.
+    SPIEL_DCHECK_EQ(left_offset, nodes_at_depths_[d + 1].size());
+  }
+  return gradient[0];
 }
 
 DecisionId InfostateTree::DecisionIdFromInfostateString(
