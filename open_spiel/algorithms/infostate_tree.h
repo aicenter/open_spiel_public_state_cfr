@@ -213,6 +213,7 @@ constexpr LeafId kUndefinedLeafId = LeafId();
 template<typename T> class TreeplexVector;
 template<typename T> class LeafVector;
 template<typename T> class DecisionVector;
+using SfStrategy = class TreeplexVector<double>;
 
 // A convenience iterator over a contiguous range of node ids.
 template<class Id>
@@ -326,7 +327,7 @@ class InfostateTree final {
   const std::vector<InfostateNode*>& nodes_at_depth(size_t depth) const;
 
   // -- Tree operations --------------------------------------------------------
-  std::pair<double, TreeplexVector<double>> BestResponse(
+  std::pair<double, SfStrategy> BestResponse(
       TreeplexVector<double>&& gradient) const;
   // Compute best response value based on gradient from opponents over leaves.
   // This consumes the gradient vector, as it uses it to compute the value.

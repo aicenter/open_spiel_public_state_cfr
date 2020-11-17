@@ -659,7 +659,7 @@ std::pair<size_t, size_t> InfostateTree::CollectStartEndSequenceIds(
   }
 }
 
-std::pair<double, TreeplexVector<double>> InfostateTree::BestResponse(
+std::pair<double, SfStrategy> InfostateTree::BestResponse(
     TreeplexVector<double>&& gradient) const {
   // TODO.
 }
