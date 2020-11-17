@@ -145,6 +145,10 @@ class NodeId {
     SPIEL_CHECK_EQ(tree_, rhs.tree_);
     return id() == rhs.id();
   }
+  bool operator!=(const Self& rhs) const {
+    SPIEL_CHECK_EQ(tree_, rhs.tree_);
+    return id() != rhs.id();
+  }
   bool BelongsToTree(const InfostateTree* other) const { return tree_ == other; }
 #else
 
@@ -156,7 +160,8 @@ class NodeId {
     identifier_ = rhs.id();
     return this;
   }
-  bool operator==(const Self & rhs) const { return id() == rhs.id(); }
+  bool operator==(const Self& rhs) const { return id() == rhs.id(); }
+  bool operator!=(const Self& rhs) const { return id() != rhs.id(); }
   // BelongsToTree is not implemented on purpose:
   // It must not be called in release mode -- used only by DCHECK statements.
 #endif
@@ -166,11 +171,10 @@ class NodeId {
     return identifier_;
   }
   bool is_undefined() const { return identifier_ == kUndefinedNodeId; }
-  bool operator!=(const Self& rhs) const { return !(rhs == *this); }
-  // Implicit conversion to size_t, so we can use NodeId to index vectors etc.
-  operator size_t() const { return id(); }
-  // Implicit conversion to bool, so we can use if(my_id) conditions.
-  operator bool() const { return !is_undefined(); }
+  void next() {
+    SPIEL_CHECK_NE(identifier_, kUndefinedNodeId);
+    ++identifier_;
+  }
 };
 
 }  // namespace
@@ -304,6 +308,8 @@ class InfostateTree final {
   // -- Sequence operations ----------------------------------------------------
   SequenceId empty_sequence() const;
   InfostateNode* observation_infostate(const SequenceId& sequence_id);
+  const InfostateNode* observation_infostate(
+      const SequenceId& sequence_id) const;
   Range<SequenceId> AllSequenceIds() const;
   // Returns all DecisionIds which can be found in a subtree of given sequence.
   std::vector<DecisionId> DecisionIdsWithParentSeq(const SequenceId&) const;
@@ -311,6 +317,8 @@ class InfostateTree final {
   absl::optional<DecisionId> DecisionIdForSequence(const SequenceId&) const;
   // Returns `None` if the sequence is the empty sequence.
   absl::optional<InfostateNode*> DecisionForSequence(const SequenceId&);
+  // Returns whether the sequence ends with the last action the player can make.
+  bool IsLeafSequence(const SequenceId&) const;
 
   // -- Decision operations ----------------------------------------------------
   InfostateNode* decision_infostate(const DecisionId& decision_id);
@@ -327,10 +335,12 @@ class InfostateTree final {
   const std::vector<InfostateNode*>& nodes_at_depth(size_t depth) const;
 
   // -- Tree operations --------------------------------------------------------
+  // Compute best response and value based on gradient from opponents.
+  // This consumes the gradient vector, as it is used to compute the value.
   std::pair<double, SfStrategy> BestResponse(
       TreeplexVector<double>&& gradient) const;
   // Compute best response value based on gradient from opponents over leaves.
-  // This consumes the gradient vector, as it uses it to compute the value.
+  // This consumes the gradient vector, as it is used to compute the value.
   double BestResponseValue(LeafVector<double>&& gradient) const;
 
   // -- For debugging ----------------------------------------------------------
@@ -437,7 +447,7 @@ class InfostateNode final {
   /*const*/ DecisionId decision_id_ = kUndefinedDecisionId;
   // Sequence identifier of this node.
   // The first is the parent sequence of the infostate, while the last
-  // two sequence IDs represent the sequence id of the first and last action
+  // two sequence IDs represent the sequence id of the first and last action + 1
   // at the infostate node. Because sequences assigned to an infostate
   // are contiguous, we don't need to store all intermediate sequence IDs.
   // We can thus use a Range iterable to make looping frictionless.
@@ -568,6 +578,15 @@ class TreeVector {
     SPIEL_DCHECK_LT(id.id(), vec_.size());
     return vec_[id.id()];
   }
+  const T& operator[](const Id& id) const {
+    SPIEL_DCHECK_TRUE(id.BelongsToTree(tree_));
+    SPIEL_DCHECK_LE(0, id.id());
+    SPIEL_DCHECK_LT(id.id(), vec_.size());
+    return vec_[id.id()];
+  }
+  std::ostream& operator<<(std::ostream& os) const {
+    return os << vec_ << " (for player " << tree_->acting_player() << ')';
+  }
   size_t size() const { return vec_.size(); }
   Range<Id> range() { return Range<Id>(0, vec_.size(), tree_); }
   Range<Id> range(size_t from, size_t to) { return Range<Id>(from, to, tree_); }
@@ -597,6 +616,11 @@ template<typename T>
 class DecisionVector final : public TreeVector<T, DecisionId> {
   using TreeVector<T, DecisionId>::TreeVector;
 };
+
+// Returns whether the supplied vector is a valid sequence-form strategy:
+// The probability flow has to sum up to 1 and each sequence's incoming
+// probability must be equal to outgoing probabilities.
+bool IsValidSfStrategy(const SfStrategy& stategy);
 
 }  // namespace algorithms
 }  // namespace open_spiel

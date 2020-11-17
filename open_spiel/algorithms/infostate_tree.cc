@@ -275,9 +275,12 @@ const std::vector<Action>& InfostateNode::TerminalHistory() const {
   SPIEL_DCHECK_EQ(type_, kTerminalInfostateNode);
   return terminal_history_;
 }
+
 Range<SequenceId> InfostateNode::AllSequenceIds() const {
-  return Range<SequenceId>(start_sequence_id_, end_sequence_id_, &tree_);
+  return Range<SequenceId>(start_sequence_id_.id(),
+                           end_sequence_id_.id(), &tree_);
 }
+
 VecWithUniquePtrsIterator<InfostateNode> InfostateNode::child_iterator() const {
   return VecWithUniquePtrsIterator(children_);
 }
@@ -514,7 +517,7 @@ const std::vector<InfostateNode*>& InfostateTree::leaf_nodes() const {
 }
 InfostateNode* InfostateTree::leaf_node(const LeafId& leaf_id) const {
   SPIEL_DCHECK_TRUE(leaf_id.BelongsToTree(this));
-  return nodes_at_depths().back().at(leaf_id);
+  return nodes_at_depths().back().at(leaf_id.id());
 }
 const std::vector<InfostateNode*>& InfostateTree::AllDecisionInfostates()
 const {
@@ -523,23 +526,30 @@ const {
 InfostateNode* InfostateTree::decision_infostate(
     const DecisionId& decision_id) {
   SPIEL_DCHECK_TRUE(decision_id.BelongsToTree(this));
-  SPIEL_DCHECK_EQ(decision_infostates_.at(decision_id)->type(),
+  SPIEL_DCHECK_EQ(decision_infostates_.at(decision_id.id())->type(),
                   kDecisionInfostateNode);
-  return decision_infostates_.at(decision_id);
+  return decision_infostates_.at(decision_id.id());
 }
 const InfostateNode* InfostateTree::decision_infostate(
     const DecisionId& decision_id) const {
   SPIEL_DCHECK_TRUE(decision_id.BelongsToTree(this));
-  SPIEL_DCHECK_EQ(decision_infostates_.at(decision_id)->type(),
+  SPIEL_DCHECK_EQ(decision_infostates_.at(decision_id.id())->type(),
                   kDecisionInfostateNode);
-  return decision_infostates_.at(decision_id);
+  return decision_infostates_.at(decision_id.id());
 }
 InfostateNode* InfostateTree::observation_infostate(
     const SequenceId& sequence_id) {
   SPIEL_DCHECK_TRUE(sequence_id.BelongsToTree(this));
-  SPIEL_DCHECK_EQ(sequences_.at(sequence_id)->type(),
+  SPIEL_DCHECK_EQ(sequences_.at(sequence_id.id())->type(),
                   kObservationInfostateNode);
-  return sequences_.at(sequence_id);
+  return sequences_.at(sequence_id.id());
+}
+const InfostateNode* InfostateTree::observation_infostate(
+    const SequenceId& sequence_id) const {
+  SPIEL_DCHECK_TRUE(sequence_id.BelongsToTree(this));
+  SPIEL_DCHECK_EQ(sequences_.at(sequence_id.id())->type(),
+                  kObservationInfostateNode);
+  return sequences_.at(sequence_id.id());
 }
 Range<DecisionId> InfostateTree::AllDecisionIds() const {
   return Range<DecisionId>(0, decision_infostates_.size(), this);
@@ -547,7 +557,7 @@ Range<DecisionId> InfostateTree::AllDecisionIds() const {
 absl::optional<DecisionId> InfostateTree::DecisionIdForSequence(
     const SequenceId& sequence_id) const {
   SPIEL_DCHECK_TRUE(sequence_id.BelongsToTree(this));
-  InfostateNode* node = sequences_.at(sequence_id);
+  InfostateNode* node = sequences_.at(sequence_id.id());
   SPIEL_DCHECK_TRUE(node);
   if (node->is_root_node()) {
     return {};
@@ -558,7 +568,7 @@ absl::optional<DecisionId> InfostateTree::DecisionIdForSequence(
 absl::optional<InfostateNode*> InfostateTree::DecisionForSequence(
     const SequenceId& sequence_id) {
   SPIEL_DCHECK_TRUE(sequence_id.BelongsToTree(this));
-  InfostateNode* node = sequences_.at(sequence_id);
+  InfostateNode* node = sequences_.at(sequence_id.id());
   SPIEL_DCHECK_TRUE(node);
   if (node->is_root_node()) {
     return {};
@@ -566,10 +576,16 @@ absl::optional<InfostateNode*> InfostateTree::DecisionForSequence(
     return node->parent_;
   }
 }
+bool InfostateTree::IsLeafSequence(const SequenceId& sequence_id) const {
+  SPIEL_DCHECK_TRUE(sequence_id.BelongsToTree(this));
+  InfostateNode* node = sequences_.at(sequence_id.id());
+  SPIEL_DCHECK_TRUE(node);
+  return node->start_sequence_id() == node->end_sequence_id();
+}
 std::vector<DecisionId> InfostateTree::DecisionIdsWithParentSeq(
     const SequenceId& sequence_id) const {
   std::vector<DecisionId> out;
-  const InfostateNode* observation_node = sequences_.at(sequence_id);
+  const InfostateNode* observation_node = sequences_.at(sequence_id.id());
   std::stack<const InfostateNode*> open_set;
   for (const InfostateNode* child : observation_node->child_iterator()) {
     open_set.push(child);
@@ -643,7 +659,7 @@ std::pair<size_t, size_t> InfostateTree::CollectStartEndSequenceIds(
   if (min_index != kUndefinedNodeId) {
     SPIEL_CHECK_LE(min_index, max_index);
     node->start_sequence_id_ = SequenceId(min_index, this);
-    node->end_sequence_id_ = SequenceId(max_index, this);
+    node->end_sequence_id_ = SequenceId(max_index + 1, this);
   } else {
     node->start_sequence_id_ = propagate_sequence_id;
     node->end_sequence_id_ = propagate_sequence_id;
@@ -655,13 +671,62 @@ std::pair<size_t, size_t> InfostateTree::CollectStartEndSequenceIds(
     return {min_index, max_index};
   } else {
     // We have hit a defined sequence id, propagate it up.
-    return {node->sequence_id_, node->sequence_id_};
+    return {node->sequence_id_.id(), node->sequence_id_.id()};
   }
 }
 
 std::pair<double, SfStrategy> InfostateTree::BestResponse(
     TreeplexVector<double>&& gradient) const {
-  // TODO.
+  SPIEL_CHECK_EQ(this, gradient.tree());
+  SPIEL_CHECK_EQ(num_sequences(), gradient.size());
+  SfStrategy response(this);
+
+  // 1. Compute counterfactual best response
+  // (i.e. in all infostates, even unreachable ones)
+  SequenceId current(0, this);
+  const double init_value = -std::numeric_limits<double>::infinity();
+  while (current.id() <= empty_sequence().id()) {
+    double max_value = init_value;
+    SequenceId max_id = current;
+    const InfostateNode* node = observation_infostate(current);
+    current = node->start_sequence_id();
+    while (current != node->end_sequence_id()) {
+      if (gradient[current] > max_value) {
+        max_value = gradient[current];
+        max_id = current;
+      }
+      current.next();
+    }
+    if (init_value != max_value) {
+      gradient[node->sequence_id()] += max_value;
+      response[max_id] = 1.;
+    }
+    current.next();
+  }
+  SPIEL_CHECK_EQ(current.id(), empty_sequence().id() + 1);
+
+  // 2. Prune away unreachable subtrees.
+  //
+  // This can be done with a more costly recursion.
+  // Instead we make a more cache-friendly double pass through the response
+  // vector: we increment the visited path by 1, resulting in a value of 2.
+  // Then we zero-out all values but 2.
+  current = empty_sequence();
+  response[current] = 2.;
+  while (!IsLeafSequence(current)) {
+    for (SequenceId seq : observation_infostate(current)->AllSequenceIds()) {
+      if (response[seq] == 1.) {
+        current = seq;
+        response[seq] += 1.;
+        break;
+      }
+    }
+  }
+  for (SequenceId seq : response.range()) {
+    response[seq] = response[seq] == 2. ? 1. : 0.;
+  }
+  SPIEL_DCHECK_TRUE(IsValidSfStrategy(response));
+  return {gradient[empty_sequence()], response};
 }
 
 double InfostateTree::BestResponseValue(LeafVector<double>&& gradient) const {
@@ -707,6 +772,37 @@ DecisionId InfostateTree::DecisionIdFromInfostateString(
       return node->decision_id();
   }
   return kUndefinedDecisionId;
+}
+
+bool CheckSum(const SfStrategy& strategy, SequenceId id, double expected_sum) {
+  if (fabs(strategy[id] - expected_sum) > 1e-13) {
+    return false;
+  }
+
+  const InfostateTree* tree = strategy.tree();
+  if (tree->IsLeafSequence(id)) {
+    return true;
+  }
+
+  double actual_sum = 0.;
+  const InfostateNode* node = tree->observation_infostate(id);
+  for (SequenceId sub_seq : node->AllSequenceIds()) {
+    actual_sum += strategy[sub_seq];
+  }
+  if (fabs(actual_sum - expected_sum) > 1e-13) {
+    return false;
+  }
+
+  for (SequenceId sub_seq : node->AllSequenceIds()) {
+    if (!CheckSum(strategy, sub_seq, strategy[sub_seq])) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool IsValidSfStrategy(const SfStrategy& strategy) {
+  return CheckSum(strategy, strategy.tree()->empty_sequence(), 1.);
 }
 
 }  // namespace algorithms

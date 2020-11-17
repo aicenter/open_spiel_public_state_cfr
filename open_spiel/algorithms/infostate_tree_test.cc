@@ -411,10 +411,13 @@ void TestSequenceIdLabeling() {
       depth = node->depth();
       // Longer sequences (extensions) must have the corresponding
       // infostate nodes placed deeper.
+//      int num_children = 0;
       for (SequenceId extension : node->AllSequenceIds()) {
         InfostateNode* child = tree->observation_infostate(extension);
         SPIEL_CHECK_LT(node->depth(), child->depth());
+//        ++num_children;
       }
+//      SPIEL_CHECK_EQ(node->num_children(), num_children);
     }
   }
 }
@@ -441,6 +444,22 @@ void TestBestResponse() {
         -1. * (1. - alpha),  // Tail, Tail
       });
       SPIEL_CHECK_FLOAT_EQ(tree1->BestResponseValue(std::move(grad)), br_value);
+    }
+    {
+      TreeplexVector<double> grad(tree0.get(), {
+        -1. + 2. * alpha, 1. - 2. * alpha, 0.
+      });
+      std::pair<double, SfStrategy> actual_response =
+          tree0->BestResponse(std::move(grad));
+      SPIEL_CHECK_FLOAT_EQ(actual_response.first, br_value);
+    }
+    {
+      TreeplexVector<double> grad(tree1.get(), {
+        1. - 2. * alpha, -1. + 2. * alpha, 0.
+      });
+      std::pair<double, SfStrategy> actual_response =
+          tree1->BestResponse(std::move(grad));
+      SPIEL_CHECK_FLOAT_EQ(actual_response.first, br_value);
     }
   }
 }
