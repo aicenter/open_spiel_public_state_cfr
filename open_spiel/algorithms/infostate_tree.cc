@@ -682,26 +682,31 @@ double InfostateTree::BestResponseValue(LeafVector<double>&& gradient) const {
          parent_idx++) {
       const InfostateNode* node = nodes_at_depths_[d][parent_idx];
       const int num_children = node->num_children();
+      const Range<LeafId> children_range(left_offset,
+                                         left_offset + num_children, this);
+      const LeafId parent_id(parent_idx, this);
+
       if (node->type() == kDecisionInfostateNode) {
         double max_value = std::numeric_limits<double>::min();
-        for (int i = 0; i < num_children; i++) {
-          max_value = std::fmax(max_value, gradient[left_offset + i]);
+        for (LeafId id : children_range) {
+          max_value = std::fmax(max_value, gradient[id]);
         }
-        gradient[parent_idx] = max_value;
+        gradient[parent_id] = max_value;
       } else {
         SPIEL_DCHECK_EQ(node->type(), kObservationInfostateNode);
         double sum_value = 0.;
-        for (int i = 0; i < num_children; i++) {
-          sum_value += gradient[left_offset + i];
+        for (LeafId id : children_range) {
+          sum_value += gradient[id];
         }
-        gradient[parent_idx] = sum_value;
+        gradient[parent_id] = sum_value;
       }
       left_offset += num_children;
     }
     // Check that we passed over all of the children.
     SPIEL_DCHECK_EQ(left_offset, nodes_at_depths_[d + 1].size());
   }
-  return gradient[0];
+  const LeafId root_id(0, this);
+  return gradient[root_id];
 }
 
 DecisionId InfostateTree::DecisionIdFromInfostateString(

@@ -554,13 +554,16 @@ class LeafVector final {
  public:
   explicit LeafVector(const InfostateTree* tree)
       : tree_(tree), vec_(tree_->num_leaves()) {}
+  LeafVector(const InfostateTree* tree, std::vector<T> vec)
+      : tree_(tree), vec_(std::move(vec)) {
+    SPIEL_CHECK_EQ(tree_->num_leaves(), vec_.size());
+  }
   T& operator[](const LeafId& leaf_id) {
     SPIEL_DCHECK_TRUE(leaf_id.BelongsToTree(tree_));
     SPIEL_DCHECK_LE(0, leaf_id.id());
     SPIEL_DCHECK_LT(leaf_id.id(), vec_.size());
     return vec_[leaf_id];
   }
-  T& operator[](size_t pos) { return vec_[pos]; }
   size_t size() const { return vec_.size(); }
 };
 

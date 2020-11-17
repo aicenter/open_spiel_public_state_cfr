@@ -425,20 +425,22 @@ void TestBestResponse() {
   for (double alpha = 0; alpha < 1.; alpha += 0.1) {
     const double br_value = std::fmax(2*alpha - 1, -2*alpha + 1);
     {
-      LeafVector<double> grad(tree0.get());
-      grad[0] = -1. * alpha;         // Head, Head
-      grad[1] =  1. * (1. - alpha);  // Tail, Head
-      grad[2] =  1. * alpha;         // Head, Tail
-      grad[3] = -1. * (1. - alpha);  // Tail, Tail
-      SPIEL_CHECK_FLOAT_EQ(tree1->BestResponseValue(std::move(grad)), br_value);
+      LeafVector<double> grad(tree0.get(), {
+         1. * alpha,         // Head, Head
+        -1. * (1. - alpha),  // Head, Tail
+        -1. *  alpha,        // Tail, Head
+         1. * (1. - alpha),  // Tail, Tail
+      });
+      SPIEL_CHECK_FLOAT_EQ(tree0->BestResponseValue(std::move(grad)), br_value);
     }
     {
-      LeafVector<double> grad(tree1.get());
-      grad[0] =  1. * alpha;         // Head, Head
-      grad[1] = -1. * (1. - alpha);  // Head, Tail
-      grad[2] = -1. *  alpha;        // Tail, Head
-      grad[3] =  1. * (1. - alpha);  // Tail, Tail
-      SPIEL_CHECK_FLOAT_EQ(tree0->BestResponseValue(std::move(grad)), br_value);
+      LeafVector<double> grad(tree1.get(), {
+        -1. * alpha,         // Head, Head
+         1. * (1. - alpha),  // Tail, Head
+         1. * alpha,         // Head, Tail
+        -1. * (1. - alpha),  // Tail, Tail
+      });
+      SPIEL_CHECK_FLOAT_EQ(tree1->BestResponseValue(std::move(grad)), br_value);
     }
   }
 }
