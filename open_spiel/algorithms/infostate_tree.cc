@@ -124,7 +124,7 @@ InfostateNode* InfostateNode::GetChild(
 
 std::ostream& InfostateNode::operator<<(std::ostream& os) const {
   if (!parent_) return os << 'x';
-  return os << parent_ << ',' <<  incoming_index_;
+  return os << parent_ << ',' << incoming_index_;
 }
 
 std::string InfostateNode::MakeCertificate() const {
@@ -316,8 +316,9 @@ std::unique_ptr<InfostateNode> InfostateTree::MakeRootNode() const {
       /*depth=*/0, /*legal_actions=*/{}, /*terminal_history=*/{}));
 }
 
-void InfostateTree::UpdateLeafNode(InfostateNode* node, const State& state,
-                                   size_t leaf_depth, double chance_reach_probs) {
+void InfostateTree::UpdateLeafNode(
+    InfostateNode* node, const State& state, size_t leaf_depth,
+    double chance_reach_probs) {
   tree_height_ = std::max(tree_height_, leaf_depth);
   node->corresponding_states_.push_back(state.Clone());
   node->corresponding_ch_reaches_.push_back(chance_reach_probs);
@@ -650,8 +651,8 @@ std::pair<size_t, size_t> InfostateTree::CollectStartEndSequenceIds(
       : node->sequence_id();  // This becomes the parent for next nodes.
 
   for (InfostateNode* child : node->child_iterator()) {
-    auto[min_child, max_child] =
-        CollectStartEndSequenceIds(child, propagate_sequence_id);
+    auto[min_child, max_child] = CollectStartEndSequenceIds(
+        child, propagate_sequence_id);
     min_index = std::min(min_child, min_index);
     max_index = std::max(max_child, max_index);
   }

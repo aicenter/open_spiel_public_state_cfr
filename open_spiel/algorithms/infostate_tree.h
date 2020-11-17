@@ -149,7 +149,9 @@ class NodeId {
     SPIEL_CHECK_EQ(tree_, rhs.tree_);
     return id() != rhs.id();
   }
-  bool BelongsToTree(const InfostateTree* other) const { return tree_ == other; }
+  bool BelongsToTree(const InfostateTree* other) const {
+    return tree_ == other;
+  }
 #else
 
  public:
@@ -389,7 +391,7 @@ class InfostateTree final {
 
   void CollectNodesAtDepth(InfostateNode* node, size_t depth);
   void LabelNodesWithIds();
-  std::pair<size_t,size_t> CollectStartEndSequenceIds(
+  std::pair<size_t, size_t> CollectStartEndSequenceIds(
       InfostateNode* node, const SequenceId parent_sequence);
 };
 
