@@ -21,6 +21,7 @@
 #include <array>
 #include <unordered_map>
 
+#include "open_spiel/policy.h"
 #include "open_spiel/algorithms/infostate_tree.h"
 
 // An implementation of a sequence-form linear program for computing Nash
