@@ -673,8 +673,8 @@ double InfostateTree::BestResponseValue(LeafVector<double>&& gradient) const {
          parent_idx++) {
       const InfostateNode* node = nodes_at_depths_[d][parent_idx];
       const int num_children = node->num_children();
-      const Range<LeafId> children_range(left_offset,
-                                         left_offset + num_children, this);
+      const Range<LeafId> children_range = gradient.range(
+          left_offset, left_offset + num_children);
       const LeafId parent_id(parent_idx, this);
 
       if (node->type() == kDecisionInfostateNode) {

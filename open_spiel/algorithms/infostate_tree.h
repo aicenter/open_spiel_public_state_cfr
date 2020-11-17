@@ -568,8 +568,12 @@ class TreeVector {
     return vec_[id.id()];
   }
   size_t size() const { return vec_.size(); }
-  auto begin() { return RangeIterator<Id>(0, tree_); }
-  auto end() { return RangeIterator<Id>(vec_.size(), tree_); }
+  RangeIterator<Id> begin() const { return RangeIterator<Id>(0, tree_); }
+  RangeIterator<Id> end() const {
+    return RangeIterator<Id>(vec_.size(), tree_);
+  }
+  Range<Id> range(size_t from, size_t to) { return Range<Id>(from, to, tree_); }
+  const InfostateTree* tree() const { return tree_; }
 };
 
 }  // namespace
