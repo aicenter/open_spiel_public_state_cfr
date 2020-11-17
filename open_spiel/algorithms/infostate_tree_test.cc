@@ -15,8 +15,8 @@
 #include "open_spiel/algorithms/infostate_tree.h"
 
 #include <algorithm>
+#include <memory>
 #include <utility>
-
 
 #include "open_spiel/games/goofspiel.h"
 #include "open_spiel/games/kuhn_poker.h"

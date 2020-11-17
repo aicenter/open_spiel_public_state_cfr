@@ -26,7 +26,6 @@
 namespace open_spiel {
 namespace algorithms {
 
-
 InfostateNode::InfostateNode(
     const InfostateTree& tree, InfostateNode* parent, int incoming_index,
     InfostateNodeType type, const std::string& infostate_string,
@@ -55,14 +54,12 @@ InfostateNode::InfostateNode(
   );
 }
 
-
 const std::string& InfostateNode::infostate_string() const {
   // Avoid working with empty infostate strings.
   // Use Hasinfostate_string() first to check.
   SPIEL_DCHECK_TRUE(has_infostate_string());
   return infostate_string_;
 }
-
 
 bool InfostateNode::has_infostate_string() const {
   return infostate_string_ != kFillerInfostate
@@ -84,13 +81,13 @@ const std::vector<Action>& InfostateNode::legal_actions() const {
   return legal_actions_;
 }
 
-const std::vector<std::unique_ptr<State>>&
-InfostateNode::corresponding_states() const {
+const std::vector<std::unique_ptr<State>>& InfostateNode::corresponding_states()
+const {
   return corresponding_states_;
 }
 
-const std::vector<double>&
-InfostateNode::corresponding_chance_reach_probs() const {
+const std::vector<double>& InfostateNode::corresponding_chance_reach_probs()
+const {
   return corresponding_ch_reaches_;
 }
 
@@ -198,13 +195,11 @@ void InfostateNode::RebalanceSubtree(int target_depth, int current_depth) {
   }
 }
 
-
 std::unique_ptr<InfostateNode> InfostateNode::Release() {
   SPIEL_DCHECK_TRUE(parent_);
   SPIEL_DCHECK_TRUE(parent_->children_.at(incoming_index_).get() == this);
   return std::move(parent_->children_.at(incoming_index_));
 }
-
 
 void InfostateNode::SwapParent(std::unique_ptr<InfostateNode> self,
                                InfostateNode* target, int at_index) {
@@ -214,7 +209,6 @@ void InfostateNode::SwapParent(std::unique_ptr<InfostateNode> self,
   this->parent_ = target;
   this->incoming_index_ = at_index;
 }
-
 
 InfostateTree::InfostateTree(
     const std::vector<const State*>& start_states,
@@ -663,9 +657,6 @@ std::pair<size_t, size_t> InfostateTree::CollectStartEndSequenceIds(
     // We have hit a defined sequence id, propagate it up.
     return {node->sequence_id_, node->sequence_id_};
   }
-}
-size_t InfostateTree::tree_height() const {
-  return tree_height_;
 }
 
 std::pair<double, TreeplexVector<double>> InfostateTree::BestResponse(

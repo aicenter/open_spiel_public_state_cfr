@@ -15,6 +15,10 @@
 #ifndef OPEN_SPIEL_ALGORITHMS_INFOSTATE_TREE_H_
 #define OPEN_SPIEL_ALGORITHMS_INFOSTATE_TREE_H_
 
+#include <memory>
+#include <utility>
+#include <vector>
+
 #include "open_spiel/spiel.h"
 
 // This file contains data structures used in imperfect information games.
@@ -148,7 +152,10 @@ class NodeId {
   // Do not save the tree pointer, but expose the same interface
   // so it's easy to use.
   NodeId(size_t id_value, const InfostateTree*) : identifier_(id_value) {}
-  Self& operator=(Self&& rhs) { identifier_ = rhs.id(); return this; }
+  Self& operator=(Self&& rhs) {
+    identifier_ = rhs.id();
+    return this;
+  }
   bool operator==(const Self & rhs) const { return id() == rhs.id(); }
   // BelongsToTree is not implemented on purpose:
   // It must not be called in release mode -- used only by DCHECK statements.
@@ -214,7 +221,10 @@ class RangeIterator {
   const InfostateTree* tree_;
  public:
   RangeIterator(size_t id, const InfostateTree* tree) : id_(id), tree_(tree) {}
-  RangeIterator& operator++() { ++id_; return *this; }
+  RangeIterator& operator++() {
+    ++id_;
+    return *this;
+  }
   bool operator!=(const RangeIterator& other) const {
     return id_ != other.id_ || tree_ != other.tree_;
   }
@@ -279,12 +289,16 @@ class InfostateTree final {
   Player acting_player() const { return acting_player_; }
   // Zero-based height.
   // (the height of a tree that contains only root node is zero.)
-  size_t tree_height() const;
+  size_t tree_height() const { return tree_height_; }
 
   // -- General statistics -----------------------------------------------------
   size_t num_decisions() const { return decision_infostates_.size(); }
   size_t num_sequences() const { return sequences_.size(); }
   size_t num_leaves() const { return nodes_at_depths_.back().size(); }
+  // A function overload used for TreeVector templates.
+  size_t num_ids(DecisionId) const { return num_decisions(); }
+  size_t num_ids(SequenceId) const { return num_sequences(); }
+  size_t num_ids(LeafId) const { return num_leaves(); }
 
   // -- Sequence operations ----------------------------------------------------
   SequenceId empty_sequence() const;
@@ -353,10 +367,11 @@ class InfostateTree final {
   void RecursivelyBuildTree(InfostateNode* parent, size_t depth,
                             const State& state, int move_limit,
                             double chance_reach_prob);
-  void BuildTerminalNode(InfostateNode* parent, size_t depth, const State& state,
+  void BuildTerminalNode(InfostateNode* parent, size_t depth,
+                         const State& state, double chance_reach_prob);
+  void BuildDecisionNode(InfostateNode* parent, size_t depth,
+                         const State& state, int move_limit,
                          double chance_reach_prob);
-  void BuildDecisionNode(InfostateNode* parent, size_t depth, const State& state,
-                         int move_limit, double chance_reach_prob);
   void BuildObservationNode(InfostateNode* parent, size_t depth,
                             const State& state, int move_limit,
                             double chance_reach_prob);
@@ -376,7 +391,10 @@ class VecWithUniquePtrsIterator {
   explicit VecWithUniquePtrsIterator(
       const std::vector<std::unique_ptr<T>>& vec, int pos = 0)
       : pos_(pos), vec_(vec) {}
-  VecWithUniquePtrsIterator& operator++() { pos_++; return *this; }
+  VecWithUniquePtrsIterator& operator++() {
+    pos_++;
+    return *this;
+  }
   bool operator==(VecWithUniquePtrsIterator other) const {
     return pos_ == other.pos_;
   }
@@ -525,63 +543,57 @@ class InfostateNode final {
   InfostateNode* GetChild(const std::string& infostate_string) const;
 };
 
+namespace {
+
+// An implementation detail - Not to be used directly.
+//
+// Create a common TreeVector container that can be indexed
+// with the respective NodeIds. This is later specialized for the individual
+// indexing of the trees.
+template<typename T, typename Id>
+class TreeVector {
+  const InfostateTree* tree_;
+  std::vector<T> vec_;
+ public:
+  explicit TreeVector(const InfostateTree* tree)
+      : tree_(tree), vec_(tree_->num_ids(Id(kUndefinedNodeId, tree))) {}
+  TreeVector(const InfostateTree* tree, std::vector<T> vec)
+      : tree_(tree), vec_(std::move(vec)) {
+    SPIEL_CHECK_EQ(tree_->num_ids(Id(kUndefinedNodeId, tree)), vec_.size());
+  }
+  T& operator[](const Id& id) {
+    SPIEL_DCHECK_TRUE(id.BelongsToTree(tree_));
+    SPIEL_DCHECK_LE(0, id.id());
+    SPIEL_DCHECK_LT(id.id(), vec_.size());
+    return vec_[id.id()];
+  }
+  size_t size() const { return vec_.size(); }
+  auto begin() { return RangeIterator<Id>(0, tree_); }
+  auto end() { return RangeIterator<Id>(vec_.size(), tree_); }
+};
+
+}  // namespace
+
 // Arrays that can be easily indexed by SequenceIds.
 // The space of all such arrays forms a treeplex [3].
 //
 // [3]: Smoothing Techniques for Computing Nash Equilibria of Sequential Games
 //      http://www.cs.cmu.edu/~sandholm/proxtreeplex.MathOfOR.pdf
 template<typename T>
-class TreeplexVector final {
-  const InfostateTree* tree_;
-  std::vector<T> vec_;
- public:
-  explicit TreeplexVector(const InfostateTree* tree)
-      : tree_(tree), vec_(tree_->num_sequences()) {}
-  T& operator[](const SequenceId& sequence_id) {
-    SPIEL_DCHECK_TRUE(sequence_id.BelongsToTree(tree_));
-    SPIEL_DCHECK_LE(0, sequence_id.id());
-    SPIEL_DCHECK_LT(sequence_id.id(), vec_.size());
-    return vec_[sequence_id];
-  }
-  size_t size() const { return vec_.size(); }
+class TreeplexVector final : public TreeVector<T, SequenceId> {
+  using TreeVector<T, SequenceId>::TreeVector;
 };
 
 // Arrays that can be easily indexed by LeafIds.
 template<typename T>
-class LeafVector final {
-  const InfostateTree* tree_;
-  std::vector<T> vec_;
- public:
-  explicit LeafVector(const InfostateTree* tree)
-      : tree_(tree), vec_(tree_->num_leaves()) {}
-  LeafVector(const InfostateTree* tree, std::vector<T> vec)
-      : tree_(tree), vec_(std::move(vec)) {
-    SPIEL_CHECK_EQ(tree_->num_leaves(), vec_.size());
-  }
-  T& operator[](const LeafId& leaf_id) {
-    SPIEL_DCHECK_TRUE(leaf_id.BelongsToTree(tree_));
-    SPIEL_DCHECK_LE(0, leaf_id.id());
-    SPIEL_DCHECK_LT(leaf_id.id(), vec_.size());
-    return vec_[leaf_id];
-  }
-  size_t size() const { return vec_.size(); }
+class LeafVector final : public TreeVector<T, LeafId> {
+  using TreeVector<T, LeafId>::TreeVector;
 };
 
 // Arrays that can be easily indexed by DecisionIds.
 template<typename T>
-class DecisionVector final {
-  const InfostateTree* tree_;
-  std::vector<T> vec_;
- public:
-  explicit DecisionVector(const InfostateTree* tree)
-      : tree_(tree), vec_(tree_->num_decisions()) {}
-  T& operator[](const DecisionId& decision_id) {
-    SPIEL_DCHECK_TRUE(decision_id.BelongsToTree(tree_));
-    SPIEL_DCHECK_LE(0, decision_id.id());
-    SPIEL_DCHECK_LT(decision_id.id(), vec_.size());
-    return vec_[decision_id];
-  }
-  size_t size() const { return vec_.size(); }
+class DecisionVector final : public TreeVector<T, DecisionId> {
+  using TreeVector<T, DecisionId>::TreeVector;
 };
 
 }  // namespace algorithms
