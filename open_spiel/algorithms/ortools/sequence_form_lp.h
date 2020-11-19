@@ -21,8 +21,11 @@
 #include <array>
 #include <unordered_map>
 
+#include "ortools/linear_solver/linear_solver.h"
+
 #include "open_spiel/policy.h"
 #include "open_spiel/algorithms/infostate_tree.h"
+
 
 // An implementation of a sequence-form linear program for computing Nash
 // equilibria in sequential games, based on [1]. The implementation constructs
@@ -38,31 +41,83 @@ namespace open_spiel {
 namespace algorithms {
 namespace ortools {
 
-struct ZeroSumSequentialGameSolution {
-  double game_value;
-  // Optimal policy. Could be computed only for a single player, see below.
-  TabularPolicy policy;
+
+template<class T>
+struct BijectiveContainer {
+  std::map<T, T> x2y;
+  std::map<T, T> y2x;
+
+  void put(std::pair<T, T> xy) {
+    const T& x = xy.first;
+    const T& y = xy.second;
+    SPIEL_CHECK_TRUE(x2y.find(x) == x2y.end());
+    SPIEL_CHECK_TRUE(y2x.find(y) == y2x.end());
+    x2y[x] = y;
+    y2x[y] = x;
+  }
+
+  const std::map<T, T>& association(int direction) const {
+    SPIEL_CHECK_TRUE(direction == 0 || direction == 1);
+    if (direction == 0) return x2y;
+    else return y2x;
+  }
 };
 
-// A basic implementation: computes game value and tabular policy for both
-// players in the whole game.
-std::unique_ptr<ZeroSumSequentialGameSolution> SolveZeroSumSequentialGame(
-    const Game& game);
+BijectiveContainer<const InfostateNode*> ConnectTerminals(
+    const InfostateTree& tree_a, const InfostateTree& tree_b);
 
-// A more advanced implementation, where we can restrict the computation only
-// to a "subset" of the infostate tree (specified by the starting states and
-// their chance reach probabilities).
-// This is useful for the computation of optimal extensions of depth-limited
-// subgames [2].
-//
-// [2]: Value Functions for Depth-Limited Solving in Imperfect-Information Games
-//      https://arxiv.org/abs/1906.06412
-std::unique_ptr<ZeroSumSequentialGameSolution> SolveZeroSumSequentialGame(
-    std::shared_ptr<Observer> infostate_observer,
-    const std::vector<const State*>& start_states,
-    const std::vector<float>& chance_reach_probs,
-    std::optional<int> solve_only_player = {},
-    bool collect_tabular_policy = true);
+// Variables needed for solving the LP.
+struct SolverVariables {
+  operations_research::MPVariable* var_cf_value;
+  operations_research::MPVariable* var_reach_prob;
+  operations_research::MPConstraint* ct_child_cf_value;
+  operations_research::MPConstraint* ct_parent_cf_value;
+  operations_research::MPConstraint* ct_child_reach_prob;
+  operations_research::MPConstraint* ct_parent_reach_prob;
+};
+
+class SequenceFormLpSolver {
+ using MPSolver = operations_research::MPSolver;
+ public:
+  SequenceFormLpSolver(const Game& game);
+
+  SequenceFormLpSolver(
+      std::array<std::shared_ptr<InfostateTree>, 2> solver_trees,
+      MPSolver::OptimizationProblemType type = MPSolver::GLOP_LINEAR_PROGRAMMING);
+
+  // Specify the linear program for given player.
+  void SpecifyLinearProgram(Player pl);
+
+  // Solve the linear program for the given player.
+  // Returns the objective value (root value for the player).
+  double SolveForPlayer(Player pl);
+
+  // Reset the solver and erase all pointers.
+  // This is called automatically when you call SpecifyLinearProgram.
+  void ClearSpecification();
+
+  // Transform the computed sequence form policy into a behavioral policy.
+  // This function can be called only after call for SolveForPlayer().
+  TabularPolicy OptimalPolicy(Player for_player);
+
+  // Transform the computed realization plan into a behavioral policy.
+  // This function can be called only after call for SolveForPlayer().
+  SfStrategy OptimalSfStrategy(Player for_player);
+
+  // For debugging.
+  void PrintProblemSpecification();
+
+ protected:
+  const std::array<std::shared_ptr<InfostateTree>, 2> solver_trees_;
+  const BijectiveContainer<const InfostateNode*> terminal_bijection_;
+  operations_research::MPSolver solver_;
+  std::unordered_map<const InfostateNode*, SolverVariables> data_table_;
+
+  void SpecifyReachProbsConstraints(InfostateNode* node);
+  void SpecifyCfValuesConstraints(InfostateNode* node);
+  void SpecifyRootConstraints(InfostateNode* root_node);
+  void SpecifyObjective(InfostateNode* root_node);
+};
 
 
 }  // namespace ortools

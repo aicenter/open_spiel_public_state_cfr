@@ -27,15 +27,32 @@ constexpr double kErrorTolerance = 1e-14;
 void TestGameValueAndExploitability(const std::string& game_name,
                                     double expected_game_value) {
   std::shared_ptr<const Game> game = LoadGame(game_name);
-  std::unique_ptr<ZeroSumSequentialGameSolution> solution =
-      SolveZeroSumSequentialGame(*game);
-  SPIEL_CHECK_FLOAT_NEAR(solution->game_value, expected_game_value,
+  SequenceFormLpSolver solver(*game);
+  solver.SpecifyLinearProgram(0);
+  double actual_game_value = solver.SolveForPlayer(0);
+  SPIEL_CHECK_FLOAT_NEAR(actual_game_value, expected_game_value,
                          kErrorTolerance);
 
+  // Compute policy for the opponent.
+  TabularPolicy policy0 = solver.OptimalPolicy(0);
+  solver.SpecifyLinearProgram(1);
+  double opponent_game_value = solver.SolveForPlayer(1);
+  SPIEL_CHECK_FLOAT_NEAR(actual_game_value + opponent_game_value,
+                         0., kErrorTolerance);
+  TabularPolicy policy1 = solver.OptimalPolicy(1);
+
+  // Test exploitability -- this is implemented only for simultaneous games.
   if (game->GetType().dynamics == GameType::Dynamics::kSimultaneous)
     return;
-  SPIEL_CHECK_FLOAT_NEAR(Exploitability(*game, solution->policy), 0.,
-                         kErrorTolerance);
+
+  // Merge the two tables.
+  std::unordered_map<std::string, ActionsAndProbs> profile_table =
+      policy0.PolicyTable();
+  profile_table.insert(policy1.PolicyTable().begin(),
+                       policy1.PolicyTable().end());
+  TabularPolicy optimal_profile(profile_table);
+  SPIEL_CHECK_FLOAT_NEAR(Exploitability(*game, optimal_profile),
+                         0., kErrorTolerance);
 }
 
 
