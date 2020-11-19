@@ -22,11 +22,13 @@
 #include <cstdint>
 #include <limits>
 #include <locale>
+#include <map>
 #include <random>
 #include <sstream>
 #include <string>
 #include <type_traits>
 #include <utility>
+#include <unordered_map>
 #include <vector>
 
 #include "open_spiel/abseil-cpp/absl/random/uniform_real_distribution.h"
@@ -57,6 +59,10 @@ template <typename T, typename U>
 std::ostream& operator<<(std::ostream& stream, const std::pair<T, U>& v);
 template <typename T>
 std::ostream& operator<<(std::ostream& stream, const std::vector<T>& v);
+template <typename K, typename V>
+std::ostream& operator<<(std::ostream& stream, const std::unordered_map<K, V>& m);
+template <typename K, typename V>
+std::ostream& operator<<(std::ostream& stream, const std::map<K, V>& m);
 template <typename T, std::size_t N>
 std::ostream& operator<<(std::ostream& stream, const std::array<T, N>& v);
 template <typename T>
@@ -78,6 +84,22 @@ std::ostream& operator<<(std::ostream& stream, absl::Span<T> v) {
 template <typename T>
 std::ostream& operator<<(std::ostream& stream, const std::vector<T>& v) {
   return stream << absl::MakeSpan(v);
+}
+template <typename K, typename V>
+std::ostream& operator<<(std::ostream& stream, const std::unordered_map<K, V>& m) {
+  stream << '{';
+  for (const auto& [k,v] : m) {
+    stream << k << ':' << v << ',';
+  }
+  return stream << '}';
+}
+template <typename K, typename V>
+std::ostream& operator<<(std::ostream& stream, const std::map<K, V>& m) {
+  stream << '{';
+  for (const auto& [k,v] : m) {
+    stream << k << ':' << v << ',';
+  }
+  return stream << '}';
 }
 template <typename T, std::size_t N>
 std::ostream& operator<<(std::ostream& stream, const std::array<T, N>& v) {
