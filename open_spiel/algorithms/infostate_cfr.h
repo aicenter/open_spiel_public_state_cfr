@@ -71,6 +71,12 @@ class DecisionVector<CFRInfoStateValues> {
     SPIEL_DCHECK_LT(decision_id.id(), vec_.size());
     return vec_[decision_id.id()];
   }
+  const CFRInfoStateValues& operator[](const DecisionId& decision_id) const {
+    SPIEL_DCHECK_TRUE(decision_id.BelongsToTree(tree_));
+    SPIEL_DCHECK_LE(0, decision_id.id());
+    SPIEL_DCHECK_LT(decision_id.id(), vec_.size());
+    return vec_[decision_id.id()];
+  }
   auto begin() { return vec_.begin(); }
   auto end() { return vec_.end(); }
 };
