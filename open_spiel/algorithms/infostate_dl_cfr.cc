@@ -80,41 +80,13 @@ DepthLimitedCFR::DepthLimitedCFR(
                     std::move(terminal_evaluator),
                     game->MakeObserver(kPublicStateObsType, {})) {}
 
-void FillStatesAndChanceRange(std::vector<const State*>* start_states,
-                              std::vector<float>* chance_reach_probs,
-                              absl::Span<const InfostateNode* const> start_nodes) {
-  // Collect pointers to starting states, along with their reach probs.
-  // It's enough to do this just through one player, as the other player
-  // has just a permutation of these states.
-  for (const InfostateNode* cfr_node : start_nodes) {
-    SPIEL_CHECK_EQ(cfr_node->corresponding_states().size(),
-                   cfr_node->corresponding_chance_reach_probs().size());
-    for (int i = 0; i < cfr_node->corresponding_states().size(); ++i) {
-      start_states->push_back(
-          cfr_node->corresponding_states()[i].get());
-      chance_reach_probs->push_back(
-          cfr_node->corresponding_chance_reach_probs()[i]);
-    }
-  }
-}
 
 std::array<std::shared_ptr<InfostateTree>, 2> CreateTrees(
     std::array<absl::Span<const InfostateNode* const>, 2> start_nodes,
-    const std::shared_ptr<Observer>& infostate_observer,
     int max_move_limit) {
-  std::array<std::vector<const State*>, 2> start_states;
-  std::array<std::vector<float>, 2> chance_reach_probs;
-
-  FillStatesAndChanceRange(&start_states[0], &chance_reach_probs[0],
-                           start_nodes[0]);
-  FillStatesAndChanceRange(&start_states[1], &chance_reach_probs[1],
-                           start_nodes[1]);
 
   return {
-      MakeInfostateTree(start_states[0], chance_reach_probs[0],
-                        infostate_observer, /*acting_player=*/0, max_move_limit),
-      MakeInfostateTree(start_states[1], chance_reach_probs[1],
-                        infostate_observer, /*acting_player=*/1, max_move_limit)
+
   };
 }
 
@@ -399,8 +371,10 @@ CFREvaluator::CFREvaluator(std::shared_ptr<const Game> game, int depth_limit,
 std::unique_ptr<PublicStateContext> CFREvaluator::CreateContext(
     const LeafPublicState& state) const {
   auto dlcfr = std::make_unique<DepthLimitedCFR>(
-      game, CreateTrees({state.leaf_nodes[0], state.leaf_nodes[1]},
-                        infostate_observer, depth_limit),
+      game, std::array{
+          MakeInfostateTree(state.leaf_nodes[0], depth_limit),
+          MakeInfostateTree(state.leaf_nodes[1], depth_limit)
+      },
       leaf_evaluator, terminal_evaluator, public_observer);
   auto cfr_public_state = std::make_unique<CFRPublicState>(std::move(dlcfr));
   SPIEL_DCHECK_TRUE(
