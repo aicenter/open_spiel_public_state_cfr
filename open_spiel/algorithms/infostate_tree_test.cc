@@ -158,7 +158,6 @@ void TestRootCertificates() {
     std::shared_ptr<InfostateTree> tree = MakeTree("kuhn_poker", /*player=*/1);
     SPIEL_CHECK_EQ(tree->root().MakeCertificate(), expected_certificate);
   }
-
   {
     std::string expected_certificate =
       "(["
@@ -290,7 +289,7 @@ void CheckTreeLeaves(const InfostateTree& tree, int move_limit) {
     // The conditions are following:
     // - either all states are terminal, and have the same MoveNumber() that
     //   is less or equal to move_limit,
-    // - or all states are non-terminal and the MoveNumber() == move_limit.
+    // - or not all states are terminal and the MoveNumber() == move_limit.
 
     const int num_states = leaf_node->corresponding_states().size();
     int terminal_cnt = 0;
@@ -411,13 +410,10 @@ void TestSequenceIdLabeling() {
       depth = node->depth();
       // Longer sequences (extensions) must have the corresponding
       // infostate nodes placed deeper.
-//      int num_children = 0;
       for (SequenceId extension : node->AllSequenceIds()) {
         InfostateNode* child = tree->observation_infostate(extension);
         SPIEL_CHECK_LT(node->depth(), child->depth());
-//        ++num_children;
       }
-//      SPIEL_CHECK_EQ(node->num_children(), num_children);
     }
   }
 }

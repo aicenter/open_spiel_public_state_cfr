@@ -30,7 +30,8 @@ namespace {
 
 void TestLinkingWithOpenSpielCore() {
   std::cout << "Running open_spiel_core" << '\n';
-  std::shared_ptr<const open_spiel::Game> game = open_spiel::LoadGame("kuhn_poker");
+  std::shared_ptr<const open_spiel::Game> game =
+      open_spiel::LoadGame("kuhn_poker");
   SPIEL_CHECK_EQ(game->GetType().short_name, "kuhn_poker");
 }
 

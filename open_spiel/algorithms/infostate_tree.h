@@ -25,7 +25,7 @@
 // Specifically, we implement an infostate tree, a representation of a game
 // from the perspective of an acting player.
 //
-// The information-state tree contains information states [1], which describe
+// The information-state tree [1] contains information states, which describe
 // where the player is a) acting, b) getting observations, or c) receiving
 // terminal utilities (when the game ends). See `InfostateNodeType` for more
 // details.
@@ -42,11 +42,11 @@
 //
 // - `DecisionId` refers to a decision infostate where the player acts.
 // - `SequenceId` refers to an observation infostate that follows the decision
-//    infostate after following some action.
+//    infostate after some action.
 // - `LeafId` refers to an infostate node which is a leaf.
 //
-// All of these ids are very cheap (they are just typed `size_t`s) and they can
-// be used to get a pointer to the corresponding infostate node.
+// All of these ids are very cheap (they are just typed `size_t`s).
+// They can be used to get a pointer to the corresponding infostate node.
 //
 // To enable some algorithmic optimizations we construct the trees "balanced".
 // We call a _balanced_ tree one which has all leaf nodes at the same depth.
@@ -55,7 +55,7 @@
 // as most games are balanced by default due to game rules.
 //
 // [1]: Rethinking Formal Models of Partially Observable Multiagent Decision
-//      Making https://arxiv.org/pdf/1906.11110.pdf
+//      Making https://arxiv.org/abs/1906.11110
 
 namespace open_spiel {
 namespace algorithms {
@@ -77,7 +77,7 @@ namespace algorithms {
 //
 // [2]: Faster Game Solving via Predictive Blackwell Approachability:
 //      Connecting Regret Matching and Mirror Descent
-//      https://arxiv.org/pdf/2007.14358.pdf.
+//      https://arxiv.org/abs/2007.14358
 enum InfostateNodeType {
   kDecisionInfostateNode,
   kObservationInfostateNode,

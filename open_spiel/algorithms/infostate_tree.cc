@@ -21,7 +21,8 @@
 #include <utility>
 #include <vector>
 
-#include "open_spiel/utils/action_view.h"
+#include "open_spiel/action_view.h"
+
 
 namespace open_spiel {
 namespace algorithms {
@@ -363,8 +364,9 @@ void InfostateTree::BuildDecisionNode(
     // Fetches the observation child and goes deeper recursively.
     SPIEL_DCHECK_EQ(decision_node->type(), kDecisionInfostateNode);
 
-    if (is_leaf_node)  // Do not build deeper.
+    if (is_leaf_node) {  // Do not build deeper.
       return UpdateLeafNode(decision_node, state, depth, chance_reach_prob);
+    }
 
     if (state.IsSimultaneousNode()) {
       const ActionView action_view(state);
@@ -397,8 +399,9 @@ void InfostateTree::BuildDecisionNode(
         parent, kDecisionInfostateNode, info_state,
         /*terminal_utility=*/NAN, /*chance_reach_prob=*/NAN, depth, &state));
 
-    if (is_leaf_node)  // Do not build deeper.
+    if (is_leaf_node) {  // Do not build deeper.
       return UpdateLeafNode(decision_node, state, depth, chance_reach_prob);
+    }
 
     // Build observation nodes right away after the decision node.
     // This is because the player might be acting multiple times in a row:
@@ -461,8 +464,9 @@ void InfostateTree::BuildObservationNode(
   }
   SPIEL_DCHECK_EQ(observation_node->type(), kObservationInfostateNode);
 
-  if (is_leaf_node)  // Do not build deeper.
+  if (is_leaf_node) {  // Do not build deeper.
     return UpdateLeafNode(observation_node, state, depth, chance_reach_prob);
+  }
 
   if (state.IsChanceNode()) {
     for (std::pair<Action, double> action_prob : state.ChanceOutcomes()) {
