@@ -1,4 +1,6 @@
 add_library (algorithms OBJECT
+  bandits.cc
+  bandits.h
   best_response.cc
   best_response.h
   cfr.cc
@@ -69,6 +71,10 @@ target_include_directories (algorithms PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 if (${BUILD_WITH_ORTOOLS})
   add_subdirectory (ortools)
 endif()
+
+add_executable(bandits_test bandits_test.cc
+        $<TARGET_OBJECTS:algorithms> ${OPEN_SPIEL_OBJECTS})
+add_test(bandits_test bandits_test)
 
 add_executable(best_response_test best_response_test.cc
         $<TARGET_OBJECTS:algorithms> ${OPEN_SPIEL_OBJECTS})
