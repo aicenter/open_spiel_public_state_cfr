@@ -26,7 +26,7 @@ RegretMatching::RegretMatching(size_t num_actions)
       cumulative_strategy_(num_actions, 0.),
       current_strategy_(num_actions, 1. / num_actions) {}
 
-const std::vector<double>& RegretMatching::NextStrategy() {
+const std::vector<double>& RegretMatching::NextStrategy(double weight) {
   double positive_regrets_sum = 0.;
   for (double regret : cumulative_regrets_) {
     positive_regrets_sum += regret > 0. ? regret : 0.;
@@ -45,7 +45,7 @@ const std::vector<double>& RegretMatching::NextStrategy() {
   }
 
   for (int i = 0; i < num_actions_; ++i) {
-    cumulative_strategy_[i] += current_strategy_[i];
+    cumulative_strategy_[i] += weight * current_strategy_[i];
   }
   return current_strategy_;
 }
@@ -95,7 +95,7 @@ RegretMatchingPlus::RegretMatchingPlus(size_t num_actions)
       current_strategy_(num_actions, 1. / num_actions),
       time_(1) {}
 
-const std::vector<double>& RegretMatchingPlus::NextStrategy() {
+const std::vector<double>& RegretMatchingPlus::NextStrategy(double weight) {
   double positive_regrets_sum = 0.;
   for (double regret : cumulative_regrets_) {
     positive_regrets_sum += regret > 0. ? regret : 0.;
@@ -114,7 +114,7 @@ const std::vector<double>& RegretMatchingPlus::NextStrategy() {
   }
 
   for (int i = 0; i < num_actions_; ++i) {
-    cumulative_strategy_[i] += time_ * current_strategy_[i];
+    cumulative_strategy_[i] += time_ * weight * current_strategy_[i];
   }
   ++time_;
   return current_strategy_;
