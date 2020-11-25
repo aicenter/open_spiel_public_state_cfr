@@ -23,10 +23,9 @@ namespace bandits {
 RegretMatching::RegretMatching(size_t num_actions)
     : Bandit(num_actions),
       cumulative_regrets_(num_actions, 0.),
-      cumulative_strategy_(num_actions, 0.),
-      current_strategy_(num_actions, 1. / num_actions) {}
+      cumulative_strategy_(num_actions, 0.)  {}
 
-const std::vector<double>& RegretMatching::NextStrategy(double weight) {
+void RegretMatching::ComputeStrategy(size_t current_time, double weight) {
   double positive_regrets_sum = 0.;
   for (double regret : cumulative_regrets_) {
     positive_regrets_sum += regret > 0. ? regret : 0.;
@@ -47,7 +46,6 @@ const std::vector<double>& RegretMatching::NextStrategy(double weight) {
   for (int i = 0; i < num_actions_; ++i) {
     cumulative_strategy_[i] += weight * current_strategy_[i];
   }
-  return current_strategy_;
 }
 
 void RegretMatching::ObserveLoss(absl::Span<const double> loss) {
@@ -80,10 +78,9 @@ std::vector<double> RegretMatching::AverageStrategy() {
 }
 
 void RegretMatching::Reset() {
+  Bandit::Reset();
   std::fill(cumulative_regrets_.begin(), cumulative_regrets_.end(), 0.);
   std::fill(cumulative_strategy_.begin(), cumulative_strategy_.end(), 0.);
-  std::fill(current_strategy_.begin(), current_strategy_.end(),
-            1. / num_actions_);
 }
 
 // -- RegretMatchingPlus -------------------------------------------------------
@@ -91,11 +88,9 @@ void RegretMatching::Reset() {
 RegretMatchingPlus::RegretMatchingPlus(size_t num_actions)
     : Bandit(num_actions),
       cumulative_regrets_(num_actions, 0.),
-      cumulative_strategy_(num_actions, 0.),
-      current_strategy_(num_actions, 1. / num_actions),
-      time_(1) {}
+      cumulative_strategy_(num_actions, 0.) {}
 
-const std::vector<double>& RegretMatchingPlus::NextStrategy(double weight) {
+void RegretMatchingPlus::ComputeStrategy(size_t current_time, double weight) {
   double positive_regrets_sum = 0.;
   for (double regret : cumulative_regrets_) {
     positive_regrets_sum += regret > 0. ? regret : 0.;
@@ -114,9 +109,8 @@ const std::vector<double>& RegretMatchingPlus::NextStrategy(double weight) {
   }
 
   for (int i = 0; i < num_actions_; ++i) {
-    cumulative_strategy_[i] += time_ * weight * current_strategy_[i];
+    cumulative_strategy_[i] += current_time * weight * current_strategy_[i];
   }
-  ++time_;
   return current_strategy_;
 }
 
@@ -150,11 +144,9 @@ std::vector<double> RegretMatchingPlus::AverageStrategy() {
 }
 
 void RegretMatchingPlus::Reset() {
+  Bandit::Reset();
   std::fill(cumulative_regrets_.begin(), cumulative_regrets_.end(), 0.);
   std::fill(cumulative_strategy_.begin(), cumulative_strategy_.end(), 0.);
-  std::fill(current_strategy_.begin(), current_strategy_.end(),
-            1. / num_actions_);
-  time_ = 1;
 }
 
 // TODO:
