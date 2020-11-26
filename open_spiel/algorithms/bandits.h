@@ -15,6 +15,7 @@
 #ifndef OPEN_SPIEL_ALGORITHMS_BANDITS_H_
 #define OPEN_SPIEL_ALGORITHMS_BANDITS_H_
 
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -52,6 +53,7 @@ namespace open_spiel {
 namespace algorithms {
 namespace bandits {
 
+// Base class for all bandit algorithms.
 class Bandit {
  protected:
   const size_t num_actions_;
@@ -108,6 +110,40 @@ class Bandit {
   virtual bool uses_context() { return false; }
   virtual void ObserveContext(absl::Span<const double> context) {
     SpielFatalError("ObserveContext() is not implemented.");
+  }
+};
+
+// A bandit that always returns the same strategy.
+class FixedStrategy final : public Bandit {
+ public:
+  FixedStrategy(const std::vector<double>& fixed_strategy)
+      : Bandit(fixed_strategy.size()) {
+    std::copy(fixed_strategy.begin(), fixed_strategy.end(),
+              current_strategy_.begin());
+  }
+  void ComputeStrategy(size_t current_time, double weight = 1.) override {}
+  void ObserveLoss(absl::Span<const double> loss) override {}
+  void Reset() override {}  // No need to reset anything.
+};
+
+// A bandit that chooses an action with the smallest loss.
+// In time t=1, it chooses uniform strategy.
+class BestResponse final : public Bandit {
+  size_t response_index_ = 0;
+ public:
+  BestResponse(size_t num_actions) : Bandit(num_actions) {}
+  void ComputeStrategy(size_t current_time, double weight = 1.) override {
+    std::fill(current_strategy_.begin(), current_strategy_.end(), 0.);
+    current_strategy_[response_index_] = 1.;
+  }
+  void ObserveLoss(absl::Span<const double> loss) override {
+    SPIEL_DCHECK_EQ(loss.size(), current_strategy_.size());
+    auto iter_min = std::min_element(loss.begin(), loss.end());
+    response_index_ = std::distance(loss.begin(), iter_min);
+  };
+  void Reset() override {
+    Bandit::Reset();
+    response_index_ = 0;
   }
 };
 
@@ -313,18 +349,6 @@ class OptimisticHedge final : public Bandit {
 class UpperConfidenceBounds final : public Bandit {
  public:
   UpperConfidenceBounds(size_t num_actions);
-  bool uses_average_strategy() override { return true; }
-  bool uses_predictions() override { return true; }
-
-  void ComputeStrategy(size_t current_time, double weight = 1.) override;
-  void ObserveLoss(absl::Span<const double> loss) override;
-  std::vector<double> AverageStrategy() override;
-  void Reset() override;
-};
-
-class EpsGreedy final : public Bandit {
- public:
-  EpsGreedy(size_t num_actions);
   bool uses_average_strategy() override { return true; }
   bool uses_predictions() override { return true; }
 
