@@ -32,46 +32,46 @@ void RegretMatching::ComputeStrategy(size_t current_time, double weight) {
   }
 
   if (positive_regrets_sum) {
-    for (int i = 0; i < num_actions_; ++i) {
+    for (int i = 0; i < num_actions(); ++i) {
       const double regret = cumulative_regrets_[i];
       current_strategy_[i] =
           (regret > 0. ? regret : 0.) / positive_regrets_sum;
     }
   } else {
-    for (int i = 0; i < num_actions_; ++i) {
-      current_strategy_[i] = 1. / num_actions_;
+    for (int i = 0; i < num_actions(); ++i) {
+      current_strategy_[i] = 1. / num_actions();
     }
   }
 
-  for (int i = 0; i < num_actions_; ++i) {
+  for (int i = 0; i < num_actions(); ++i) {
     cumulative_strategy_[i] += weight * current_strategy_[i];
   }
 }
 
 void RegretMatching::ObserveLoss(absl::Span<const double> loss) {
-  SPIEL_DCHECK_EQ(loss.size(), num_actions_);
+  SPIEL_DCHECK_EQ(loss.size(), num_actions());
   double v = 0.;
-  for (int i = 0; i < num_actions_; ++i) {
+  for (int i = 0; i < num_actions(); ++i) {
     v += loss[i] * current_strategy_[i];
   }
-  for (int i = 0; i < num_actions_; ++i) {
+  for (int i = 0; i < num_actions(); ++i) {
     cumulative_regrets_[i] += v - loss[i];
   }
 }
 
 std::vector<double> RegretMatching::AverageStrategy() {
   std::vector<double> strategy;
-  strategy.reserve(num_actions_);
+  strategy.reserve(num_actions());
   double normalization = 0.;
   for (double action : cumulative_strategy_) normalization += action;
 
   if (normalization) {
-    for (int i = 0; i < num_actions_; ++i) {
+    for (int i = 0; i < num_actions(); ++i) {
       strategy.push_back(cumulative_strategy_[i] / normalization);
     }
   } else {
-    for (int i = 0; i < num_actions_; ++i) {
-      strategy.push_back(1. / num_actions_);
+    for (int i = 0; i < num_actions(); ++i) {
+      strategy.push_back(1. / num_actions());
     }
   }
   return strategy;
@@ -97,47 +97,47 @@ void RegretMatchingPlus::ComputeStrategy(size_t current_time, double weight) {
   }
 
   if (positive_regrets_sum) {
-    for (int i = 0; i < num_actions_; ++i) {
+    for (int i = 0; i < num_actions(); ++i) {
       const double regret = cumulative_regrets_[i];
       current_strategy_[i] =
           (regret > 0. ? regret : 0.) / positive_regrets_sum;
     }
   } else {
-    for (int i = 0; i < num_actions_; ++i) {
-      current_strategy_[i] = 1. / num_actions_;
+    for (int i = 0; i < num_actions(); ++i) {
+      current_strategy_[i] = 1. / num_actions();
     }
   }
 
-  for (int i = 0; i < num_actions_; ++i) {
+  for (int i = 0; i < num_actions(); ++i) {
     cumulative_strategy_[i] += current_time * weight * current_strategy_[i];
   }
   return current_strategy_;
 }
 
 void RegretMatchingPlus::ObserveLoss(absl::Span<const double> loss) {
-  SPIEL_DCHECK_EQ(loss.size(), num_actions_);
+  SPIEL_DCHECK_EQ(loss.size(), num_actions());
   double v = 0.;
-  for (int i = 0; i < num_actions_; ++i) {
+  for (int i = 0; i < num_actions(); ++i) {
     v += loss[i] * current_strategy_[i];
   }
-  for (int i = 0; i < num_actions_; ++i) {
+  for (int i = 0; i < num_actions(); ++i) {
     cumulative_regrets_[i] = std::fmax(0, cumulative_regrets_[i] + v - loss[i]);
   }
 }
 
 std::vector<double> RegretMatchingPlus::AverageStrategy() {
   std::vector<double> strategy;
-  strategy.reserve(num_actions_);
+  strategy.reserve(num_actions());
   double normalization = 0.;
   for (double action : cumulative_strategy_) normalization += action;
 
   if (normalization) {
-    for (int i = 0; i < num_actions_; ++i) {
+    for (int i = 0; i < num_actions(); ++i) {
       strategy.push_back(cumulative_strategy_[i] / normalization);
     }
   } else {
-    for (int i = 0; i < num_actions_; ++i) {
-      strategy.push_back(1. / num_actions_);
+    for (int i = 0; i < num_actions(); ++i) {
+      strategy.push_back(1. / num_actions());
     }
   }
   return strategy;
