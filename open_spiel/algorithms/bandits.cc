@@ -59,7 +59,7 @@ void RegretMatching::ObserveLoss(absl::Span<const double> loss) {
   }
 }
 
-std::vector<double> RegretMatching::AverageStrategy() {
+std::vector<double> RegretMatching::AverageStrategy() const {
   std::vector<double> strategy;
   strategy.reserve(num_actions());
   double normalization = 0.;
@@ -125,7 +125,7 @@ void RegretMatchingPlus::ObserveLoss(absl::Span<const double> loss) {
   }
 }
 
-std::vector<double> RegretMatchingPlus::AverageStrategy() {
+std::vector<double> RegretMatchingPlus::AverageStrategy() const {
   std::vector<double> strategy;
   strategy.reserve(num_actions());
   double normalization = 0.;
