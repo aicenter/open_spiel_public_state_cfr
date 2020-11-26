@@ -702,6 +702,15 @@ DecisionId InfostateTree::DecisionIdFromInfostateString(
   return kUndefinedDecisionId;
 }
 
+const InfostateNode* InfostateTree::DecisionNodeFromInfostateString(
+    const std::string& infostate_string) const {
+  for (InfostateNode* node : decision_infostates_) {
+    if (node->infostate_string() == infostate_string)
+      return node;
+  }
+  return nullptr;
+}
+
 bool CheckSum(const SfStrategy& strategy, SequenceId id, double expected_sum) {
   if (fabs(strategy[id] - expected_sum) > 1e-13) {
     return false;

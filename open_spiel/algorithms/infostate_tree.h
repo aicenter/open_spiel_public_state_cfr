@@ -362,6 +362,8 @@ class InfostateTree final {
   }
   DecisionId DecisionIdFromInfostateString(
       const std::string& infostate_string) const;
+  const InfostateNode* DecisionNodeFromInfostateString(
+      const std::string& infostate_string) const;
 
   // -- Leaf operations --------------------------------------------------------
   const std::vector<InfostateNode*>& leaf_nodes() const {
