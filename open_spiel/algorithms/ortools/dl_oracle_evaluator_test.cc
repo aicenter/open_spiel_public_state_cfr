@@ -32,7 +32,7 @@ void SetKuhnParametricPolicy(dlcfr::DepthLimitedCFR* dl_solver, double a) {
   // Set strategy as described in https://en.wikipedia.org/wiki/Kuhn_poker
 
   // Player 0
-  const std::shared_ptr<InfostateTree> tree0 = dl_solver->Trees()[0];
+  const std::shared_ptr<InfostateTree> tree0 = dl_solver->trees()[0];
   DecisionId jack     = tree0->DecisionIdFromInfostateString("0");
   DecisionId jack_pb  = tree0->DecisionIdFromInfostateString("0pb");
   DecisionId queen    = tree0->DecisionIdFromInfostateString("1");
@@ -49,7 +49,7 @@ void SetKuhnParametricPolicy(dlcfr::DepthLimitedCFR* dl_solver, double a) {
   if (!king_pb.is_undefined())  vec0[king_pb ].cumulative_policy = { 0.          , 1.         };
 
   // Player 1
-  const std::shared_ptr<InfostateTree> tree1 = dl_solver->Trees()[1];
+  const std::shared_ptr<InfostateTree> tree1 = dl_solver->trees()[1];
   DecisionId jack_p  = tree0->DecisionIdFromInfostateString("0p");
   DecisionId jack_b  = tree0->DecisionIdFromInfostateString("0b");
   DecisionId queen_p = tree0->DecisionIdFromInfostateString("1p");
@@ -76,7 +76,7 @@ void TestOptimalValuesKuhnBettingPublicState() {
       dlcfr::MakeTerminalEvaluator();
   dlcfr::DepthLimitedCFR dl_solver(game, /*trunk_depth_limit=*/3,
                                    leaf_evaluator, terminal_evaluator);
-  dlcfr::LeafPublicState& bet_state = dl_solver.GetPublicLeaves()[1];
+  dlcfr::LeafPublicState& bet_state = dl_solver.public_leaves()[1];
 
   // Make sure there is no regression and infostates are properly arranged
   // as when writing this test.

@@ -135,13 +135,12 @@ class DepthLimitedCFR {
   double RootValue(Player pl = 0) const;
   std::array<absl::Span<const double>, 2> RootChildrenCfValues() const;
 
-  std::array<const InfostateNode*, 2> Roots() const;
-  std::vector<std::shared_ptr<InfostateTree>>& Trees();
+  std::vector<std::shared_ptr<InfostateTree>>& trees() { return trees_; }
   std::vector<BanditVector>& bandits() { return bandits_; }
-
-
-  std::vector<std::unique_ptr<PublicStateContext>>& GetContexts();
-  std::vector<LeafPublicState>& GetPublicLeaves();
+  std::vector<std::unique_ptr<PublicStateContext>>& contexts() {
+    return contexts_;
+  }
+  std::vector<LeafPublicState>& public_leaves() { return public_leaves_; }
 
   // Trunk evaluation.
   std::shared_ptr<Policy> AveragePolicy();

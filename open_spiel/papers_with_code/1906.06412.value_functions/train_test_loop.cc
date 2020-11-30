@@ -147,16 +147,16 @@ void TrainEvalLoop(
 
   // 3. Make a Batch of data that encompasses all leaf public states.
   std::array<RangeTable, 2> tables = CreateRangeTables(
-      *game, hand_observer, trunk_with_oracle->GetPublicLeaves());
+      *game, hand_observer, trunk_with_oracle->public_leaves());
   const dlcfr::LeafPublicState& some_leaf =
-      trunk_with_oracle->GetPublicLeaves().at(0);
+      trunk_with_oracle->public_leaves().at(0);
   const size_t encoding_size = some_leaf.public_tensor.size();
   std::array<size_t, 2> ranges_size = {tables[0].largest_range(),
                                        tables[1].largest_range()};
   const size_t range_size_sum = ranges_size[0] + ranges_size[1];
   const size_t input_size = encoding_size + range_size_sum;
   const size_t output_size = range_size_sum;
-  BatchData batch(trunk_with_oracle->GetPublicLeaves(),
+  BatchData batch(trunk_with_oracle->public_leaves(),
                   input_size, output_size, encoding_size, ranges_size);
 
   // 4. Create network and optimizer.

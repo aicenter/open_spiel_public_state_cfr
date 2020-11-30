@@ -138,7 +138,9 @@ class InfostateCFR {
   std::shared_ptr<Policy> CurrentPolicy();
 
   const std::vector<BanditVector>& bandits() const { return bandits_; }
-  const std::vector<std::shared_ptr<InfostateTree>>& trees() const { return trees_; }
+  const std::vector<std::shared_ptr<InfostateTree>>& trees() const {
+    return trees_;
+  }
 
  private:
   void PrepareTerminals();
@@ -156,10 +158,10 @@ class InfostateCFR {
   // For the player 0 and already multiplied by chance reach probs.
   std::vector<double> terminal_values_;
 
-  // Mutable values to keep track of.
+  // Mutable values to keep track of for each tree.
   // These have the size of largest depth of the tree (i.e. leaf nodes).
-  std::array<std::vector<double>, 2> reach_probs_;
-  std::array<std::vector<double>, 2> cf_values_;
+  std::vector<std::vector<double>> reach_probs_;
+  std::vector<std::vector<double>> cf_values_;
 
   std::vector<BanditVector> bandits_;
 

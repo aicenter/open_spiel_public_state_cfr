@@ -326,11 +326,12 @@ bool LeafPublicState::IsTerminal() const {
 
 bool CheckChildPublicStateConsistency(
     const CFRPublicState& cfr_public_state, const LeafPublicState& leaf_state) {
-  std::array<const InfostateNode*, 2> roots = cfr_public_state.dlcfr->Roots();
+  auto trees = cfr_public_state.dlcfr->trees();
   for (int pl = 0; pl < 2; ++pl) {
-    SPIEL_CHECK_EQ(leaf_state.leaf_nodes[pl].size(), roots[pl]->num_children());
-    for (int i = 0; i < roots[pl]->num_children(); ++i) {
-      const InfostateNode& actual = *roots[pl]->child_at(i);
+    const InfostateNode& root = trees[pl]->root();
+    SPIEL_CHECK_EQ(leaf_state.leaf_nodes[pl].size(), root.num_children());
+    for (int i = 0; i < root.num_children(); ++i) {
+      const InfostateNode& actual = *root.child_at(i);
       const InfostateNode& expected = *leaf_state.leaf_nodes[pl][i];
       SPIEL_CHECK_EQ(actual.infostate_string(), expected.infostate_string());
     }
@@ -420,16 +421,6 @@ double DepthLimitedCFR::RootValue(Player pl) const {
   return RootCfValue(
       root_branching, absl::MakeConstSpan(&cf_values_[pl][0], root_branching),
       player_ranges_[pl]);
-}
-std::array<const InfostateNode*, 2> DepthLimitedCFR::Roots() const {
-  return {&trees_[0]->root(), &trees_[1]->root()};
-}
-std::vector<std::shared_ptr<InfostateTree>>& DepthLimitedCFR::Trees() { return trees_; }
-std::vector<std::unique_ptr<PublicStateContext>>& DepthLimitedCFR::GetContexts() {
-  return contexts_;
-}
-std::vector<LeafPublicState>& DepthLimitedCFR::GetPublicLeaves() {
-  return public_leaves_;
 }
 
 }  // namespace dlcfr

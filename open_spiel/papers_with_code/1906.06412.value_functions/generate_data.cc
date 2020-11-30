@@ -71,7 +71,7 @@ void PlacementCopy(absl::Span<const float> from, absl::Span<float> to,
 void CopyRangesAndValues(dlcfr::DepthLimitedCFR* trunk,
                          const std::array<RangeTable, 2>& tables,
                          BatchData* batch) {
-  const std::vector<dlcfr::LeafPublicState>& leaves = trunk->GetPublicLeaves();
+  const std::vector<dlcfr::LeafPublicState>& leaves = trunk->public_leaves();
   for (int i = 0; i < leaves.size(); ++i) {
     for (int pl = 0; pl < 2; ++pl) {
       PlacementCopy(absl::MakeSpan(leaves[i].ranges[pl]),

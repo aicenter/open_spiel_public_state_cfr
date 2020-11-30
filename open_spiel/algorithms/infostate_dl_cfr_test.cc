@@ -120,7 +120,7 @@ void TestRecursiveDepthLimitedSolving(const std::string& game_name) {
       std::shared_ptr<Policy> dl_avg = dl_solver->AveragePolicy();
       std::shared_ptr<Policy> vec_cur = vec_solver.CurrentPolicy();
       std::shared_ptr<Policy> dl_cur = dl_solver->CurrentPolicy();
-      auto trees = dl_solver->Trees();
+      auto trees = dl_solver->trees();
 
       for (int j = 0; j < trunk_iterations; ++j) {
         vec_solver.RunSimultaneousIterations(1);
