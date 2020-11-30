@@ -17,6 +17,7 @@
 #include <cmath>
 #include <iostream>
 
+#include "open_spiel/algorithms/cfr.h"
 #include "open_spiel/algorithms/infostate_tree.h"
 #include "open_spiel/algorithms/expected_returns.h"
 #include "open_spiel/algorithms/tabular_exploitability.h"
@@ -72,6 +73,12 @@ void CFRTest_MatchingPennies() {
 
   // Running iterations should not change the policy,
   // as uniform is already an equilibrium.
+  solver.RunAlternatingIterations(1);
+  CheckReturnsMatchingPennies(*game, *average_policy);
+
+  solver.RunSimultaneousIterations(1);
+  CheckReturnsMatchingPennies(*game, *average_policy);
+
   solver.RunAlternatingIterations(10);
   CheckReturnsMatchingPennies(*game, *average_policy);
 
@@ -118,6 +125,17 @@ void CFRTest_IIGoof4() {
       RootExpectedReturns(*game->NewInitialState(), *average_policy), 0.01);
 }
 
+void CheckInfostatePolicy(
+    const std::string& infostate, const Policy& a, const Policy& b) {
+  ActionsAndProbs vec_policy = a.GetStatePolicy(infostate);
+  ActionsAndProbs str_policy = b.GetStatePolicy(infostate);
+  SPIEL_CHECK_EQ(vec_policy.size(), str_policy.size());
+  for (int j = 0; j < vec_policy.size(); ++j) {
+    SPIEL_CHECK_EQ(vec_policy[j].first, str_policy[j].first);
+    SPIEL_CHECK_FLOAT_NEAR(vec_policy[j].second, str_policy[j].second, 1e-6);
+  }
+}
+
 void TestImplementationsHaveSameIterations() {
   std::shared_ptr<const Game> game = LoadGame("kuhn_poker");
   const int cfr_iterations = 10;
@@ -127,34 +145,20 @@ void TestImplementationsHaveSameIterations() {
                                   /*linear_averaging=*/false,
                                   /*regret_matching_plus=*/false);
 
-  CFRInfoStateValuesPtrTable vec_ptable = vec_solver.InfoStateValuesPtrTable();
-  CFRInfoStateValuesTable & str_table = str_solver.InfoStateValuesTable();
-  SPIEL_CHECK_EQ(vec_ptable.size(), str_table.size());
+  std::shared_ptr<Policy> vec_avg = vec_solver.AveragePolicy();
+  std::shared_ptr<Policy> str_avg = str_solver.AveragePolicy();
+  std::shared_ptr<Policy> vec_cur = vec_solver.CurrentPolicy();
+  std::shared_ptr<Policy> str_cur = str_solver.CurrentPolicy();
 
   for (int i = 0; i < cfr_iterations; ++i) {
-    str_solver.EvaluateAndUpdatePolicy();
     vec_solver.RunSimultaneousIterations(1);
+    for (const auto& [infostate, _] : str_solver.InfoStateValuesTable()) {
+      CheckInfostatePolicy(infostate, *vec_cur, *str_cur);
+    }
 
-    for (const auto& [infostate, str_values] : str_table) {
-      const CFRInfoStateValues& vec_values = *(vec_ptable.at(infostate));
-      SPIEL_CHECK_EQ(str_values.num_actions(), vec_values.num_actions());
-
-      // Check regrets.
-      for (int j = 0; j < vec_values.num_actions(); ++j) {
-        SPIEL_CHECK_TRUE(fabs(vec_values.cumulative_regrets[j]
-                              - str_values.cumulative_regrets[j]) < 1e-6);
-      }
-      // Cumulative policy is more tricky: we need to normalize it first.
-      double str_cumul_sum = 0, vec_cumul_sum = 0;
-      for (int j = 0; j < vec_values.num_actions(); ++j) {
-        str_cumul_sum += str_values.cumulative_policy[j];
-        vec_cumul_sum += vec_values.cumulative_policy[j];
-      }
-      for (int j = 0; j < vec_values.num_actions(); ++j) {
-        SPIEL_CHECK_TRUE(fabs(
-            vec_values.cumulative_policy[j] / vec_cumul_sum
-            - str_values.cumulative_policy[j] / str_cumul_sum) < 1e-6);
-      }
+    str_solver.EvaluateAndUpdatePolicy();
+    for (const auto& [infostate, _] : str_solver.InfoStateValuesTable()) {
+      CheckInfostatePolicy(infostate, *vec_avg, *str_avg);
     }
   }
 }

@@ -14,16 +14,20 @@
 
 
 #include "open_spiel/algorithms/infostate_cfr.h"
+#include "open_spiel/algorithms/bandits.h"
+#include "open_spiel/utils/functional.h"
 
 
 namespace open_spiel {
 namespace algorithms {
 
 void TopDown(
-    const std::vector<std::vector<InfostateNode*>>& nodes_at_depth,
-    DecisionVector<CFRInfoStateValues>& node_values,
-    absl::Span<float> reach_probs) {
-  const int tree_depth = nodes_at_depth.size();
+    const InfostateTree& tree, absl::Span<double> reach_probs,
+    std::function<std::vector<double>(
+        DecisionId, /*current_reach=*/double)> policy_fn) {
+  const std::vector<std::vector<InfostateNode*>>& nodes_at_depths =
+      tree.nodes_at_depths();
+  const int tree_depth = nodes_at_depths.size();
   // Loop over all depths, except for the first two depths:
   // - Depth 0: corresponds to the dummy observation node, which is used mainly
   //   for computing the sum of all cf values. As it is not a decision node,
@@ -38,33 +42,25 @@ void TopDown(
     // current reach. However, because the tree is balanced and the usage
     // of the buffer only monotically grows with depth, doing it in reverse we
     // do not overwrite the current reach prob.
-    int right_offset = nodes_at_depth[d].size();
-    for (int parent_idx = nodes_at_depth[d - 1].size() - 1;
+    int right_offset = nodes_at_depths[d].size();
+    for (int parent_idx = nodes_at_depths[d - 1].size() - 1;
          parent_idx >= 0; parent_idx--) {
-      const float current_reach = reach_probs[parent_idx];
-      const int num_children = nodes_at_depth[d - 1][parent_idx]->num_children();
+      const double current_reach = reach_probs[parent_idx];
+      const InfostateNode* node = nodes_at_depths[d - 1][parent_idx];
+      const int num_children = node->num_children();
       right_offset -= num_children;
-      const InfostateNode* node = nodes_at_depth[d - 1][parent_idx];
+
       if (node->type() == kDecisionInfostateNode) {
-        CFRInfoStateValues& values = node_values[node->decision_id()];
-        const std::vector<double>& policy = values.current_policy;
-        const std::vector<double>& regrets = values.cumulative_regrets;
-        std::vector<double>& avg_policy = values.cumulative_policy;
-
+        std::vector<double> policy =
+            policy_fn(node->decision_id(), current_reach);
         SPIEL_DCHECK_EQ(policy.size(), num_children);
-        // Copy the policy and update with reach probs.
-        // Update cumulative policy, as we now have the appropriate reaches.
-        for (int i = 0; i < num_children; i++) {
-          avg_policy[i] += policy[i] * current_reach;
-        }
-
+        SPIEL_DCHECK_TRUE(IsValidProbDistribution(policy));
         for (int i = 0; i < num_children; i++) {
           reach_probs[right_offset + i] = policy[i] * current_reach;
         }
-
       } else {
         SPIEL_DCHECK_EQ(node->type(), kObservationInfostateNode);
-        // Copy only the reach probs.
+        // Copy the reach probs.
         for (int i = 0; i < num_children; i++) {
           reach_probs[right_offset + i] = current_reach;
         }
@@ -76,10 +72,13 @@ void TopDown(
 }
 
 void BottomUp(
-    const std::vector<std::vector<InfostateNode*>>& nodes_at_depth,
-    DecisionVector<CFRInfoStateValues>& node_values,
-    absl::Span<float> cf_values) {
-  const int tree_depth = nodes_at_depth.size();
+    const InfostateTree& tree, absl::Span<double> cf_values,
+    std::function<
+        void(DecisionId, /*loss=*/absl::Span<const double>)> observe_loss_fn,
+    std::function<std::vector<double>(DecisionId)> policy_fn) {
+  const std::vector<std::vector<InfostateNode*>>& nodes_at_depths =
+      tree.nodes_at_depths();
+  const int tree_depth = nodes_at_depths.size();
   // Loop over all depths, except for the last one, as it is already set
   // by calling the leaf evaluation.
   for (int d = tree_depth - 2; d >= 1; d--) {
@@ -91,41 +90,19 @@ void BottomUp(
     // forward we do not overwrite the parent's node cf value.
     int left_offset = 0;
     // Loop over all parents of current nodes.
-    for (int parent_idx = 0; parent_idx < nodes_at_depth[d].size();
+    for (int parent_idx = 0; parent_idx < nodes_at_depths[d].size();
          parent_idx++) {
-      const InfostateNode* node = nodes_at_depth[d][parent_idx];
+      const InfostateNode* node = nodes_at_depths[d][parent_idx];
       const int num_children = node->num_children();
       double node_sum = 0.;
       if (node->type() == kDecisionInfostateNode) {
-        CFRInfoStateValues& values = node_values[node->decision_id()];
-        std::vector<double>& regrets = values.cumulative_regrets;
-        std::vector<double>& policy = values.current_policy;
-        SPIEL_DCHECK_EQ(policy.size(), num_children);
-        SPIEL_DCHECK_EQ(regrets.size(), num_children);
+        observe_loss_fn(
+            node->decision_id(),
+            absl::Span<const double>(&cf_values[left_offset], num_children));
+        std::vector<double> policy = policy_fn(node->decision_id());
         // Propagate child values by multiplying with current policy.
         for (int i = 0; i < num_children; i++) {
           node_sum += policy[i] * cf_values[left_offset + i];
-        }
-        // TODO: abstract away RM!
-        // Update regrets.
-        for (int i = 0; i < num_children; i++) {
-          regrets[i] += cf_values[left_offset + i] - node_sum;
-        }
-        // Apply RM: compute current policy.
-        double sum_positive_regrets = 0.;
-        for (int i = 0; i < num_children; i++) {
-          if (regrets[i] > 0) {
-            sum_positive_regrets += regrets[i];
-          }
-        }
-        for (int i = 0; i < num_children; ++i) {
-          if (sum_positive_regrets > 0) {
-            policy[i] = regrets[i] > 0
-                        ? regrets[i] / sum_positive_regrets
-                        : 0;
-          } else {
-            policy[i] = 1.0 / num_children;
-          }
         }
       } else {
         SPIEL_DCHECK_EQ(node->type(), kObservationInfostateNode);
@@ -139,16 +116,17 @@ void BottomUp(
       left_offset += num_children;
     }
     // Check that we passed over all of the children.
-    SPIEL_DCHECK_EQ(left_offset, nodes_at_depth[d + 1].size());
+    SPIEL_DCHECK_EQ(left_offset, nodes_at_depths[d + 1].size());
   }
 }
 
-float RootCfValue(int root_branching_factor, absl::Span<const float> cf_values,
-                  absl::Span<const float> range) {
+double RootCfValue(int root_branching_factor,
+                   absl::Span<const double> cf_values,
+                   absl::Span<const double> range) {
   SPIEL_CHECK_TRUE(range.empty() ||
                    (range.size() == root_branching_factor
                     && range.size() == cf_values.size()));
-  float root_value = 0.;
+  double root_value = 0.;
   if (range.empty()) {
     for (int i = 0; i < root_branching_factor; ++i) {
       root_value += cf_values[i];
@@ -161,69 +139,18 @@ float RootCfValue(int root_branching_factor, absl::Span<const float> cf_values,
   return root_value;
 }
 
-namespace {
-// Make sure we can get the average policy to compute expected values
-// and exploitability.
-class InfostateCFRAveragePolicy : public Policy {
-  const CFRInfoStateValuesPtrTable infostate_ptr_table_;
- public:
-  InfostateCFRAveragePolicy(const CFRInfoStateValuesPtrTable& ptable)
-      : infostate_ptr_table_(ptable) {}
-  ActionsAndProbs GetStatePolicy(const std::string& info_state) const override {
-    const CFRInfoStateValues& vs = *infostate_ptr_table_.at(info_state);
-    double sum_prob = 0.0;
-    for (int i = 0; i < vs.num_actions(); ++i) {
-      sum_prob += vs.cumulative_policy[i];
-    }
-
-    ActionsAndProbs out;
-    out.reserve(vs.num_actions());
-    for (int i = 0; i < vs.num_actions(); ++i) {
-      if (sum_prob > 0) {
-        out.push_back({vs.legal_actions[i],
-                       vs.cumulative_policy[i] / sum_prob});
-      } else {
-        // Return a uniform policy at this node
-        out.push_back({vs.legal_actions[i],
-                       vs.cumulative_policy[i] / vs.num_actions()});
-      }
-    }
-    return out;
-  }
-};
-
-}  // namespace
-
-std::unordered_map<const InfostateNode*, CFRInfoStateValues> CreateTable(
-    const std::array<std::shared_ptr<InfostateTree>, 2>& trees) {
-  std::unordered_map<const InfostateNode*, CFRInfoStateValues> map;
-  for (int pl = 0; pl < 2; ++pl) {
-    const std::vector<std::vector<InfostateNode*>>& nodes =
-        trees[pl]->nodes_at_depths();
-    for (int d = 0; d < nodes.size() - 1; ++d) {
-      for (const InfostateNode* node : nodes[d]) {
-        if (node->type() != kDecisionInfostateNode) continue;
-        map[node] = CFRInfoStateValues(node->legal_actions());
-      }
-    }
-  }
-  return map;
-}
-
-InfostateCFR::InfostateCFR(std::array<std::shared_ptr<InfostateTree>, 2> trees)
+InfostateCFR::InfostateCFR(std::vector<std::shared_ptr<InfostateTree>> trees)
     : trees_(std::move(trees)),
       cf_values_({
-        std::vector<float>(trees_[0]->num_leaves(), 0.),
-        std::vector<float>(trees_[1]->num_leaves(), 0.)
-      }),
+                     std::vector<double>(trees_[0]->num_leaves(), 0.),
+                     std::vector<double>(trees_[1]->num_leaves(), 0.)
+                 }),
       reach_probs_({
-        std::vector<float>(trees_[0]->num_leaves(), 0.),
-        std::vector<float>(trees_[1]->num_leaves(), 0.)
-      }),
-      node_values_({
-        DecisionVector<CFRInfoStateValues>(trees_[0].get()),
-        DecisionVector<CFRInfoStateValues>(trees_[1].get())
-      }) {
+                       std::vector<double>(trees_[0]->num_leaves(), 0.),
+                       std::vector<double>(trees_[1]->num_leaves(), 0.)
+                   }),
+      bandits_(MakeBanditVectors(trees_)) {
+  SPIEL_CHECK_EQ(trees_.size(), 2);
   PrepareTerminals();
 }
 
@@ -232,26 +159,35 @@ InfostateCFR::InfostateCFR(const Game& game)
 
 void InfostateCFR::RunSimultaneousIterations(int iterations) {
   for (int t = 0; t < iterations; ++t) {
+    ++num_iterations_;
     PrepareRootReachProbs();
-    TopDown(trees_[0]->nodes_at_depths(), node_values_[0], absl::MakeSpan(reach_probs_[0]));
-    TopDown(trees_[1]->nodes_at_depths(), node_values_[1], absl::MakeSpan(reach_probs_[1]));
+    for (int pl = 0; pl < 2; ++pl) {
+      TopDownCurrentPolicyWithCompute(
+          *trees_[pl], bandits_[pl],
+          absl::MakeSpan(reach_probs_[pl]), num_iterations_);
+    }
     SPIEL_CHECK_FLOAT_NEAR(TerminalReachProbSum(), 1.0, 1e-3);
 
     EvaluateLeaves();
-    BottomUp(trees_[0]->nodes_at_depths(), node_values_[0], absl::MakeSpan(cf_values_[0]));
-    BottomUp(trees_[1]->nodes_at_depths(), node_values_[1], absl::MakeSpan(cf_values_[1]));
+    for (int pl = 0; pl < 2; ++pl) {
+      BottomUp(*trees_[pl], bandits_[pl], absl::MakeSpan(cf_values_[pl]));
+    }
     SPIEL_CHECK_FLOAT_NEAR(
         RootCfValue(trees_[0]->root_branching_factor(), cf_values_[0]),
-        - RootCfValue(trees_[1]->root_branching_factor(), cf_values_[1]), 1e-6);
+        -RootCfValue(trees_[1]->root_branching_factor(), cf_values_[1]), 1e-6);
   }
 }
 void InfostateCFR::RunAlternatingIterations(int iterations) {
   for (int t = 0; t < iterations; ++t) {
+    ++num_iterations_;
     for (int pl = 0; pl < 2; ++pl) {
       PrepareRootReachProbs(1 - pl);
-      TopDown(trees_[1 - pl]->nodes_at_depths(), node_values_[1 - pl], absl::MakeSpan(reach_probs_[1 - pl]));
+      TopDownCurrentPolicyWithCompute(
+          *trees_[1 - pl], bandits_[1 - pl],
+          absl::MakeSpan(reach_probs_[1 - pl]), num_iterations_);
+
       EvaluateLeaves(pl);
-      BottomUp(trees_[pl]->nodes_at_depths(), node_values_[pl], absl::MakeSpan(cf_values_[pl]));
+      BottomUp(*trees_[pl], bandits_[pl], absl::MakeSpan(cf_values_[pl]));
     }
   }
 }
@@ -269,32 +205,22 @@ void InfostateCFR::PrepareRootReachProbs(Player pl) {
 void InfostateCFR::EvaluateLeaves() {
   for (int i = 0; i < trees_[0]->num_leaves(); ++i) {
     const int j = terminal_permutation_[i];
-    cf_values_[0][i] =  terminal_values_[i] * reach_probs_[1][j];
-    cf_values_[1][j] = -terminal_values_[i] * reach_probs_[0][i];
+    cf_values_[0][i] = - terminal_values_[i] * reach_probs_[1][j];
+    cf_values_[1][j] =   terminal_values_[i] * reach_probs_[0][i];
   }
 }
 void InfostateCFR::EvaluateLeaves(Player pl) {
   if (pl == 0) {
-    for (int i = 0; i <  trees_[0]->num_leaves(); ++i) {
+    for (int i = 0; i < trees_[0]->num_leaves(); ++i) {
       const int j = terminal_permutation_[i];
-      cf_values_[0][i] =  terminal_values_[i] * reach_probs_[1][j];
+      cf_values_[0][i] = - terminal_values_[i] * reach_probs_[1][j];
     }
   } else {
     for (int i = 0; i < trees_[1]->num_leaves(); ++i) {
       const int j = terminal_permutation_[i];
-      cf_values_[1][j] = -terminal_values_[i] * reach_probs_[0][i];
+      cf_values_[1][j] = terminal_values_[i] * reach_probs_[0][i];
     }
   }
-}
-CFRInfoStateValuesPtrTable InfostateCFR::InfoStateValuesPtrTable() {
-  CFRInfoStateValuesPtrTable vec_ptable;
-  for (int pl = 0; pl < 2; ++pl) {
-    for (DecisionId id : trees_[pl]->AllDecisionIds()) {
-      vec_ptable[trees_[pl]->decision_infostate(id)->infostate_string()]
-        = &node_values_[pl][id];
-    }
-  }
-  return vec_ptable;
 }
 void InfostateCFR::PrepareTerminals() {
   const std::vector<InfostateNode*>& leaves_a = trees_[0]->leaf_nodes();
@@ -336,23 +262,27 @@ void InfostateCFR::PrepareTerminals() {
                       terminal_permutation_.end(), 0),
       num_terminals * (num_terminals - 1) / 2);
 }
-float InfostateCFR::TerminalReachProbSum() {
+double InfostateCFR::TerminalReachProbSum() {
   const int num_terminals = terminal_values_.size();
-  float reach_sum = 0.;
+  double reach_sum = 0.;
   for (int i = 0; i < num_terminals; ++i) {
     const int j = terminal_permutation_[i];
-    const float leaf_reach = terminal_ch_reaches_[i]
+    const double leaf_reach = terminal_ch_reaches_[i]
         * reach_probs_[0][i] * reach_probs_[1][j];
-    SPIEL_CHECK_LE(leaf_reach, 1.0);
+    SPIEL_CHECK_GE(leaf_reach, 0.);
+    SPIEL_CHECK_LE(leaf_reach, 1.);
     reach_sum += leaf_reach;
   }
   return reach_sum;
 }
 
-std::shared_ptr<Policy> InfostateCFR::AveragePolicy(){
-  return std::make_shared<InfostateCFRAveragePolicy>(InfoStateValuesPtrTable());
+std::shared_ptr<Policy> InfostateCFR::AveragePolicy() {
+  return std::make_shared<BanditsAveragePolicy>(trees_, bandits_);
 }
-float InfostateCFR::RootValue() const {
+std::shared_ptr<Policy> InfostateCFR::CurrentPolicy() {
+  return std::make_shared<BanditsCurrentPolicy>(trees_, bandits_);
+}
+double InfostateCFR::RootValue() const {
   return RootCfValue(trees_[0]->root_branching_factor(), cf_values_[0]);
 }
 
