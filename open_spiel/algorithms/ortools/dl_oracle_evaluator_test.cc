@@ -28,42 +28,42 @@ namespace algorithms {
 namespace ortools {
 namespace {
 
-void SetKuhnParametricPolicy(dlcfr::DepthLimitedCFR* dl_solver, double a) {
+void MakeFixedBandit(BanditVector& vec, std::string infostate_string,
+                     const std::vector<double>& policy) {
+  DecisionId id = vec.tree()->DecisionIdFromInfostateString(infostate_string);
+  if (!id.is_undefined()) {
+    vec[id] = std::make_unique<bandits::FixedStrategy>(policy);
+  }
+}
+
+std::vector<BanditVector> MakeKuhnParametricPolicy(
+    dlcfr::DepthLimitedCFR* dl_solver, double a) {
   // Set strategy as described in https://en.wikipedia.org/wiki/Kuhn_poker
 
   // Player 0
   const std::shared_ptr<InfostateTree> tree0 = dl_solver->trees()[0];
-  DecisionId jack     = tree0->DecisionIdFromInfostateString("0");
-  DecisionId jack_pb  = tree0->DecisionIdFromInfostateString("0pb");
-  DecisionId queen    = tree0->DecisionIdFromInfostateString("1");
-  DecisionId queen_pb = tree0->DecisionIdFromInfostateString("1pb");
-  DecisionId king     = tree0->DecisionIdFromInfostateString("2");
-  DecisionId king_pb  = tree0->DecisionIdFromInfostateString("2pb");
-
-  DecisionVector<CFRInfoStateValues>& vec0 = dl_solver->node_values()[0];
-  if (!jack.is_undefined())     vec0[jack    ].cumulative_policy = { 1. - a      , a          };
-  if (!jack_pb.is_undefined())  vec0[jack_pb ].cumulative_policy = { 1           , 0.         };
-  if (!queen.is_undefined())    vec0[queen   ].cumulative_policy = { 1.          , 0.         };
-  if (!queen_pb.is_undefined()) vec0[queen_pb].cumulative_policy = { 2 / 3. - a  , a + 1 / 3. };
-  if (!king.is_undefined())     vec0[king    ].cumulative_policy = { 1. - 3. * a , 3. * a     };
-  if (!king_pb.is_undefined())  vec0[king_pb ].cumulative_policy = { 0.          , 1.         };
+  BanditVector vec0(tree0.get());
+  MakeFixedBandit(vec0, "0"  ,  { 1. - a      , a          });
+  MakeFixedBandit(vec0, "0pb",  { 1           , 0.         });
+  MakeFixedBandit(vec0, "1"  ,  { 1.          , 0.         });
+  MakeFixedBandit(vec0, "1pb",  { 2 / 3. - a  , a + 1 / 3. });
+  MakeFixedBandit(vec0, "2"  ,  { 1. - 3. * a , 3. * a     });
+  MakeFixedBandit(vec0, "2pb",  { 0.          , 1.         });
 
   // Player 1
   const std::shared_ptr<InfostateTree> tree1 = dl_solver->trees()[1];
-  DecisionId jack_p  = tree0->DecisionIdFromInfostateString("0p");
-  DecisionId jack_b  = tree0->DecisionIdFromInfostateString("0b");
-  DecisionId queen_p = tree0->DecisionIdFromInfostateString("1p");
-  DecisionId queen_b = tree0->DecisionIdFromInfostateString("1b");
-  DecisionId king_p  = tree0->DecisionIdFromInfostateString("2p");
-  DecisionId king_b  = tree0->DecisionIdFromInfostateString("2b");
+  BanditVector vec1(tree1.get());
+  MakeFixedBandit(vec1, "0p",  { 2 / 3. , 1 / 3. });
+  MakeFixedBandit(vec1, "0b",  { 1      , 0.     });
+  MakeFixedBandit(vec1, "1p",  { 1.     , 0.     });
+  MakeFixedBandit(vec1, "1b",  { 2 / 3. , 1 / 3. });
+  MakeFixedBandit(vec1, "2p",  { 0.     , 1.     });
+  MakeFixedBandit(vec1, "2b",  { 0      , 1.     });
 
-  DecisionVector<CFRInfoStateValues>& vec1 = dl_solver->node_values()[1];
-  if (!jack_p.is_undefined())  vec1[jack_p ].cumulative_policy = { 2 / 3. , 1 / 3. };
-  if (!jack_b.is_undefined())  vec1[jack_b ].cumulative_policy = { 1      , 0.     };
-  if (!queen_p.is_undefined()) vec1[queen_p].cumulative_policy = { 1.     , 0.     };
-  if (!queen_b.is_undefined()) vec1[queen_b].cumulative_policy = { 2 / 3. , 1 / 3. };
-  if (!king_p.is_undefined())  vec1[king_p ].cumulative_policy = { 0.     , 1.     };
-  if (!king_b.is_undefined())  vec1[king_b ].cumulative_policy = { 0      , 1.     };
+  std::vector<BanditVector> out;
+  out.push_back(std::move(vec0));
+  out.push_back(std::move(vec1));
+  return out;
 }
 
 void TestOptimalValuesKuhnBettingPublicState() {
