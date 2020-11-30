@@ -138,6 +138,7 @@ class InfostateCFR {
   std::shared_ptr<Policy> CurrentPolicy();
 
   const std::vector<BanditVector>& bandits() const { return bandits_; }
+  const std::vector<std::shared_ptr<InfostateTree>>& trees() const { return trees_; }
 
  private:
   void PrepareTerminals();

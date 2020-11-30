@@ -59,9 +59,9 @@ struct LeafPublicState final {
   // to its `State`s via `CFRNode::CorrespondingStates()`.
   std::array<std::vector<const InfostateNode*>, 2> leaf_nodes;
   // For each player, store ranges for the top-most infostates.
-  std::array<std::vector<float>, 2> ranges;
+  std::array<std::vector<double>, 2> ranges;
   // For each player, store counterfactual values for the top-most infostates.
-  std::array<std::vector<float>, 2> values;
+  std::array<std::vector<double>, 2> values;
   // Position in the vector of DepthLimitedCFR::public_leaves_
   size_t public_id;
 
@@ -98,7 +98,7 @@ struct TerminalPublicStateContext final : public PublicStateContext {
   // Map from player 0 index (key) to player 1 (value).
   std::vector<int> permutation;
   // For the player 0 and already multiplied by chance reach probs.
-  std::vector<float> utilities;
+  std::vector<double> utilities;
   explicit TerminalPublicStateContext(const LeafPublicState& state);
 };
 
@@ -123,7 +123,7 @@ class DepthLimitedCFR {
                   std::shared_ptr<const LeafEvaluator> terminal_evaluator);
 
   DepthLimitedCFR(std::shared_ptr<const Game> game,
-                  std::array<std::shared_ptr<InfostateTree>, 2> trees,
+                  std::vector<std::shared_ptr<InfostateTree>> trees,
                   std::shared_ptr<const LeafEvaluator> leaf_evaluator,
                   std::shared_ptr<const LeafEvaluator> terminal_evaluator,
                   std::shared_ptr<Observer> public_observer);
@@ -131,32 +131,31 @@ class DepthLimitedCFR {
   void RunSimultaneousIterations(int iterations);
   void SimultaneousTopDownEvaluate();
 
-  void SetPlayerRanges(const std::array<std::vector<float>, 2>& ranges);
-  float RootValue(Player pl = 0) const;
-  std::array<absl::Span<const float>, 2> RootChildrenCfValues() const;
+  void SetPlayerRanges(const std::array<std::vector<double>, 2>& ranges);
+  double RootValue(Player pl = 0) const;
+  std::array<absl::Span<const double>, 2> RootChildrenCfValues() const;
 
   std::array<const InfostateNode*, 2> Roots() const;
-  std::array<std::shared_ptr<InfostateTree>, 2>& Trees();
-  std::array<DecisionVector<CFRInfoStateValues>, 2>& node_values() {
-    return node_values_;
-  };
+  std::vector<std::shared_ptr<InfostateTree>>& Trees();
+  std::vector<BanditVector>& bandits() { return bandits_; }
 
-  CFRInfoStateValuesPtrTable InfoStateValuesPtrTable();
 
   std::vector<std::unique_ptr<PublicStateContext>>& GetContexts();
   std::vector<LeafPublicState>& GetPublicLeaves();
 
   // Trunk evaluation.
-  float CfBestResponse(Player responding_player) const;
-  float TrunkExploitability() const;
+  std::shared_ptr<Policy> AveragePolicy();
+  std::shared_ptr<Policy> CurrentPolicy();
+  double CfBestResponse(Player responding_player) const;
+  double TrunkExploitability() const;
 
  private:
   const std::shared_ptr<const Game> game_;
-  std::array<std::shared_ptr<InfostateTree>, 2> trees_;
+  std::vector<std::shared_ptr<InfostateTree>> trees_;
   const std::shared_ptr<Observer> public_observer_;
   const std::shared_ptr<const LeafEvaluator> leaf_evaluator_;
   const std::shared_ptr<const LeafEvaluator> terminal_evaluator_;
-  std::array<std::vector<float>, 2> player_ranges_;
+  std::array<std::vector<double>, 2> player_ranges_;
 
   // Allocated based on propagator / cfr tree construction.
   std::vector<LeafPublicState> public_leaves_;
@@ -165,10 +164,12 @@ class DepthLimitedCFR {
 
   // Mutable values to keep track of.
   // These have the size of largest depth of the tree (i.e. leaf nodes).
-  std::array<std::vector<float>, 2> reach_probs_;
-  std::array<std::vector<float>, 2> cf_values_;
+  std::array<std::vector<double>, 2> reach_probs_;
+  std::array<std::vector<double>, 2> cf_values_;
 
-  std::array<DecisionVector<CFRInfoStateValues>, 2> node_values_;
+  std::vector<BanditVector> bandits_;
+
+  size_t num_iterations_ = 0;
 
   void PrepareRootReachProbs();
   void PrepareLeafNodesForPublicStates();
@@ -176,7 +177,7 @@ class DepthLimitedCFR {
   void CreateContexts();
   void EvaluateLeaves();
   LeafPublicState* GetPublicLeaf(absl::Span<float> public_tensor);
-  float CfBestResponse(const InfostateNode& node, Player pl, int* leaf_index) const;
+  double CfBestResponse(const InfostateNode& node, Player pl, int* leaf_index) const;
 
   // Internal checks.
   bool DoStatesProduceEqualPublicObservations(

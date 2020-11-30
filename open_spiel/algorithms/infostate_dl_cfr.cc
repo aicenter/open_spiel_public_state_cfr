@@ -15,30 +15,16 @@
 
 #include "open_spiel/abseil-cpp/absl/hash/hash.h"
 #include "open_spiel/algorithms/infostate_dl_cfr.h"
+#include "open_spiel/algorithms/bandits.h"
+#include "open_spiel/algorithms/bandits_policy.h"
 
 namespace open_spiel {
 namespace algorithms {
 namespace dlcfr {
 
-std::unordered_map<const InfostateNode*, CFRInfoStateValues> CreateTable(
-    const std::array<std::shared_ptr<InfostateTree>, 2>& trees) {
-  std::unordered_map<const InfostateNode*, CFRInfoStateValues> map;
-  for (int pl = 0; pl < 2; ++pl) {
-    const std::vector<std::vector<InfostateNode*>>& nodes =
-        trees[pl]->nodes_at_depths();
-    for (int d = 0; d < nodes.size() - 1; ++d) {
-      for (const InfostateNode* node : nodes[d]) {
-        if (node->type() != kDecisionInfostateNode) continue;
-        map[node] = CFRInfoStateValues(node->legal_actions());
-      }
-    }
-  }
-  return map;
-}
-
 DepthLimitedCFR::DepthLimitedCFR(
     std::shared_ptr<const Game> game,
-    std::array<std::shared_ptr<InfostateTree>, 2> trees,
+    std::vector<std::shared_ptr<InfostateTree>> trees,
     std::shared_ptr<const LeafEvaluator> leaf_evaluator,
     std::shared_ptr<const LeafEvaluator> terminal_evaluator,
     std::shared_ptr<Observer> public_observer
@@ -46,24 +32,21 @@ DepthLimitedCFR::DepthLimitedCFR(
     game_(std::move(game)),
     trees_(std::move(trees)),
     cf_values_({
-      std::vector<float>(trees_[0]->num_leaves(), 0.),
-      std::vector<float>(trees_[1]->num_leaves(), 0.)
+      std::vector<double>(trees_[0]->num_leaves(), 0.),
+      std::vector<double>(trees_[1]->num_leaves(), 0.)
     }),
     reach_probs_({
-      std::vector<float>(trees_[0]->num_leaves(), 0.),
-      std::vector<float>(trees_[1]->num_leaves(), 0.)
+      std::vector<double>(trees_[0]->num_leaves(), 0.),
+      std::vector<double>(trees_[1]->num_leaves(), 0.)
     }),
     public_observer_(std::move(public_observer)),
     leaf_evaluator_(std::move(leaf_evaluator)),
     terminal_evaluator_(std::move(terminal_evaluator)),
     player_ranges_({
-      std::vector<float>(trees_[0]->root_branching_factor(), 1.),
-      std::vector<float>(trees_[1]->root_branching_factor(), 1.)
+      std::vector<double>(trees_[0]->root_branching_factor(), 1.),
+      std::vector<double>(trees_[1]->root_branching_factor(), 1.)
     }),
-    node_values_({
-      DecisionVector<CFRInfoStateValues>(trees_[0].get()),
-      DecisionVector<CFRInfoStateValues>(trees_[1].get())
-    }) {
+    bandits_(MakeBanditVectors(trees_)) {
   PrepareLeafNodesForPublicStates();
   PrepareRangesAndValuesForPublicStates();
   CreateContexts();
@@ -116,8 +99,8 @@ void DepthLimitedCFR::PrepareRangesAndValuesForPublicStates() {
   for (LeafPublicState& s : public_leaves_) {
     for (int pl = 0; pl < 2; ++pl) {
       const int num_leaves = s.leaf_nodes[pl].size();
-      s.ranges[pl] = std::vector<float>(num_leaves, 0.);
-      s.values[pl] = std::vector<float>(num_leaves, 0.);
+      s.ranges[pl] = std::vector<double>(num_leaves, 0.);
+      s.values[pl] = std::vector<double>(num_leaves, 0.);
     }
   }
 }
@@ -156,6 +139,13 @@ bool DepthLimitedCFR::DoStatesProduceEqualPublicObservations(
     if (public_observation.Tensor() != expected_observation) return false;
   }
   return true;
+}
+
+std::shared_ptr<Policy> DepthLimitedCFR::AveragePolicy() {
+  return std::make_shared<BanditsAveragePolicy>(trees_, bandits_);
+}
+std::shared_ptr<Policy> DepthLimitedCFR::CurrentPolicy() {
+  return std::make_shared<BanditsCurrentPolicy>(trees_, bandits_);
 }
 
 std::shared_ptr<LeafEvaluator> MakeTerminalEvaluator() {
@@ -208,23 +198,28 @@ void TerminalEvaluator::EvaluatePublicState(
   auto* terminal = open_spiel::down_cast<TerminalPublicStateContext*>(context);
   for (int i = 0; i < terminal->utilities.size(); ++i) {
     const int j = terminal->permutation[i];
-    state->values[0][i] = terminal->utilities[i] * state->ranges[1][j];
-    state->values[1][j] = -terminal->utilities[i] * state->ranges[0][i];
+    state->values[0][i] = -terminal->utilities[i] * state->ranges[1][j];
+    state->values[1][j] = terminal->utilities[i] * state->ranges[0][i];
   }
 }
 
 void DepthLimitedCFR::SimultaneousTopDownEvaluate() {
   PrepareRootReachProbs();
-  TopDown(trees_[0]->nodes_at_depths(), node_values_[0], absl::MakeSpan(reach_probs_[0]));
-  TopDown(trees_[1]->nodes_at_depths(), node_values_[1], absl::MakeSpan(reach_probs_[1]));
+  for (int pl = 0; pl < 2; ++pl) {
+    TopDownCurrentPolicyWithCompute(
+        *trees_[pl], bandits_[pl],
+        absl::MakeSpan(reach_probs_[pl]), num_iterations_);
+  }
   EvaluateLeaves();
 }
 
 void DepthLimitedCFR::RunSimultaneousIterations(int iterations) {
   for (int t = 0; t < iterations; ++t) {
+    ++num_iterations_;
     SimultaneousTopDownEvaluate();
-    BottomUp(trees_[0]->nodes_at_depths(), node_values_[0], absl::MakeSpan(cf_values_[0]));
-    BottomUp(trees_[1]->nodes_at_depths(), node_values_[1], absl::MakeSpan(cf_values_[1]));
+    for (int pl = 0; pl < 2; ++pl) {
+      BottomUp(*trees_[pl], bandits_[pl], absl::MakeSpan(cf_values_[pl]));
+    }
 //    SPIEL_DCHECK_FLOAT_NEAR(RootValue(/*pl=*/0), -RootValue(/*pl=*/1), 1e-6);
   }
 }
@@ -279,21 +274,11 @@ void DepthLimitedCFR::EvaluateLeaves() {
   }
 }
 
-CFRInfoStateValuesPtrTable DepthLimitedCFR::InfoStateValuesPtrTable() {
-  CFRInfoStateValuesPtrTable vec_ptable;
-  for (int pl = 0; pl < 2; ++pl) {
-    for (DecisionId id : trees_[pl]->AllDecisionIds()) {
-      vec_ptable[trees_[pl]->decision_infostate(id)->infostate_string()]
-          = &node_values_[pl][id];
-    }
-  }
-  return vec_ptable;
-}
 void DepthLimitedCFR::SetPlayerRanges(
-    const std::array<std::vector<float>, 2>& ranges) {
+    const std::array<std::vector<double>, 2>& ranges) {
   player_ranges_ = ranges;
 }
-std::array<absl::Span<const float>, 2> DepthLimitedCFR::RootChildrenCfValues()
+std::array<absl::Span<const double>, 2> DepthLimitedCFR::RootChildrenCfValues()
 const {
   return {
       absl::MakeConstSpan(&cf_values_[0][0], trees_[0]->root_branching_factor()),
@@ -371,7 +356,7 @@ CFREvaluator::CFREvaluator(std::shared_ptr<const Game> game, int depth_limit,
 std::unique_ptr<PublicStateContext> CFREvaluator::CreateContext(
     const LeafPublicState& state) const {
   auto dlcfr = std::make_unique<DepthLimitedCFR>(
-      game, std::array{
+      game, std::vector{
           MakeInfostateTree(state.leaf_nodes[0], depth_limit),
           MakeInfostateTree(state.leaf_nodes[1], depth_limit)
       },
@@ -388,7 +373,7 @@ void CFREvaluator::EvaluatePublicState(LeafPublicState* public_state,
   DepthLimitedCFR* dlcfr = cfr_state->dlcfr.get();
   dlcfr->SetPlayerRanges(public_state->ranges);
   dlcfr->RunSimultaneousIterations(num_cfr_iterations);
-  std::array<absl::Span<const float>, 2> resulting_values =
+  std::array<absl::Span<const double>, 2> resulting_values =
       dlcfr->RootChildrenCfValues();
   // Copy the results.
   for (int pl = 0; pl < 2; ++pl) {
@@ -400,11 +385,11 @@ void CFREvaluator::EvaluatePublicState(LeafPublicState* public_state,
 
 // -- Counterfactul Best Response ----------------------------------------------
 
-float DepthLimitedCFR::TrunkExploitability() const {
+double DepthLimitedCFR::TrunkExploitability() const {
   return (CfBestResponse(0) + CfBestResponse(1)) / 2.;
 }
 
-float DepthLimitedCFR::CfBestResponse(
+double DepthLimitedCFR::CfBestResponse(
     const InfostateNode& node, Player pl, int* leaf_index) const {
   if (node.is_leaf_node()) {
     return cf_values_[pl][(*leaf_index)++];
@@ -417,7 +402,7 @@ float DepthLimitedCFR::CfBestResponse(
     return sum_value;
   }
   SPIEL_CHECK_EQ(node.type(), kDecisionInfostateNode);
-  double max_value = -std::numeric_limits<float>::infinity();
+  double max_value = -std::numeric_limits<double>::infinity();
   for (const InfostateNode* child : node.child_iterator()) {
     max_value = std::fmax(CfBestResponse(*child, pl, leaf_index),
                           max_value);
@@ -425,12 +410,12 @@ float DepthLimitedCFR::CfBestResponse(
   return max_value;
 }
 
-float DepthLimitedCFR::CfBestResponse(Player responding_player) const {
+double DepthLimitedCFR::CfBestResponse(Player responding_player) const {
   int leaf_index = 0;
   const InfostateNode& root_node = trees_[responding_player]->root();
   return CfBestResponse(root_node, responding_player, &leaf_index);
 }
-float DepthLimitedCFR::RootValue(Player pl) const {
+double DepthLimitedCFR::RootValue(Player pl) const {
   const int root_branching = trees_[pl]->root_branching_factor();
   return RootCfValue(
       root_branching, absl::MakeConstSpan(&cf_values_[pl][0], root_branching),
@@ -439,7 +424,7 @@ float DepthLimitedCFR::RootValue(Player pl) const {
 std::array<const InfostateNode*, 2> DepthLimitedCFR::Roots() const {
   return {&trees_[0]->root(), &trees_[1]->root()};
 }
-std::array<std::shared_ptr<InfostateTree>, 2>& DepthLimitedCFR::Trees() { return trees_; }
+std::vector<std::shared_ptr<InfostateTree>>& DepthLimitedCFR::Trees() { return trees_; }
 std::vector<std::unique_ptr<PublicStateContext>>& DepthLimitedCFR::GetContexts() {
   return contexts_;
 }

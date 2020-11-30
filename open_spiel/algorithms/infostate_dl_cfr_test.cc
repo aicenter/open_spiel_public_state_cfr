@@ -33,48 +33,21 @@ namespace algorithms {
 namespace dlcfr {
 namespace {
 
-void TestExploitabilityCalculation(const std::string& game_name) {
-  std::shared_ptr<const Game> game = LoadGame(game_name);
-
-  DepthLimitedCFR dl_solver(game, /*depth_limit=*/100,
-      /*leaf_evaluator=*/nullptr, MakeTerminalEvaluator());
-  dl_solver.SimultaneousTopDownEvaluate();
-  double actual_expl = dl_solver.TrunkExploitability();
-
-  if (game->GetType().dynamics == GameType::Dynamics::kSimultaneous) {
-    game = ConvertToTurnBased(*game);
+void CheckInfostatePolicy(
+    const std::string& infostate, const Policy& a, const Policy& b) {
+  ActionsAndProbs vec_policy = a.GetStatePolicy(infostate);
+  ActionsAndProbs str_policy = b.GetStatePolicy(infostate);
+  SPIEL_CHECK_EQ(vec_policy.size(), str_policy.size());
+  for (int j = 0; j < vec_policy.size(); ++j) {
+    SPIEL_CHECK_EQ(vec_policy[j].first, str_policy[j].first);
+    SPIEL_CHECK_FLOAT_NEAR(vec_policy[j].second, str_policy[j].second, 1e-6);
   }
-  CFRSolver str_solver(*game);
-  double expected_expl = Exploitability(*game, *str_solver.CurrentPolicy());
-
-  SPIEL_DCHECK_FLOAT_NEAR(expected_expl, actual_expl, 1e-6);
 }
 
-void CheckIterationConsistency(
-    const CFRInfoStateValuesPtrTable& actual_table,
-    const CFRInfoStateValuesPtrTable& expected_table) {
-  for (const auto&[infostate, actual_ptr] : actual_table) {
-    const CFRInfoStateValues& actual_values = *actual_ptr;
-    const CFRInfoStateValues& expected_values = *(expected_table.at(infostate));
-    SPIEL_CHECK_EQ(actual_values.num_actions(), expected_values.num_actions());
-
-    // Check regrets.
-    for (int j = 0; j < expected_values.num_actions(); ++j) {
-      SPIEL_CHECK_FLOAT_NEAR(
-        expected_values.cumulative_regrets[j],
-        actual_values.cumulative_regrets[j], 1e-6);
-    }
-    // Cumulative policy is more tricky: we need to normalize it first.
-    double act_cumul_sum = 0, exp_cumul_sum = 0;
-    for (int j = 0; j < expected_values.num_actions(); ++j) {
-      act_cumul_sum += actual_values.cumulative_policy[j];
-      exp_cumul_sum += expected_values.cumulative_policy[j];
-    }
-    for (int j = 0; j < expected_values.num_actions(); ++j) {
-      SPIEL_CHECK_FLOAT_NEAR(
-        expected_values.cumulative_policy[j] / exp_cumul_sum,
-        actual_values.cumulative_policy[j] / act_cumul_sum, 1e-6);
-    }
+void CheckIterationConsistency(const Policy& a, const Policy& b,
+                               const InfostateTree& tree) {
+  for (DecisionId id : tree.AllDecisionIds()) {
+    CheckInfostatePolicy(tree.decision_infostate(id)->infostate_string(), a, b);
   }
 }
 
@@ -83,19 +56,24 @@ void TestTerminalEvaluatorHasSameIterations(const std::string& game_name) {
   const int cfr_iterations = 10;
 
   InfostateCFR vec_solver(*game);
-  CFRInfoStateValuesPtrTable vec_ptable = vec_solver.InfoStateValuesPtrTable();
 
   // We use only the terminal evaluator.
   std::shared_ptr<LeafEvaluator> terminal_evaluator = MakeTerminalEvaluator();
   DepthLimitedCFR dl_solver(game, /*depth_limit=*/100,
       /*leaf_evaluator=*/nullptr, terminal_evaluator);
-  CFRInfoStateValuesPtrTable dl_ptable = dl_solver.InfoStateValuesPtrTable();
 
-  SPIEL_CHECK_EQ(vec_ptable.size(), dl_ptable.size());
+  std::shared_ptr<Policy> vec_avg = vec_solver.AveragePolicy();
+  std::shared_ptr<Policy> dl_avg = dl_solver.AveragePolicy();
+  std::shared_ptr<Policy> vec_cur = vec_solver.CurrentPolicy();
+  std::shared_ptr<Policy> dl_cur = dl_solver.CurrentPolicy();
+
   for (int i = 0; i < cfr_iterations; ++i) {
     vec_solver.RunSimultaneousIterations(1);
     dl_solver.RunSimultaneousIterations(1);
-    CheckIterationConsistency(dl_ptable, vec_ptable);
+    for (int pl = 0; pl < 2; ++pl) {
+      CheckIterationConsistency(*vec_avg, *dl_avg, *vec_solver.trees()[pl]);
+      CheckIterationConsistency(*vec_cur, *dl_cur, *vec_solver.trees()[pl]);
+    }
   }
 }
 
@@ -135,20 +113,24 @@ void TestRecursiveDepthLimitedSolving(const std::string& game_name) {
          ++subgame_depth_limit) {
 
       InfostateCFR vec_solver(*game);
-      CFRInfoStateValuesPtrTable vec_ptable =
-          vec_solver.InfoStateValuesPtrTable();
-
       std::unique_ptr<DepthLimitedCFR> dl_solver = MakeRecursiveDepthLimitedCFR(
           game, trunk_depth_limit, subgame_depth_limit);
-      CFRInfoStateValuesPtrTable
-          dl_ptable = dl_solver->InfoStateValuesPtrTable();
+
+      std::shared_ptr<Policy> vec_avg = vec_solver.AveragePolicy();
+      std::shared_ptr<Policy> dl_avg = dl_solver->AveragePolicy();
+      std::shared_ptr<Policy> vec_cur = vec_solver.CurrentPolicy();
+      std::shared_ptr<Policy> dl_cur = dl_solver->CurrentPolicy();
+      auto trees = dl_solver->Trees();
 
       for (int j = 0; j < trunk_iterations; ++j) {
         vec_solver.RunSimultaneousIterations(1);
         dl_solver->RunSimultaneousIterations(1);
         SPIEL_CHECK_FLOAT_NEAR(
             vec_solver.RootValue(), dl_solver->RootValue(), 1e-6);
-        CheckIterationConsistency(dl_ptable, vec_ptable);
+        for (int pl = 0; pl < 2; ++pl) {
+          CheckIterationConsistency(*vec_avg, *dl_avg, *trees[pl]);
+          CheckIterationConsistency(*vec_cur, *dl_cur, *trees[pl]);
+        }
       }
     }
   }
@@ -169,7 +151,6 @@ int main(int argc, char** argv) {
   };
 
   for (const std::string& game_name : test_games) {
-    algorithms::TestExploitabilityCalculation(game_name);
     algorithms::TestTerminalEvaluatorHasSameIterations(game_name);
     algorithms::TestRecursiveDepthLimitedSolving(game_name);
   }
