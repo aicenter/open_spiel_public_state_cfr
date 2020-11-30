@@ -384,38 +384,6 @@ void CFREvaluator::EvaluatePublicState(LeafPublicState* public_state,
   }
 }
 
-// -- Counterfactul Best Response ----------------------------------------------
-
-double DepthLimitedCFR::TrunkExploitability() const {
-  return (CfBestResponse(0) + CfBestResponse(1)) / 2.;
-}
-
-double DepthLimitedCFR::CfBestResponse(
-    const InfostateNode& node, Player pl, int* leaf_index) const {
-  if (node.is_leaf_node()) {
-    return cf_values_[pl][(*leaf_index)++];
-  }
-  if (node.type() == kObservationInfostateNode) {
-    double sum_value = 0.;
-    for (const InfostateNode* child : node.child_iterator()) {
-      sum_value += CfBestResponse(*child, pl, leaf_index);
-    }
-    return sum_value;
-  }
-  SPIEL_CHECK_EQ(node.type(), kDecisionInfostateNode);
-  double max_value = -std::numeric_limits<double>::infinity();
-  for (const InfostateNode* child : node.child_iterator()) {
-    max_value = std::fmax(CfBestResponse(*child, pl, leaf_index),
-                          max_value);
-  }
-  return max_value;
-}
-
-double DepthLimitedCFR::CfBestResponse(Player responding_player) const {
-  int leaf_index = 0;
-  const InfostateNode& root_node = trees_[responding_player]->root();
-  return CfBestResponse(root_node, responding_player, &leaf_index);
-}
 double DepthLimitedCFR::RootValue(Player pl) const {
   const int root_branching = trees_[pl]->root_branching_factor();
   return RootCfValue(

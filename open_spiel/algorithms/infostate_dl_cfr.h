@@ -145,8 +145,6 @@ class DepthLimitedCFR {
   // Trunk evaluation.
   std::shared_ptr<Policy> AveragePolicy();
   std::shared_ptr<Policy> CurrentPolicy();
-  double CfBestResponse(Player responding_player) const;
-  double TrunkExploitability() const;
 
  private:
   const std::shared_ptr<const Game> game_;
@@ -176,7 +174,6 @@ class DepthLimitedCFR {
   void CreateContexts();
   void EvaluateLeaves();
   LeafPublicState* GetPublicLeaf(absl::Span<float> public_tensor);
-  double CfBestResponse(const InfostateNode& node, Player pl, int* leaf_index) const;
 
   // Internal checks.
   bool DoStatesProduceEqualPublicObservations(
