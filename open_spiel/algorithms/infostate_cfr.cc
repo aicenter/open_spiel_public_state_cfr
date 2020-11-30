@@ -27,6 +27,7 @@ void TopDown(
         DecisionId, /*current_reach=*/double)> policy_fn) {
   const std::vector<std::vector<InfostateNode*>>& nodes_at_depths =
       tree.nodes_at_depths();
+  SPIEL_CHECK_EQ(reach_probs.size(), nodes_at_depths.back().size());
   const int tree_depth = nodes_at_depths.size();
   // Loop over all depths, except for the first two depths:
   // - Depth 0: corresponds to the dummy observation node, which is used mainly
@@ -78,6 +79,7 @@ void BottomUp(
     std::function<std::vector<double>(DecisionId)> policy_fn) {
   const std::vector<std::vector<InfostateNode*>>& nodes_at_depths =
       tree.nodes_at_depths();
+  SPIEL_CHECK_EQ(cf_values.size(), nodes_at_depths.back().size());
   const int tree_depth = nodes_at_depths.size();
   // Loop over all depths, except for the last one, as it is already set
   // by calling the leaf evaluation.
