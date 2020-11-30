@@ -79,39 +79,47 @@ struct SolverVariables {
 class SequenceFormLpSolver {
  using MPSolver = operations_research::MPSolver;
  public:
-  SequenceFormLpSolver(const Game& game);
-
   SequenceFormLpSolver(
       std::array<std::shared_ptr<InfostateTree>, 2> solver_trees,
-      MPSolver::OptimizationProblemType type = MPSolver::GLOP_LINEAR_PROGRAMMING);
+      const std::string& solver_id = "GLOP_LINEAR_PROGRAMMING");
+  SequenceFormLpSolver(const Game& game);
 
   // Specify the linear program for given player.
   void SpecifyLinearProgram(Player pl);
 
-  // Solve the linear program for the given player.
+  // Solve the linear program.
   // Returns the objective value (root value for the player).
-  double SolveForPlayer(Player pl);
+  double Solve();
 
   // Reset the solver and erase all pointers.
   // This is called automatically when you call SpecifyLinearProgram.
   void ClearSpecification();
 
   // Transform the computed sequence form policy into a behavioral policy.
-  // This function can be called only after call for SolveForPlayer().
+  // This function can be called only after call for Solve().
   TabularPolicy OptimalPolicy(Player for_player);
 
   // Transform the computed realization plan into a behavioral policy.
-  // This function can be called only after call for SolveForPlayer().
+  // This function can be called only after call for Solve().
   SfStrategy OptimalSfStrategy(Player for_player);
 
   // For debugging.
   void PrintProblemSpecification();
 
+  const std::array<std::shared_ptr<InfostateTree>, 2>& trees() const {
+    return solver_trees_;
+  }
+  std::unordered_map<
+      const InfostateNode*, SolverVariables>& lp_specification() {
+    return lp_spec_;
+  }
+  operations_research::MPSolver* solver() { return solver_.get(); }
+
  protected:
   const std::array<std::shared_ptr<InfostateTree>, 2> solver_trees_;
   const BijectiveContainer<const InfostateNode*> terminal_bijection_;
-  operations_research::MPSolver solver_;
-  std::unordered_map<const InfostateNode*, SolverVariables> data_table_;
+  std::unique_ptr<operations_research::MPSolver> solver_;
+  std::unordered_map<const InfostateNode*, SolverVariables> lp_spec_;
 
   void SpecifyReachProbsConstraints(InfostateNode* node);
   void SpecifyCfValuesConstraints(InfostateNode* node);

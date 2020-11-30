@@ -36,14 +36,17 @@ SequenceFormLpSolver::SequenceFormLpSolver(const Game& game)
 
 SequenceFormLpSolver::SequenceFormLpSolver(
     std::array<std::shared_ptr<InfostateTree>, 2> solver_trees,
-    operations_research::MPSolver::OptimizationProblemType type)
+    const std::string& solver_id)
     : solver_trees_(std::move(solver_trees)),
-      terminal_bijection_(ConnectTerminals(*solver_trees_[0], *solver_trees_[1])),
-      solver_("sf", type), data_table_() {}
+      terminal_bijection_(
+          ConnectTerminals(*solver_trees_[0], *solver_trees_[1])),
+      solver_(MPSolver::CreateSolver(solver_id)), lp_spec_() {
+  SPIEL_CHECK_TRUE(solver_);
+}
 
 
 void SequenceFormLpSolver::SpecifyReachProbsConstraints(InfostateNode* node) {
-  data_table_[node].var_reach_prob = solver_.MakeNumVar(
+  lp_spec_[node].var_reach_prob = solver_->MakeNumVar(
       /*lb=*/0.0, /*ub=*/1., "");
 
   if (node->type() == kTerminalInfostateNode)
@@ -53,21 +56,23 @@ void SequenceFormLpSolver::SpecifyReachProbsConstraints(InfostateNode* node) {
       SpecifyReachProbsConstraints(child);
 
       // Equality constraint: parent = child
-      opres::MPConstraint* ct = data_table_[child].ct_parent_reach_prob
-          = solver_.MakeRowConstraint(/*lb=*/0, /*ub=*/0, "");
-      ct->SetCoefficient(data_table_[node].var_reach_prob, -1);
-      ct->SetCoefficient(data_table_[child].var_reach_prob, 1);
+      opres::MPConstraint* ct
+          = lp_spec_[child].ct_parent_reach_prob
+          = solver_->MakeRowConstraint(/*lb=*/0, /*ub=*/0, "");
+      ct->SetCoefficient(lp_spec_[node].var_reach_prob, -1);
+      ct->SetCoefficient(lp_spec_[child].var_reach_prob, 1);
     }
     return;
   }
   if (node->type() == kDecisionInfostateNode) {
     // Equality constraint: parent = sum of children
-    opres::MPConstraint* ct = data_table_[node].ct_child_reach_prob
-        = solver_.MakeRowConstraint(/*lb=*/0, /*ub=*/0, "");
-    ct->SetCoefficient(data_table_[node].var_reach_prob, -1);
+    opres::MPConstraint* ct
+        = lp_spec_[node].ct_child_reach_prob
+        = solver_->MakeRowConstraint(/*lb=*/0, /*ub=*/0, "");
+    ct->SetCoefficient(lp_spec_[node].var_reach_prob, -1);
     for (InfostateNode* child : node->child_iterator()) {
       SpecifyReachProbsConstraints(child);
-      ct->SetCoefficient(data_table_[child].var_reach_prob, 1);
+      ct->SetCoefficient(lp_spec_[child].var_reach_prob, 1);
     }
     return;
   }
@@ -76,26 +81,28 @@ void SequenceFormLpSolver::SpecifyReachProbsConstraints(InfostateNode* node) {
 }
 
 void SequenceFormLpSolver::SpecifyCfValuesConstraints(InfostateNode* node) {
-  data_table_[node].var_cf_value = solver_.MakeNumVar(
+  lp_spec_[node].var_cf_value = solver_->MakeNumVar(
       /*lb=*/-opres::MPSolver::infinity(),
       /*ub=*/opres::MPSolver::infinity(), "");
 
   if (node->type() == kDecisionInfostateNode) {
     for (InfostateNode* child : node->child_iterator()) {
       SpecifyCfValuesConstraints(child);
-      opres::MPConstraint* ct = data_table_[child].ct_parent_cf_value
-          = solver_.MakeRowConstraint();
+      opres::MPConstraint* ct
+          = lp_spec_[child].ct_parent_cf_value
+          = solver_->MakeRowConstraint();
       ct->SetUB(0.);
-      ct->SetCoefficient(data_table_[node].var_cf_value, -1);
-      ct->SetCoefficient(data_table_[child].var_cf_value, 1);
+      ct->SetCoefficient(lp_spec_[node].var_cf_value, -1);
+      ct->SetCoefficient(lp_spec_[child].var_cf_value, 1);
     }
     return;
   }
 
-  opres::MPConstraint* ct = data_table_[node].ct_child_cf_value
-      = solver_.MakeRowConstraint();
+  opres::MPConstraint* ct
+      = lp_spec_[node].ct_child_cf_value
+      = solver_->MakeRowConstraint();
   ct->SetUB(0.);
-  ct->SetCoefficient(data_table_[node].var_cf_value, -1);
+  ct->SetCoefficient(lp_spec_[node].var_cf_value, -1);
 
   if (node->type() == kTerminalInfostateNode) {
     const std::map<const InfostateNode*, const InfostateNode*>& terminal_map =
@@ -104,7 +111,7 @@ void SequenceFormLpSolver::SpecifyCfValuesConstraints(InfostateNode* node) {
     const double value =
         node->terminal_utility() * node->terminal_chance_reach_prob();
     // Terminal value constraint comes from the opponent.
-    ct->SetCoefficient(data_table_[opponent_node].var_reach_prob, value);
+    ct->SetCoefficient(lp_spec_[opponent_node].var_reach_prob, value);
     return;
   }
   if (node->type() == kObservationInfostateNode) {
@@ -112,7 +119,7 @@ void SequenceFormLpSolver::SpecifyCfValuesConstraints(InfostateNode* node) {
     ct->SetLB(0.);
     for (InfostateNode* child : node->child_iterator()) {
       SpecifyCfValuesConstraints(child);
-      ct->SetCoefficient(data_table_[child].var_cf_value, 1);
+      ct->SetCoefficient(lp_spec_[child].var_cf_value, 1);
     }
     return;
   }
@@ -122,20 +129,20 @@ void SequenceFormLpSolver::SpecifyCfValuesConstraints(InfostateNode* node) {
 
 void SequenceFormLpSolver::SpecifyRootConstraints(InfostateNode* root_node) {
   SPIEL_CHECK_TRUE(root_node->is_root_node());
-  SolverVariables& root_data = data_table_.at(root_node);
+  SolverVariables& root_data = lp_spec_.at(root_node);
   root_data.var_reach_prob->SetLB(1.);
   root_data.var_reach_prob->SetUB(1.);
 }
 
 void SequenceFormLpSolver::SpecifyObjective(InfostateNode* root_node) {
-  opres::MPObjective* const objective = solver_.MutableObjective();
-  objective->SetCoefficient(data_table_[root_node].var_cf_value, 1);
+  opres::MPObjective* const objective = solver_->MutableObjective();
+  objective->SetCoefficient(lp_spec_[root_node].var_cf_value, 1);
   objective->SetMinimization();
 }
 
 void SequenceFormLpSolver::ClearSpecification() {
-  solver_.Clear();
-  for (auto&[node, vars] : data_table_) {
+  solver_->Clear();
+  for (auto&[node, vars] : lp_spec_) {
     vars.var_cf_value = nullptr;
     vars.var_reach_prob = nullptr;
     vars.ct_child_cf_value = nullptr;
@@ -154,15 +161,13 @@ void SequenceFormLpSolver::SpecifyLinearProgram(Player pl) {
   SpecifyObjective(solver_trees_[1 - pl]->mutable_root());
 }
 
-double SequenceFormLpSolver::SolveForPlayer(Player pl) {
-  SPIEL_CHECK_TRUE(pl == 0 || pl == 1);
-  opres::MPSolver::ResultStatus status = solver_.Solve();
+double SequenceFormLpSolver::Solve() {
+  opres::MPSolver::ResultStatus status = solver_->Solve();
   SPIEL_CHECK_EQ(status, opres::MPSolver::ResultStatus::OPTIMAL);
-  return -solver_.Objective().Value();
+  return -solver_->Objective().Value();
 }
 
-TabularPolicy SequenceFormLpSolver::OptimalPolicy(
-    Player for_player) {
+TabularPolicy SequenceFormLpSolver::OptimalPolicy(Player for_player) {
   SPIEL_CHECK_TRUE(for_player == 0 || for_player == 1);
   const InfostateTree* tree = solver_trees_[for_player].get();
   TabularPolicy policy;
@@ -174,12 +179,13 @@ TabularPolicy SequenceFormLpSolver::OptimalPolicy(
     state_policy.reserve(node->num_children());
     double rp_sum = 0.;
     for (int i = 0; i < actions.size(); ++i) {
-      rp_sum += data_table_[node->child_at(i)].var_reach_prob->solution_value();;
+      rp_sum += lp_spec_[node->child_at(i)].var_reach_prob->solution_value();
     }
     for (int i = 0; i < actions.size(); ++i) {
       double prob;
       if (rp_sum) {
-        prob = data_table_[node->child_at(i)].var_reach_prob->solution_value() / rp_sum;
+        prob = lp_spec_[node->child_at(i)].var_reach_prob->solution_value()
+             / rp_sum;
       } else {
         // If the infostate is unreachable, the strategy is not defined.
         // However some code in the library may require having the strategy,
@@ -200,7 +206,7 @@ SfStrategy SequenceFormLpSolver::OptimalSfStrategy(
   SfStrategy strategy(tree);
   for (SequenceId id : tree->AllSequenceIds()) {
     const InfostateNode* node = tree->observation_infostate(id);
-    strategy[id] = data_table_[node].var_reach_prob->solution_value();
+    strategy[id] = lp_spec_[node].var_reach_prob->solution_value();
   }
   return strategy;
 }
@@ -224,9 +230,9 @@ ConnectTerminals(const InfostateTree& tree_a, const InfostateTree& tree_b) {
 
 
 void SequenceFormLpSolver::PrintProblemSpecification() {
-  const std::vector<opres::MPVariable*>& variables = solver_.variables();
-  const std::vector<opres::MPConstraint*>& constraints = solver_.constraints();
-  const opres::MPObjective& objective = solver_.Objective();
+  const std::vector<opres::MPVariable*>& variables = solver_->variables();
+  const std::vector<opres::MPConstraint*>& constraints = solver_->constraints();
+  const opres::MPObjective& objective = solver_->Objective();
 
   std::cout << "Objective:" << std::endl;
   if (objective.maximization()) std::cout << "max ";
@@ -243,7 +249,7 @@ void SequenceFormLpSolver::PrintProblemSpecification() {
   std::cout << std::endl;
 
   std::cout << "Constraints:" << std::endl;
-  for (auto& ct : solver_.constraints()) {
+  for (auto& ct : solver_->constraints()) {
     std::cout << ct->lb() << " <= ";
     bool first_ct = true;
     for (int i = 0; i < variables.size(); ++i) {
@@ -264,7 +270,6 @@ void SequenceFormLpSolver::PrintProblemSpecification() {
               << " (" << var->name() << ")" << std::endl;
   }
 }
-
 
 }  // namespace ortools
 }  // namespace algorithms

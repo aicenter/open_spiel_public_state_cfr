@@ -29,14 +29,14 @@ void TestGameValueAndExploitability(const std::string& game_name,
   std::shared_ptr<const Game> game = LoadGame(game_name);
   SequenceFormLpSolver solver(*game);
   solver.SpecifyLinearProgram(0);
-  double actual_game_value = solver.SolveForPlayer(0);
+  double actual_game_value = solver.Solve();
   SPIEL_CHECK_FLOAT_NEAR(actual_game_value, expected_game_value,
                          kErrorTolerance);
 
   // Compute policy for the opponent.
   TabularPolicy policy0 = solver.OptimalPolicy(0);
   solver.SpecifyLinearProgram(1);
-  double opponent_game_value = solver.SolveForPlayer(1);
+  double opponent_game_value = solver.Solve();
   SPIEL_CHECK_FLOAT_NEAR(actual_game_value + opponent_game_value,
                          0., kErrorTolerance);
   TabularPolicy policy1 = solver.OptimalPolicy(1);
