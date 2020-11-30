@@ -115,6 +115,10 @@ class SequenceFormLpSolver {
   }
   operations_research::MPSolver* solver() { return solver_.get(); }
 
+  const BijectiveContainer<const InfostateNode*>& terminal_bijection() const {
+    return terminal_bijection_;
+  }
+
  protected:
   const std::array<std::shared_ptr<InfostateTree>, 2> solver_trees_;
   const BijectiveContainer<const InfostateNode*> terminal_bijection_;
