@@ -129,18 +129,22 @@ class DepthLimitedCFR {
                   std::shared_ptr<Observer> public_observer);
 
   void RunSimultaneousIterations(int iterations);
-  void SimultaneousTopDownEvaluate();
+  void PrepareRootReachProbs();
+  void EvaluateLeaves();
 
   void SetPlayerRanges(const std::array<std::vector<double>, 2>& ranges);
   double RootValue(Player pl = 0) const;
   std::array<absl::Span<const double>, 2> RootChildrenCfValues() const;
 
+  // Accessors.
   std::vector<std::shared_ptr<InfostateTree>>& trees() { return trees_; }
   std::vector<BanditVector>& bandits() { return bandits_; }
   std::vector<std::unique_ptr<PublicStateContext>>& contexts() {
     return contexts_;
   }
   std::vector<LeafPublicState>& public_leaves() { return public_leaves_; }
+  std::vector<std::vector<double>>& reach_probs() { return reach_probs_; }
+  std::vector<std::vector<double>>& cf_values() { return cf_values_; }
 
   // Trunk evaluation.
   std::shared_ptr<Policy> AveragePolicy();
@@ -161,18 +165,16 @@ class DepthLimitedCFR {
 
   // Mutable values to keep track of.
   // These have the size of largest depth of the tree (i.e. leaf nodes).
-  std::array<std::vector<double>, 2> reach_probs_;
-  std::array<std::vector<double>, 2> cf_values_;
+  std::vector<std::vector<double>> reach_probs_;
+  std::vector<std::vector<double>> cf_values_;
 
   std::vector<BanditVector> bandits_;
 
   size_t num_iterations_ = 0;
 
-  void PrepareRootReachProbs();
   void PrepareLeafNodesForPublicStates();
   void PrepareRangesAndValuesForPublicStates();
   void CreateContexts();
-  void EvaluateLeaves();
   LeafPublicState* GetPublicLeaf(absl::Span<float> public_tensor);
 
   // Internal checks.
