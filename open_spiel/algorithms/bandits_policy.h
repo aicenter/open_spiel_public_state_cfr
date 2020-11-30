@@ -30,43 +30,48 @@ namespace algorithms {
 
 using BanditVector = DecisionVector<std::unique_ptr<bandits::Bandit>>;
 
-class BanditsCurrentPolicy : public Policy {
-  const InfostateTree* tree_;
-  const BanditVector* bandits_;
+std::vector<BanditVector> MakeBanditVectors(
+    const std::vector<std::shared_ptr<InfostateTree>>& trees,
+    const std::string& bandit_name = "RegretMatching",
+    GameParameters bandit_params = {});
+
+class BanditsPolicy : public Policy {
+  const std::vector<std::shared_ptr<InfostateTree>>& trees_;
+  const std::vector<BanditVector>& bandits_;
  public:
-  BanditsCurrentPolicy(const InfostateTree* tree, const BanditVector* bandits)
-      : tree_(tree), bandits_(bandits) {}
+  enum class PolicySelection {
+    kCurrentStrategy,
+    kAverageStrategy
+  };
+
+  BanditsPolicy(
+      const std::vector<std::shared_ptr<InfostateTree>>& trees,
+      const std::vector<BanditVector>& bandits)
+      : trees_(trees), bandits_(bandits) {}
+
+  ActionsAndProbs GetInfoStatePolicy(
+      const std::string& info_state, PolicySelection selection) const;
+};
+
+class BanditsAveragePolicy : public BanditsPolicy {
+ public:
+  BanditsAveragePolicy(const std::vector<std::shared_ptr<InfostateTree>>& trees,
+                       const std::vector<BanditVector>& bandits)
+      : BanditsPolicy(trees, bandits) {}
 
   ActionsAndProbs GetStatePolicy(const std::string& info_state) const override {
-    const InfostateNode* node =
-        tree_->DecisionNodeFromInfostateString(info_state);
-    SPIEL_CHECK_TRUE(node);
-    const bandits::Bandit* bandit = (*bandits_)[node->decision_id()].get();
-    const std::vector<Action>& actions = node->legal_actions();
-    const std::vector<double>& probs = bandit->current_strategy();
-    std::vector<std::pair<Action, double>> out;
-    Zip(actions.begin(), actions.end(), probs.begin(), out);
-    return out;
+    return GetInfoStatePolicy(info_state, PolicySelection::kAverageStrategy);
   }
 };
 
-class BanditsAveragePolicy : public Policy {
-  const InfostateTree* tree_;
-  const BanditVector* bandits_;
+class BanditsCurrentPolicy : public BanditsPolicy {
  public:
-  BanditsAveragePolicy(const InfostateTree* tree, const BanditVector* bandits)
-      : tree_(tree), bandits_(bandits) {}
+  BanditsCurrentPolicy(const std::vector<std::shared_ptr<InfostateTree>>& trees,
+                       const std::vector<BanditVector>& bandits)
+      : BanditsPolicy(trees, bandits) {}
 
   ActionsAndProbs GetStatePolicy(const std::string& info_state) const override {
-    const InfostateNode* node =
-        tree_->DecisionNodeFromInfostateString(info_state);
-    SPIEL_CHECK_TRUE(node);
-    const bandits::Bandit* bandit = (*bandits_)[node->decision_id()].get();
-    const std::vector<Action>& actions = node->legal_actions();
-    const std::vector<double> probs = bandit->AverageStrategy();
-    std::vector<std::pair<Action, double>> out;
-    Zip(actions.begin(), actions.end(), probs.begin(), out);
-    return out;
+    return GetInfoStatePolicy(info_state, PolicySelection::kCurrentStrategy);
   }
 };
 

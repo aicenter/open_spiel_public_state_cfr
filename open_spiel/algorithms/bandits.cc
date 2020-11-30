@@ -167,6 +167,15 @@ void RegretMatchingPlus::Reset() {
 
 
 }  // namespace bandits
+
+std::unique_ptr<bandits::Bandit> MakeBandit(
+    const std::string& bandit_name, size_t num_actions,
+    GameParameters bandit_params) {
+  // TODO: finish
+  SPIEL_CHECK_EQ(bandit_name, "RegretMatching");
+  return std::make_unique<bandits::RegretMatching>(num_actions);
+}
+
 }  // namespace algorithms
 }  // namespace open_spiel
 

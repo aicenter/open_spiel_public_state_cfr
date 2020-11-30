@@ -131,6 +131,7 @@ class BestResponse final : public Bandit {
  public:
   BestResponse(size_t num_actions) : Bandit(num_actions) {}
   void ComputeStrategy(size_t current_time, double weight = 1.) override {
+    if (current_time == 1) return;
     std::fill(current_strategy_.begin(), current_strategy_.end(), 0.);
     current_strategy_[response_index_] = 1.;
   }
@@ -357,6 +358,11 @@ class UpperConfidenceBounds final : public Bandit {
 };
 
 }  // namespace bandits
+
+std::unique_ptr<bandits::Bandit> MakeBandit(
+    const std::string& bandit_name, size_t num_actions,
+    GameParameters bandit_params);
+
 }  // namespace algorithms
 }  // namespace open_spiel
 

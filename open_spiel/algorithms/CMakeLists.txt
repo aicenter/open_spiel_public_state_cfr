@@ -2,6 +2,7 @@ add_library (algorithms OBJECT
   bandits.cc
   bandits.h
   bandits_policy.h
+  bandits_policy.cc
   best_response.cc
   best_response.h
   cfr.cc
