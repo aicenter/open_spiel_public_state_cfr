@@ -278,6 +278,26 @@ TabularPolicy GetFirstActionPolicy(const Game& game);
 
 std::string PrintPolicy(const ActionsAndProbs& policy);
 
+inline bool IsValidProbDistribution(const ActionsAndProbs& probs) {
+  double sum_probs = 0;
+  for (const auto& [action, prob] : probs) {
+    if (prob < 0) return false;
+    if (prob > 1) return false;
+    sum_probs += prob;
+  }
+  return abs(sum_probs - 1.0) < 1e-10;
+}
+
+inline bool IsValidProbDistribution(const std::vector<double>& probs) {
+  double sum_probs = 0;
+  for (double prob : probs) {
+    if (prob < 0) return false;
+    if (prob > 1) return false;
+    sum_probs += prob;
+  }
+  return abs(sum_probs - 1.0) < 1e-10;
+}
+
 }  // namespace open_spiel
 
 #endif  // OPEN_SPIEL_POLICY_H_
