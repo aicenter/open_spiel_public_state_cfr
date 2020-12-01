@@ -62,10 +62,10 @@ void TopDown(
         DecisionId, /*current_reach=*/double)> policy_fn);
 
 inline void TopDownCurrentPolicy(
-    const InfostateTree& tree, BanditVector& bandits,
-    absl::Span<double> reach_probs, size_t current_time) {
+    const InfostateTree& tree, const BanditVector& bandits,
+    absl::Span<double> reach_probs) {
   TopDown(tree, reach_probs, [&](DecisionId id, double reach_prob) {
-      bandits::Bandit* bandit = bandits[id].get();
+      const bandits::Bandit* bandit = bandits[id].get();
       return bandit->current_strategy();
   });
 }
@@ -112,11 +112,30 @@ inline void BottomUp(const InfostateTree& tree, BanditVector& bandits,
            });
 }
 
+inline void BottomUpCfBestResponse(const InfostateTree& tree,
+                                   absl::Span<double> cf_values) {
+  size_t response_index = 0;
+  size_t num_actions = 0;
+  BottomUp(
+      tree, cf_values,
+      [&](DecisionId id, absl::Span<const double> loss) {
+          num_actions = loss.size();
+          auto iter_min = std::min_element(loss.begin(), loss.end());
+          response_index = std::distance(loss.begin(), iter_min);
+      },
+      [&](DecisionId id) {
+          auto policy = std::vector<double>(num_actions);
+          policy[response_index] = 1.;
+          return policy;
+      }
+  );
+}
+
 // Calculates the root cf value as weighted sum of the cf_values()
 // (the weights are the respective ranges). If the supplied range is empty,
 // it returns their sum (i.e. all weights have a value of 1).
 double RootCfValue(int root_branching_factor,
-                   absl::Span<const double> cf_values,
+                   absl::Span<const double> cf_loss,
                    absl::Span<const double> range = {});
 
 // Run vectorized CFR on the whole game or on specified trees.

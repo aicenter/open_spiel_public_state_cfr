@@ -123,22 +123,22 @@ void BottomUp(
 }
 
 double RootCfValue(int root_branching_factor,
-                   absl::Span<const double> cf_values,
+                   absl::Span<const double> cf_loss,
                    absl::Span<const double> range) {
   SPIEL_CHECK_TRUE(range.empty() ||
                    (range.size() == root_branching_factor
-                    && range.size() == cf_values.size()));
+                    && range.size() == cf_loss.size()));
   double root_value = 0.;
   if (range.empty()) {
     for (int i = 0; i < root_branching_factor; ++i) {
-      root_value += cf_values[i];
+      root_value += cf_loss[i];
     }
   } else {
     for (int i = 0; i < root_branching_factor; ++i) {
-      root_value += range[i] * cf_values[i];
+      root_value += range[i] * cf_loss[i];
     }
   }
-  return root_value;
+  return -root_value;
 }
 
 InfostateCFR::InfostateCFR(std::vector<std::shared_ptr<InfostateTree>> trees)
