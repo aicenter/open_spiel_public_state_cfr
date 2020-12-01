@@ -81,6 +81,35 @@ class NFGState : public SimMoveState {
   }
 };
 
+class NFGObserver : public Observer {
+  IIGObservationType iig_obs_type_;
+ public:
+  explicit NFGObserver(IIGObservationType iig_obs_type)
+      : Observer(/*has_string=*/true, /*has_tensor=*/true),
+        iig_obs_type_(iig_obs_type) {}
+  void WriteTensor(const State& state, Player player,
+                   Allocator* allocator) const override {
+    const NFGState& nfg_state = open_spiel::down_cast<const NFGState&>(state);
+    SPIEL_CHECK_GE(player, 0);
+    SPIEL_CHECK_LT(player, nfg_state.NumPlayers());
+    auto out = allocator->Get("is_terminal", {1});
+    out.at(0) = nfg_state.IsTerminal() ? 1 : 0;
+  }
+  std::string StringFrom(const State& state, Player player) const override {
+    const NFGState& nfg_state = open_spiel::down_cast<const NFGState&>(state);
+    SPIEL_CHECK_GE(player, 0);
+    SPIEL_CHECK_LT(player, nfg_state.NumPlayers());
+    std::string info_state = absl::StrCat("Observing player: ", player, ". ");
+    if (!nfg_state.IsTerminal()) {
+      absl::StrAppend(&info_state, "Non-terminal");
+    } else {
+      absl::StrAppend(&info_state,
+                      "Terminal. History string: ", nfg_state.HistoryString());
+    }
+    return info_state;
+  }
+};
+
 class NormalFormGame : public SimMoveGame {
  public:
   // Game has one state.
@@ -117,6 +146,14 @@ class NormalFormGame : public SimMoveGame {
     }
     SpielFatalError(absl::StrCat("No appropriate UtilitySum value for ",
                                  "general-sum or identical utility games."));
+  }
+
+  std::shared_ptr<Observer> MakeObserver(
+      absl::optional<IIGObservationType> iig_obs_type,
+      const GameParameters& params) const override {
+    if (!params.empty()) SpielFatalError("Observation params not supported");
+    return std::make_shared<NFGObserver>(
+        iig_obs_type.value_or(kDefaultObsType));
   }
 
  protected:
