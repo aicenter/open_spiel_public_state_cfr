@@ -13,23 +13,40 @@
 // limitations under the License.
 
 
+#include "open_spiel/algorithms/history_tree.h"
 #include "open_spiel/algorithms/infostate_dl_cfr.h"
+#include "open_spiel/algorithms/ortools/sequence_form_lp.h"
 
 namespace open_spiel {
 namespace algorithms {
 namespace ortools {
+
+struct OraclePublicStateContext : public dlcfr::PublicStateContext {
+  std::array<SequenceFormLpSolver, 2> solvers;
+  std::vector<HistoryTree> subgame_histories;
+  std::map<std::string, std::array<size_t, 2>> subgame_ranges;
+  OraclePublicStateContext(
+      std::array<SequenceFormLpSolver, 2> solvers,
+      std::vector<HistoryTree> root_histories,
+      std::map<std::string, std::array<size_t, 2>> subgame_ranges)
+      : solvers(std::move(solvers)),
+        subgame_histories(std::move(root_histories)),
+        subgame_ranges(std::move(subgame_ranges)) {}
+};
 
 struct OracleEvaluator : public dlcfr::LeafEvaluator {
   std::shared_ptr<const Game> game;
   std::shared_ptr<Observer> infostate_observer;
   OracleEvaluator(std::shared_ptr<const Game> game,
                   std::shared_ptr<Observer> infostate_observer);
+  std::unique_ptr<dlcfr::PublicStateContext> CreateContext(
+      const dlcfr::LeafPublicState& leaf_state) const override;
   void EvaluatePublicState(dlcfr::LeafPublicState* s,
                            dlcfr::PublicStateContext* context) const override;
 };
 
-double TrunkExploitability(
-    dlcfr::DepthLimitedCFR* trunk, ortools::OracleEvaluator* oracle_evaluator);
+double TrunkExploitability(const std::vector<BanditVector>& eval_bandits,
+                           dlcfr::DepthLimitedCFR* oracle_trunk);
 
 }  // namespace ortools
 }  // namespace algorithms
