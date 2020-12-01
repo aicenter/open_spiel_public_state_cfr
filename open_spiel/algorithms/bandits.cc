@@ -171,9 +171,14 @@ void RegretMatchingPlus::Reset() {
 std::unique_ptr<bandits::Bandit> MakeBandit(
     const std::string& bandit_name, size_t num_actions,
     GameParameters bandit_params) {
+  if (bandit_name == "RegretMatching") {
+    return std::make_unique<bandits::RegretMatching>(num_actions);
+  }
+  if (bandit_name == "UniformStrategy") {
+    return std::make_unique<bandits::UniformStrategy>(num_actions);
+  }
   // TODO: finish
-  SPIEL_CHECK_EQ(bandit_name, "RegretMatching");
-  return std::make_unique<bandits::RegretMatching>(num_actions);
+  SpielFatalError("Exhausted pattern match!");
 }
 
 }  // namespace algorithms

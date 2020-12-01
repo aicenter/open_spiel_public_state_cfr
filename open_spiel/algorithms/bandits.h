@@ -111,6 +111,15 @@ class Bandit {
   }
 };
 
+// A bandit that always a uniform strategy.
+class UniformStrategy final : public Bandit {
+ public:
+  UniformStrategy(size_t num_actions) : Bandit(num_actions) {}
+  void ComputeStrategy(size_t current_time, double weight = 1.) override {}
+  void ObserveLoss(absl::Span<const double> loss) override {}
+  void Reset() override {}  // No need to reset anything.
+};
+
 // A bandit that always returns the same strategy.
 class FixedStrategy final : public Bandit {
  public:
