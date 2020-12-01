@@ -221,12 +221,12 @@ class Observer {
   }
 
   // Write a tensor observation to the memory returned by the Allocator.
-  virtual void WriteTensor(const State& state, int player,
+  virtual void WriteTensor(const State& state, Player player,
                            Allocator* allocator) const = 0;
 
   // Return a string observation. For human-readability or for tabular
   // algorithms on small games.
-  virtual std::string StringFrom(const State& state, int player) const = 0;
+  virtual std::string StringFrom(const State& state, Player player) const = 0;
 
   // What observations do we support?
   bool HasString() const { return has_string_; }
@@ -268,10 +268,10 @@ class Observation {
 
   // Gets the observation from the State and player and stores it in
   // the internal tensor.
-  void SetFrom(const State& state, int player);
+  void SetFrom(const State& state, Player player);
 
   // Returns the string observation for the State and player.
-  std::string StringFrom(const State& state, int player) const {
+  std::string StringFrom(const State& state, Player player) const {
     return observer_->StringFrom(state, player);
   }
 
