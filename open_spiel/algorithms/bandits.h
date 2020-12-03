@@ -32,22 +32,22 @@
 //
 // 1. ComputeStrategy() computes a strategy `x_t ∈ S^n` (probability simplex
 //    `S^n ⊆ R^n`).
-// 2. ObserveLoss() receives a loss vector `l_t` that is meant to evaluate the
-//    strategy `x_t` that was last computed.
+// 2. ObserveRewards() receives a reward vector `r_t` that is meant to evaluate
+//    the strategy `x_t` that was last computed.
 //
-// Specifically, the bandit incurs a loss equal to inner product of `l_t` and
-// `x_t`. The loss vector `l_t` can depend on all past strategies that were
-// output by the bandit. The bandit operates online in the sense that each
-// strategy `x_t` can depend only on the decision `x_1 , ... , x_(t−1)` output
-// in the past, as well as the loss vectors `l_1 , ... , l_(t−1)` that were
-// observed in the past. No information about the future losses `l_t, l_(t+1),
-// ...` is available to the bandit at time `t`.
+// Specifically, the bandit receives an expected reward equal to inner product
+// of `r_t` and `x_t`. The reward vector `r_t` can depend on all past strategies
+// that were // output by the bandit. The bandit operates online in the sense
+// that each strategy `x_t` can depend only on the decision `x_1 , ... ,
+// x_(t−1)` output in the past, as well as the reward vectors `r_1 , ... ,
+// r_(t−1)` that were observed in the past. No information about the future
+// rewards `r_t, r_(t+1), ...` is available to the bandit at time `t`.
 //
-// An example of a computation of a loss function: if bandit algorithms are used
-// on a zero-sum normal-form game described by a payoff matrix `A` for the first
-// player, then the loss vector `l_t` for the first player is `-Ay` and `x^T A`
-// for the second player, where `x` and `y` are the strategies for the players
-// one and two respectively.
+// An example of a computation of a reward function: if bandit algorithms are
+// used on a zero-sum normal-form game described by a payoff matrix `A` for the
+// first player, then the reward vector `r_t` for the first player is `Ay` and
+// `-x^T A` for the second player, where `x` and `y` are the strategies for the
+// players one and two respectively.
 
 namespace open_spiel {
 namespace algorithms {
@@ -85,8 +85,8 @@ class Bandit {
     return current_strategy_;
   }
 
-  // Observe the loss `l_t` incurred after the strategy `x_t` was used.
-  virtual void ObserveLoss(absl::Span<const double> loss) = 0;
+  // Observe the rewards `r_t` incurred after the strategy `x_t` was used.
+  virtual void ObserveRewards(absl::Span<const double> rewards) = 0;
 
   // Does this bandit compute also an average strategy?
   virtual bool uses_average_strategy() const { return false; }
@@ -116,7 +116,7 @@ class UniformStrategy final : public Bandit {
  public:
   UniformStrategy(size_t num_actions) : Bandit(num_actions) {}
   void ComputeStrategy(size_t current_time, double weight = 1.) override {}
-  void ObserveLoss(absl::Span<const double> loss) override {}
+  void ObserveRewards(absl::Span<const double> rewards) override {}
   void Reset() override {}  // No need to reset anything.
 };
 
@@ -129,11 +129,11 @@ class FixedStrategy final : public Bandit {
               current_strategy_.begin());
   }
   void ComputeStrategy(size_t current_time, double weight = 1.) override {}
-  void ObserveLoss(absl::Span<const double> loss) override {}
+  void ObserveRewards(absl::Span<const double> rewards) override {}
   void Reset() override {}  // No need to reset anything.
 };
 
-// A bandit that chooses an action with the smallest loss.
+// A bandit that chooses an action with the highest reward.
 // In time t=1, it chooses uniform strategy.
 class BestResponse final : public Bandit {
   size_t response_index_ = 0;
@@ -144,10 +144,10 @@ class BestResponse final : public Bandit {
     std::fill(current_strategy_.begin(), current_strategy_.end(), 0.);
     current_strategy_[response_index_] = 1.;
   }
-  void ObserveLoss(absl::Span<const double> loss) override {
-    SPIEL_DCHECK_EQ(loss.size(), current_strategy_.size());
-    auto iter_min = std::min_element(loss.begin(), loss.end());
-    response_index_ = std::distance(loss.begin(), iter_min);
+  void ObserveRewards(absl::Span<const double> rewards) override {
+    SPIEL_DCHECK_EQ(rewards.size(), current_strategy_.size());
+    auto iter_max = std::max_element(rewards.begin(), rewards.end());
+    response_index_ = std::distance(rewards.begin(), iter_max);
   };
   void Reset() override {
     Bandit::Reset();
@@ -166,7 +166,7 @@ class RegretMatching final : public Bandit {
   bool uses_average_strategy() const override { return true; }
 
   void ComputeStrategy(size_t current_time, double weight = 1.) override;
-  void ObserveLoss(absl::Span<const double> loss) override;
+  void ObserveRewards(absl::Span<const double> rewards) override;
   std::vector<double> AverageStrategy() const override;
   void Reset() override;
 };
@@ -182,7 +182,7 @@ class RegretMatchingPlus final : public Bandit {
   bool uses_average_strategy() const override { return true; }
 
   void ComputeStrategy(size_t current_time, double weight = 1.) override;
-  void ObserveLoss(absl::Span<const double> loss) override;
+  void ObserveRewards(absl::Span<const double> rewards) override;
   std::vector<double> AverageStrategy() const override;
   void Reset() override;
 };
@@ -198,7 +198,7 @@ class PredictiveRegretMatching final : public Bandit {
   bool uses_predictions() const override { return true; }
 
   void ComputeStrategy(size_t current_time, double weight = 1.) override;
-  void ObserveLoss(absl::Span<const double> loss) override;
+  void ObserveRewards(absl::Span<const double> rewards) override;
   std::vector<double> AverageStrategy() const override;
   void Reset() override;
 };
@@ -214,7 +214,7 @@ class PredictiveRegretMatchingPlus final : public Bandit {
   bool uses_predictions() const override { return true; }
 
   void ComputeStrategy(size_t current_time, double weight = 1.) override;
-  void ObserveLoss(absl::Span<const double> loss) override;
+  void ObserveRewards(absl::Span<const double> rewards) override;
   std::vector<double> AverageStrategy() const override;
   void Reset() override;
 };
@@ -229,7 +229,7 @@ class FollowTheLeader final : public Bandit {
   bool uses_predictions() const override { return true; }
 
   void ComputeStrategy(size_t current_time, double weight = 1.) override;
-  void ObserveLoss(absl::Span<const double> loss) override;
+  void ObserveRewards(absl::Span<const double> rewards) override;
   std::vector<double> AverageStrategy() const override;
   void Reset() override;
 };
@@ -247,7 +247,7 @@ class FollowTheRegularizedLeader final : public Bandit {
   bool uses_predictions() const override { return true; }
 
   void ComputeStrategy(size_t current_time, double weight = 1.) override;
-  void ObserveLoss(absl::Span<const double> loss) override;
+  void ObserveRewards(absl::Span<const double> rewards) override;
   std::vector<double> AverageStrategy() const override;
   void Reset() override;
 };
@@ -263,7 +263,7 @@ class PredictiveFollowTheRegularizedLeader final : public Bandit {
   bool uses_predictions() const override { return true; }
 
   void ComputeStrategy(size_t current_time, double weight = 1.) override;
-  void ObserveLoss(absl::Span<const double> loss) override;
+  void ObserveRewards(absl::Span<const double> rewards) override;
   std::vector<double> AverageStrategy() const override;
   void Reset() override;
 };
@@ -275,7 +275,7 @@ class OptimisticMirrorDescent final : public Bandit {
   bool uses_predictions() const override { return true; }
 
   void ComputeStrategy(size_t current_time, double weight = 1.) override;
-  void ObserveLoss(absl::Span<const double> loss) override;
+  void ObserveRewards(absl::Span<const double> rewards) override;
   std::vector<double> AverageStrategy() const override;
   void Reset() override;
 };
@@ -287,7 +287,7 @@ class PredictiveOptimisticMirrorDescent final : public Bandit {
   bool uses_predictions() const override { return true; }
 
   void ComputeStrategy(size_t current_time, double weight = 1.) override;
-  void ObserveLoss(absl::Span<const double> loss) override;
+  void ObserveRewards(absl::Span<const double> rewards) override;
   std::vector<double> AverageStrategy() const override;
   void Reset() override;
 };
@@ -299,7 +299,7 @@ class Exp3 final : public Bandit {
   bool uses_predictions() const override { return true; }
 
   void ComputeStrategy(size_t current_time, double weight = 1.) override;
-  void ObserveLoss(absl::Span<const double> loss) override;
+  void ObserveRewards(absl::Span<const double> rewards) override;
   std::vector<double> AverageStrategy() const override;
   void Reset() override;
 };
@@ -311,7 +311,7 @@ class Exp4 final : public Bandit {
   bool uses_predictions() const override { return true; }
 
   void ComputeStrategy(size_t current_time, double weight = 1.) override;
-  void ObserveLoss(absl::Span<const double> loss) override;
+  void ObserveRewards(absl::Span<const double> rewards) override;
   std::vector<double> AverageStrategy() const override;
   void Reset() override;
 };
@@ -326,7 +326,7 @@ class DiscountedRegretMatching final : public Bandit {
   bool uses_average_strategy() const override { return true; }
 
   void ComputeStrategy(size_t current_time, double weight = 1.) override;
-  void ObserveLoss(absl::Span<const double> loss) override;
+  void ObserveRewards(absl::Span<const double> rewards) override;
   std::vector<double> AverageStrategy() const override;
   void Reset() override;
 };
@@ -337,7 +337,7 @@ class Hedge final : public Bandit {
   bool uses_average_strategy() const override { return true; }
 
   void ComputeStrategy(size_t current_time, double weight = 1.) override;
-  void ObserveLoss(absl::Span<const double> loss) override;
+  void ObserveRewards(absl::Span<const double> rewards) override;
   std::vector<double> AverageStrategy() const override;
   void Reset() override;
 };
@@ -349,7 +349,7 @@ class OptimisticHedge final : public Bandit {
   bool uses_average_strategy() const override { return true; }
 
   void ComputeStrategy(size_t current_time, double weight = 1.) override;
-  void ObserveLoss(absl::Span<const double> loss) override;
+  void ObserveRewards(absl::Span<const double> rewards) override;
   std::vector<double> AverageStrategy() const override;
   void Reset() override;
 };
@@ -361,7 +361,7 @@ class UpperConfidenceBounds final : public Bandit {
   bool uses_predictions() const override { return true; }
 
   void ComputeStrategy(size_t current_time, double weight = 1.) override;
-  void ObserveLoss(absl::Span<const double> loss) override;
+  void ObserveRewards(absl::Span<const double> rewards) override;
   std::vector<double> AverageStrategy() const override;
   void Reset() override;
 };

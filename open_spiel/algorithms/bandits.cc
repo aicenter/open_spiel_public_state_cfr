@@ -48,14 +48,14 @@ void RegretMatching::ComputeStrategy(size_t current_time, double weight) {
   }
 }
 
-void RegretMatching::ObserveLoss(absl::Span<const double> loss) {
-  SPIEL_DCHECK_EQ(loss.size(), num_actions());
-  double v = 0.;
+void RegretMatching::ObserveRewards(absl::Span<const double> rewards) {
+  SPIEL_DCHECK_EQ(rewards.size(), num_actions());
+  double expected_reward = 0.;
   for (int i = 0; i < num_actions(); ++i) {
-    v += loss[i] * current_strategy_[i];
+    expected_reward += rewards[i] * current_strategy_[i];
   }
   for (int i = 0; i < num_actions(); ++i) {
-    cumulative_regrets_[i] += v - loss[i];
+    cumulative_regrets_[i] += rewards[i] - expected_reward;
   }
 }
 
@@ -114,14 +114,15 @@ void RegretMatchingPlus::ComputeStrategy(size_t current_time, double weight) {
   return current_strategy_;
 }
 
-void RegretMatchingPlus::ObserveLoss(absl::Span<const double> loss) {
-  SPIEL_DCHECK_EQ(loss.size(), num_actions());
-  double v = 0.;
+void RegretMatchingPlus::ObserveRewards(absl::Span<const double> rewards) {
+  SPIEL_DCHECK_EQ(rewards.size(), num_actions());
+  double expected_reward = 0.;
   for (int i = 0; i < num_actions(); ++i) {
-    v += loss[i] * current_strategy_[i];
+    expected_reward += rewards[i] * current_strategy_[i];
   }
   for (int i = 0; i < num_actions(); ++i) {
-    cumulative_regrets_[i] = std::fmax(0, cumulative_regrets_[i] + v - loss[i]);
+    cumulative_regrets_[i] =
+        std::fmax(0, cumulative_regrets_[i] + rewards[i] - expected_reward);
   }
 }
 
