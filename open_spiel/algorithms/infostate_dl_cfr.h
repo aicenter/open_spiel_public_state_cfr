@@ -36,7 +36,7 @@
 //
 // Therefore the leaf evaluator provides these two methods:
 //
-// - CreateContext: take a leaf public state and return any special context
+// - CreateContext: takes a leaf public state and return any special context
 //   representation needed for this leaf evaluator. These will be saved by
 //   DL-CFR to provide them later as necessary.
 // - EvaluatePublicState: receives a pointer to the leaf public state along with
@@ -75,7 +75,14 @@ struct LeafPublicState final {
   bool IsConsistent() const;
 };
 
-// Derived classes specify members as they need.
+// Derived classes specify members as they need for their specific
+// leaf evaluators.
+//
+// It is **strongly advised** to make the contexts immutable, or if the leaf
+// evaluator mutates the context for the purposes of its computation, it should
+// restore it back to the original. This is because it is beneficial to share
+// the same context between multiple leaf evaluator implementations (for example
+// the sequence-form oracle evaluators).
 struct PublicStateContext {
   // Make sure PublicStateContext is polymorphic.
   virtual ~PublicStateContext() = default;
