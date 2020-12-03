@@ -198,8 +198,8 @@ void TerminalEvaluator::EvaluatePublicState(
   auto* terminal = open_spiel::down_cast<TerminalPublicStateContext*>(context);
   for (int i = 0; i < terminal->utilities.size(); ++i) {
     const int j = terminal->permutation[i];
-    state->values[0][i] = -terminal->utilities[i] * state->ranges[1][j];
-    state->values[1][j] = terminal->utilities[i] * state->ranges[0][i];
+    state->values[0][i] = terminal->utilities[i] * state->ranges[1][j];
+    state->values[1][j] = - terminal->utilities[i] * state->ranges[0][i];
   }
 }
 

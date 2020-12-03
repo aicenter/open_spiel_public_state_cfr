@@ -74,8 +74,8 @@ void TopDown(
 
 void BottomUp(
     const InfostateTree& tree, absl::Span<double> cf_values,
-    std::function<
-        void(DecisionId, /*loss=*/absl::Span<const double>)> observe_loss_fn,
+    std::function<void(
+        DecisionId, /*rewards=*/absl::Span<const double>)> observe_rewards_fn,
     std::function<std::vector<double>(DecisionId)> policy_fn) {
   const std::vector<std::vector<InfostateNode*>>& nodes_at_depths =
       tree.nodes_at_depths();
@@ -98,7 +98,7 @@ void BottomUp(
       const int num_children = node->num_children();
       double node_sum = 0.;
       if (node->type() == kDecisionInfostateNode) {
-        observe_loss_fn(
+        observe_rewards_fn(
             node->decision_id(),
             absl::Span<const double>(&cf_values[left_offset], num_children));
         std::vector<double> policy = policy_fn(node->decision_id());
@@ -123,22 +123,22 @@ void BottomUp(
 }
 
 double RootCfValue(int root_branching_factor,
-                   absl::Span<const double> cf_loss,
+                   absl::Span<const double> cf_values,
                    absl::Span<const double> range) {
   SPIEL_CHECK_TRUE(range.empty() ||
                    (range.size() == root_branching_factor
-                    && range.size() == cf_loss.size()));
-  double root_value = 0.;
+                    && range.size() == cf_values.size()));
+  double root_cf_value = 0.;
   if (range.empty()) {
     for (int i = 0; i < root_branching_factor; ++i) {
-      root_value += cf_loss[i];
+      root_cf_value += cf_values[i];
     }
   } else {
     for (int i = 0; i < root_branching_factor; ++i) {
-      root_value += range[i] * cf_loss[i];
+      root_cf_value += range[i] * cf_values[i];
     }
   }
-  return -root_value;
+  return root_cf_value;
 }
 
 InfostateCFR::InfostateCFR(std::vector<std::shared_ptr<InfostateTree>> trees)
@@ -207,20 +207,20 @@ void InfostateCFR::PrepareRootReachProbs(Player pl) {
 void InfostateCFR::EvaluateLeaves() {
   for (int i = 0; i < trees_[0]->num_leaves(); ++i) {
     const int j = terminal_permutation_[i];
-    cf_values_[0][i] = - terminal_values_[i] * reach_probs_[1][j];
-    cf_values_[1][j] =   terminal_values_[i] * reach_probs_[0][i];
+    cf_values_[0][i] =   terminal_values_[i] * reach_probs_[1][j];
+    cf_values_[1][j] = - terminal_values_[i] * reach_probs_[0][i];
   }
 }
 void InfostateCFR::EvaluateLeaves(Player pl) {
   if (pl == 0) {
     for (int i = 0; i < trees_[0]->num_leaves(); ++i) {
       const int j = terminal_permutation_[i];
-      cf_values_[0][i] = - terminal_values_[i] * reach_probs_[1][j];
+      cf_values_[0][i] = terminal_values_[i] * reach_probs_[1][j];
     }
   } else {
     for (int i = 0; i < trees_[1]->num_leaves(); ++i) {
       const int j = terminal_permutation_[i];
-      cf_values_[1][j] = terminal_values_[i] * reach_probs_[0][i];
+      cf_values_[1][j] = - terminal_values_[i] * reach_probs_[0][i];
     }
   }
 }

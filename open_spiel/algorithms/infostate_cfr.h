@@ -96,15 +96,15 @@ inline void TopDownAveragePolicy(
 void BottomUp(
     const InfostateTree& tree, absl::Span<double> cf_values,
     std::function<
-        void(DecisionId, /*loss=*/absl::Span<const double>)> observe_loss_fn,
+        void(DecisionId, /*rewards=*/absl::Span<const double>)> observe_rewards_fn,
     std::function<std::vector<double>(DecisionId)> policy_fn);
 
 inline void BottomUp(const InfostateTree& tree, BanditVector& bandits,
                      absl::Span<double> cf_values) {
   BottomUp(tree, cf_values,
-           [&](DecisionId id, absl::Span<const double> loss) {
+           [&](DecisionId id, absl::Span<const double> rewards) {
                bandits::Bandit* bandit = bandits[id].get();
-               bandit->ObserveLoss(loss);
+               bandit->ObserveRewards(rewards);
            },
            [&](DecisionId id) {
                bandits::Bandit* bandit = bandits[id].get();
@@ -118,10 +118,10 @@ inline void BottomUpCfBestResponse(const InfostateTree& tree,
   size_t num_actions = 0;
   BottomUp(
       tree, cf_values,
-      [&](DecisionId id, absl::Span<const double> loss) {
-          num_actions = loss.size();
-          auto iter_min = std::min_element(loss.begin(), loss.end());
-          response_index = std::distance(loss.begin(), iter_min);
+      [&](DecisionId id, absl::Span<const double> rewards) {
+          num_actions = rewards.size();
+          auto iter_max = std::max_element(rewards.begin(), rewards.end());
+          response_index = std::distance(rewards.begin(), iter_max);
       },
       [&](DecisionId id) {
           auto policy = std::vector<double>(num_actions);
@@ -135,7 +135,7 @@ inline void BottomUpCfBestResponse(const InfostateTree& tree,
 // (the weights are the respective ranges). If the supplied range is empty,
 // it returns their sum (i.e. all weights have a value of 1).
 double RootCfValue(int root_branching_factor,
-                   absl::Span<const double> cf_loss,
+                   absl::Span<const double> cf_values,
                    absl::Span<const double> range = {});
 
 // Run vectorized CFR on the whole game or on specified trees.
