@@ -128,7 +128,7 @@ DecisionVector<std::vector<double>> ComputeCfBestResponse(
   DecisionVector<std::vector<double>> strategy(&tree);
   BottomUp(
       tree, cf_gradient,
-      [&](DecisionId id, absl::Span<const double> loss) -> void {
+      [&](DecisionId id, absl::Span<const double> rewards) -> void {
           const InfostateNode* node = tree.decision_infostate(id);
           strategy[id] = std::vector(node->num_children(), 0.);
           auto node_reach = player_spec[node].var_reach_prob;
@@ -143,9 +143,9 @@ DecisionVector<std::vector<double>> ComputeCfBestResponse(
                   / node_reach->solution_value();
             }
           } else {
-            auto iter_min = std::min_element(loss.begin(), loss.end());
-            const size_t best_response = std::distance(loss.begin(), iter_min);
-            strategy[id][best_response] = 1.;
+            auto iter_max = std::max_element(rewards.begin(), rewards.end());
+            const size_t best_resp_idx = std::distance(rewards.begin(), iter_max);
+            strategy[id][best_resp_idx] = 1.;
           }
       },
       /*policy_fn=*/[&](DecisionId id) -> std::vector<double> {
@@ -247,6 +247,8 @@ void OracleEvaluator::EvaluatePublicState(
         const size_t j = oracle_context->subgame_ranges.at(state_str)[1 - pl];
         const double opponent_range = s->ranges[1 - pl][j];
         const double chance_range = node->corresponding_chance_reach_probs()[k];
+        // We must change the sign appropriately because expected_utilities
+        // are computed for player 0.
         const double sign = 1 - 2 * pl;
         s->values[pl][i] += expected_utilities.at(state_str)
                           * opponent_range * chance_range * sign;
