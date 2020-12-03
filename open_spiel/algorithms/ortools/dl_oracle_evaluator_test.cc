@@ -219,27 +219,21 @@ void TestValueOracle(const std::string& game_name) {
   }
 }
 
-void TestTrunkDeepAsWholeGameExploitability(const std::string& game_name) {
+void TestOneSidedFixedStrategyExploitability(const std::string& game_name) {
   std::shared_ptr<const Game> game = LoadGame(game_name);
-
-  std::shared_ptr<const dlcfr::LeafEvaluator> terminal_evaluator =
-      dlcfr::MakeTerminalEvaluator();
-  std::shared_ptr<Observer> public_observer =
-      game->MakeObserver(kPublicStateObsType, {});
-  std::shared_ptr<Observer> infostate_observer =
-      game->MakeObserver(kInfoStateObsType, {});
-
-  dlcfr::DepthLimitedCFR dl_solver(game, 100, nullptr, terminal_evaluator);
-  std::vector<BanditVector> uniform_bandits =
-      MakeBanditVectors(dl_solver.trees(), "UniformStrategy");
-  UniformPolicy uniform_policy;
+  SequenceFormLpSolver whole_game(*game);
 
   // Exploitability implementation does not support simultaneous move games.
   if (game->GetType().dynamics == GameType::Dynamics::kSimultaneous) {
     game = ConvertToTurnBased(*game);
   }
+  UniformPolicy uniform_policy;
   const double expected_expl = Exploitability(*game, uniform_policy);
-  const double actual_expl = TrunkExploitability(uniform_bandits, &dl_solver);
+
+  auto bandit_policy = MakeBanditVectors(whole_game.trees(), "UniformStrategy");
+  BanditsCurrentPolicy uniform_bandit_policy(whole_game.trees(), bandit_policy);
+  const double actual_expl = TrunkExploitability(
+      &whole_game, uniform_bandit_policy);
   SPIEL_CHECK_FLOAT_NEAR(expected_expl, actual_expl, 1e-10);
 }
 
@@ -278,16 +272,18 @@ int main(int argc, char** argv) {
   algorithms::TestTrunkExploitabilityInKuhn();
   algorithms::TestOptimalValuesKuhn();
 //  algorithms::TestOracleConvergence();
-//  algorithms::TestOptimalValuesKuhnBettingPublicState();
 //
-  std::vector<std::string> test_games = {
-      "matrix_mp",
-      "kuhn_poker",
-      "leduc_poker",
-      "goofspiel(players=2,num_cards=4,imp_info=True)",
-  };
-  for (const std::string& game_name : test_games) {
-//    algorithms::TestTrunkDeepAsWholeGameExploitability(game_name);
-//    algorithms::TestValueOracle(game_name);
-  }
+//  std::vector<std::string> test_games = {
+//      "matrix_mp",
+//      "kuhn_poker",
+//      "leduc_poker",
+//      "goofspiel(players=2,num_cards=4,imp_info=True)",
+//  };
+//  for (const std::string& game_name : test_games) {
+//    algorithms::TestOneSidedFixedStrategyExploitability(game_name);
+//    // TODO: fix HistoryTree and enable sim move games.
+//    if (game_name.find("poker") != std::string::npos) {
+//      algorithms::TestValueOracle(game_name);
+//    }
+//  }
 }
