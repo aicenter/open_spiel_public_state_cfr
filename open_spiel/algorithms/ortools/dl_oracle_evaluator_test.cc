@@ -39,12 +39,11 @@ void MakeFixedBandit(BanditVector& vec, std::string infostate_string,
 }
 
 std::vector<BanditVector> MakeKuhnParametricPolicy(
-    dlcfr::DepthLimitedCFR* dl_solver, double a) {
+    const std::vector<std::shared_ptr<InfostateTree>>& trees, double a) {
   // Set strategy as described in https://en.wikipedia.org/wiki/Kuhn_poker
 
   // Player 0
-  const std::shared_ptr<InfostateTree> tree0 = dl_solver->trees()[0];
-  BanditVector vec0(tree0.get());
+  BanditVector vec0(trees[0].get());
   MakeFixedBandit(vec0, "0"  ,  { 1. - a      , a          });
   MakeFixedBandit(vec0, "0pb",  { 1           , 0.         });
   MakeFixedBandit(vec0, "1"  ,  { 1.          , 0.         });
@@ -53,8 +52,7 @@ std::vector<BanditVector> MakeKuhnParametricPolicy(
   MakeFixedBandit(vec0, "2pb",  { 0.          , 1.         });
 
   // Player 1
-  const std::shared_ptr<InfostateTree> tree1 = dl_solver->trees()[1];
-  BanditVector vec1(tree1.get());
+  BanditVector vec1(trees[1].get());
   MakeFixedBandit(vec1, "0p",  { 2 / 3. , 1 / 3. });
   MakeFixedBandit(vec1, "0b",  { 1      , 0.     });
   MakeFixedBandit(vec1, "1p",  { 1.     , 0.     });
@@ -68,90 +66,40 @@ std::vector<BanditVector> MakeKuhnParametricPolicy(
   return out;
 }
 
-void TestOptimalValuesKuhnBettingPublicState() {
+void TestTrunkExploitabilityInKuhn() {
   std::shared_ptr<const Game> game = LoadGame("kuhn_poker");
-  std::shared_ptr<Observer> infostate_observer =
-      game->MakeObserver(kInfoStateObsType, {});
-  auto leaf_evaluator = std::make_shared<OracleEvaluator>(
-      game, infostate_observer);
-  std::shared_ptr<const dlcfr::LeafEvaluator> terminal_evaluator =
-      dlcfr::MakeTerminalEvaluator();
-  dlcfr::DepthLimitedCFR dl_solver(game, /*trunk_depth_limit=*/3,
-                                   leaf_evaluator, terminal_evaluator);
-  dlcfr::LeafPublicState& bet_state = dl_solver.public_leaves()[1];
+  SequenceFormLpSolver whole_game(*game);
 
-  // Make sure there is no regression and infostates are properly arranged
-  // as when writing this test.
-  SPIEL_CHECK_EQ(bet_state.leaf_nodes[0][0]->infostate_string(), "0b");
-  SPIEL_CHECK_EQ(bet_state.leaf_nodes[0][1]->infostate_string(), "1b");
-  SPIEL_CHECK_EQ(bet_state.leaf_nodes[0][2]->infostate_string(), "2b");
-  const int PL0_J = 0;
-  const int PL0_Q = 1;
-  const int PL0_K = 2;
-  // This does not follow an intuitive order, because of the way how the tree
-  // is constructed: we recurse through dealing card 0 to player 0, and player 1
-  // receives cards 1 or 2, so we also build those infostates first.
-  SPIEL_CHECK_EQ(bet_state.leaf_nodes[1][0]->infostate_string(), "1b");
-  SPIEL_CHECK_EQ(bet_state.leaf_nodes[1][1]->infostate_string(), "2b");
-  SPIEL_CHECK_EQ(bet_state.leaf_nodes[1][2]->infostate_string(), "0b");
-  const int PL1_J = 2;
-  const int PL1_Q = 0;
-  const int PL1_K = 1;
-
-  // If the cf. values are computed with BR instead of CBR, the value function
-  // does not return correct values for \alpha \in [0; 0.25)
-  // Let's test various parametrizations to make sure that the values are indeed
-  // correctly computed.
-  std::vector<float> test_parametrizations = { 0., 0.1, 0.25, 0.5, 1. };
-
-  for (float alpha : test_parametrizations) {
-    bet_state.ranges = {
-        // Player 0 bets with these probabilities when it has cards J, Q or K
-        std::vector<double>({alpha, alpha, 1 - alpha}),
-        // Player 1 did not act before this public state, so ranges are fixed.
-        std::vector<double>({1., 1., 1.})
-    };
-    leaf_evaluator->EvaluatePublicState(&bet_state, /*context=*/nullptr);
-    if (alpha < 0.25) {
-      // PL1 passes
-      SPIEL_CHECK_FLOAT_NEAR(bet_state.values[0][PL0_J], -1 / 6., 1e-10);
-      SPIEL_CHECK_FLOAT_NEAR(bet_state.values[0][PL0_K], 1 / 3., 1e-10);
-    } else {
-      // PL1 bets
-      SPIEL_CHECK_FLOAT_NEAR(bet_state.values[0][PL0_J], -2 / 3., 1e-10);
-      SPIEL_CHECK_FLOAT_NEAR(bet_state.values[0][PL0_K], 1 / 2., 1e-10);
-    }
-    SPIEL_CHECK_FLOAT_NEAR(bet_state.values[0][PL0_Q], -1 / 6., 1e-10);
-
-    SPIEL_CHECK_FLOAT_NEAR(bet_state.values[1][PL1_J], -1 / 6., 1e-6);
-    SPIEL_CHECK_FLOAT_NEAR(bet_state.values[1][PL1_Q],
-        std::fmax((2 * alpha - 1) / 3., -1/6.), 1e-6);
-    SPIEL_CHECK_FLOAT_NEAR(bet_state.values[1][PL1_K], 2 * alpha / 3, 1e-6);
-  }
-}
-
-void TestTrunkExploitabilityOptimalValuesKuhn() {
-  std::shared_ptr<const Game> game = LoadGame("kuhn_poker");
-  std::shared_ptr<Observer> infostate_observer =
-      game->MakeObserver(kInfoStateObsType, {});
-  std::shared_ptr<const dlcfr::LeafEvaluator> terminal_evaluator =
-      dlcfr::MakeTerminalEvaluator();
-  auto oracle_evaluator =
-      std::make_shared<OracleEvaluator>(game, infostate_observer);
-  dlcfr::DepthLimitedCFR dl_solver(game, /*trunk_depth_limit=*/3,
-                                   oracle_evaluator, terminal_evaluator);
-
-  // Range of values that produce Nash (optimal).
+  // Range of values that produce Nash in the trunk.
   for (double a : std::vector<double>{0., 1 / 6., 1 / 3.,}) {
-    std::vector<BanditVector> policy = MakeKuhnParametricPolicy(&dl_solver, a);
-    double actual_exploitability = TrunkExploitability(policy, &dl_solver);
-    SPIEL_CHECK_FLOAT_NEAR(actual_exploitability, 0., 1e-10);
+    auto bandit_policy = MakeKuhnParametricPolicy(whole_game.trees(), a);
+    BanditsCurrentPolicy policy(whole_game.trees(), bandit_policy);
+    const double actual_expl = TrunkExploitability(&whole_game, policy);
+    SPIEL_CHECK_FLOAT_NEAR(actual_expl, 0., 1e-10);
+
+    const double value0 = ComputeRootValueWhileFixingStrategy(
+        &whole_game, policy, /*pl=*/0);
+    SPIEL_CHECK_FLOAT_NEAR(value0, -1. / 18., 1e-10);
+
+    const double value1 = ComputeRootValueWhileFixingStrategy(
+        &whole_game, policy, /*pl=*/1);
+    SPIEL_CHECK_FLOAT_NEAR(value1, 1. / 18., 1e-10);
+
+    for (int pl = 0; pl < 2; ++pl) {
+      const double actual_pl_expl =
+          TrunkPlayerExploitability(&whole_game, policy, /*pl=*/pl);
+      SPIEL_CHECK_FLOAT_NEAR(actual_pl_expl, 0., 1e-10);
+    }
   }
 
-  std::vector<BanditVector> policy =
-      MakeKuhnParametricPolicy(&dl_solver, 1 / 2.);
-  double actual_exploitability = TrunkExploitability(policy, &dl_solver);
-  SPIEL_CHECK_GT(actual_exploitability, 0.);
+  {
+    // Policy that is not a Nash.
+    auto bandit_policy =
+        MakeBanditVectors(whole_game.trees(), "UniformStrategy");
+    BanditsCurrentPolicy policy(whole_game.trees(), bandit_policy);
+    const double actual_expl = TrunkExploitability(&whole_game, policy);
+    SPIEL_CHECK_GT(actual_expl, 0.);
+  }
 }
 
 void TestOptimalValuesKuhn() {
@@ -361,7 +309,7 @@ void TestOracleConvergence() {
 namespace algorithms = open_spiel::algorithms::ortools;
 
 int main(int argc, char** argv) {
-  algorithms::TestTrunkExploitabilityOptimalValuesKuhn();
+  algorithms::TestTrunkExploitabilityInKuhn();
 //  algorithms::TestOptimalValuesKuhn();
 //  algorithms::TestTrunkExploitability();
 //  algorithms::TestOracleConvergence();

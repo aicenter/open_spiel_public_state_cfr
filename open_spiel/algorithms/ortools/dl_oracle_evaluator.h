@@ -45,8 +45,21 @@ struct OracleEvaluator : public dlcfr::LeafEvaluator {
                            dlcfr::PublicStateContext* context) const override;
 };
 
-double TrunkExploitability(const std::vector<BanditVector>& eval_bandits,
-                           dlcfr::DepthLimitedCFR* oracle_trunk);
+
+double ComputeRootValueWhileFixingStrategy(
+    SequenceFormLpSolver* solver, const Policy& fixed_policy, Player fixed_player);
+
+// Based on Proposition 3.11 in the value functions paper [1], as the average of
+// the individual player exploitabilities -- we don't need to know the game
+// value.
+double TrunkExploitability(SequenceFormLpSolver* solver,
+                           const Policy& trunk_policy);
+
+// Based on Proposition 3.11 in the value functions paper [1].
+// If you do not supply game value, it will be calculated automatically.
+double TrunkPlayerExploitability(
+    SequenceFormLpSolver* solver, const Policy& trunk_policy, Player p,
+    absl::optional<double> maybe_game_value = {});
 
 }  // namespace ortools
 }  // namespace algorithms

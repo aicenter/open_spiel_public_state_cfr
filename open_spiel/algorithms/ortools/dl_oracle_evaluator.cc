@@ -81,7 +81,7 @@ OracleEvaluator::OracleEvaluator(std::shared_ptr<const Game> game,
       infostate_observer(std::move(infostate_observer)) {}
 
 // Needs to have LP specified everywhere else using standard SF-LP.
-void RespecifyValueSolvingSubgame(
+void RefineSpecToValueSolvingSubgame(
     const InfostateNode& player_root,
     absl::Span<const double> range,
     std::unordered_map<const InfostateNode*, SolverVariables>& lp_spec) {
@@ -182,6 +182,7 @@ double ComputeExpectedUtility(HistoryNode* node, const TabularPolicy& policy) {
 
 void OracleEvaluator::EvaluatePublicState(
     dlcfr::LeafPublicState* s, dlcfr::PublicStateContext* context) const {
+  SPIEL_CHECK_TRUE(context);
   auto* oracle_context =
       open_spiel::down_cast<OraclePublicStateContext*>(context);
   std::array<SequenceFormLpSolver, 2>& solvers = oracle_context->solvers;
@@ -189,14 +190,13 @@ void OracleEvaluator::EvaluatePublicState(
   // Check pointers for the trees are still the same.
   SPIEL_CHECK_EQ(solvers[0].trees()[0].get(), solvers[1].trees()[0].get());
   SPIEL_CHECK_EQ(solvers[0].trees()[1].get(), solvers[1].trees()[1].get());
-  const std::array<std::shared_ptr<InfostateTree>, 2>& trees =
-      solvers[0].trees();
+  const std::vector<std::shared_ptr<InfostateTree>>& trees = solvers[0].trees();
 
   // Step 0. Construct the value-solving subgame for each player and solve it.
   for (int pl = 0; pl < 2; ++pl) {
     SPIEL_CHECK_EQ(s->leaf_nodes[pl].size(), s->ranges[pl].size());
-    RespecifyValueSolvingSubgame(trees[pl]->root(), s->ranges[pl],
-                                 solvers[pl].lp_specification());
+    RefineSpecToValueSolvingSubgame(trees[pl]->root(), s->ranges[pl],
+                                    solvers[pl].lp_specification());
     // Run the solver!
     solvers[pl].Solve();
   }
@@ -228,7 +228,6 @@ void OracleEvaluator::EvaluatePublicState(
       mutual_cbrs.SetStatePolicy(node->infostate_string(), policy);
     }
   }
-  std::cout << mutual_cbrs.PolicyTable() << "\n";
 
   // Step 4. Compute expected utilities of subgame histories (for player 0).
   std::map<std::string, /*utility=*/double> expected_utilities;
@@ -236,8 +235,6 @@ void OracleEvaluator::EvaluatePublicState(
     expected_utilities[h.Root()->GetHistory()] =
         ComputeExpectedUtility(h.Root(), mutual_cbrs);
   }
-
-  std::cout << expected_utilities << "\n";
 
   // Step 5. Compute final counterfactually optimal values.
   for (int pl = 0; pl < 2; ++pl) {
@@ -256,15 +253,12 @@ void OracleEvaluator::EvaluatePublicState(
       }
     }
   }
-
-//  std::cout << s->ranges << "\n";
-//  std::cout << s->values << "\n";
   return;
 }
 
 std::unique_ptr<dlcfr::PublicStateContext> OracleEvaluator::CreateContext(
     const dlcfr::LeafPublicState& leaf_state) const {
-  std::array<std::shared_ptr<InfostateTree>, 2> trees = {
+  std::vector<std::shared_ptr<InfostateTree>> trees = {
       MakeInfostateTree(leaf_state.leaf_nodes[0]),
       MakeInfostateTree(leaf_state.leaf_nodes[1])
   };
@@ -301,28 +295,64 @@ std::unique_ptr<dlcfr::PublicStateContext> OracleEvaluator::CreateContext(
       std::move(solvers), std::move(subgame_histories), std::move(subgame_ranges));
 }
 
-double TrunkExploitability(const std::vector<BanditVector>& eval_bandits,
-                           dlcfr::DepthLimitedCFR* oracle_trunk) {
-  // Compute range using the provided bandits.
-  oracle_trunk->PrepareRootReachProbs();
-  for (int pl = 0; pl < 2; ++pl) {
-    TopDownCurrentPolicy(  // TODO: current / avg
-        *oracle_trunk->trees()[pl], eval_bandits[pl],
-        absl::MakeSpan(oracle_trunk->reach_probs()[pl]));
+void RecursivelyRefineSpecFixStrategyWithPolicy(
+    const InfostateNode* node,
+    const Policy& fixed_policy,
+    SequenceFormLpSolver* solver) {
+  if (node->type() == kDecisionInfostateNode) {
+    ActionsAndProbs local_policy =
+        fixed_policy.GetStatePolicy(node->infostate_string());
+    if (!local_policy.empty()) {  // Fix policy at this node!
+      SPIEL_DCHECK_EQ(local_policy.size(), node->num_children());
+      std::unordered_map<const InfostateNode*, SolverVariables>& lp_spec =
+          solver->lp_specification();
+
+      for (int i = 0; i < node->num_children(); ++i) {
+        const InfostateNode* child = node->child_at(i);
+        SPIEL_DCHECK_EQ(node->legal_actions()[i], local_policy[i].first);
+        const double prob = local_policy[i].second;
+        opres::MPConstraint* ct = solver->solver()->MakeRowConstraint(0., 0.);
+        ct->SetCoefficient(lp_spec[node].var_reach_prob, prob);
+        ct->SetCoefficient(lp_spec[child].var_reach_prob, -1.);
+      }
+    }
   }
 
-  // Compute optimal extension.
-  oracle_trunk->EvaluateLeaves();
-
-  // Compute exploitability as bottom-up (counterfactual) best response
-  // based on cf. values of cf. optimal extensions.
-  double exploitability = 0.;
-  for (int pl = 0; pl < 2; ++pl) {
-    BottomUpCfBestResponse(*oracle_trunk->trees()[pl],
-                           absl::MakeSpan(oracle_trunk->cf_values()[pl]));
-    exploitability += oracle_trunk->RootValue(pl);
+  for (const InfostateNode* child : node->child_iterator()) {
+    RecursivelyRefineSpecFixStrategyWithPolicy(child, fixed_policy, solver);
   }
-  return exploitability / 2;
+}
+
+double ComputeRootValueWhileFixingStrategy(
+    SequenceFormLpSolver* solver, const Policy& fixed_policy,
+    Player fixed_player) {
+  solver->SpecifyLinearProgram(fixed_player);
+  RecursivelyRefineSpecFixStrategyWithPolicy(
+      solver->trees()[fixed_player]->mutable_root(), fixed_policy, solver);
+  return solver->Solve();
+}
+
+double TrunkExploitability(SequenceFormLpSolver* solver,
+                           const Policy& trunk_policy) {
+  return (- ComputeRootValueWhileFixingStrategy(solver, trunk_policy, 0)
+          - ComputeRootValueWhileFixingStrategy(solver, trunk_policy, 1)) / 2.;
+}
+
+double TrunkPlayerExploitability(
+    SequenceFormLpSolver* solver, const Policy& trunk_policy, Player p,
+    absl::optional<double> maybe_game_value) {
+  double game_value;
+  if (maybe_game_value.has_value()) {
+    game_value = maybe_game_value.value();
+  } else {
+    solver->SpecifyLinearProgram(Player{0});
+    game_value = solver->Solve();
+  }
+  // Switch sign appropriately - game value is defined for player 0!
+  const double root_value = game_value * (1 - 2*p);
+  const double fixed_value =
+      ComputeRootValueWhileFixingStrategy(solver, trunk_policy, p);
+  return root_value - fixed_value;
 }
 
 }  // namespace ortools
