@@ -113,12 +113,8 @@ void TestOptimalValuesKuhn() {
   dlcfr::DepthLimitedCFR dl_solver(game, /*trunk_depth_limit=*/3,
                                    oracle_evaluator, terminal_evaluator);
 
-  for (double a : std::vector<double>{
-    0.,
-    1/6.,
-    1/3.,  // Range of values that produce Nash (optimal).
-  }) {
-    std::cout << "a: " << a << '\n';
+  // Range of values that produce Nash.
+  for (double a : std::vector<double>{0., 1 / 6., 1 / 3.}) {
     // Set player strategies.
     // Nomenclature of variables: "action"_"infostate" where action=p/b (pass/bet)
     const double
@@ -175,7 +171,7 @@ void TestOptimalValuesKuhn() {
     SPIEL_CHECK_FLOAT_EQ(root_val0, -root_val1);
 
     std::vector<BanditVector> bandit_fixed_policy =
-        MakeKuhnParametricPolicy(&dl_solver, a);
+        MakeKuhnParametricPolicy(dl_solver.trees(), a);
 
     dl_solver.PrepareRootReachProbs();
     for (int pl = 0; pl < 2; ++pl) {
@@ -187,47 +183,17 @@ void TestOptimalValuesKuhn() {
 
     auto& state_p = dl_solver.public_leaves()[0];
     auto& state_b = dl_solver.public_leaves()[1];
-    auto& solvers_p = open_spiel::down_cast<OraclePublicStateContext*>(dl_solver.contexts()[0].get())->solvers;
-    auto& solvers_b = open_spiel::down_cast<OraclePublicStateContext*>(dl_solver.contexts()[1].get())->solvers;
 
-    std::cout << "# PASS" << std::endl;
-    std::cout << "Policy pl0: " << solvers_p[0].OptimalPolicy(0).PolicyTable() << "\n";
-    std::cout << "Policy pl1: " << solvers_p[1].OptimalPolicy(1).PolicyTable() << "\n";
-    std::cout << "pl0" << std::endl;
-    std::cout << state_p.leaf_nodes[0][0]->infostate_string() << ' ' << state_p.values[0][0] << ' ' << v0_0p << '\n';
-    if(p_0) SPIEL_CHECK_FLOAT_EQ(state_p.values[0][0], v0_0p);
-    std::cout << state_p.leaf_nodes[0][1]->infostate_string() << ' ' << state_p.values[0][1] << ' ' << v0_1p << '\n';
-    if(p_1) SPIEL_CHECK_FLOAT_EQ(state_p.values[0][1], v0_1p);
-    std::cout << state_p.leaf_nodes[0][2]->infostate_string() << ' ' << state_p.values[0][2] << ' ' << v0_2p << '\n';
-    if(p_2) SPIEL_CHECK_FLOAT_EQ(state_p.values[0][2], v0_2p);
-    std::cout << "pl1" << std::endl;
-    std::cout << state_p.leaf_nodes[1][0]->infostate_string() << ' ' << state_p.values[1][0] << ' ' << v1_1p << '\n';
+    if (p_0) SPIEL_CHECK_FLOAT_EQ(state_p.values[0][0], v0_0p);
+    if (p_1) SPIEL_CHECK_FLOAT_EQ(state_p.values[0][1], v0_1p);
+    if (p_2) SPIEL_CHECK_FLOAT_EQ(state_p.values[0][2], v0_2p);
     SPIEL_CHECK_FLOAT_EQ(state_p.values[1][0], v1_1p);
-    std::cout << state_p.leaf_nodes[1][1]->infostate_string() << ' ' << state_p.values[1][1] << ' ' << v1_2p << '\n';
     SPIEL_CHECK_FLOAT_EQ(state_p.values[1][1], v1_2p);
-    std::cout << state_p.leaf_nodes[1][2]->infostate_string() << ' ' << state_p.values[1][2] << ' ' << v1_0p << '\n';
     SPIEL_CHECK_FLOAT_EQ(state_p.values[1][2], v1_0p);
-    std::cout << state_b.leaf_nodes[0][0]->infostate_string() << ' ' << state_b.values[0][0] << ' ' << v0_0b << '\n';
 
-    std::cout << "# BET" << std::endl;
-    std::cout << "Policy pl0: " << solvers_b[0].OptimalPolicy(0).PolicyTable() << "\n";
-    std::cout << "Policy pl1: " << solvers_b[1].OptimalPolicy(1).PolicyTable() << "\n";
-//    solvers_b[1].PrintProblemSpecification();
-    std::cout << "pl0" << std::endl;
-    std::cout << state_b.leaf_nodes[0][0]->infostate_string() << ' ' << state_b.values[0][0] << ' ' << v0_0b << '\n';
-    if(b_0) SPIEL_CHECK_FLOAT_EQ(state_b.values[0][0], v0_0b);
-    std::cout << state_b.leaf_nodes[0][1]->infostate_string() << ' ' << state_b.values[0][1] << ' ' << v0_1b << '\n';
-    if(b_1) SPIEL_CHECK_FLOAT_EQ(state_b.values[0][1], v0_1b);
-    std::cout << state_b.leaf_nodes[0][2]->infostate_string() << ' ' << state_b.values[0][2] << ' ' << v0_2b << '\n';
-    if(b_2) SPIEL_CHECK_FLOAT_EQ(state_b.values[0][2], v0_2b);
-    std::cout << "pl1" << std::endl;
-    std::cout << state_b.leaf_nodes[1][0]->infostate_string() << ' ' << state_b.values[1][0] << ' ' << v1_1b << '\n';
     SPIEL_CHECK_FLOAT_EQ(state_b.values[1][0], v1_1b);
-    std::cout << state_b.leaf_nodes[1][1]->infostate_string() << ' ' << state_b.values[1][1] << ' ' << v1_0b << '\n';
-    SPIEL_CHECK_FLOAT_EQ(state_b.values[1][1], v1_0b);
-    std::cout << state_b.leaf_nodes[1][2]->infostate_string() << ' ' << state_b.values[1][2] << ' ' << v1_2b << '\n';
-    SPIEL_CHECK_FLOAT_EQ(state_b.values[1][2], v1_2b);
-    std::cout << "----\n";
+    SPIEL_CHECK_FLOAT_EQ(state_b.values[1][1], v1_2b);
+    SPIEL_CHECK_FLOAT_EQ(state_b.values[1][2], v1_0b);
   }
 }
 
@@ -310,8 +276,7 @@ namespace algorithms = open_spiel::algorithms::ortools;
 
 int main(int argc, char** argv) {
   algorithms::TestTrunkExploitabilityInKuhn();
-//  algorithms::TestOptimalValuesKuhn();
-//  algorithms::TestTrunkExploitability();
+  algorithms::TestOptimalValuesKuhn();
 //  algorithms::TestOracleConvergence();
 //  algorithms::TestOptimalValuesKuhnBettingPublicState();
 //
