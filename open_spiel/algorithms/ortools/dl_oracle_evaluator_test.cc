@@ -253,11 +253,15 @@ void TestOracleConvergence() {
   dlcfr::DepthLimitedCFR dl_solver(
       game, 3, oracle_evaluator, terminal_evaluator);
 
+  SequenceFormLpSolver whole_game(*game);
   for (int i = 0; i < 500; ++i) {
-    dl_solver.RunSimultaneousIterations(1);
-    double current_expl = TrunkExploitability(dl_solver.bandits(), &dl_solver);
-    double avg_expl = TrunkExploitability(dl_solver.bandits(), &dl_solver);
+    double current_expl = TrunkExploitability(
+        &whole_game, *dl_solver.CurrentPolicy());
+    double avg_expl = TrunkExploitability(
+        &whole_game, *dl_solver.AveragePolicy());
     std::cout << i << "," << current_expl << "," << avg_expl << "," << std::endl;
+
+    dl_solver.RunSimultaneousIterations(10);
   }
 }
 
@@ -272,18 +276,18 @@ int main(int argc, char** argv) {
   algorithms::TestTrunkExploitabilityInKuhn();
   algorithms::TestOptimalValuesKuhn();
 //  algorithms::TestOracleConvergence();
-//
-//  std::vector<std::string> test_games = {
-//      "matrix_mp",
-//      "kuhn_poker",
-//      "leduc_poker",
-//      "goofspiel(players=2,num_cards=4,imp_info=True)",
-//  };
-//  for (const std::string& game_name : test_games) {
-//    algorithms::TestOneSidedFixedStrategyExploitability(game_name);
-//    // TODO: fix HistoryTree and enable sim move games.
-//    if (game_name.find("poker") != std::string::npos) {
-//      algorithms::TestValueOracle(game_name);
-//    }
-//  }
+
+  std::vector<std::string> test_games = {
+      "matrix_mp",
+      "kuhn_poker",
+      "leduc_poker",
+      "goofspiel(players=2,num_cards=4,imp_info=True)",
+  };
+  for (const std::string& game_name : test_games) {
+    algorithms::TestOneSidedFixedStrategyExploitability(game_name);
+    // TODO: fix HistoryTree and enable sim move games.
+    if (game_name.find("poker") != std::string::npos) {
+      algorithms::TestValueOracle(game_name);
+    }
+  }
 }
