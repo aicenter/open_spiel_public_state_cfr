@@ -52,7 +52,10 @@ ActionsAndProbs BanditsPolicy::GetInfoStatePolicy(
     node = trees_[pl]->DecisionNodeFromInfostateString(info_state);
     pl++;
   }
-  SPIEL_CHECK_TRUE(node);  // Infostate not found!
+  if (!node) {  // Infostate not found!
+    return {};
+  }
+
   const int found_pl = pl - 1;
   const bandits::Bandit* bandit =
       bandits_[found_pl][node->decision_id()].get();
