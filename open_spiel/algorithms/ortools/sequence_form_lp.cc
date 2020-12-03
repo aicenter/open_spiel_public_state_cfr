@@ -35,13 +35,14 @@ SequenceFormLpSolver::SequenceFormLpSolver(const Game& game)
                            }) {}
 
 SequenceFormLpSolver::SequenceFormLpSolver(
-    std::array<std::shared_ptr<InfostateTree>, 2> solver_trees,
+    std::vector<std::shared_ptr<InfostateTree>> solver_trees,
     const std::string& solver_id)
     : solver_trees_(std::move(solver_trees)),
       terminal_bijection_(
           ConnectTerminals(*solver_trees_[0], *solver_trees_[1])),
       solver_(MPSolver::CreateSolver(solver_id)), lp_spec_() {
   SPIEL_CHECK_TRUE(solver_);
+  SPIEL_CHECK_EQ(solver_trees_.size(), 2);
 }
 
 

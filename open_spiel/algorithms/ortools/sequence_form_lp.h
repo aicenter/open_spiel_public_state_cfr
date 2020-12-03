@@ -76,11 +76,12 @@ struct SolverVariables {
   operations_research::MPConstraint* ct_parent_reach_prob;
 };
 
+// TODO: SequenceFormLpSpecification
 class SequenceFormLpSolver {
  using MPSolver = operations_research::MPSolver;
  public:
   SequenceFormLpSolver(
-      std::array<std::shared_ptr<InfostateTree>, 2> solver_trees,
+      std::vector<std::shared_ptr<InfostateTree>> solver_trees,
       const std::string& solver_id = "GLOP_LINEAR_PROGRAMMING");
   SequenceFormLpSolver(const Game& game);
 
@@ -88,7 +89,7 @@ class SequenceFormLpSolver {
   void SpecifyLinearProgram(Player pl);
 
   // Solve the linear program.
-  // Returns the objective value (root value for the player).
+  // Returns the root value for the player whose strategy was computed.
   double Solve();
 
   // Reset the solver and erase all pointers.
@@ -106,8 +107,12 @@ class SequenceFormLpSolver {
   // For debugging.
   void PrintProblemSpecification();
 
-  const std::array<std::shared_ptr<InfostateTree>, 2>& trees() const {
+  const std::vector<std::shared_ptr<InfostateTree>>& trees() const {
     return solver_trees_;
+  }
+  std::array<const InfostateNode*, 2> roots() const {
+    return {solver_trees_[0]->mutable_root(),
+            solver_trees_[1]->mutable_root()};
   }
   std::unordered_map<
       const InfostateNode*, SolverVariables>& lp_specification() {
@@ -120,7 +125,7 @@ class SequenceFormLpSolver {
   }
 
  protected:
-  const std::array<std::shared_ptr<InfostateTree>, 2> solver_trees_;
+  const std::vector<std::shared_ptr<InfostateTree>> solver_trees_;
   const BijectiveContainer<const InfostateNode*> terminal_bijection_;
   std::unique_ptr<operations_research::MPSolver> solver_;
   std::unordered_map<const InfostateNode*, SolverVariables> lp_spec_;
