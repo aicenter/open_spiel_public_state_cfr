@@ -46,34 +46,35 @@ SequenceFormLpSolver::SequenceFormLpSolver(
 }
 
 
-void SequenceFormLpSolver::SpecifyReachProbsConstraints(InfostateNode* node) {
-  lp_spec_[node].var_reach_prob = solver_->MakeNumVar(
+void SequenceFormLpSolver::SpecifyReachProbsConstraints(
+    InfostateNode* player_node) {
+  lp_spec_[player_node].var_reach_prob = solver_->MakeNumVar(
       /*lb=*/0.0, /*ub=*/1., "");
 
-  if (node->type() == kTerminalInfostateNode)
+  if (player_node->type() == kTerminalInfostateNode)
     return;  // Nothing to do.
-  if (node->type() == kObservationInfostateNode) {
-    for (InfostateNode* child : node->child_iterator()) {
-      SpecifyReachProbsConstraints(child);
+  if (player_node->type() == kObservationInfostateNode) {
+    for (InfostateNode* player_child : player_node->child_iterator()) {
+      SpecifyReachProbsConstraints(player_child);
 
       // Equality constraint: parent = child
       opres::MPConstraint* ct
-          = lp_spec_[child].ct_parent_reach_prob
+          = lp_spec_[player_child].ct_parent_reach_prob
           = solver_->MakeRowConstraint(/*lb=*/0, /*ub=*/0, "");
-      ct->SetCoefficient(lp_spec_[node].var_reach_prob, -1);
-      ct->SetCoefficient(lp_spec_[child].var_reach_prob, 1);
+      ct->SetCoefficient(lp_spec_[player_node].var_reach_prob, -1);
+      ct->SetCoefficient(lp_spec_[player_child].var_reach_prob, 1);
     }
     return;
   }
-  if (node->type() == kDecisionInfostateNode) {
+  if (player_node->type() == kDecisionInfostateNode) {
     // Equality constraint: parent = sum of children
     opres::MPConstraint* ct
-        = lp_spec_[node].ct_child_reach_prob
+        = lp_spec_[player_node].ct_child_reach_prob
         = solver_->MakeRowConstraint(/*lb=*/0, /*ub=*/0, "");
-    ct->SetCoefficient(lp_spec_[node].var_reach_prob, -1);
-    for (InfostateNode* child : node->child_iterator()) {
-      SpecifyReachProbsConstraints(child);
-      ct->SetCoefficient(lp_spec_[child].var_reach_prob, 1);
+    ct->SetCoefficient(lp_spec_[player_node].var_reach_prob, -1);
+    for (InfostateNode* player_child : player_node->child_iterator()) {
+      SpecifyReachProbsConstraints(player_child);
+      ct->SetCoefficient(lp_spec_[player_child].var_reach_prob, 1);
     }
     return;
   }
@@ -81,46 +82,47 @@ void SequenceFormLpSolver::SpecifyReachProbsConstraints(InfostateNode* node) {
   SpielFatalError("Exhausted pattern match!");
 }
 
-void SequenceFormLpSolver::SpecifyCfValuesConstraints(InfostateNode* node) {
-  lp_spec_[node].var_cf_value = solver_->MakeNumVar(
+void SequenceFormLpSolver::SpecifyCfValuesConstraints(
+    InfostateNode* opponent_node) {
+  lp_spec_[opponent_node].var_cf_value = solver_->MakeNumVar(
       /*lb=*/-opres::MPSolver::infinity(),
       /*ub=*/opres::MPSolver::infinity(), "");
 
-  if (node->type() == kDecisionInfostateNode) {
-    for (InfostateNode* child : node->child_iterator()) {
-      SpecifyCfValuesConstraints(child);
+  if (opponent_node->type() == kDecisionInfostateNode) {
+    for (InfostateNode* opponent_child : opponent_node->child_iterator()) {
+      SpecifyCfValuesConstraints(opponent_child);
       opres::MPConstraint* ct
-          = lp_spec_[child].ct_parent_cf_value
+          = lp_spec_[opponent_child].ct_parent_cf_value
           = solver_->MakeRowConstraint();
       ct->SetUB(0.);
-      ct->SetCoefficient(lp_spec_[node].var_cf_value, -1);
-      ct->SetCoefficient(lp_spec_[child].var_cf_value, 1);
+      ct->SetCoefficient(lp_spec_[opponent_node].var_cf_value, -1);
+      ct->SetCoefficient(lp_spec_[opponent_child].var_cf_value, 1);
     }
     return;
   }
 
   opres::MPConstraint* ct
-      = lp_spec_[node].ct_child_cf_value
+      = lp_spec_[opponent_node].ct_child_cf_value
       = solver_->MakeRowConstraint();
   ct->SetUB(0.);
-  ct->SetCoefficient(lp_spec_[node].var_cf_value, -1);
+  ct->SetCoefficient(lp_spec_[opponent_node].var_cf_value, -1);
 
-  if (node->type() == kTerminalInfostateNode) {
+  if (opponent_node->type() == kTerminalInfostateNode) {
     const std::map<const InfostateNode*, const InfostateNode*>& terminal_map =
-        terminal_bijection_.association(node->tree().acting_player());
-    const InfostateNode* opponent_node = terminal_map.at(node);
-    const double value =
-        node->terminal_utility() * node->terminal_chance_reach_prob();
+        terminal_bijection_.association(opponent_node->tree().acting_player());
+    const InfostateNode* player_node = terminal_map.at(opponent_node);
+    const double value = opponent_node->terminal_utility()
+                       * opponent_node->terminal_chance_reach_prob();
     // Terminal value constraint comes from the opponent.
-    ct->SetCoefficient(lp_spec_[opponent_node].var_reach_prob, value);
+    ct->SetCoefficient(lp_spec_[player_node].var_reach_prob, value);
     return;
   }
-  if (node->type() == kObservationInfostateNode) {
+  if (opponent_node->type() == kObservationInfostateNode) {
     // Value constraint: sum of children = parent
     ct->SetLB(0.);
-    for (InfostateNode* child : node->child_iterator()) {
-      SpecifyCfValuesConstraints(child);
-      ct->SetCoefficient(lp_spec_[child].var_cf_value, 1);
+    for (InfostateNode* opponent_child : opponent_node->child_iterator()) {
+      SpecifyCfValuesConstraints(opponent_child);
+      ct->SetCoefficient(lp_spec_[opponent_child].var_cf_value, 1);
     }
     return;
   }
@@ -128,16 +130,18 @@ void SequenceFormLpSolver::SpecifyCfValuesConstraints(InfostateNode* node) {
   SpielFatalError("Exhausted pattern match!");
 }
 
-void SequenceFormLpSolver::SpecifyRootConstraints(InfostateNode* root_node) {
-  SPIEL_CHECK_TRUE(root_node->is_root_node());
-  SolverVariables& root_data = lp_spec_.at(root_node);
+void SequenceFormLpSolver::SpecifyRootConstraints(
+    const InfostateNode* player_root_node) {
+  SPIEL_CHECK_TRUE(player_root_node->is_root_node());
+  SolverVariables& root_data = lp_spec_.at(player_root_node);
   root_data.var_reach_prob->SetLB(1.);
   root_data.var_reach_prob->SetUB(1.);
 }
 
-void SequenceFormLpSolver::SpecifyObjective(InfostateNode* root_node) {
+void SequenceFormLpSolver::SpecifyObjective(
+    const InfostateNode* opponent_root_node) {
   opres::MPObjective* const objective = solver_->MutableObjective();
-  objective->SetCoefficient(lp_spec_[root_node].var_cf_value, 1);
+  objective->SetCoefficient(lp_spec_[opponent_root_node].var_cf_value, 1);
   objective->SetMinimization();
 }
 

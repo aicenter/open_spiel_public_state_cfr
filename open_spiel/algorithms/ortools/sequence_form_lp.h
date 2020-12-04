@@ -130,10 +130,10 @@ class SequenceFormLpSolver {
   std::unique_ptr<operations_research::MPSolver> solver_;
   std::unordered_map<const InfostateNode*, SolverVariables> lp_spec_;
 
-  void SpecifyReachProbsConstraints(InfostateNode* node);
-  void SpecifyCfValuesConstraints(InfostateNode* node);
-  void SpecifyRootConstraints(InfostateNode* root_node);
-  void SpecifyObjective(InfostateNode* root_node);
+  void SpecifyReachProbsConstraints(InfostateNode* player_node);
+  void SpecifyCfValuesConstraints(InfostateNode* opponent_node);
+  void SpecifyRootConstraints(const InfostateNode* player_root_node);
+  void SpecifyObjective(const InfostateNode* opponent_root_node);
 };
 
 
