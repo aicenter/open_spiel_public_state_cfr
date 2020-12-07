@@ -28,14 +28,14 @@ RegretMatching::RegretMatching(size_t num_actions)
 void RegretMatching::ComputeStrategy(size_t current_time, double weight) {
   double positive_regrets_sum = 0.;
   for (double regret : cumulative_regrets_) {
-    positive_regrets_sum += regret > 0. ? regret : 0.;
+    positive_regrets_sum += regret > 1e-10 ? regret : 0.;
   }
 
   if (positive_regrets_sum) {
     for (int i = 0; i < num_actions(); ++i) {
       const double regret = cumulative_regrets_[i];
       current_strategy_[i] =
-          (regret > 0. ? regret : 0.) / positive_regrets_sum;
+          (regret > 1e-10 ? regret : 0.) / positive_regrets_sum;
     }
   } else {
     for (int i = 0; i < num_actions(); ++i) {
