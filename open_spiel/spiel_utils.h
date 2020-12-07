@@ -74,11 +74,13 @@ std::ostream& operator<<(std::ostream& stream, absl::Span<T> v);
 // Actual template implementations.
 template <typename T>
 std::ostream& operator<<(std::ostream& stream, absl::Span<T> v) {
-  stream << "[";
+  stream << '[';
+  bool first = true;
   for (const auto& element : v) {
-    stream << element << " ";
+    if (!first) stream << ", "; else first = false;
+    stream << element;
   }
-  stream << "]";
+  stream << ']';
   return stream;
 }
 template <typename T>
@@ -88,26 +90,32 @@ std::ostream& operator<<(std::ostream& stream, const std::vector<T>& v) {
 template <typename K, typename V>
 std::ostream& operator<<(std::ostream& stream, const std::unordered_map<K, V>& m) {
   stream << '{';
+  bool first = true;
   for (const auto& [k,v] : m) {
-    stream << k << ':' << v << ',';
+    if (!first) stream << ", "; else first = false;
+    stream << '"' << k << "\": " << v;
   }
   return stream << '}';
 }
 template <typename K, typename V>
 std::ostream& operator<<(std::ostream& stream, const std::map<K, V>& m) {
   stream << '{';
+  bool first = true;
   for (const auto& [k,v] : m) {
-    stream << k << ':' << v << ',';
+    if (!first) stream << ", "; else first = false;
+    stream << '"' << k << "\": " << v;
   }
   return stream << '}';
 }
 template <typename T, std::size_t N>
 std::ostream& operator<<(std::ostream& stream, const std::array<T, N>& v) {
-  stream << "[";
+  stream << '[';
+  bool first = true;
   for (const auto& element : v) {
-    stream << element << " ";
+    if (!first) stream << ", "; else first = false;
+    stream << element;
   }
-  stream << "]";
+  stream << ']';
   return stream;
 }
 template <typename T>
@@ -120,7 +128,7 @@ std::ostream& operator<<(std::ostream& stream, const absl::optional<T>& v) {
 }
 template <typename T, typename U>
 std::ostream& operator<<(std::ostream& stream, const std::pair<T, U>& v) {
-  stream << "(" << v.first << "," << v.second << ")";
+  stream << '(' << v.first << ',' << v.second << ')';
   return stream;
 }
 
