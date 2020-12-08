@@ -49,6 +49,42 @@ std::shared_ptr<const Game> Factory(const GameParameters& params) {
 REGISTER_SPIEL_GAME(kGameType, Factory);
 }  // namespace matching_pennies
 
+
+// Biased Matching Pennies:
+//   1 -2
+//  -1  1
+//
+// The game value is -0.2.
+// An optimal strategy for Player I  is: (0.4, 0.6)
+// An optimal strategy for Player II is: (0.6, 0.4)
+namespace biased_matching_pennies {
+// Facts about the game
+const GameType kGameType{
+    /*short_name=*/"matrix_biased_mp",
+    /*long_name=*/"Biased Matching Pennies",
+    GameType::Dynamics::kSimultaneous,
+    GameType::ChanceMode::kDeterministic,
+    GameType::Information::kOneShot,
+    GameType::Utility::kZeroSum,
+    GameType::RewardModel::kTerminal,
+    /*max_num_players=*/2,
+    /*min_num_players=*/2,
+    /*provides_information_state_string=*/true,
+    /*provides_information_state_tensor=*/true,
+    /*provides_observation_string=*/false,
+    /*provides_observation_tensor=*/false,
+    /*parameter_specification=*/{}  // no parameters
+};
+
+std::shared_ptr<const Game> Factory(const GameParameters& params) {
+  return std::shared_ptr<const Game>(
+      new MatrixGame(kGameType, params, {"Heads", "Tails"}, {"Heads", "Tails"},
+                     {1, -2, -1, 1}, {-1, 2, 1, -1}));
+}
+
+REGISTER_SPIEL_GAME(kGameType, Factory);
+}  // namespace matching_pennies
+
 // Rock, Paper, Scissors.
 namespace rock_paper_scissors {
 // Facts about the game
