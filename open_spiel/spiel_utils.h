@@ -317,7 +317,7 @@ bool AllNear(const std::vector<T>& vector1, const std::vector<T>& vector2,
 #define SPIEL_DCHECK_LT(x, y) SPIEL_CHECK_LT(x, y)
 #define SPIEL_DCHECK_EQ(x, y) SPIEL_CHECK_EQ(x, y)
 #define SPIEL_DCHECK_NE(x, y) SPIEL_CHECK_NE(x, y)
-#define SPIEL_DCHECK_PROB(x) SPIEL_DCHECK_PROB(x)
+#define SPIEL_DCHECK_PROB(x) SPIEL_CHECK_PROB(x)
 #define SPIEL_DCHECK_FLOAT_EQ(x, y) SPIEL_CHECK_FLOAT_EQ(x, y)
 #define SPIEL_DCHECK_FLOAT_NEAR(x, y, epsilon) \
   SPIEL_CHECK_FLOAT_NEAR(x, y, epsilon)
