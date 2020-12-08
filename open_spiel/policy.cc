@@ -53,6 +53,15 @@ double GetProb(const ActionsAndProbs& action_and_probs, Action action) {
   return it->second;
 }
 
+std::vector<double> GetProbs(const ActionsAndProbs& action_and_probs) {
+  std::vector<double> out;
+  out.reserve(action_and_probs.size());
+  for (int i = 0; i < action_and_probs.size(); ++i) {
+    out.push_back(action_and_probs[i].second);
+  }
+  return out;
+}
+
 Action GetAction(const ActionsAndProbs& action_and_probs) {
   for (const auto& iter : action_and_probs) {
     if (iter.second == 1.0) {
@@ -60,6 +69,44 @@ Action GetAction(const ActionsAndProbs& action_and_probs) {
     }
   }
   return kInvalidAction;
+}
+
+ActionsAndProbs PurePolicy(const State& state, Action action) {
+  SPIEL_CHECK_FALSE(state.IsSimultaneousNode());
+  ActionsAndProbs actions_and_probs;
+  std::vector<Action> legal_actions = state.LegalActions();
+  actions_and_probs.reserve(legal_actions.size());
+  bool found = false;
+  for (int i = 0; i < legal_actions.size(); ++i) {
+    double prob = 0.;
+    if (legal_actions[i] == action) {
+      prob = 1.;
+      SPIEL_CHECK_FALSE(found);
+      found = true;
+    }
+    actions_and_probs.push_back({ legal_actions[i], prob });
+  }
+  SPIEL_CHECK_TRUE(found);
+  return actions_and_probs;
+}
+
+ActionsAndProbs PurePolicy(const State& state, Player player, Action action) {
+  SPIEL_CHECK_TRUE(state.IsPlayerActing(player));
+  ActionsAndProbs actions_and_probs;
+  std::vector<Action> legal_actions = state.LegalActions(player);
+  actions_and_probs.reserve(legal_actions.size());
+  bool found = false;
+  for (int i = 0; i < legal_actions.size(); ++i) {
+    double prob = 0.;
+    if (legal_actions[i] == action) {
+      prob = 1.;
+      SPIEL_CHECK_FALSE(found);
+      found = true;
+    }
+    actions_and_probs.push_back({ legal_actions[i], prob });
+  }
+  SPIEL_CHECK_TRUE(found);
+  return actions_and_probs;
 }
 
 ActionsAndProbs ToDeterministicPolicy(const ActionsAndProbs& actions_and_probs,

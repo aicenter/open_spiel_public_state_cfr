@@ -31,6 +31,9 @@ namespace open_spiel {
 // Returns the probability for the specified action, or -1 if not found.
 double GetProb(const ActionsAndProbs& action_and_probs, Action action);
 
+// Returns the probabilities without the actions.
+std::vector<double> GetProbs(const ActionsAndProbs& action_and_probs);
+
 // Set an action probability for the specified action.
 void SetProb(ActionsAndProbs* actions_and_probs, Action action, double prob);
 
@@ -41,6 +44,14 @@ Action GetAction(const ActionsAndProbs& action_and_probs);
 // Returns a policy where every legal action has probability 1 / (number of
 // legal actions).
 ActionsAndProbs UniformStatePolicy(const State& state);
+
+// Returns a policy where a specified action has probability 1 and all other
+// have probability zero.
+ActionsAndProbs PurePolicy(const State& state, Action action);
+
+// Returns a policy where a specified action has probability 1 and all other
+// have probability zero.
+ActionsAndProbs PurePolicy(const State& state, Player player, Action action);
 
 // Return a new policy with all the same actions, but with probability 1 on the
 // specified action, and 0 on the others.
