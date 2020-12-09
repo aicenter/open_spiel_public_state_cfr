@@ -623,6 +623,8 @@ class InfostateNode final {
   // of (isomorphic) trees.
   std::string MakeCertificate() const;
 
+  std::string ToString() const;
+
  private:
   // Make sure that the subtree ends at the requested target depth by inserting
   // dummy observation nodes with one outcome.

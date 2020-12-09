@@ -74,6 +74,11 @@ std::ostream& InfostateNode::operator<<(std::ostream& os) const {
   return os << parent_ << ',' << incoming_index_;
 }
 
+std::string InfostateNode::ToString() const {
+  if (!parent_) return "x";
+  return absl::StrCat(parent_->ToString(), ",", incoming_index_);
+}
+
 std::string InfostateNode::MakeCertificate() const {
   if (type_ == kTerminalInfostateNode) return "{}";
 
