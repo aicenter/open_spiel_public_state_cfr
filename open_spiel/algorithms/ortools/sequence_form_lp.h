@@ -82,7 +82,8 @@ class SequenceFormLpSolver {
  public:
   SequenceFormLpSolver(
       std::vector<std::shared_ptr<InfostateTree>> solver_trees,
-      const std::string& solver_id = "GLOP_LINEAR_PROGRAMMING");
+      // See also MPSolver::OptimizationProblemType
+      const std::string& solver_id = "CBC");
   SequenceFormLpSolver(const Game& game);
 
   // Specify the linear program for given player.

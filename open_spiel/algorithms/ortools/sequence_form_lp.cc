@@ -43,6 +43,9 @@ SequenceFormLpSolver::SequenceFormLpSolver(
       solver_(MPSolver::CreateSolver(solver_id)), lp_spec_() {
   SPIEL_CHECK_TRUE(solver_);
   SPIEL_CHECK_EQ(solver_trees_.size(), 2);
+  // Do NOT use GLOP -- it has some numerical stability issues
+  // for the formulated LPs!
+  SPIEL_CHECK_TRUE(solver_id.find("GLOP", 0) == std::string::npos);
 }
 
 
@@ -160,14 +163,27 @@ void SequenceFormLpSolver::ClearSpecification() {
 void SequenceFormLpSolver::SpecifyLinearProgram(Player pl) {
   SPIEL_CHECK_TRUE(pl == 0 || pl == 1);
   ClearSpecification();
-  SpecifyReachProbsConstraints(solver_trees_[pl]->mutable_root());
-  SpecifyRootConstraints(solver_trees_[pl]->mutable_root());
-  SpecifyCfValuesConstraints(solver_trees_[1 - pl]->mutable_root());
-  SpecifyObjective(solver_trees_[1 - pl]->mutable_root());
+  SpecifyReachProbsConstraints(
+      /*player_node=*/solver_trees_[pl]->mutable_root());
+  SpecifyRootConstraints(
+      /*player_node=*/solver_trees_[pl]->mutable_root());
+  SpecifyCfValuesConstraints(
+      /*opponent_node=*/solver_trees_[1 - pl]->mutable_root());
+  SpecifyObjective(
+      /*opponent_node=*/solver_trees_[1 - pl]->mutable_root());
 }
 
 double SequenceFormLpSolver::Solve() {
   opres::MPSolver::ResultStatus status = solver_->Solve();
+//  // Export the model if the result was not optimal.
+//  // You can then use external debugging tools (like cplex studio).
+//  if (status != opres::MPSolver::ResultStatus::OPTIMAL) {
+//    std::string out;
+//    // Pick the format.
+//    solver_->ExportModelAsMpsFormat(false, false, &out);
+//    solver_->ExportModelAsLpFormat(false, &out);
+//    std::cout << out << "\n";
+//  }
   SPIEL_CHECK_EQ(status, opres::MPSolver::ResultStatus::OPTIMAL);
   return -solver_->Objective().Value();
 }
