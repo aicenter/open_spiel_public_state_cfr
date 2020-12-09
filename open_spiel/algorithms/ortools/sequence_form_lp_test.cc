@@ -27,7 +27,7 @@ constexpr double kErrorTolerance = 1e-14;
 void TestGameValueAndExploitability(const std::string& game_name,
                                     double expected_game_value) {
   std::shared_ptr<const Game> game = LoadGame(game_name);
-  SequenceFormLpSolver solver(*game);
+  SequenceFormLpSpecification solver(*game);
   solver.SpecifyLinearProgram(0);
   double actual_game_value = solver.Solve();
   SPIEL_CHECK_FLOAT_NEAR(actual_game_value, expected_game_value,

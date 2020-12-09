@@ -76,15 +76,14 @@ struct SolverVariables {
   operations_research::MPConstraint* ct_parent_reach_prob;
 };
 
-// TODO: SequenceFormLpSpecification
-class SequenceFormLpSolver {
+class SequenceFormLpSpecification {
  using MPSolver = operations_research::MPSolver;
  public:
-  SequenceFormLpSolver(
+  SequenceFormLpSpecification(
       std::vector<std::shared_ptr<InfostateTree>> solver_trees,
       // See also MPSolver::OptimizationProblemType
       const std::string& solver_id = "CBC");
-  SequenceFormLpSolver(const Game& game);
+  SequenceFormLpSpecification(const Game& game);
 
   // Specify the linear program for given player.
   void SpecifyLinearProgram(Player pl);

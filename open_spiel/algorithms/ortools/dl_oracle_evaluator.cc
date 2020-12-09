@@ -274,7 +274,7 @@ void OracleEvaluator::EvaluatePublicState(
   SPIEL_CHECK_TRUE(context);
   auto* oracle_context =
       open_spiel::down_cast<OraclePublicStateContext*>(context);
-  std::array<SequenceFormLpSolver, 2>& solvers = oracle_context->solvers;
+  std::array<SequenceFormLpSpecification, 2>& solvers = oracle_context->solvers;
 
   // Check pointers for the trees are still the same.
   SPIEL_CHECK_EQ(solvers[0].trees()[0].get(), solvers[1].trees()[0].get());
@@ -369,9 +369,9 @@ std::unique_ptr<dlcfr::PublicStateContext> OracleEvaluator::CreateContext(
       MakeInfostateTree(leaf_state.leaf_nodes[0]),
       MakeInfostateTree(leaf_state.leaf_nodes[1])
   };
-  std::array<SequenceFormLpSolver, 2> solvers = {
-      SequenceFormLpSolver(trees),
-      SequenceFormLpSolver(trees)
+  std::array<SequenceFormLpSpecification, 2> solvers = {
+      SequenceFormLpSpecification(trees),
+      SequenceFormLpSpecification(trees)
   };
   for (int pl = 0; pl < 2; ++pl) {
     solvers[pl].SpecifyLinearProgram(pl);
@@ -406,7 +406,7 @@ std::unique_ptr<dlcfr::PublicStateContext> OracleEvaluator::CreateContext(
 void RecursivelyRefineSpecFixStrategyWithPolicy(
     const InfostateNode* player_node,
     const Policy& fixed_policy,
-    SequenceFormLpSolver* solver) {
+    SequenceFormLpSpecification* solver) {
   if (player_node->type() == kDecisionInfostateNode) {
     ActionsAndProbs local_policy =
         fixed_policy.GetStatePolicy(player_node->infostate_string());
@@ -437,7 +437,7 @@ void RecursivelyRefineSpecFixStrategyWithPolicy(
 }
 
 double ComputeRootValueWhileFixingStrategy(
-    SequenceFormLpSolver* solver, const Policy& fixed_policy,
+    SequenceFormLpSpecification* solver, const Policy& fixed_policy,
     Player fixed_player) {
   solver->SpecifyLinearProgram(fixed_player);
   RecursivelyRefineSpecFixStrategyWithPolicy(
@@ -445,14 +445,14 @@ double ComputeRootValueWhileFixingStrategy(
   return solver->Solve();
 }
 
-double TrunkExploitability(SequenceFormLpSolver* solver,
+double TrunkExploitability(SequenceFormLpSpecification* solver,
                            const Policy& trunk_policy) {
   return (- ComputeRootValueWhileFixingStrategy(solver, trunk_policy, 0)
           - ComputeRootValueWhileFixingStrategy(solver, trunk_policy, 1)) / 2.;
 }
 
 double TrunkPlayerExploitability(
-    SequenceFormLpSolver* solver, const Policy& trunk_policy, Player p,
+    SequenceFormLpSpecification* solver, const Policy& trunk_policy, Player p,
     absl::optional<double> maybe_game_value) {
   double game_value;
   if (maybe_game_value.has_value()) {

@@ -68,7 +68,7 @@ std::vector<BanditVector> MakeKuhnParametricPolicy(
 
 void TestTrunkExploitabilityInKuhn() {
   std::shared_ptr<const Game> game = LoadGame("kuhn_poker");
-  SequenceFormLpSolver whole_game(*game);
+  SequenceFormLpSpecification whole_game(*game);
 
   // Range of values that produce Nash in the trunk.
   for (double a : std::vector<double>{0., 1 / 6., 1 / 3.,}) {
@@ -225,7 +225,7 @@ void TestValueOracle(const std::string& game_name) {
       std::cout << '.' << std::flush;
     }
 
-    SequenceFormLpSolver whole_game(*game);
+    SequenceFormLpSpecification whole_game(*game);
     auto average_policy = dl_solver.AveragePolicy();
     const double expl = TrunkExploitability(&whole_game, *average_policy);
     std::cout << " expl=" << expl << "\n";
@@ -236,7 +236,7 @@ void TestValueOracle(const std::string& game_name) {
 void TestOneSidedFixedStrategyExploitability(const std::string& game_name) {
   std::cout << "One sided exploitability ... " << std::flush;;
   std::shared_ptr<const Game> game = LoadGame(game_name);
-  SequenceFormLpSolver whole_game(*game);
+  SequenceFormLpSpecification whole_game(*game);
 
   // Exploitability implementation does not support simultaneous move games.
   if (game->GetType().dynamics == GameType::Dynamics::kSimultaneous) {
@@ -269,7 +269,7 @@ void RunTrunkIterationsWithValueOracle(std::string game_name, int depth) {
   dlcfr::DepthLimitedCFR dl_solver(
       game, depth, oracle_evaluator, terminal_evaluator);
 
-  SequenceFormLpSolver whole_game(*game);
+  SequenceFormLpSpecification whole_game(*game);
   auto current_policy = dl_solver.CurrentPolicy();
   auto average_policy = dl_solver.AveragePolicy();
   int num_iters = 10;

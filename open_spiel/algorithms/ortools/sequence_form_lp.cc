@@ -28,13 +28,13 @@ namespace ortools {
 
 namespace opres = operations_research;
 
-SequenceFormLpSolver::SequenceFormLpSolver(const Game& game)
-    : SequenceFormLpSolver({
+SequenceFormLpSpecification::SequenceFormLpSpecification(const Game& game)
+    : SequenceFormLpSpecification({
                                MakeInfostateTree(game, 0),
                                MakeInfostateTree(game, 1),
                            }) {}
 
-SequenceFormLpSolver::SequenceFormLpSolver(
+SequenceFormLpSpecification::SequenceFormLpSpecification(
     std::vector<std::shared_ptr<InfostateTree>> solver_trees,
     const std::string& solver_id)
     : solver_trees_(std::move(solver_trees)),
@@ -49,7 +49,7 @@ SequenceFormLpSolver::SequenceFormLpSolver(
 }
 
 
-void SequenceFormLpSolver::SpecifyReachProbsConstraints(
+void SequenceFormLpSpecification::SpecifyReachProbsConstraints(
     InfostateNode* player_node) {
   lp_spec_[player_node].var_reach_prob = solver_->MakeNumVar(
       /*lb=*/0.0, /*ub=*/1., "");
@@ -85,7 +85,7 @@ void SequenceFormLpSolver::SpecifyReachProbsConstraints(
   SpielFatalError("Exhausted pattern match!");
 }
 
-void SequenceFormLpSolver::SpecifyCfValuesConstraints(
+void SequenceFormLpSpecification::SpecifyCfValuesConstraints(
     InfostateNode* opponent_node) {
   lp_spec_[opponent_node].var_cf_value = solver_->MakeNumVar(
       /*lb=*/-opres::MPSolver::infinity(),
@@ -133,7 +133,7 @@ void SequenceFormLpSolver::SpecifyCfValuesConstraints(
   SpielFatalError("Exhausted pattern match!");
 }
 
-void SequenceFormLpSolver::SpecifyRootConstraints(
+void SequenceFormLpSpecification::SpecifyRootConstraints(
     const InfostateNode* player_root_node) {
   SPIEL_CHECK_TRUE(player_root_node->is_root_node());
   SolverVariables& root_data = lp_spec_.at(player_root_node);
@@ -141,14 +141,14 @@ void SequenceFormLpSolver::SpecifyRootConstraints(
   root_data.var_reach_prob->SetUB(1.);
 }
 
-void SequenceFormLpSolver::SpecifyObjective(
+void SequenceFormLpSpecification::SpecifyObjective(
     const InfostateNode* opponent_root_node) {
   opres::MPObjective* const objective = solver_->MutableObjective();
   objective->SetCoefficient(lp_spec_[opponent_root_node].var_cf_value, 1);
   objective->SetMinimization();
 }
 
-void SequenceFormLpSolver::ClearSpecification() {
+void SequenceFormLpSpecification::ClearSpecification() {
   solver_->Clear();
   for (auto&[node, vars] : lp_spec_) {
     vars.var_cf_value = nullptr;
@@ -160,7 +160,7 @@ void SequenceFormLpSolver::ClearSpecification() {
   }
 }
 
-void SequenceFormLpSolver::SpecifyLinearProgram(Player pl) {
+void SequenceFormLpSpecification::SpecifyLinearProgram(Player pl) {
   SPIEL_CHECK_TRUE(pl == 0 || pl == 1);
   ClearSpecification();
   SpecifyReachProbsConstraints(
@@ -173,7 +173,7 @@ void SequenceFormLpSolver::SpecifyLinearProgram(Player pl) {
       /*opponent_node=*/solver_trees_[1 - pl]->mutable_root());
 }
 
-double SequenceFormLpSolver::Solve() {
+double SequenceFormLpSpecification::Solve() {
   opres::MPSolver::ResultStatus status = solver_->Solve();
 //  // Export the model if the result was not optimal.
 //  // You can then use external debugging tools (like cplex studio).
@@ -188,7 +188,7 @@ double SequenceFormLpSolver::Solve() {
   return -solver_->Objective().Value();
 }
 
-TabularPolicy SequenceFormLpSolver::OptimalPolicy(Player for_player) {
+TabularPolicy SequenceFormLpSpecification::OptimalPolicy(Player for_player) {
   SPIEL_CHECK_TRUE(for_player == 0 || for_player == 1);
   const InfostateTree* tree = solver_trees_[for_player].get();
   TabularPolicy policy;
@@ -220,7 +220,7 @@ TabularPolicy SequenceFormLpSolver::OptimalPolicy(Player for_player) {
   return policy;
 }
 
-SfStrategy SequenceFormLpSolver::OptimalSfStrategy(
+SfStrategy SequenceFormLpSpecification::OptimalSfStrategy(
     Player for_player) {
   SPIEL_CHECK_TRUE(for_player == 0 || for_player == 1);
   const InfostateTree* tree = solver_trees_[for_player].get();
@@ -250,7 +250,7 @@ ConnectTerminals(const InfostateTree& tree_a, const InfostateTree& tree_b) {
 }
 
 
-void SequenceFormLpSolver::PrintProblemSpecification() {
+void SequenceFormLpSpecification::PrintProblemSpecification() {
   const std::vector<opres::MPVariable*>& variables = solver_->variables();
   const std::vector<opres::MPConstraint*>& constraints = solver_->constraints();
   const opres::MPObjective& objective = solver_->Objective();

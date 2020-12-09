@@ -50,7 +50,7 @@ void RunTrunkIterationsWithValueOracle(std::string game_name, int depth) {
   dlcfr::DepthLimitedCFR dl_solver(
       game, depth, oracle_evaluator, terminal_evaluator);
 
-  SequenceFormLpSolver whole_game(*game);
+  SequenceFormLpSpecification whole_game(*game);
   auto current_policy = dl_solver.CurrentPolicy();
   auto average_policy = dl_solver.AveragePolicy();
   int num_iters = 10;

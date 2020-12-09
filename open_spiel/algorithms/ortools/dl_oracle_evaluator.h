@@ -22,11 +22,11 @@ namespace algorithms {
 namespace ortools {
 
 struct OraclePublicStateContext : public dlcfr::PublicStateContext {
-  std::array<SequenceFormLpSolver, 2> solvers;
+  std::array<SequenceFormLpSpecification, 2> solvers;
   std::vector<HistoryTree> subgame_histories;
   std::map<std::string, std::array<size_t, 2>> subgame_ranges;
   OraclePublicStateContext(
-      std::array<SequenceFormLpSolver, 2> solvers,
+      std::array<SequenceFormLpSpecification, 2> solvers,
       std::vector<HistoryTree> root_histories,
       std::map<std::string, std::array<size_t, 2>> subgame_ranges)
       : solvers(std::move(solvers)),
@@ -47,18 +47,18 @@ struct OracleEvaluator : public dlcfr::LeafEvaluator {
 
 
 double ComputeRootValueWhileFixingStrategy(
-    SequenceFormLpSolver* solver, const Policy& fixed_policy, Player fixed_player);
+    SequenceFormLpSpecification* solver, const Policy& fixed_policy, Player fixed_player);
 
 // Based on Proposition 3.11 in the value functions paper [1], as the average of
 // the individual player exploitabilities -- we don't need to know the game
 // value.
-double TrunkExploitability(SequenceFormLpSolver* solver,
+double TrunkExploitability(SequenceFormLpSpecification* solver,
                            const Policy& trunk_policy);
 
 // Based on Proposition 3.11 in the value functions paper [1].
 // If you do not supply game value, it will be calculated automatically.
 double TrunkPlayerExploitability(
-    SequenceFormLpSolver* solver, const Policy& trunk_policy, Player p,
+    SequenceFormLpSpecification* solver, const Policy& trunk_policy, Player p,
     absl::optional<double> maybe_game_value = {});
 
 }  // namespace ortools
