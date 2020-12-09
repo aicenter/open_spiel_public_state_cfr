@@ -34,7 +34,7 @@ namespace algorithms {
 namespace ortools {
 namespace {
 
-void TestOracleConvergence(std::string game_name, int depth) {
+void RunTrunkIterationsWithValueOracle(std::string game_name, int depth) {
   std::shared_ptr<const Game> game = LoadGame(game_name);
 
   std::shared_ptr<const dlcfr::LeafEvaluator> terminal_evaluator =
@@ -78,6 +78,6 @@ int main(int argc, char** argv) {
       "exploitability approaching zero.");
   absl::ParseCommandLine(argc, argv);
 
-  open_spiel::algorithms::ortools::TestOracleConvergence(
+  open_spiel::algorithms::ortools::RunTrunkIterationsWithValueOracle(
       absl::GetFlag(FLAGS_game_name), absl::GetFlag(FLAGS_depth));
 }
