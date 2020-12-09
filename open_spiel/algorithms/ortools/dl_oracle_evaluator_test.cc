@@ -253,7 +253,7 @@ void TestOneSidedFixedStrategyExploitability(const std::string& game_name) {
   std::cout << "ok.\n";
 }
 
-void TestOracleConvergence(std::string game_name, int depth) {
+void RunTrunkIterationsWithValueOracle(std::string game_name, int depth) {
   std::shared_ptr<const Game> game = LoadGame(game_name);
 
   std::shared_ptr<const dlcfr::LeafEvaluator> terminal_evaluator =

@@ -612,6 +612,7 @@ class InfostateNode final {
     SPIEL_CHECK_TRUE(is_leaf_node());
     return corresponding_ch_reaches_;
   }
+  // TODO: rename
   const std::vector<Action>& TerminalHistory() const {
     SPIEL_DCHECK_EQ(type_, kTerminalInfostateNode);
     return terminal_history_;
