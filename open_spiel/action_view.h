@@ -64,6 +64,7 @@ struct FlatJointActions {
   const int num_flat_joint_actions;
   FlatJointActionsIterator begin() const;
   FlatJointActionsIterator end() const;
+  std::vector<Action> as_vector() const;
 };
 
 // Provides a number of iterators that are useful for dealing
@@ -90,6 +91,9 @@ struct ActionView {
   // As this is an iterator, it does not allocate memory for the whole cartesian
   // product of the actions.
   FlatJointActions flat_joint_actions() const;
+
+  // Deconstruct the flat joint action to the individual actions of each player.
+  std::vector<Action> FlatJointActionToActions(Action flat_joint_action) const;
 
   // Provides an iterator over flattened actions, while we fix one action
   // for the specified player.

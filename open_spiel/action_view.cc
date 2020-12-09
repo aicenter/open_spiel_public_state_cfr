@@ -41,6 +41,24 @@ ActionView::ActionView(const Player current_player,
 ActionView::ActionView(const State& state)
     : ActionView(state.CurrentPlayer(), CollectActions(state)) {}
 
+std::vector<Action> ActionView::FlatJointActionToActions(
+    Action flat_joint_action) const {
+  std::vector<Action> actions(num_players(), kInvalidAction);
+  for (Player player = 0; player < num_players(); ++player) {
+    // For each player with legal actions available:
+    int num_actions = legal_actions[player].size();
+    if (num_actions > 0) {
+      // Extract the least-significant digit (radix = the number legal actions
+      // for the current player) from flat_action. Use the digit as an index
+      // into the player's set of legal actions.
+      actions[player] = legal_actions[player][flat_joint_action % num_actions];
+      // Update the flat_action to be for the remaining players only.
+      flat_joint_action /= num_actions;
+    }
+  }
+  return actions;
+}
+
 // FlatJointActions
 
 FlatJointActions ActionView::flat_joint_actions() const {
@@ -56,6 +74,11 @@ FlatJointActionsIterator FlatJointActions::begin() const {
 }
 FlatJointActionsIterator FlatJointActions::end() const {
   return FlatJointActionsIterator{num_flat_joint_actions};
+}
+std::vector<Action> FlatJointActions::as_vector() const {
+  std::vector<Action> out(num_flat_joint_actions);
+  std::iota(out.begin(), out.end(), 0);
+  return out;
 }
 FlatJointActionsIterator& FlatJointActionsIterator::operator++() {
   current_action_++;
