@@ -26,10 +26,10 @@ namespace algorithms {
 namespace {
 
 std::unique_ptr<HistoryNode> RecursivelyBuildGameTree(
-    std::unique_ptr<State> state, Player player_id,
+    std::unique_ptr<State> state,
     std::unordered_map<std::string, HistoryNode*>* state_to_node) {
   std::unique_ptr<HistoryNode> node(
-      new HistoryNode(player_id, std::move(state)));
+      new HistoryNode(std::move(state)));
   if (state_to_node == nullptr) SpielFatalError("state_to_node is null.");
   (*state_to_node)[node->GetHistory()] = node.get();
   State* state_ptr = node->GetState();
@@ -45,25 +45,23 @@ std::unique_ptr<HistoryNode> RecursivelyBuildGameTree(
         }
         probability_sum += prob;
         std::unique_ptr<HistoryNode> child_node = RecursivelyBuildGameTree(
-            std::move(child), player_id, state_to_node);
+            std::move(child), state_to_node);
         node->AddChild(outcome, {prob, std::move(child_node)});
       }
       SPIEL_CHECK_FLOAT_EQ(probability_sum, 1.0);
       break;
     }
     case StateType::kDecision: {
-      for (const auto& legal_action : state_ptr->LegalActions()) {
-        std::unique_ptr<State> child = state_ptr->Child(legal_action);
-
+      for (const auto& action : state_ptr->LegalActions()) {
+        std::unique_ptr<HistoryNode> child_history = RecursivelyBuildGameTree(
+            std::move(state_ptr->Child(action)), state_to_node);
         // Note: The probabilities here are meaningless if state.CurrentPlayer()
         // != player_id, as we'll be getting the probabilities from the policy
         // during the call to Value. For state.CurrentPlayer() == player_id,
         // the probabilities are equal to 1. for every action as these are
         // *counter-factual* probabilities, which ignore the probability of
         // the player that we are playing as.
-        node->AddChild(legal_action,
-                       {1., RecursivelyBuildGameTree(
-                                std::move(child), player_id, state_to_node)});
+        node->AddChild(action, {1., std::move(child_history)});
       }
       break;
     }
@@ -78,75 +76,64 @@ std::unique_ptr<HistoryNode> RecursivelyBuildGameTree(
 
 }  // namespace
 
-HistoryNode::HistoryNode(Player player_id, std::unique_ptr<State> game_state)
+HistoryNode::HistoryNode(std::unique_ptr<State> game_state)
     : state_(std::move(game_state)),
-      history_(state_->ToString()),
+      action_view_(*state_),
+      history_(state_->HistoryString()),
       type_(state_->GetType()) {
-  // Unless it's the opposing player's turn, we always view the game from the
-  // view of player player_id.
-  if (type_ == StateType::kDecision && state_->CurrentPlayer() != player_id) {
-    infostate_ = state_->InformationStateString();
-  } else if (type_ == StateType::kChance) {
-    infostate_ = kChanceNodeInfostateString;
-  } else if (type_ == StateType::kTerminal) {
-    infostate_ = kTerminalNodeInfostateString;
-  } else {
-    infostate_ = state_->InformationStateString(player_id);
+  infostates_.reserve(state_->NumPlayers());
+  for (int pl = 0; pl < state_->NumPlayers(); ++pl) {
+    infostates_.push_back(state_->InformationStateString(pl));
   }
-  // Compute & store the legal actions so we can check that all actions we're
-  // adding are legal.
-  for (Action action : state_->LegalActions()) legal_actions_.insert(action);
+
   if (type_ == StateType::kTerminal) {
-    value_ = state_->PlayerReturn(player_id);
+    terminal_utilities_ = state_->Returns();
   }
 }
 
 void HistoryNode::AddChild(
     Action outcome, std::pair<double, std::unique_ptr<HistoryNode>> child) {
-  if (!legal_actions_.count(outcome)) SpielFatalError("Child is not legal.");
-  if (child.second == nullptr) {
-    SpielFatalError("Error inserting child; child is null.");
-  }
-  if (child.first < 0. || child.first > 1.) {
-    SpielFatalError(absl::StrCat(
-        "AddChild error: Probability for child must be in [0, 1], not: ",
-        child.first));
-  }
-  child_info_[outcome] = std::move(child);
-  if (child_info_.size() > legal_actions_.size()) {
-    SpielFatalError("More children than legal actions.");
-  }
+  const auto legal_actions = LegalActions();
+  SPIEL_CHECK_TRUE(
+      std::find(legal_actions.begin(), legal_actions.end(), outcome)
+      != legal_actions.end());
+  SPIEL_CHECK_PROB(child.first);
+  SPIEL_CHECK_TRUE(child.second);
+  SPIEL_CHECK_LT(children_.size(), legal_actions.size());
+  SPIEL_CHECK_EQ(legal_actions[children_.size()], outcome);
+  children_.push_back(std::move(child));
 }
 
-std::pair<double, HistoryNode*> HistoryNode::GetChild(Action outcome) {
-  auto it = child_info_.find(outcome);
-  if (it == child_info_.end()) {
-    SpielFatalError("Error getting child; action not found.");
-  }
-  // it->second.first is the probability associated with outcome, so as it is a
-  // probability, it must be in [0, 1].
-  SPIEL_CHECK_GE(it->second.first, 0.);
-  SPIEL_CHECK_LE(it->second.first, 1.);
-  std::pair<double, HistoryNode*> child =
-      std::make_pair(it->second.first, it->second.second.get());
-  if (child.second == nullptr) {
-    SpielFatalError("Error getting child; child is null.");
-  }
+std::pair<double, HistoryNode*> HistoryNode::GetChild(Action action) {
+  const auto legal_actions = LegalActions();
+  SPIEL_CHECK_EQ(legal_actions.size(), children_.size());
+
+  const auto it = std::find(legal_actions.begin(),
+                            legal_actions.end(), action);
+  SPIEL_CHECK_TRUE(it != legal_actions.end());
+  const size_t child_idx = std::distance(legal_actions.begin(), it);
+
+  std::pair<double, HistoryNode*> child = std::make_pair(
+      children_[child_idx].first, children_[child_idx].second.get());
+  SPIEL_CHECK_TRUE(child.second);
   return child;
 }
 
 std::vector<Action> HistoryNode::GetChildActions() const {
-  std::vector<Action> actions;
-  actions.reserve(child_info_.size());
-  for (const auto& kv : child_info_) actions.push_back(kv.first);
-  return actions;
+  return LegalActions();
+}
+
+std::vector<Action> HistoryNode::LegalActions() const {
+  if (state_->IsSimultaneousNode()) {
+    return action_view_.flat_joint_actions().as_vector();
+  } else {
+    return action_view_.legal_actions[0];
+  }
 }
 
 HistoryNode* HistoryTree::GetByHistory(const std::string& history) {
   HistoryNode* node = state_to_node_[history];
-  if (node == nullptr) {
-    SpielFatalError(absl::StrCat("Node is null for history: '", history, "'"));
-  }
+  SPIEL_CHECK_TRUE(node);
   return node;
 }
 
@@ -159,10 +146,8 @@ std::vector<std::string> HistoryTree::GetHistories() {
   return histories;
 }
 
-// Builds game tree consisting of all decision nodes for player_id.
-HistoryTree::HistoryTree(std::unique_ptr<State> state, Player player_id) {
-  root_ =
-      RecursivelyBuildGameTree(std::move(state), player_id, &state_to_node_);
+HistoryTree::HistoryTree(std::unique_ptr<State> state) {
+  root_ = RecursivelyBuildGameTree(std::move(state), &state_to_node_);
 }
 
 ActionsAndProbs GetSuccessorsWithProbs(const State& state,
@@ -242,7 +227,7 @@ GetAllInfoSets(std::unique_ptr<State> state, Player best_responder,
     std::string infostate =
         state_and_prob.first->InformationStateString(best_responder);
     infosets[infostate].push_back(
-        {tree->GetByHistory(state_and_prob.first->ToString()),
+        {tree->GetByHistory(state_and_prob.first->HistoryString()),
          state_and_prob.second});
   }
   return infosets;

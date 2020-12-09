@@ -23,6 +23,7 @@
 #include <utility>
 #include <vector>
 
+#include "open_spiel/action_view.h"
 #include "open_spiel/policy.h"
 #include "open_spiel/spiel.h"
 #include "open_spiel/spiel_utils.h"
@@ -35,43 +36,58 @@ namespace algorithms {
 // history in the game.
 class HistoryNode {
  public:
-  // Use specific infostate strings for chance and terminal nodes so that we
-  // don't rely on the game implementations defining them at those states.
-  static constexpr const char* kChanceNodeInfostateString = "Chance Node";
-  static constexpr const char* kTerminalNodeInfostateString = "Terminal node";
-
-  HistoryNode(Player player_id, std::unique_ptr<State> game_state);
+  HistoryNode(std::unique_ptr<State> game_state);
 
   State* GetState() { return state_.get(); }
 
-  const std::string& GetInfoState() { return infostate_; }
+  const std::string& GetInfoState() {
+    SPIEL_CHECK_GE(state_->CurrentPlayer(), 0);
+    return infostates_[state_->CurrentPlayer()];
+  }
+
+  const std::string& GetInfoState(Player player) {
+    SPIEL_CHECK_GE(player, 0);
+    SPIEL_CHECK_LT(player, state_->NumPlayers());
+    return infostates_[player];
+  }
 
   const std::string& GetHistory() { return history_; }
 
   const StateType& GetType() { return type_; }
 
-  double GetValue() const { return value_; }
+//  double GetValue() const {
+//    SpielFatalError("Obsolete, please use GetUtility(Player)");
+//  }
+  double GetUtility(Player player) const {
+    SPIEL_CHECK_GE(player, 0);
+    SPIEL_CHECK_LT(player, state_->NumPlayers());
+    return terminal_utilities_[player];
+  }
 
-  Action NumChildren() const { return child_info_.size(); }
+  Action NumChildren() const { return children_.size(); }
 
-  void AddChild(Action outcome,
-                std::pair<double, std::unique_ptr<HistoryNode>> child);
+  void AddChild(Action outcome, std::pair<
+      /*chance_probability=*/double, std::unique_ptr<HistoryNode>> child);
 
   std::vector<Action> GetChildActions() const;
 
-  std::pair<double, HistoryNode*> GetChild(Action outcome);
+  std::vector<Action> LegalActions() const;
+
+  std::pair<double, HistoryNode*> GetChild(Action action);
+
+  const ActionView& action_view() const { return action_view_; }
 
  private:
   std::unique_ptr<State> state_;
-  std::string infostate_;
+  std::vector<std::string> infostates_;
   std::string history_;
   StateType type_;
-  double value_;
+  std::vector<double> terminal_utilities_;
 
-  // Map from legal actions to transition probabilities. Uses a map as we need
-  // to preserve the order of the actions.
-  std::unordered_set<Action> legal_actions_;
-  std::map<Action, std::pair<double, std::unique_ptr<HistoryNode>>> child_info_;
+  ActionView action_view_;
+  std::vector<std::pair<
+    /*chance_probability=*/double,
+    std::unique_ptr<HistoryNode>>> children_;
 };
 
 // History here refers to the fact that we're using histories- i.e.
@@ -82,10 +98,11 @@ class HistoryNode {
 // player as the base abstraction.
 class HistoryTree {
  public:
-  // Builds a tree of histories. player_id is needed here as we view all chance
-  // and terminal nodes from the viewpoint of player_id. Decision nodes are
-  // viewed from the perspective of the player making the decision.
-  HistoryTree(std::unique_ptr<State> state, Player player_id);
+  // Builds a tree of histories.
+  HistoryTree(std::unique_ptr<State> state);
+
+  HistoryTree(const Game& game)
+      : HistoryTree(std::move(game.NewInitialState())) {}
 
   HistoryNode* Root() { return root_.get(); }
 
