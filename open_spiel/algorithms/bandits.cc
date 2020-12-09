@@ -175,6 +175,9 @@ std::unique_ptr<bandits::Bandit> MakeBandit(
   if (bandit_name == "RegretMatching") {
     return std::make_unique<bandits::RegretMatching>(num_actions);
   }
+  if (bandit_name == "RegretMatchingPlus") {
+    return std::make_unique<bandits::RegretMatchingPlus>(num_actions);
+  }
   if (bandit_name == "UniformStrategy") {
     return std::make_unique<bandits::UniformStrategy>(num_actions);
   }
