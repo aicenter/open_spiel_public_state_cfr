@@ -52,8 +52,9 @@
 //
 //   g(z) = u(z) * pi^{sf_lp}_opponent(z) * range_opponent(z) * pi_chance(z),
 //
-// i.e. terminal utility multiplied by opponent's reach that includes the
-// opponent's range (based on the opponent's realization plan).
+// i.e. terminal utility multiplied by chance, opponent's reach (based on the
+// opponent's realization plan from the previously solved LP) and the opponent's
+// range.
 //
 // 2. For all infostates within infostate-subtrees that have a non-zero range,
 // compute behavioral strategies and save them into a policy table. These are
@@ -195,7 +196,7 @@ DecisionVector<std::vector<double>> ComputeCfBestResponse(
             }
           } else {
             // TODO: randomization of the CBR.
-            /*auto iter_max = std::max_element(rewards.begin(), rewards.end());
+            auto iter_max = std::max_element(rewards.begin(), rewards.end());
             const double max_reward = *iter_max;
             std::vector<size_t> max_indices;
             for (int i = 0; i < rewards.size(); i++) {
@@ -203,10 +204,12 @@ DecisionVector<std::vector<double>> ComputeCfBestResponse(
             }
             std::uniform_int_distribution<int> dist(0, max_indices.size() - 1);
             const int resp_idx = dist(mt);
-            strategy[id][resp_idx] = 1.;*/
-            auto iter_max = std::max_element(rewards.begin(), rewards.end());
-            const size_t best_resp_idx = std::distance(rewards.begin(), iter_max);
-            strategy[id][best_resp_idx] = 1.;
+            strategy[id][resp_idx] = 1.;
+
+//            // No CBR randomization:
+//            auto iter_max = std::max_element(rewards.begin(), rewards.end());
+//            const size_t best_resp_idx = std::distance(rewards.begin(), iter_max);
+//            strategy[id][best_resp_idx] = 1.;
           }
       },
       /*policy_fn=*/[&](DecisionId id) -> std::vector<double> {
@@ -215,28 +218,53 @@ DecisionVector<std::vector<double>> ComputeCfBestResponse(
   return strategy;
 }
 
-double ComputeExpectedUtility(HistoryNode* node, const TabularPolicy& policy) {
+double ComputeExpectedUtility(HistoryNode* node, const TabularPolicy& policy,
+                              Player for_player) {
   if (node->GetType() == StateType::kTerminal) {
-    return node->GetValue();
+    return node->GetUtility(for_player);
   }
   if (node->GetType() == StateType::kChance) {
     double value = 0.;
     for (Action a : node->GetChildActions()) {
-      const auto& [prob, child] = node->GetChild(a);
-      value += prob * ComputeExpectedUtility(child, policy);
+      const auto& [chance_prob, child] = node->GetChild(a);
+      value += chance_prob * ComputeExpectedUtility(child, policy, for_player);
     }
     return value;
   }
   if (node->GetType() == StateType::kDecision) {
-    double value = 0.;
-    auto state_policy = policy.GetStatePolicy(node->GetInfoState());
-    for (Action action : node->GetChildActions()) {
-      const auto& [fixed_prob, child] = node->GetChild(action);
-      SPIEL_CHECK_EQ(fixed_prob, 1.);
-      const double prob = GetProb(state_policy, action);
-      value += prob * ComputeExpectedUtility(child, policy);
+    if (node->GetState()->IsSimultaneousNode()) {
+      const int num_players = node->GetState()->NumPlayers();
+      std::vector<ActionsAndProbs> state_policies;
+      state_policies.reserve(num_players);
+      for (int pl = 0; pl < num_players; ++pl) {
+        state_policies.push_back(policy.GetStatePolicy(node->GetInfoState(pl)));
+      }
+
+      double value = 0.;
+      for (Action flat_joint_action : node->GetChildActions()) {
+        const auto&[chance_prob, child] = node->GetChild(flat_joint_action);
+        SPIEL_CHECK_EQ(chance_prob, 1.);
+        double prob = 1.;
+        std::vector<Action> player_actions =
+            node->action_view().FlatJointActionToActions(flat_joint_action);
+        for (int pl = 0; pl < num_players; ++pl) {
+          prob *= GetProb(state_policies[pl], player_actions[pl]);
+        }
+        value += prob * ComputeExpectedUtility(child, policy, for_player);
+      }
+      return value;
+
+    } else {
+      double value = 0.;
+      auto state_policy = policy.GetStatePolicy(node->GetInfoState());
+      for (Action action : node->GetChildActions()) {
+        const auto&[chance_prob, child] = node->GetChild(action);
+        SPIEL_CHECK_EQ(chance_prob, 1.);
+        const double prob = GetProb(state_policy, action);
+        value += prob * ComputeExpectedUtility(child, policy, for_player);
+      }
+      return value;
     }
-    return value;
   }
   SpielFatalError("Exhausted pattern match!");
 }
@@ -301,13 +329,11 @@ void OracleEvaluator::EvaluatePublicState(
     }
   }
 
-//  std::cout << s->public_id << " " << mutual_cbrs.PolicyTable() << "\n";
-
-  // Step 4. Compute expected utilities of subgame histories (for player 0).
+  // Step 4. Compute expected utilities of subgame histories.
   std::map<std::string, /*utility=*/double> expected_utilities;
   for (HistoryTree& h : oracle_context->subgame_histories) {
     expected_utilities[h.Root()->GetHistory()] =
-        ComputeExpectedUtility(h.Root(), mutual_cbrs);
+        ComputeExpectedUtility(h.Root(), mutual_cbrs, /*for_player*/0);
   }
 
   // Step 5. Compute final counterfactually optimal values.
@@ -318,21 +344,22 @@ void OracleEvaluator::EvaluatePublicState(
       for (int k = 0; k < player_node->corresponding_states_size(); ++k) {
         const std::unique_ptr<State>& state =
             player_node->corresponding_states()[k];
-        const std::string state_str = state->ToString();
-        const size_t j = oracle_context->subgame_ranges.at(state_str)[1 - pl];
+        const std::string history_str = state->HistoryString();
+        const size_t j = oracle_context->subgame_ranges.at(history_str)[1 - pl];
         const double opponent_range = s->ranges[1 - pl][j];
         const double chance_reach =
             player_node->corresponding_chance_reach_probs()[k];
         // We must change the sign appropriately because expected_utilities
         // are computed for player 0.
         const double sign = 1 - 2 * pl;
-        s->values[pl][i] += expected_utilities.at(state_str)
+        s->values[pl][i] += expected_utilities.at(history_str)
                           * opponent_range * chance_reach * sign;
       }
     }
   }
 
 //  std::cout << "public_id " << s->public_id << ": \nranges: " << s-> ranges << " \nvalues: " << s->values << "\n";
+//  std::cout << mutual_cbrs.PolicyTable() << "\n";
   return;
 }
 
@@ -357,15 +384,16 @@ std::unique_ptr<dlcfr::PublicStateContext> OracleEvaluator::CreateContext(
   for (int i = 0; i < leaf_state.leaf_nodes[0].size(); ++i) {
     const InfostateNode* leaf_node = leaf_state.leaf_nodes[0][i];
     for (const std::unique_ptr<State>& s : leaf_node->corresponding_states()) {
-      subgame_histories.emplace_back(std::move(s->Clone()), /*player_id=*/0);
-      subgame_ranges[s->ToString()][0] = i;
+      SPIEL_CHECK_FALSE(s->IsTerminal());
+      subgame_histories.emplace_back(std::move(s->Clone()));
+      subgame_ranges[s->HistoryString()][0] = i;
     }
   }
   size_t num_histories = subgame_ranges.size();
   for (int j = 0; j < leaf_state.leaf_nodes[1].size(); ++j) {
     const InfostateNode* leaf_node = leaf_state.leaf_nodes[1][j];
     for (const std::unique_ptr<State>& s : leaf_node->corresponding_states()) {
-      subgame_ranges[s->ToString()][1] = j;
+      subgame_ranges[s->HistoryString()][1] = j;
       --num_histories;
     }
   }
@@ -384,12 +412,16 @@ void RecursivelyRefineSpecFixStrategyWithPolicy(
         fixed_policy.GetStatePolicy(player_node->infostate_string());
     if (!local_policy.empty()) {  // Fix policy at this node!
       SPIEL_DCHECK_EQ(local_policy.size(), player_node->num_children());
+      SPIEL_DCHECK_TRUE(IsValidProbDistribution(local_policy));
       std::unordered_map<const InfostateNode*, SolverVariables>& lp_spec =
           solver->lp_specification();
 
       for (int i = 0; i < player_node->num_children(); ++i) {
         const InfostateNode* player_child = player_node->child_at(i);
         SPIEL_DCHECK_EQ(player_node->legal_actions()[i], local_policy[i].first);
+        SPIEL_DCHECK_TRUE(lp_spec[player_node].var_reach_prob);
+        SPIEL_DCHECK_TRUE(lp_spec[player_child].var_reach_prob);
+
         const double prob = local_policy[i].second;
         opres::MPConstraint* ct = solver->solver()->MakeRowConstraint(0., 0.);
         ct->SetCoefficient(lp_spec[player_node].var_reach_prob, prob);
