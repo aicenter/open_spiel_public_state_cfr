@@ -22,16 +22,22 @@ namespace algorithms {
 namespace ortools {
 
 struct OraclePublicStateContext : public dlcfr::PublicStateContext {
-  std::array<SequenceFormLpSpecification, 2> solvers;
-  std::vector<HistoryTree> subgame_histories;
-  std::map<std::string, std::array<size_t, 2>> subgame_ranges;
+  const std::vector<HistoryTree> subgame_root_histories;
+  const std::map<
+      /* history string */ std::string, // stringified std::vector<Action>
+      /* range index of player */std::array<size_t, 2>> subgame_range_indexing;
+
+  // Specifications are not const because they will be refined for the value
+  // computation, for each public state evaluation.
+  std::array<SequenceFormLpSpecification, 2> specifications;
+
   OraclePublicStateContext(
-      std::array<SequenceFormLpSpecification, 2> solvers,
+      std::array<SequenceFormLpSpecification, 2> specifications,
       std::vector<HistoryTree> root_histories,
-      std::map<std::string, std::array<size_t, 2>> subgame_ranges)
-      : solvers(std::move(solvers)),
-        subgame_histories(std::move(root_histories)),
-        subgame_ranges(std::move(subgame_ranges)) {}
+      std::map<std::string, std::array<size_t, 2>> subgame_range_indexing)
+      : subgame_root_histories(std::move(root_histories)),
+        subgame_range_indexing(std::move(subgame_range_indexing)),
+        specifications(std::move(specifications)) {}
 };
 
 struct OracleEvaluator : public dlcfr::LeafEvaluator {

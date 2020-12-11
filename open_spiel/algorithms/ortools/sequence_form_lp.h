@@ -66,8 +66,8 @@ struct BijectiveContainer {
 BijectiveContainer<const InfostateNode*> ConnectTerminals(
     const InfostateTree& tree_a, const InfostateTree& tree_b);
 
-// Variables needed for solving the LP.
-struct SolverVariables {
+// Variables / constraints per each node, needed for solving the LP.
+struct NodeSpecification {
   operations_research::MPVariable* var_cf_value;
   operations_research::MPVariable* var_reach_prob;
   operations_research::MPConstraint* ct_child_cf_value;
@@ -80,7 +80,7 @@ class SequenceFormLpSpecification {
  using MPSolver = operations_research::MPSolver;
  public:
   SequenceFormLpSpecification(
-      std::vector<std::shared_ptr<InfostateTree>> solver_trees,
+      std::vector<std::shared_ptr<InfostateTree>> trees,
       // See also MPSolver::OptimizationProblemType
       const std::string& solver_id = "CBC");
   SequenceFormLpSpecification(const Game& game);
@@ -108,15 +108,14 @@ class SequenceFormLpSpecification {
   void PrintProblemSpecification();
 
   const std::vector<std::shared_ptr<InfostateTree>>& trees() const {
-    return solver_trees_;
+    return trees_;
   }
   std::array<const InfostateNode*, 2> roots() const {
-    return {solver_trees_[0]->mutable_root(),
-            solver_trees_[1]->mutable_root()};
+    return {trees_[0]->mutable_root(),
+            trees_[1]->mutable_root()};
   }
-  std::unordered_map<
-      const InfostateNode*, SolverVariables>& lp_specification() {
-    return lp_spec_;
+  std::unordered_map<const InfostateNode*, NodeSpecification>& node_spec() {
+    return node_spec_;
   }
   operations_research::MPSolver* solver() { return solver_.get(); }
 
@@ -125,10 +124,10 @@ class SequenceFormLpSpecification {
   }
 
  protected:
-  const std::vector<std::shared_ptr<InfostateTree>> solver_trees_;
+  const std::vector<std::shared_ptr<InfostateTree>> trees_;
   const BijectiveContainer<const InfostateNode*> terminal_bijection_;
   std::unique_ptr<operations_research::MPSolver> solver_;
-  std::unordered_map<const InfostateNode*, SolverVariables> lp_spec_;
+  std::unordered_map<const InfostateNode*, NodeSpecification> node_spec_;
 
   void SpecifyReachProbsConstraints(InfostateNode* player_node);
   void SpecifyCfValuesConstraints(InfostateNode* opponent_node);
