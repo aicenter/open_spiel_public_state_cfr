@@ -55,7 +55,7 @@ struct BijectiveContainer {
     x2y[x] = y;
     y2x[y] = x;
   }
-
+  // Direction is equivalent to player id.
   const std::map<T, T>& association(int direction) const {
     SPIEL_CHECK_TRUE(direction == 0 || direction == 1);
     if (direction == 0) return x2y;
