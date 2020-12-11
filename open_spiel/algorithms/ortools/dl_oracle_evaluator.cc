@@ -268,18 +268,19 @@ void OracleEvaluator::EvaluatePublicState(
   SPIEL_CHECK_TRUE(context);
   auto* oracle_context =
       open_spiel::down_cast<OraclePublicStateContext*>(context);
-  std::array<SequenceFormLpSpecification, 2>& solvers = oracle_context->specifications;
+  std::array<SequenceFormLpSpecification, 2>& specs =
+      oracle_context->specifications;
 
   // Check pointers for the trees are still the same.
-  SPIEL_CHECK_EQ(solvers[0].trees()[0].get(), solvers[1].trees()[0].get());
-  SPIEL_CHECK_EQ(solvers[0].trees()[1].get(), solvers[1].trees()[1].get());
-  SPIEL_DCHECK_EQ(solvers[0].terminal_bijection().association(0),
-                  solvers[1].terminal_bijection().association(0));
-  SPIEL_DCHECK_EQ(solvers[0].terminal_bijection().association(1),
-                  solvers[1].terminal_bijection().association(1));
-  const std::vector<std::shared_ptr<InfostateTree>>& trees = solvers[0].trees();
+  SPIEL_CHECK_EQ(specs[0].trees()[0].get(), specs[1].trees()[0].get());
+  SPIEL_CHECK_EQ(specs[0].trees()[1].get(), specs[1].trees()[1].get());
+  SPIEL_DCHECK_EQ(specs[0].terminal_bijection().association(0),
+                  specs[1].terminal_bijection().association(0));
+  SPIEL_DCHECK_EQ(specs[0].terminal_bijection().association(1),
+                  specs[1].terminal_bijection().association(1));
+  const std::vector<std::shared_ptr<InfostateTree>>& trees = specs[0].trees();
   const BijectiveContainer<const InfostateNode*>& terminal_bijection =
-      solvers[0].terminal_bijection();
+      specs[0].terminal_bijection();
 
   // Step 0. Construct the value-solving subgame for each player and solve it.
   for (int pl = 0; pl < 2; ++pl) {
@@ -288,9 +289,9 @@ void OracleEvaluator::EvaluatePublicState(
         /*opponent_root=*/trees[1 - pl]->mutable_root(),
         /*opponent_range=*/s->ranges[1 - pl],
         /*opponent_terminal_map=*/terminal_bijection.association(1 - pl),
-        /*player_spec=*/solvers[pl].node_spec());
+        /*player_spec=*/specs[pl].node_spec());
     // Run the solver!
-    solvers[pl].Solve();
+    specs[pl].Solve();
   }
 
   // Step 1. Compute the "gradients" of counterfactual values.
@@ -299,8 +300,8 @@ void OracleEvaluator::EvaluatePublicState(
     cf_gradients.push_back(ComputeGradient(
         /*player_terminals=*/trees[pl]->leaf_nodes(),
         /*player_terminal_map=*/terminal_bijection.association(pl),
-        /*player_spec=*/solvers[pl].node_spec(),
-        /*opponent_spec=*/solvers[1 - pl].node_spec()));
+        /*player_spec=*/specs[pl].node_spec(),
+        /*opponent_spec=*/specs[1 - pl].node_spec()));
   }
 
   // Step 2. and 3.: Compute the behavioral strategies.
@@ -313,7 +314,7 @@ void OracleEvaluator::EvaluatePublicState(
         RefineBestResponseToCfBestResponse(
             /*player_tree=*/*trees[pl],
             /*player_cf_gradient=*/absl::MakeSpan(cf_gradients[pl]),
-            /*player_spec=*/solvers[pl].node_spec());
+            /*player_spec=*/specs[pl].node_spec());
 
     for (DecisionId id : trees[pl]->AllDecisionIds()) {
       const InfostateNode* player_node = trees[pl]->decision_infostate(id);
@@ -439,34 +440,34 @@ void RecursivelyRefineSpecFixStrategyWithPolicy(
 }
 
 double ComputeRootValueWhileFixingStrategy(
-    SequenceFormLpSpecification* solver, const Policy& fixed_policy,
+    SequenceFormLpSpecification* specification, const Policy& fixed_policy,
     Player fixed_player) {
-  solver->SpecifyLinearProgram(fixed_player);
+  specification->SpecifyLinearProgram(fixed_player);
   RecursivelyRefineSpecFixStrategyWithPolicy(
-      solver->trees()[fixed_player]->mutable_root(), fixed_policy, solver);
-  return solver->Solve();
+      specification->trees()[fixed_player]->mutable_root(), fixed_policy, specification);
+  return specification->Solve();
 }
 
-double TrunkExploitability(SequenceFormLpSpecification* solver,
+double TrunkExploitability(SequenceFormLpSpecification* spec,
                            const Policy& trunk_policy) {
-  return (- ComputeRootValueWhileFixingStrategy(solver, trunk_policy, 0)
-          - ComputeRootValueWhileFixingStrategy(solver, trunk_policy, 1)) / 2.;
+  return (- ComputeRootValueWhileFixingStrategy(spec, trunk_policy, 0)
+          - ComputeRootValueWhileFixingStrategy(spec, trunk_policy, 1)) / 2.;
 }
 
 double TrunkPlayerExploitability(
-    SequenceFormLpSpecification* solver, const Policy& trunk_policy, Player p,
-    absl::optional<double> maybe_game_value) {
+    SequenceFormLpSpecification* spec, const Policy& trunk_policy,
+    Player p, absl::optional<double> maybe_game_value) {
   double game_value;
   if (maybe_game_value.has_value()) {
     game_value = maybe_game_value.value();
   } else {
-    solver->SpecifyLinearProgram(Player{0});
-    game_value = solver->Solve();
+    spec->SpecifyLinearProgram(Player{0});
+    game_value = spec->Solve();
   }
   // Switch sign appropriately - game value is defined for player 0!
   const double root_value = game_value * (1 - 2*p);
   const double fixed_value =
-      ComputeRootValueWhileFixingStrategy(solver, trunk_policy, p);
+      ComputeRootValueWhileFixingStrategy(spec, trunk_policy, p);
   return root_value - fixed_value;
 }
 

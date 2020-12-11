@@ -27,19 +27,19 @@ constexpr double kErrorTolerance = 1e-14;
 void TestGameValueAndExploitability(const std::string& game_name,
                                     double expected_game_value) {
   std::shared_ptr<const Game> game = LoadGame(game_name);
-  SequenceFormLpSpecification solver(*game);
-  solver.SpecifyLinearProgram(0);
-  double actual_game_value = solver.Solve();
+  SequenceFormLpSpecification specification(*game);
+  specification.SpecifyLinearProgram(0);
+  double actual_game_value = specification.Solve();
   SPIEL_CHECK_FLOAT_NEAR(actual_game_value, expected_game_value,
                          kErrorTolerance);
 
   // Compute policy for the opponent.
-  TabularPolicy policy0 = solver.OptimalPolicy(0);
-  solver.SpecifyLinearProgram(1);
-  double opponent_game_value = solver.Solve();
+  TabularPolicy policy0 = specification.OptimalPolicy(0);
+  specification.SpecifyLinearProgram(1);
+  double opponent_game_value = specification.Solve();
   SPIEL_CHECK_FLOAT_NEAR(actual_game_value + opponent_game_value,
                          0., kErrorTolerance);
-  TabularPolicy policy1 = solver.OptimalPolicy(1);
+  TabularPolicy policy1 = specification.OptimalPolicy(1);
 
   // Test exploitability -- this is implemented only for simultaneous games.
   if (game->GetType().dynamics == GameType::Dynamics::kSimultaneous)
