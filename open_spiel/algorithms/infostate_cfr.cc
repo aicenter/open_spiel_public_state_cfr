@@ -71,12 +71,10 @@ void TopDown(
     SPIEL_DCHECK_EQ(right_offset, 0);
   }
 }
-
 void BottomUp(
     const InfostateTree& tree, absl::Span<double> cf_values,
-    std::function<void(
-        DecisionId, /*rewards=*/absl::Span<const double>)> observe_rewards_fn,
-    std::function<std::vector<double>(DecisionId)> policy_fn) {
+    std::function<std::vector<double>(
+        DecisionId, /*rewards=*/absl::Span<const double>)> observe_rewards_fn) {
   const std::vector<std::vector<InfostateNode*>>& nodes_at_depths =
       tree.nodes_at_depths();
   SPIEL_CHECK_EQ(cf_values.size(), nodes_at_depths.back().size());
@@ -96,25 +94,24 @@ void BottomUp(
          parent_idx++) {
       const InfostateNode* node = nodes_at_depths[d][parent_idx];
       const int num_children = node->num_children();
-      double node_sum = 0.;
+      double node_expected_value = 0.;
       if (node->type() == kDecisionInfostateNode) {
-        observe_rewards_fn(
+        std::vector<double> policy = observe_rewards_fn(
             node->decision_id(),
             absl::Span<const double>(&cf_values[left_offset], num_children));
-        std::vector<double> policy = policy_fn(node->decision_id());
         // Propagate child values by multiplying with current policy.
         for (int i = 0; i < num_children; i++) {
-          node_sum += policy[i] * cf_values[left_offset + i];
+          node_expected_value += policy[i] * cf_values[left_offset + i];
         }
       } else {
         SPIEL_DCHECK_EQ(node->type(), kObservationInfostateNode);
         // Just sum the child values, no policy weighing is needed.
         for (int i = 0; i < num_children; i++) {
-          node_sum += cf_values[left_offset + i];
+          node_expected_value += cf_values[left_offset + i];
         }
       }
 
-      cf_values[parent_idx] = node_sum;
+      cf_values[parent_idx] = node_expected_value;
       left_offset += num_children;
     }
     // Check that we passed over all of the children.

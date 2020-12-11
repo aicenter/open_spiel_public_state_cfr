@@ -95,9 +95,8 @@ inline void TopDownAveragePolicy(
 // The leaf values must be provided externally by writing to leaves_cf_values().
 void BottomUp(
     const InfostateTree& tree, absl::Span<double> cf_values,
-    std::function<
-        void(DecisionId, /*rewards=*/absl::Span<const double>)> observe_rewards_fn,
-    std::function<std::vector<double>(DecisionId)> policy_fn);
+    std::function</*infostate_policy=*/std::vector<double>(
+        DecisionId, /*rewards=*/absl::Span<const double>)> observe_rewards_fn);
 
 inline void BottomUp(const InfostateTree& tree, BanditVector& bandits,
                      absl::Span<double> cf_values) {
@@ -105,25 +104,18 @@ inline void BottomUp(const InfostateTree& tree, BanditVector& bandits,
            [&](DecisionId id, absl::Span<const double> rewards) {
                bandits::Bandit* bandit = bandits[id].get();
                bandit->ObserveRewards(rewards);
-           },
-           [&](DecisionId id) {
-               bandits::Bandit* bandit = bandits[id].get();
                return bandit->current_strategy();
            });
 }
 
 inline void BottomUpCfBestResponse(const InfostateTree& tree,
                                    absl::Span<double> cf_values) {
-  size_t response_index = 0;
-  size_t num_actions = 0;
   BottomUp(
       tree, cf_values,
-      [&](DecisionId id, absl::Span<const double> rewards) {
-          num_actions = rewards.size();
+      [](DecisionId id, absl::Span<const double> rewards) {
+          size_t num_actions = rewards.size();
           auto iter_max = std::max_element(rewards.begin(), rewards.end());
-          response_index = std::distance(rewards.begin(), iter_max);
-      },
-      [&](DecisionId id) {
+          size_t response_index = std::distance(rewards.begin(), iter_max);
           auto policy = std::vector<double>(num_actions);
           policy[response_index] = 1.;
           return policy;

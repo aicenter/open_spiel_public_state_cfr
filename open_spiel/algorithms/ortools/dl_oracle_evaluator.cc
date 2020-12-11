@@ -180,38 +180,35 @@ DecisionVector<std::vector<double>> RefineBestResponseToCfBestResponse(
   std::mt19937 mt;
   DecisionVector<std::vector<double>> strategy(&player_tree);
   BottomUp(
-      player_tree, player_cf_gradient,
-      /*observe_rewards_fn=*/[&](DecisionId id,
-                                 absl::Span<const double> rewards) -> void {
-          const InfostateNode* node = player_tree.decision_infostate(id);
-          SPIEL_CHECK_EQ(rewards.size(), node->num_children());
-          strategy[id] = std::vector(node->num_children(), 0.);
-          auto node_reach = player_spec[node].var_reach_prob;
-          SPIEL_CHECK_TRUE(node_reach);
-
-          if (node_reach->solution_value() > 0) {
-            size_t i = 0;
-            for (InfostateNode* child : node->child_iterator()) {
-              auto child_reach = player_spec[child].var_reach_prob;
-              SPIEL_CHECK_TRUE(child_reach);
-              strategy[id][i++] = child_reach->solution_value()
-                  / node_reach->solution_value();
-            }
-          } else {
-            auto iter_max = std::max_element(rewards.begin(), rewards.end());
-            const double max_reward = *iter_max;
-            std::vector<size_t> max_indices;
-            for (int i = 0; i < rewards.size(); i++) {
-              if (fabs(max_reward - rewards[i]) < 1e-10) max_indices.push_back(i);
-            }
-            std::uniform_int_distribution<int> dist(0, max_indices.size() - 1);
-            const int resp_idx = dist(mt);
-            strategy[id][resp_idx] = 1.;
-          }
-      },
-      /*policy_fn=*/[&](DecisionId id) -> std::vector<double> {
-          return strategy[id];
-      });
+    player_tree, player_cf_gradient,
+    /*observe_rewards_fn=*/[&](DecisionId id, absl::Span<const double> rewards)
+    {
+      const InfostateNode* node = player_tree.decision_infostate(id);
+      SPIEL_CHECK_EQ(rewards.size(), node->num_children());
+      strategy[id] = std::vector(node->num_children(), 0.);
+      auto node_reach = player_spec[node].var_reach_prob;
+      SPIEL_CHECK_TRUE(node_reach);
+      if (node_reach->solution_value() > 0) {
+        size_t i = 0;
+        for (InfostateNode* child : node->child_iterator()) {
+          auto child_reach = player_spec[child].var_reach_prob;
+          SPIEL_CHECK_TRUE(child_reach);
+          strategy[id][i++] = child_reach->solution_value()
+              / node_reach->solution_value();
+        }
+      } else {
+        auto iter_max = std::max_element(rewards.begin(), rewards.end());
+        const double max_reward = *iter_max;
+        std::vector<size_t> max_indices;
+        for (int i = 0; i < rewards.size(); i++) {
+          if (fabs(max_reward - rewards[i]) < 1e-10) max_indices.push_back(i);
+        }
+        std::uniform_int_distribution<int> dist(0, max_indices.size() - 1);
+        const int resp_idx = dist(mt);
+        strategy[id][resp_idx] = 1.;
+      }
+      return strategy[id];
+    });
   return strategy;
 }
 
