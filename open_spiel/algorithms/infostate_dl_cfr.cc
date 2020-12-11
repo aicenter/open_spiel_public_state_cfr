@@ -24,13 +24,13 @@ namespace dlcfr {
 
 DepthLimitedCFR::DepthLimitedCFR(
     std::shared_ptr<const Game> game,
-    std::vector<std::shared_ptr<InfostateTree>> trees,
+    std::vector<std::shared_ptr<InfostateTree>> depth_lim_trees,
     std::shared_ptr<const LeafEvaluator> leaf_evaluator,
     std::shared_ptr<const LeafEvaluator> terminal_evaluator,
     std::shared_ptr<Observer> public_observer
 ) :
     game_(std::move(game)),
-    trees_(std::move(trees)),
+    trees_(std::move(depth_lim_trees)),
     cf_values_({
       std::vector<double>(trees_[0]->num_leaves(), 0.),
       std::vector<double>(trees_[1]->num_leaves(), 0.)
@@ -46,7 +46,8 @@ DepthLimitedCFR::DepthLimitedCFR(
       std::vector<double>(trees_[0]->root_branching_factor(), 1.),
       std::vector<double>(trees_[1]->root_branching_factor(), 1.)
     }),
-    bandits_(MakeBanditVectors(trees_)) {
+    bandits_(MakeBanditVectors(trees_, "RegretMatchingPlus")) {
+  SPIEL_CHECK_TRUE(public_observer_->HasTensor());
   PrepareLeafNodesForPublicStates();
   PrepareRangesAndValuesForPublicStates();
   CreateContexts();
