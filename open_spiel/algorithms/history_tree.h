@@ -38,22 +38,22 @@ class HistoryNode {
  public:
   HistoryNode(std::unique_ptr<State> game_state);
 
-  State* GetState() { return state_.get(); }
+  State* GetState() const { return state_.get(); }
 
-  const std::string& GetInfoState() {
+  const std::string& GetInfoState() const {
     SPIEL_CHECK_GE(state_->CurrentPlayer(), 0);
     return infostates_[state_->CurrentPlayer()];
   }
 
-  const std::string& GetInfoState(Player player) {
+  const std::string& GetInfoState(Player player) const {
     SPIEL_CHECK_GE(player, 0);
     SPIEL_CHECK_LT(player, state_->NumPlayers());
     return infostates_[player];
   }
 
-  const std::string& GetHistory() { return history_; }
+  const std::string& GetHistory() const { return history_; }
 
-  const StateType& GetType() { return type_; }
+  const StateType& GetType() const { return type_; }
 
 //  double GetValue() const {
 //    SpielFatalError("Obsolete, please use GetUtility(Player)");
@@ -73,7 +73,7 @@ class HistoryNode {
 
   std::vector<Action> LegalActions() const;
 
-  std::pair<double, HistoryNode*> GetChild(Action action);
+  std::pair<double, HistoryNode*> GetChild(Action action) const;
 
   const ActionView& action_view() const { return action_view_; }
 
@@ -105,6 +105,7 @@ class HistoryTree {
       : HistoryTree(std::move(game.NewInitialState())) {}
 
   HistoryNode* Root() { return root_.get(); }
+  const HistoryNode& Root() const { return *root_; }
 
   HistoryNode* GetByHistory(const std::string& history);
 

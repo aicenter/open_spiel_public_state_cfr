@@ -104,7 +104,7 @@ void HistoryNode::AddChild(
   children_.push_back(std::move(child));
 }
 
-std::pair<double, HistoryNode*> HistoryNode::GetChild(Action action) {
+std::pair<double, HistoryNode*> HistoryNode::GetChild(Action action) const {
   const auto legal_actions = LegalActions();
   SPIEL_CHECK_EQ(legal_actions.size(), children_.size());
 
