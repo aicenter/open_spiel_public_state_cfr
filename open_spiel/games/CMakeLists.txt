@@ -92,6 +92,8 @@ set(GAME_SOURCES
   oware.h
   oware/oware_board.cc
   oware/oware_board.h
+  game_picker.h
+  game_picker.cc
   pentago.cc
   pentago.h
   phantom_ttt.cc
@@ -288,6 +290,10 @@ add_executable(first_sealed_auction_test first_sealed_auction_test.cc
                ${OPEN_SPIEL_OBJECTS}
                $<TARGET_OBJECTS:tests>)
 add_test(first_sealed_auction_test first_sealed_auction_test)
+
+add_executable(game_picker_test game_picker_test.cc ${OPEN_SPIEL_OBJECTS}
+  $<TARGET_OBJECTS:tests>)
+add_test(game_picker_test game_picker_test)
 
 add_executable(gin_rummy_test gin_rummy_test.cc ${OPEN_SPIEL_OBJECTS}
                $<TARGET_OBJECTS:tests>)
