@@ -51,9 +51,10 @@ struct OracleEvaluator : public dlcfr::LeafEvaluator {
                            dlcfr::PublicStateContext* context) const override;
 };
 
-
+// GLOP may have some numerical stability issues for the formulated LPs!
 double ComputeRootValueWhileFixingStrategy(
-    SequenceFormLpSpecification* solver, const Policy& fixed_policy, Player fixed_player);
+    SequenceFormLpSpecification* solver, const Policy& fixed_policy,
+    Player fixed_player);
 
 // Based on Proposition 3.11 in the value functions paper [1], as the average of
 // the individual player exploitabilities -- we don't need to know the game

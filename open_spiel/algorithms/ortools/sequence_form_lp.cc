@@ -43,9 +43,6 @@ SequenceFormLpSpecification::SequenceFormLpSpecification(
       solver_(MPSolver::CreateSolver(solver_id)), node_spec_() {
   SPIEL_CHECK_TRUE(solver_);
   SPIEL_CHECK_EQ(trees_.size(), 2);
-  // Do NOT use GLOP -- it has some numerical stability issues
-  // for the formulated LPs!
-  SPIEL_CHECK_TRUE(solver_id.find("GLOP", 0) == std::string::npos);
 }
 
 

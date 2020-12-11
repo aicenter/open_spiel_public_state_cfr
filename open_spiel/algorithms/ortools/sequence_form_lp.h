@@ -82,7 +82,7 @@ class SequenceFormLpSpecification {
   SequenceFormLpSpecification(
       std::vector<std::shared_ptr<InfostateTree>> trees,
       // See also MPSolver::OptimizationProblemType
-      const std::string& solver_id = "CBC");
+      const std::string& solver_id = "GLOP");
   SequenceFormLpSpecification(const Game& game);
 
   // Specify the linear program for given player.
