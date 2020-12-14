@@ -175,9 +175,8 @@ void TestOptimalValuesKuhn() {
 
     dl_solver.PrepareRootReachProbs();
     for (int pl = 0; pl < 2; ++pl) {
-      TopDownCurrentPolicy(
-          *dl_solver.trees()[pl], bandit_fixed_policy[pl],
-          absl::MakeSpan(dl_solver.reach_probs()[pl]));
+      TopDown(*dl_solver.trees()[pl], bandit_fixed_policy[pl],
+              absl::MakeSpan(dl_solver.reach_probs()[pl]), 0);
     }
     dl_solver.EvaluateLeaves();
 
@@ -255,16 +254,16 @@ namespace algorithms = open_spiel::algorithms::ortools;
 int main(int argc, char** argv) {
   algorithms::TestTrunkExploitabilityInKuhn();
   algorithms::TestOptimalValuesKuhn();
-  std::vector<std::string> test_games = {
-      "matrix_biased_mp",
-      "kuhn_poker",
-//      "leduc_poker", // Fails!!
-      "goofspiel(players=2,num_cards=3,imp_info=True)",
-      "goofspiel(players=2,num_cards=3,imp_info=True,points_order=ascending)",
-  };
-  for (const std::string& game_name : test_games) {
-    std::cout << "\nTesting " << game_name << "\n";
-    algorithms::TestOneSidedFixedStrategyExploitability(game_name);
-    algorithms::TestValueOracle(game_name);
-  }
+//  std::vector<std::string> test_games = {
+//      "matrix_biased_mp",
+//      "kuhn_poker",
+////      "leduc_poker", // Fails!!
+//      "goofspiel(players=2,num_cards=3,imp_info=True)",
+//      "goofspiel(players=2,num_cards=3,imp_info=True,points_order=ascending)",
+//  };
+//  for (const std::string& game_name : test_games) {
+//    std::cout << "\nTesting " << game_name << "\n";
+//    algorithms::TestOneSidedFixedStrategyExploitability(game_name);
+//    algorithms::TestValueOracle(game_name);
+//  }
 }

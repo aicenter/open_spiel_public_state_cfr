@@ -56,37 +56,16 @@ namespace algorithms {
 // This writes to the provided span of reach_probs to store the cumulative
 // product of reach probabilities for leaf nodes. The starting values at depth 1
 // must be provided externally.
-void TopDown(
-    const InfostateTree& tree, absl::Span<double> reach_probs,
-    std::function<std::vector<double>(
-        DecisionId, /*current_reach=*/double)> policy_fn);
+void TopDown(const InfostateTree& tree, absl::Span<double> reach_probs,
+             std::function<std::vector<double>(
+                 DecisionId, /*current_reach=*/double)> policy_fn);
 
-inline void TopDownCurrentPolicy(
-    const InfostateTree& tree, const BanditVector& bandits,
-    absl::Span<double> reach_probs) {
-  TopDown(tree, reach_probs, [&](DecisionId id, double reach_prob) {
-      const bandits::Bandit* bandit = bandits[id].get();
-      return bandit->current_strategy();
-  });
-}
-
-inline void TopDownCurrentPolicyWithCompute(
-    const InfostateTree& tree, BanditVector& bandits,
-    absl::Span<double> reach_probs, size_t current_time) {
+inline void TopDown(const InfostateTree& tree, BanditVector& bandits,
+                    absl::Span<double> reach_probs, size_t current_time) {
   TopDown(tree, reach_probs, [&](DecisionId id, double reach_prob) {
       bandits::Bandit* bandit = bandits[id].get();
       bandit->ComputeStrategy(current_time, reach_prob);
       return bandit->current_strategy();
-  });
-}
-
-inline void TopDownAveragePolicy(
-    const InfostateTree& tree, BanditVector& bandits,
-    absl::Span<double> reach_probs, size_t current_time) {
-  TopDown(tree, reach_probs, [&](DecisionId id, double reach_prob) {
-      bandits::Bandit* bandit = bandits[id].get();
-      bandit->ComputeStrategy(current_time, reach_prob);
-      return bandit->AverageStrategy();
   });
 }
 
@@ -98,12 +77,26 @@ void BottomUp(
     std::function</*infostate_policy=*/std::vector<double>(
         DecisionId, /*rewards=*/absl::Span<const double>)> observe_rewards_fn);
 
-inline void BottomUp(const InfostateTree& tree, BanditVector& bandits,
-                     absl::Span<double> cf_values) {
+using RewardPredictor = std::function<
+    /*predictions=*/absl::Span<const double>(
+        /*decision_infostate=*/DecisionId,
+        /*rewards=*/absl::Span<const double>)>;
+
+// Reward predictor which predicts identical rewards.
+constexpr absl::Span<const double> IdentityPrediction(
+    DecisionId id, absl::Span<const double> rewards) { return rewards; }
+
+inline void BottomUp(
+    const InfostateTree& tree, BanditVector& bandits, absl::Span<double> cf_values,
+    RewardPredictor predictor = IdentityPrediction) {
   BottomUp(tree, cf_values,
            [&](DecisionId id, absl::Span<const double> rewards) {
                bandits::Bandit* bandit = bandits[id].get();
                bandit->ObserveRewards(rewards);
+               if (bandit->uses_predictions()) {
+                 absl::Span<const double> predictions = predictor(id, rewards);
+                 bandit->ObservePrediction(predictions);
+               }
                return bandit->current_strategy();
            });
 }

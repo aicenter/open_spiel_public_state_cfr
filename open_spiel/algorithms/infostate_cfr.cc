@@ -21,10 +21,9 @@
 namespace open_spiel {
 namespace algorithms {
 
-void TopDown(
-    const InfostateTree& tree, absl::Span<double> reach_probs,
-    std::function<std::vector<double>(
-        DecisionId, /*current_reach=*/double)> policy_fn) {
+void TopDown(const InfostateTree& tree, absl::Span<double> reach_probs,
+             std::function<std::vector<double>(
+                 DecisionId, /*current_reach=*/double)> policy_fn) {
   const std::vector<std::vector<InfostateNode*>>& nodes_at_depths =
       tree.nodes_at_depths();
   SPIEL_CHECK_EQ(reach_probs.size(), nodes_at_depths.back().size());
@@ -154,18 +153,25 @@ InfostateCFR::InfostateCFR(std::vector<std::shared_ptr<InfostateTree>> trees,
   PrepareTerminals();
 }
 
-InfostateCFR::InfostateCFR(const Game& game)
-    : InfostateCFR({MakeInfostateTree(game, 0), MakeInfostateTree(game, 1)},
-                   MakeBanditVectors(trees_)) {}
+InfostateCFR::InfostateCFR(const Game& game) {
+  std::vector<std::shared_ptr<InfostateTree>> trees = {
+      MakeInfostateTree(game, 0), MakeInfostateTree(game, 1)
+  };
+  // Uses the (somewhat obscure) placement syntax, because trees_ would not
+  // be constructed for MakeBanditVectors, and those just use the shared_ptrs
+  // of trees.
+  // This just constructs the object, it does not allocate it
+  // (because we already have by calling this constructor).
+  new (this) InfostateCFR(trees, MakeBanditVectors(trees));
+}
 
 void InfostateCFR::RunSimultaneousIterations(int iterations) {
   for (int t = 0; t < iterations; ++t) {
     ++num_iterations_;
     PrepareRootReachProbs();
     for (int pl = 0; pl < 2; ++pl) {
-      TopDownCurrentPolicyWithCompute(
-          *trees_[pl], bandits_[pl],
-          absl::MakeSpan(reach_probs_[pl]), num_iterations_);
+      TopDown(*trees_[pl], bandits_[pl],
+              absl::MakeSpan(reach_probs_[pl]), num_iterations_);
     }
     SPIEL_CHECK_FLOAT_NEAR(TerminalReachProbSum(), 1.0, 1e-3);
 
@@ -183,9 +189,8 @@ void InfostateCFR::RunAlternatingIterations(int iterations) {
     ++num_iterations_;
     for (int pl = 0; pl < 2; ++pl) {
       PrepareRootReachProbs(1 - pl);
-      TopDownCurrentPolicyWithCompute(
-          *trees_[1 - pl], bandits_[1 - pl],
-          absl::MakeSpan(reach_probs_[1 - pl]), num_iterations_);
+      TopDown(*trees_[1 - pl], bandits_[1 - pl],
+              absl::MakeSpan(reach_probs_[1 - pl]), num_iterations_);
 
       EvaluateLeaves(pl);
       BottomUp(*trees_[pl], bandits_[pl], absl::MakeSpan(cf_values_[pl]));

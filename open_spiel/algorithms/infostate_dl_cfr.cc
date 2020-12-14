@@ -210,9 +210,8 @@ void DepthLimitedCFR::RunSimultaneousIterations(int iterations) {
 
     PrepareRootReachProbs();
     for (int pl = 0; pl < 2; ++pl) {
-      TopDownCurrentPolicyWithCompute(
-          *trees_[pl], bandits_[pl],
-          absl::MakeSpan(reach_probs_[pl]), num_iterations_);
+      TopDown(*trees_[pl], bandits_[pl],
+              absl::MakeSpan(reach_probs_[pl]), num_iterations_);
     }
 
     EvaluateLeaves();
