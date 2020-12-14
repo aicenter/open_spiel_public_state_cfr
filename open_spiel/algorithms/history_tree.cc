@@ -166,7 +166,7 @@ ActionsAndProbs GetSuccessorsWithProbs(const State& state,
   } else {
     // Finally, we look at the policy we are finding a best response to, and
     // get our probabilities from there.
-    auto state_policy = policy->GetStatePolicy(state);
+    auto state_policy = policy->GetStatePolicy(state, 1-best_responder);
     if (state_policy.empty()) {
       SpielFatalError(state.InformationStateString() + " not found in policy.");
     }
