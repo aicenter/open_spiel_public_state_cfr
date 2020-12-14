@@ -28,11 +28,12 @@ namespace ortools {
 
 namespace opres = operations_research;
 
-SequenceFormLpSpecification::SequenceFormLpSpecification(const Game& game)
+SequenceFormLpSpecification::SequenceFormLpSpecification(
+    const Game& game, const std::string& solver_id)
     : SequenceFormLpSpecification({
-                               MakeInfostateTree(game, 0),
-                               MakeInfostateTree(game, 1),
-                           }) {}
+                                      MakeInfostateTree(game, 0),
+                                      MakeInfostateTree(game, 1),
+                                  }, solver_id) {}
 
 SequenceFormLpSpecification::SequenceFormLpSpecification(
     std::vector<std::shared_ptr<InfostateTree>> trees,

@@ -76,14 +76,19 @@ struct NodeSpecification {
   operations_research::MPConstraint* ct_parent_reach_prob;
 };
 
+constexpr char* kDefaultLinProgSolver = "GLOP";
+
 class SequenceFormLpSpecification {
  using MPSolver = operations_research::MPSolver;
  public:
   SequenceFormLpSpecification(
+      const Game& game,
+      // See also MPSolver::OptimizationProblemType
+      const std::string& solver_id = kDefaultLinProgSolver);
+  SequenceFormLpSpecification(
       std::vector<std::shared_ptr<InfostateTree>> trees,
       // See also MPSolver::OptimizationProblemType
-      const std::string& solver_id = "GLOP");
-  SequenceFormLpSpecification(const Game& game);
+      const std::string& solver_id = kDefaultLinProgSolver);
 
   // Specify the linear program for given player.
   void SpecifyLinearProgram(Player pl);
