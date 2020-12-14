@@ -93,6 +93,7 @@ struct PublicStateContext {
 // Ranges and values are saved within the public state.
 class LeafEvaluator {
  public:
+  virtual ~LeafEvaluator() = default;
   virtual std::unique_ptr<PublicStateContext> CreateContext(
       const LeafPublicState& leaf_state) const { return nullptr; };
   virtual void EvaluatePublicState(
