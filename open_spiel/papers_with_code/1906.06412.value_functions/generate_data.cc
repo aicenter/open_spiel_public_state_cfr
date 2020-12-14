@@ -29,56 +29,55 @@ using namespace open_spiel::algorithms;
 
 namespace {
 
-void RandomizeTrunkStrategy(
-    std::array<DecisionVector<CFRInfoStateValues>, 2> node_values,
-    std::mt19937 rnd_gen, double prob_pure_strat) {
+void RandomizeTrunkStrategy(std::vector<BanditVector>& bandits,
+                            std::mt19937 rnd_gen, double prob_pure_strat) {
   for (int pl = 0; pl < 2; ++pl) {
-    for (CFRInfoStateValues& values : node_values[pl]) {
+    for (DecisionId id : bandits[pl].range()) {
       // Randomize current policy
-      std::vector<double>& policy = values.current_policy;
+      bandits::Bandit* bandit = bandits[pl][id].get();
+      const size_t num_actions = bandit->num_actions();
+      auto* fixable_bandit =
+          open_spiel::down_cast<bandits::FixableStrategy*>(bandit);
+      std::vector<double>& policy = fixable_bandit->mutable_strategy();
 
       const bool single_pure_strategy =
           std::bernoulli_distribution(prob_pure_strat)(rnd_gen);
       if (single_pure_strategy) {
         const int which_action =
-            std::uniform_int_distribution<>(0, values.num_actions())(rnd_gen);
+            std::uniform_int_distribution<>(0, num_actions - 1)(rnd_gen);
         std::fill(policy.begin(), policy.end(), 0.);
         policy[which_action] = 1.;
       } else {
-        for (int i = 0; i < values.num_actions(); ++i) {
+        for (int i = 0; i < num_actions; ++i) {
           if (std::bernoulli_distribution(prob_pure_strat)(rnd_gen)) {
             policy[i] = std::uniform_real_distribution<>(0., 1.)(rnd_gen);
           } else {
             policy[i] = 0.;
           }
         }
+        Normalize(absl::MakeSpan(policy));
       }
+      SPIEL_DCHECK_TRUE(IsValidProbDistribution(policy));
     }
   }
 }
 
 } // namespace
 
-void PlacementCopy(absl::Span<const float> from, absl::Span<float> to,
-                   std::map<int, int> from_to) {
-  SPIEL_CHECK_EQ(from.size(), from_to.size());
-  for (int i = 0; i < from.size(); ++i) {
-    const int j = from_to[i];
-    to[j] = from[i];
-  }
-}
-
+// Copy train data into network batch.
 void CopyRangesAndValues(dlcfr::DepthLimitedCFR* trunk,
                          const std::array<RangeTable, 2>& tables,
                          BatchData* batch) {
   const std::vector<dlcfr::LeafPublicState>& leaves = trunk->public_leaves();
   for (int i = 0; i < leaves.size(); ++i) {
     for (int pl = 0; pl < 2; ++pl) {
-      PlacementCopy(absl::MakeSpan(leaves[i].ranges[pl]),
-                    batch->ranges_at(i, pl),
-                    tables[pl].bijections[i].forward());
-      PlacementCopy(leaves[i].values[pl], batch->values_at(i, pl),
-                    tables[pl].bijections[i].forward());
+      PlacementCopy<cfr_float, net_float>(
+          absl::MakeSpan(leaves[i].ranges[pl]),
+          batch->ranges_at(i, pl),
+          tables[pl].bijections[i].forward());
+      PlacementCopy<cfr_float, net_float>(
+          leaves[i].values[pl], batch->values_at(i, pl),
+          tables[pl].bijections[i].forward());
     }
   }
 }
@@ -116,7 +115,7 @@ std::array<RangeTable, 2> CreateRangeTables(
 void GenerateData(const std::array<RangeTable, 2>& tables,
                   dlcfr::DepthLimitedCFR* trunk, BatchData* batch,
                   std::mt19937 rnd_gen) {
-  RandomizeTrunkStrategy(trunk->node_values(), rnd_gen, /*prob_pure_strat=*/0.9);
+  RandomizeTrunkStrategy(trunk->bandits(), rnd_gen, /*prob_pure_strat=*/0.9);
   trunk->RunSimultaneousIterations(1);
   CopyRangesAndValues(trunk, tables, batch);
 //  for (int i = 0; i < batch->batch_size; ++i) {

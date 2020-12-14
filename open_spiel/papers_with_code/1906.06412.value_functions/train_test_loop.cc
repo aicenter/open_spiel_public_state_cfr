@@ -24,6 +24,7 @@ namespace open_spiel {
 namespace papers_with_code {
 
 constexpr size_t kSeed = 0;
+constexpr char* kUseBanditsForCfr = "PredictiveRegretMatchingPlus";
 
 // A simple 3-layer MLP neural network.
 struct Net : torch::nn::Module {
@@ -82,7 +83,7 @@ class NetEvaluator final : public dlcfr::LeafEvaluator {
   void EvaluatePublicState(dlcfr::LeafPublicState* state,
                            dlcfr::PublicStateContext* context) const override {
     for (int pl = 0; pl < 2; ++pl) {
-      PlacementCopy(
+      PlacementCopy<cfr_float, net_float>(
           absl::MakeSpan(state->ranges[pl]),
           batch_->ranges_at(state->public_id, pl),
           tables_[pl].bijections[state->public_id].forward());
@@ -94,7 +95,7 @@ class NetEvaluator final : public dlcfr::LeafEvaluator {
 //    std::cout << state->public_id << " " << data << " " << output << std::endl;
 
     for (int pl = 0; pl < 2; ++pl) {
-      PlacementCopy(
+      PlacementCopy<net_float, cfr_float>(
           absl::MakeSpan((float*) output.data_ptr(), batch_->ranges_size[pl]),
           absl::MakeSpan(state->values[pl]),
           tables_[pl].bijections[state->public_id].backward());
@@ -102,27 +103,33 @@ class NetEvaluator final : public dlcfr::LeafEvaluator {
   }
 };
 
-double EvaluateNetwork(
-    dlcfr::DepthLimitedCFR* trunk_with_net,
-    ortools::OracleEvaluator* oracle_evaluator,
-    int iterations) {
+double EvaluateNetwork(dlcfr::DepthLimitedCFR* trunk_with_net, int iterations,
+                       ortools::SequenceFormLpSpecification* whole_game) {
+  for (BanditVector& bandits : trunk_with_net->bandits()) {
+    for (DecisionId id : bandits.range()) {
+      bandits[id]->Reset();
+    }
+  }
+  std::cout << " (trunk iters) ";
   trunk_with_net->RunSimultaneousIterations(iterations);
-  return ortools::TrunkExploitability(trunk_with_net, oracle_evaluator);
+  std::cout << " (trunk expl) ";
+  return ortools::TrunkExploitability(
+      whole_game, *trunk_with_net->AveragePolicy());
 }
 
 torch::Device FindDevice() {
   if (torch::cuda::is_available()) {
-    std::cerr << "CUDA available! Training on GPU." << std::endl;
+    std::cerr << "# CUDA available! Training on GPU." << std::endl;
     return torch::Device(torch::kCUDA);
   } else {
-    std::cerr << "Training on CPU." << std::endl;
+    std::cerr << "# Training on CPU." << std::endl;
     return torch::Device(torch::kCPU);
   }
 }
 
-void TrainEvalLoop(
-    const std::string& game_name,
-    int trunk_depth, int train_batches, int num_loops, int trunk_iterations) {
+void TrainEvalLoop(const std::string& game_name,
+                   int trunk_depth, int train_batches, int num_loops,
+                   int trunk_eval_iterations) {
 
   // 1. Prepare the game, observers and depth-limited (trunk) trees.
   std::shared_ptr<const Game> game = LoadGame(game_name);
@@ -132,7 +139,7 @@ void TrainEvalLoop(
       game->MakeObserver(kPublicStateObsType, {});
   std::shared_ptr<Observer> hand_observer =
       game->MakeObserver(kHandObsType, {});
-  std::array<std::shared_ptr<InfostateTree>, 2> trunk_trees = {
+  std::vector<std::shared_ptr<InfostateTree>> trunk_trees = {
       MakeInfostateTree(*game, 0, trunk_depth),
       MakeInfostateTree(*game, 1, trunk_depth)
   };
@@ -143,7 +150,8 @@ void TrainEvalLoop(
   auto oracle_evaluator = std::make_shared<ortools::OracleEvaluator>(
       game, infostate_observer);
   auto trunk_with_oracle = std::make_unique<dlcfr::DepthLimitedCFR>(
-      game, trunk_trees, oracle_evaluator, terminal_evaluator, public_observer);
+      game, trunk_trees, oracle_evaluator, terminal_evaluator, public_observer,
+      MakeBanditVectors(trunk_trees, "FixableStrategy"));
 
   // 3. Make a Batch of data that encompasses all leaf public states.
   std::array<RangeTable, 2> tables = CreateRangeTables(
@@ -162,7 +170,7 @@ void TrainEvalLoop(
   // 4. Create network and optimizer.
   torch::manual_seed(kSeed);
   torch::Device device = FindDevice();
-  Net model(input_size, output_size, input_size*3);
+  Net model(input_size, output_size, input_size * 3);
   model.to(device);
   torch::optim::SGD optimizer(model.parameters(),
                               torch::optim::SGDOptions(0.01).momentum(0.5));
@@ -171,22 +179,34 @@ void TrainEvalLoop(
   auto net_evaluator = std::make_shared<NetEvaluator>(
       &model, &device, game, infostate_observer, tables, &batch);
   auto trunk_with_net = std::make_unique<dlcfr::DepthLimitedCFR>(
-      game, trunk_trees, net_evaluator, terminal_evaluator, public_observer);
+      game, trunk_trees, net_evaluator, terminal_evaluator, public_observer,
+      MakeBanditVectors(trunk_trees, kUseBanditsForCfr));
 
-  // 6. The train-eval loop.
+  // 6. Create the LP spec for the whole game.
+  ortools::SequenceFormLpSpecification whole_game(*game, "CLP");
+
+  // 7. The train-eval loop.
+  std::cout << "loop,avg_loss,exploitability" << std::endl;
   std::mt19937 rnd_gen(kSeed);
   for (int loop = 0; loop < num_loops; ++loop) {
     // Train.
     double cumul_loss = 0.;
+    std::cout << "# Training  ";
     for (int i = 0; i < train_batches; ++i) {
+      std::cout << '.' << std::flush;
       GenerateData(tables, trunk_with_oracle.get(), &batch, rnd_gen);
       torch::Tensor loss = TrainNetwork(&model, &device, &optimizer, &batch);
       cumul_loss += loss.item().to<double>();
     }
-    const double avg_loss = cumul_loss / train_batches;
+    std::cout << std::endl;
+
     // Eval.
+    std::cout << "# Evaluating  ";
     const double exploitability = EvaluateNetwork(
-        trunk_with_net.get(), oracle_evaluator.get(), trunk_iterations);
+        trunk_with_net.get(), trunk_eval_iterations, &whole_game);
+    const double avg_loss = cumul_loss / train_batches;
+    std::cout << std::endl;
+
     // Print.
     std::cout << loop << ',' << avg_loss << ',' << exploitability << std::endl;
   }
@@ -199,6 +219,6 @@ int main(int argc, char** argv) {
   open_spiel::papers_with_code::TrainEvalLoop("kuhn_poker",
       /*trunk_depth=*/3,
       /*train_batches=*/8,
-      /*num_loops=*/10,
-      /*trunk_iterations=*/2);
+      /*num_loops=*/100,
+      /*trunk_eval_iterations=*/1000);
 }

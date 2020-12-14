@@ -56,7 +56,7 @@ struct RangeTable {
   // This is used for encoding NN inputs (resp. outputs).
   // Forward:  tree  -> input positions
   // Backward: output positions -> tree
-  std::vector<BijectiveContainer<int>> bijections;
+  std::vector<BijectiveContainer<size_t>> bijections;
 
   // List all possible private observations ("hands") for each player.
   // Their vector indices represent the input position for each public state.
@@ -72,9 +72,20 @@ std::array<RangeTable, 2> CreateRangeTables(
     const std::shared_ptr<Observer>& hand_observer,
     const std::vector<dlcfr::LeafPublicState>& public_leaves);
 
+using net_float = float;   // Floats used in the neural network.
+using cfr_float = double;  // Floats used in the cfr computation.
+
 // Copy non-contiguous vectors using a permutation map.
-void PlacementCopy(absl::Span<const float> from, absl::Span<float> to,
-                   std::map<int, int> from_to);
+// This also converts float <-> double as needed.
+template<typename From, typename To>
+void PlacementCopy(absl::Span<const From> from, absl::Span<To> to,
+                   std::map<size_t, size_t> from_to) {
+  SPIEL_CHECK_EQ(from.size(), from_to.size());
+  for (size_t i = 0; i < from.size(); ++i) {
+    const int j = from_to[i];
+    to[j] = from[i];
+  }
+}
 
 struct BatchData {
   const size_t batch_size;
