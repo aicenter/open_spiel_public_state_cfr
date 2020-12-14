@@ -150,9 +150,179 @@ void RegretMatchingPlus::Reset() {
   std::fill(cumulative_strategy_.begin(), cumulative_strategy_.end(), 0.);
 }
 
-// TODO:
 // -- PredictiveRegretMatching -------------------------------------------------
+
+PredictiveRegretMatching::PredictiveRegretMatching(size_t num_actions)
+    : Bandit(num_actions),
+      cumulative_regrets_(num_actions, 0.),
+      cumulative_strategy_(num_actions, 0.),
+      prediction_(num_actions, 0.) {}
+
+void PredictiveRegretMatching::ComputeStrategy(
+    size_t current_time, double weight) {
+  double positive_regrets_sum = 0.;
+  for (int i = 0; i < num_actions(); ++i) {
+    const double regret = cumulative_regrets_[i] + prediction_[i];
+    positive_regrets_sum += regret > 0 ? regret : 0.;
+  }
+
+  if (positive_regrets_sum) {
+    for (int i = 0; i < num_actions(); ++i) {
+      const double regret = cumulative_regrets_[i] + prediction_[i];
+      current_strategy_[i] =
+          (regret > 0 ? regret : 0.) / positive_regrets_sum;
+    }
+  } else {
+    for (int i = 0; i < num_actions(); ++i) {
+      current_strategy_[i] = 1. / num_actions();
+    }
+  }
+
+  for (int i = 0; i < num_actions(); ++i) {
+    const double comb = 6.0 * current_time
+                      / ((current_time + 1.0) * (current_time + 2.0));
+    cumulative_strategy_[i] = comb * weight * current_strategy_[i]
+                            + (1. - comb) * cumulative_strategy_[i];
+  }
+}
+
+void PredictiveRegretMatching::ObserveRewards(
+    absl::Span<const double> rewards) {
+  SPIEL_DCHECK_EQ(rewards.size(), num_actions());
+  double expected_reward = 0.;
+  for (int i = 0; i < num_actions(); ++i) {
+    expected_reward += rewards[i] * current_strategy_[i];
+  }
+  for (int i = 0; i < num_actions(); ++i) {
+    cumulative_regrets_[i] += rewards[i] - expected_reward;
+  }
+}
+
+void PredictiveRegretMatching::ObservePrediction(
+    absl::Span<const double> rewards) {
+  SPIEL_DCHECK_EQ(rewards.size(), num_actions());
+  double expected_reward = 0.;
+  for (int i = 0; i < num_actions(); ++i) {
+    expected_reward += rewards[i] * current_strategy_[i];
+  }
+  for (int i = 0; i < num_actions(); ++i) {
+    prediction_[i] += rewards[i] - expected_reward;
+  }
+}
+
+std::vector<double> PredictiveRegretMatching::AverageStrategy() const {
+  std::vector<double> strategy;
+  strategy.reserve(num_actions());
+  double normalization = 0.;
+  for (double action : cumulative_strategy_) normalization += action;
+
+  if (normalization) {
+    for (int i = 0; i < num_actions(); ++i) {
+      strategy.push_back(cumulative_strategy_[i] / normalization);
+    }
+  } else {
+    for (int i = 0; i < num_actions(); ++i) {
+      strategy.push_back(1. / num_actions());
+    }
+  }
+  return strategy;
+}
+
+void PredictiveRegretMatching::Reset() {
+  Bandit::Reset();
+  std::fill(cumulative_regrets_.begin(), cumulative_regrets_.end(), 0.);
+  std::fill(cumulative_strategy_.begin(), cumulative_strategy_.end(), 0.);
+  std::fill(prediction_.begin(), prediction_.end(), 0.);
+}
+
+
 // -- PredictiveRegretMatchingPlus ---------------------------------------------
+
+
+PredictiveRegretMatchingPlus::PredictiveRegretMatchingPlus(size_t num_actions)
+    : Bandit(num_actions),
+      cumulative_regrets_(num_actions, 0.),
+      cumulative_strategy_(num_actions, 0.),
+      prediction_(num_actions, 0.) {}
+
+void PredictiveRegretMatchingPlus::ComputeStrategy(size_t current_time, double weight) {
+  double positive_regrets_sum = 0.;
+  for (int i = 0; i < num_actions(); ++i) {
+    const double regret = cumulative_regrets_[i] + prediction_[i];
+    positive_regrets_sum += regret > 0 ? regret : 0.;
+  }
+
+  if (positive_regrets_sum) {
+    for (int i = 0; i < num_actions(); ++i) {
+      const double regret = cumulative_regrets_[i] + prediction_[i];
+      current_strategy_[i] =
+          (regret > 0. ? regret : 0.) / positive_regrets_sum;
+    }
+  } else {
+    for (int i = 0; i < num_actions(); ++i) {
+      current_strategy_[i] = 1. / num_actions();
+    }
+  }
+
+  for (int i = 0; i < num_actions(); ++i) {
+    const double comb = 6.0 * current_time
+                      / ((current_time + 1.0) * (current_time + 2.0));
+    cumulative_strategy_[i] = comb * weight * current_strategy_[i]
+                            + (1. - comb) * cumulative_strategy_[i];
+  }
+  return current_strategy_;
+}
+
+void PredictiveRegretMatchingPlus::ObserveRewards(absl::Span<const double> rewards) {
+  SPIEL_DCHECK_EQ(rewards.size(), num_actions());
+  double expected_reward = 0.;
+  for (int i = 0; i < num_actions(); ++i) {
+    expected_reward += rewards[i] * current_strategy_[i];
+  }
+  for (int i = 0; i < num_actions(); ++i) {
+    cumulative_regrets_[i] =
+        std::fmax(0, cumulative_regrets_[i] + rewards[i] - expected_reward);
+  }
+}
+
+void PredictiveRegretMatchingPlus::ObservePrediction(
+    absl::Span<const double> rewards) {
+  SPIEL_DCHECK_EQ(rewards.size(), num_actions());
+  double expected_reward = 0.;
+  for (int i = 0; i < num_actions(); ++i) {
+    expected_reward += rewards[i] * current_strategy_[i];
+  }
+  for (int i = 0; i < num_actions(); ++i) {
+    prediction_[i] = rewards[i] - expected_reward;
+  }
+}
+
+std::vector<double> PredictiveRegretMatchingPlus::AverageStrategy() const {
+  std::vector<double> strategy;
+  strategy.reserve(num_actions());
+  double normalization = 0.;
+  for (double action : cumulative_strategy_) normalization += action;
+
+  if (normalization) {
+    for (int i = 0; i < num_actions(); ++i) {
+      strategy.push_back(cumulative_strategy_[i] / normalization);
+    }
+  } else {
+    for (int i = 0; i < num_actions(); ++i) {
+      strategy.push_back(1. / num_actions());
+    }
+  }
+  return strategy;
+}
+
+void PredictiveRegretMatchingPlus::Reset() {
+  Bandit::Reset();
+  std::fill(cumulative_regrets_.begin(), cumulative_regrets_.end(), 0.);
+  std::fill(cumulative_strategy_.begin(), cumulative_strategy_.end(), 0.);
+  std::fill(prediction_.begin(), prediction_.end(), 0.);
+}
+
+// TODO:
 // -- FollowTheLeader ----------------------------------------------------------
 // -- FollowTheRegularizedLeader -----------------------------------------------
 // -- PredictiveFollowTheRegularizedLeader -------------------------------------
@@ -177,6 +347,12 @@ std::unique_ptr<bandits::Bandit> MakeBandit(
   }
   if (bandit_name == "RegretMatchingPlus") {
     return std::make_unique<bandits::RegretMatchingPlus>(num_actions);
+  }
+  if (bandit_name == "PredictiveRegretMatching") {
+    return std::make_unique<bandits::PredictiveRegretMatching>(num_actions);
+  }
+  if (bandit_name == "PredictiveRegretMatchingPlus") {
+    return std::make_unique<bandits::PredictiveRegretMatchingPlus>(num_actions);
   }
   if (bandit_name == "UniformStrategy") {
     return std::make_unique<bandits::UniformStrategy>(num_actions);

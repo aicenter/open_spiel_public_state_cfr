@@ -192,13 +192,18 @@ class RegretMatchingPlus final : public Bandit {
 // Gabriele Farina, Christian Kroer, Tuomas Sandholm
 // https://arxiv.org/abs/2007.14358
 class PredictiveRegretMatching final : public Bandit {
+  std::vector<double> cumulative_regrets_;
+  std::vector<double> cumulative_strategy_;
+  std::vector<double> prediction_;
  public:
   PredictiveRegretMatching(size_t num_actions);
-  bool uses_average_strategy() const override { return true; }
-  bool uses_predictions() const override { return true; }
-
   void ComputeStrategy(size_t current_time, double weight = 1.) override;
   void ObserveRewards(absl::Span<const double> rewards) override;
+
+  bool uses_predictions() const override { return true; }
+  void ObservePrediction(absl::Span<const double> rewards) override;
+
+  bool uses_average_strategy() const override { return true; }
   std::vector<double> AverageStrategy() const override;
   void Reset() override;
 };
@@ -208,14 +213,20 @@ class PredictiveRegretMatching final : public Bandit {
 // Gabriele Farina, Christian Kroer, Tuomas Sandholm
 // https://arxiv.org/abs/2007.14358
 class PredictiveRegretMatchingPlus final : public Bandit {
+  std::vector<double> cumulative_regrets_;
+  std::vector<double> cumulative_strategy_;
+  std::vector<double> prediction_;
  public:
   PredictiveRegretMatchingPlus(size_t num_actions);
-  bool uses_average_strategy() const override { return true; }
-  bool uses_predictions() const override { return true; }
-
   void ComputeStrategy(size_t current_time, double weight = 1.) override;
   void ObserveRewards(absl::Span<const double> rewards) override;
+
+  bool uses_average_strategy() const override { return true; }
   std::vector<double> AverageStrategy() const override;
+
+  bool uses_predictions() const override { return true; }
+  void ObservePrediction(absl::Span<const double> rewards) override;
+
   void Reset() override;
 };
 
