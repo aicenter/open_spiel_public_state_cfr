@@ -153,20 +153,7 @@ std::string TurnBasedSimultaneousState::InformationStateString(
     Player player) const {
   SPIEL_CHECK_GE(player, 0);
   SPIEL_CHECK_LT(player, num_players_);
-
-  std::string extra_info = "";
-  extra_info = "Current player: ";
-  absl::StrAppend(&extra_info, current_player_);
-  extra_info.push_back('\n');
-  if (rollout_mode_) {
-    // Include the player's action if they have take one already.
-    if (player < current_player_) {
-      absl::StrAppend(&extra_info, "Observer's action this turn: ");
-      absl::StrAppend(&extra_info, action_vector_[player]);
-      extra_info.push_back('\n');
-    }
-  }
-  return extra_info + state_->InformationStateString(player);
+  return state_->InformationStateString(player);
 }
 
 void TurnBasedSimultaneousState::InformationStateTensor(
