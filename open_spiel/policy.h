@@ -45,6 +45,9 @@ Action GetAction(const ActionsAndProbs& action_and_probs);
 // legal actions).
 ActionsAndProbs UniformStatePolicy(const State& state);
 
+// Returns a policy where the zeroth action has probability 1.
+ActionsAndProbs FirstActionStatePolicy(const State& state);
+
 // Returns a policy where a specified action has probability 1 and all other
 // have probability zero.
 ActionsAndProbs PurePolicy(const State& state, Action action);
@@ -277,6 +280,22 @@ class UniformPolicy : public Policy {
   std::string Serialize(int double_precision = -1,
                         std::string delimiter = "") const override {
     return "UniformPolicy:";
+  }
+};
+
+// Chooses all legal actions with equal probability. This is equivalent to the
+// tabular version, except that this works for large games.
+class FirstActionPolicy : public Policy {
+ public:
+  ActionsAndProbs GetStatePolicy(const State& state,
+                                 Player player) const override {
+    SPIEL_CHECK_TRUE(state.IsPlayerActing(player));
+    return FirstActionStatePolicy(state);
+  }
+
+  std::string Serialize(int double_precision = -1,
+                        std::string delimiter = "") const override {
+    return "FirstActionPolicy:";
   }
 };
 

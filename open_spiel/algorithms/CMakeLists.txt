@@ -57,6 +57,8 @@ add_library (algorithms OBJECT
   oos.cc
   outcome_sampling_mccfr.cc
   outcome_sampling_mccfr.h
+  policy_iteration.cc
+  policy_iteration.h
   state_distribution.cc
   state_distribution.h
   tabular_exploitability.cc
