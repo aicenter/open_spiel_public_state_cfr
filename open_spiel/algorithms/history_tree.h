@@ -102,7 +102,7 @@ class HistoryTree {
   HistoryTree(std::unique_ptr<State> state);
 
   HistoryTree(const Game& game)
-      : HistoryTree(std::move(game.NewInitialState())) {}
+      : HistoryTree(game.NewInitialState()) {}
 
   HistoryNode* Root() { return root_.get(); }
   const HistoryNode& Root() const { return *root_; }
