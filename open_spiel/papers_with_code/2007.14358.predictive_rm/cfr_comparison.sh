@@ -12,8 +12,6 @@ GAMES=(
   "goofspiel(players=2,num_cards=3,imp_info=True,points_order=ascending)"
   "goofspiel(players=2,num_cards=4,imp_info=True)"
   "goofspiel(players=2,num_cards=4,imp_info=True,points_order=ascending)"
-  "goofspiel(players=2,num_cards=5,imp_info=True,points_order=ascending)"
-  "goofspiel(players=2,num_cards=5,imp_info=True,points_order=ascending)"
 )
 BANDITS=(
   "RegretMatching"

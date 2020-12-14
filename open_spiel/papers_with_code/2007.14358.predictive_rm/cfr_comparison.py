@@ -43,11 +43,11 @@ def plot_files(dirs, ax):
 fig, axes = plt.subplots(1, len(games))
 axes[0].set_ylabel("exploitability (avg strat)")
 
-for i, game in enumerate(games):
+for i, game in enumerate(natsorted(games)):
   axes[i].set_title(l(basename(game)))
   plot_files(glob.glob(f"{game}/b_bandit_name/*"), axes[i])
 
 for ax in axes:
-  ax.legend()
+  ax.legend(loc="lower left")
 
 plt.show()
