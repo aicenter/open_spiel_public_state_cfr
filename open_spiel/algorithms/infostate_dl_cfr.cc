@@ -46,7 +46,7 @@ DepthLimitedCFR::DepthLimitedCFR(
       std::vector<double>(trees_[0]->root_branching_factor(), 1.),
       std::vector<double>(trees_[1]->root_branching_factor(), 1.)
     }),
-    bandits_(MakeBanditVectors(trees_, "RegretMatchingPlus")) {
+    bandits_(MakeBanditVectors(trees_)) {
   SPIEL_CHECK_TRUE(public_observer_->HasTensor());
   PrepareLeafNodesForPublicStates();
   PrepareRangesAndValuesForPublicStates();
