@@ -138,7 +138,8 @@ double RootCfValue(int root_branching_factor,
   return root_cf_value;
 }
 
-InfostateCFR::InfostateCFR(std::vector<std::shared_ptr<InfostateTree>> trees)
+InfostateCFR::InfostateCFR(std::vector<std::shared_ptr<InfostateTree>> trees,
+                           std::vector<BanditVector> bandits)
     : trees_(std::move(trees)),
       cf_values_({
                      std::vector<double>(trees_[0]->num_leaves(), 0.),
@@ -148,13 +149,14 @@ InfostateCFR::InfostateCFR(std::vector<std::shared_ptr<InfostateTree>> trees)
                        std::vector<double>(trees_[0]->num_leaves(), 0.),
                        std::vector<double>(trees_[1]->num_leaves(), 0.)
                    }),
-      bandits_(MakeBanditVectors(trees_)) {
+      bandits_(std::move(bandits)) {
   SPIEL_CHECK_EQ(trees_.size(), 2);
   PrepareTerminals();
 }
 
 InfostateCFR::InfostateCFR(const Game& game)
-    : InfostateCFR({MakeInfostateTree(game, 0), MakeInfostateTree(game, 1)}) {}
+    : InfostateCFR({MakeInfostateTree(game, 0), MakeInfostateTree(game, 1)},
+                   MakeBanditVectors(trees_)) {}
 
 void InfostateCFR::RunSimultaneousIterations(int iterations) {
   for (int t = 0; t < iterations; ++t) {

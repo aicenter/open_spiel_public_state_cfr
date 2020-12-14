@@ -136,7 +136,9 @@ class InfostateCFR {
   // Basic constructor for the whole game.
   explicit InfostateCFR(const Game& game);
   // Run CFR on the specified trees.
-  explicit InfostateCFR(std::vector<std::shared_ptr<InfostateTree>> trees);
+  explicit InfostateCFR(
+      std::vector<std::shared_ptr<InfostateTree>> trees,
+      std::vector<BanditVector> bandits);
 
   void RunSimultaneousIterations(int iterations);
   void RunAlternatingIterations(int iterations);
