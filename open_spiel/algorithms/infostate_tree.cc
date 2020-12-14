@@ -16,43 +16,44 @@
 
 #include <limits>
 #include <memory>
-#include <string>
 #include <stack>
+#include <string>
 #include <utility>
 #include <vector>
 
 #include "open_spiel/action_view.h"
 
-
 namespace open_spiel {
 namespace algorithms {
 
-InfostateNode::InfostateNode(
-    const InfostateTree& tree, InfostateNode* parent, int incoming_index,
-    InfostateNodeType type, const std::string& infostate_string,
-    double terminal_utility,
-    double terminal_ch_reach_prob, size_t depth,
-    std::vector<Action> legal_actions, std::vector<Action> terminal_history)
-    : tree_(tree), parent_(parent),
-      incoming_index_(incoming_index), type_(type),
+using internal::kUndefinedNodeId;
+
+InfostateNode::InfostateNode(const InfostateTree& tree, InfostateNode* parent,
+                             int incoming_index, InfostateNodeType type,
+                             const std::string& infostate_string,
+                             double terminal_utility,
+                             double terminal_ch_reach_prob, size_t depth,
+                             std::vector<Action> legal_actions,
+                             std::vector<Action> terminal_history)
+    : tree_(tree),
+      parent_(parent),
+      incoming_index_(incoming_index),
+      type_(type),
       infostate_string_(infostate_string),
-      depth_(depth),
       terminal_utility_(terminal_utility),
       terminal_chn_reach_prob_(terminal_ch_reach_prob),
+      depth_(depth),
       legal_actions_(std::move(legal_actions)),
       terminal_history_(std::move(terminal_history)) {
-
   // Implications for kTerminalNode
   SPIEL_DCHECK_TRUE(type_ != kTerminalInfostateNode || parent_);
   // Implications for kDecisionNode
   SPIEL_DCHECK_TRUE(type_ != kDecisionInfostateNode || parent_);
   // Implications for kObservationNode
-  SPIEL_DCHECK_TRUE(
-      !(type_ == kObservationInfostateNode
-            && parent_ && parent_->type() == kDecisionInfostateNode)
-      || (incoming_index_ >= 0
-            && incoming_index_ < parent_->legal_actions().size())
-  );
+  SPIEL_DCHECK_TRUE(!(type_ == kObservationInfostateNode && parent_ &&
+                      parent_->type() == kDecisionInfostateNode) ||
+                    (incoming_index_ >= 0 &&
+                     incoming_index_ < parent_->legal_actions().size()));
 }
 
 InfostateNode* InfostateNode::AddChild(std::unique_ptr<InfostateNode> child) {
@@ -98,9 +99,7 @@ std::string InfostateNode::MakeCertificate() const {
   }
 
   return absl::StrCat(
-      open,
-      absl::StrJoin(certificates.begin(), certificates.end(), ""),
-      close);
+      open, absl::StrJoin(certificates.begin(), certificates.end(), ""), close);
 }
 
 void InfostateNode::RebalanceSubtree(int target_depth, int current_depth) {
@@ -123,8 +122,8 @@ void InfostateNode::RebalanceSubtree(int target_depth, int current_depth) {
             current_depth, /*legal_actions=*/{}, /*terminal_history=*/{}));
     InfostateNode* chain_tail = chain_head.get();
     for (int i = 1; i < target_depth - current_depth; ++i) {
-      chain_tail = chain_tail->AddChild(
-          std::unique_ptr<InfostateNode>(new InfostateNode(
+      chain_tail =
+          chain_tail->AddChild(std::unique_ptr<InfostateNode>(new InfostateNode(
               /*tree=*/tree_, /*parent=*/chain_tail,
               /*incoming_index=*/0, kObservationInfostateNode,
               /*infostate_string=*/kFillerInfostate,
@@ -137,9 +136,11 @@ void InfostateNode::RebalanceSubtree(int target_depth, int current_depth) {
     // First put the node to the chain. If we did it in reverse order,
     // i.e chain to parent and then node to the chain, the node would
     // become freed.
-    node->SwapParent(std::move(node), /*target=*/chain_tail, 0);
-    chain_head->SwapParent(std::move(chain_head), /*target=*/node_parent,
-                           position_in_leaf_parent);
+    auto* node_ptr = node.get();
+    node_ptr->SwapParent(std::move(node), /*target=*/chain_tail, 0);
+    auto* chain_head_ptr = chain_head.get();
+    chain_head_ptr->SwapParent(std::move(chain_head), /*target=*/node_parent,
+                               position_in_leaf_parent);
   }
 
   for (std::unique_ptr<InfostateNode>& child : children_) {
@@ -162,11 +163,10 @@ void InfostateNode::SwapParent(std::unique_ptr<InfostateNode> self,
   this->incoming_index_ = at_index;
 }
 
-InfostateTree::InfostateTree(
-    const std::vector<const State*>& start_states,
-    const std::vector<double>& chance_reach_probs,
-    std::shared_ptr<Observer> infostate_observer, Player acting_player,
-    int max_move_ahead_limit)
+InfostateTree::InfostateTree(const std::vector<const State*>& start_states,
+                             const std::vector<double>& chance_reach_probs,
+                             std::shared_ptr<Observer> infostate_observer,
+                             Player acting_player, int max_move_ahead_limit)
     : acting_player_(acting_player),
       infostate_observer_(std::move(infostate_observer)),
       root_(MakeRootNode()) {
@@ -178,15 +178,14 @@ InfostateTree::InfostateTree(
 
   int start_max_move_number = 0;
   for (const State* start_state : start_states) {
-    start_max_move_number = std::max(start_max_move_number,
-                                     start_state->MoveNumber());
+    start_max_move_number =
+        std::max(start_max_move_number, start_state->MoveNumber());
   }
 
   for (int i = 0; i < start_states.size(); ++i) {
-    RecursivelyBuildTree(
-        root_.get(), /*depth=*/1, *start_states[i],
-        start_max_move_number + max_move_ahead_limit,
-        chance_reach_probs[i]);
+    RecursivelyBuildTree(root_.get(), /*depth=*/1, *start_states[i],
+                         start_max_move_number + max_move_ahead_limit,
+                         chance_reach_probs[i]);
   }
 
   // Operations to make after building the tree.
@@ -219,23 +218,22 @@ std::ostream& InfostateTree::operator<<(std::ostream& os) const {
 
 std::unique_ptr<InfostateNode> InfostateTree::MakeNode(
     InfostateNode* parent, InfostateNodeType type,
-    const std::string& infostate_string,
-    double terminal_utility, double terminal_ch_reach_prob,
-    size_t depth, const State* originating_state) {
+    const std::string& infostate_string, double terminal_utility,
+    double terminal_ch_reach_prob, size_t depth,
+    const State* originating_state) {
   auto legal_actions =
       originating_state && originating_state->IsPlayerActing(acting_player_)
-      ? originating_state->LegalActions(acting_player_)
-      : std::vector<Action>();
-  auto terminal_history =
-      originating_state && originating_state->IsTerminal()
-      ? originating_state->History()
-      : std::vector<Action>();
+          ? originating_state->LegalActions(acting_player_)
+          : std::vector<Action>();
+  auto terminal_history = originating_state && originating_state->IsTerminal()
+                              ? originating_state->History()
+                              : std::vector<Action>();
   // Instantiate node using new to make sure that we can call
   // the private constructor.
   auto node = std::unique_ptr<InfostateNode>(new InfostateNode(
       *this, parent, parent->num_children(), type, infostate_string,
-      terminal_utility, terminal_ch_reach_prob, depth,
-      std::move(legal_actions), std::move(terminal_history)));
+      terminal_utility, terminal_ch_reach_prob, depth, std::move(legal_actions),
+      std::move(terminal_history)));
   return node;
 }
 
@@ -248,17 +246,17 @@ std::unique_ptr<InfostateNode> InfostateTree::MakeRootNode() const {
       /*depth=*/0, /*legal_actions=*/{}, /*terminal_history=*/{}));
 }
 
-void InfostateTree::UpdateLeafNode(
-    InfostateNode* node, const State& state, size_t leaf_depth,
-    double chance_reach_probs) {
+void InfostateTree::UpdateLeafNode(InfostateNode* node, const State& state,
+                                   size_t leaf_depth,
+                                   double chance_reach_probs) {
   tree_height_ = std::max(tree_height_, leaf_depth);
   node->corresponding_states_.push_back(state.Clone());
   node->corresponding_ch_reaches_.push_back(chance_reach_probs);
 }
 
-void InfostateTree::RecursivelyBuildTree(
-    InfostateNode* parent, size_t depth, const State& state,
-    int move_limit, double chance_reach_prob) {
+void InfostateTree::RecursivelyBuildTree(InfostateNode* parent, size_t depth,
+                                         const State& state, int move_limit,
+                                         double chance_reach_prob) {
   if (state.IsTerminal())
     return BuildTerminalNode(parent, depth, state, chance_reach_prob);
   else if (state.IsPlayerActing(acting_player_))
@@ -269,20 +267,20 @@ void InfostateTree::RecursivelyBuildTree(
                                 chance_reach_prob);
 }
 
-void InfostateTree::BuildTerminalNode(
-    InfostateNode* parent, size_t depth,
-    const State& state, double chance_reach_prob) {
+void InfostateTree::BuildTerminalNode(InfostateNode* parent, size_t depth,
+                                      const State& state,
+                                      double chance_reach_prob) {
   const double terminal_utility = state.Returns()[acting_player_];
-  InfostateNode* terminal_node = parent->AddChild(MakeNode(
-      parent, kTerminalInfostateNode,
-      infostate_observer_->StringFrom(state, acting_player_), terminal_utility,
-      chance_reach_prob, depth, &state));
+  InfostateNode* terminal_node = parent->AddChild(
+      MakeNode(parent, kTerminalInfostateNode,
+               infostate_observer_->StringFrom(state, acting_player_),
+               terminal_utility, chance_reach_prob, depth, &state));
   UpdateLeafNode(terminal_node, state, depth, chance_reach_prob);
 }
 
-void InfostateTree::BuildDecisionNode(
-    InfostateNode* parent, size_t depth, const State& state,
-    int move_limit, double chance_reach_prob) {
+void InfostateTree::BuildDecisionNode(InfostateNode* parent, size_t depth,
+                                      const State& state, int move_limit,
+                                      double chance_reach_prob) {
   SPIEL_DCHECK_EQ(parent->type(), kObservationInfostateNode);
   std::string info_state =
       infostate_observer_->StringFrom(state, acting_player_);
@@ -304,25 +302,23 @@ void InfostateTree::BuildDecisionNode(
       for (int i = 0; i < action_view.legal_actions[acting_player_].size();
            ++i) {
         InfostateNode* observation_node = decision_node->child_at(i);
-        SPIEL_DCHECK_EQ(observation_node->type(),
-                        kObservationInfostateNode);
+        SPIEL_DCHECK_EQ(observation_node->type(), kObservationInfostateNode);
 
         for (Action flat_actions :
              action_view.fixed_action(acting_player_, i)) {
           std::unique_ptr<State> child = state.Child(flat_actions);
-          RecursivelyBuildTree(observation_node, depth + 2, *child,
-                               move_limit, chance_reach_prob);
+          RecursivelyBuildTree(observation_node, depth + 2, *child, move_limit,
+                               chance_reach_prob);
         }
       }
     } else {
       std::vector<Action> legal_actions = state.LegalActions(acting_player_);
       for (int i = 0; i < legal_actions.size(); ++i) {
         InfostateNode* observation_node = decision_node->child_at(i);
-        SPIEL_DCHECK_EQ(observation_node->type(),
-                        kObservationInfostateNode);
+        SPIEL_DCHECK_EQ(observation_node->type(), kObservationInfostateNode);
         std::unique_ptr<State> child = state.Child(legal_actions.at(i));
-        RecursivelyBuildTree(observation_node, depth + 2, *child,
-                             move_limit, chance_reach_prob);
+        RecursivelyBuildTree(observation_node, depth + 2, *child, move_limit,
+                             chance_reach_prob);
       }
     }
   } else {  // The decision node was not found yet.
@@ -348,41 +344,40 @@ void InfostateTree::BuildDecisionNode(
         // because such a thing is not properly defined after only a partial
         // application of actions for the sim move state
         // (We need to supply all the actions).
-        InfostateNode* observation_node = decision_node->AddChild(MakeNode(
-            decision_node, kObservationInfostateNode,
-            /*infostate_string=*/kFillerInfostate,
-            /*terminal_utility=*/NAN, /*chance_reach_prob=*/NAN,
-            depth, /*originating_state=*/nullptr));
+        InfostateNode* observation_node = decision_node->AddChild(
+            MakeNode(decision_node, kObservationInfostateNode,
+                     /*infostate_string=*/kFillerInfostate,
+                     /*terminal_utility=*/NAN, /*chance_reach_prob=*/NAN, depth,
+                     /*originating_state=*/nullptr));
 
         for (Action flat_actions :
              action_view.fixed_action(acting_player_, i)) {
           // Only now we can advance the state, when we have all actions.
           std::unique_ptr<State> child = state.Child(flat_actions);
-          RecursivelyBuildTree(observation_node, depth + 2, *child,
-                               move_limit, chance_reach_prob);
+          RecursivelyBuildTree(observation_node, depth + 2, *child, move_limit,
+                               chance_reach_prob);
         }
-
       }
     } else {  // Not a sim move node.
       for (Action a : state.LegalActions()) {
         std::unique_ptr<State> child = state.Child(a);
-        InfostateNode* observation_node = decision_node->AddChild(MakeNode(
-            decision_node, kObservationInfostateNode,
-            infostate_observer_->StringFrom(*child, acting_player_),
-            /*terminal_utility=*/NAN, /*chance_reach_prob=*/NAN,
-            depth, child.get()));
-        RecursivelyBuildTree(observation_node, depth + 2, *child,
-                             move_limit, chance_reach_prob);
+        InfostateNode* observation_node = decision_node->AddChild(
+            MakeNode(decision_node, kObservationInfostateNode,
+                     infostate_observer_->StringFrom(*child, acting_player_),
+                     /*terminal_utility=*/NAN, /*chance_reach_prob=*/NAN, depth,
+                     child.get()));
+        RecursivelyBuildTree(observation_node, depth + 2, *child, move_limit,
+                             chance_reach_prob);
       }
     }
   }
 }
 
-void InfostateTree::BuildObservationNode(
-    InfostateNode* parent, size_t depth, const State& state,
-    int move_limit, double chance_reach_prob) {
-  SPIEL_DCHECK_TRUE(state.IsChanceNode()
-                 || !state.IsPlayerActing(acting_player_));
+void InfostateTree::BuildObservationNode(InfostateNode* parent, size_t depth,
+                                         const State& state, int move_limit,
+                                         double chance_reach_prob) {
+  SPIEL_DCHECK_TRUE(state.IsChanceNode() ||
+                    !state.IsPlayerActing(acting_player_));
   const bool is_leaf_node = state.MoveNumber() >= move_limit;
   const std::string info_state =
       infostate_observer_->StringFrom(state, acting_player_);
@@ -402,15 +397,14 @@ void InfostateTree::BuildObservationNode(
   if (state.IsChanceNode()) {
     for (std::pair<Action, double> action_prob : state.ChanceOutcomes()) {
       std::unique_ptr<State> child = state.Child(action_prob.first);
-      RecursivelyBuildTree(observation_node, depth + 1, *child,
-                           move_limit,
+      RecursivelyBuildTree(observation_node, depth + 1, *child, move_limit,
                            chance_reach_prob * action_prob.second);
     }
   } else {
     for (Action a : state.LegalActions()) {
       std::unique_ptr<State> child = state.Child(a);
-      RecursivelyBuildTree(observation_node, depth + 1, *child,
-                           move_limit, chance_reach_prob);
+      RecursivelyBuildTree(observation_node, depth + 1, *child, move_limit,
+                           chance_reach_prob);
     }
   }
 }
@@ -418,22 +412,20 @@ int InfostateTree::root_branching_factor() const {
   return root_->num_children();
 }
 
-std::shared_ptr<InfostateTree> MakeInfostateTree(
-    const Game& game, Player acting_player,
-    int max_move_limit) {
+std::shared_ptr<InfostateTree> MakeInfostateTree(const Game& game,
+                                                 Player acting_player,
+                                                 int max_move_limit) {
   // Uses new instead of make_shared, because shared_ptr is not a friend and
   // can't call private constructors.
   return std::shared_ptr<InfostateTree>(new InfostateTree(
       {game.NewInitialState().get()}, /*chance_reach_probs=*/{1.},
-      game.MakeObserver(kInfoStateObsType, {}),
-      acting_player, max_move_limit));
+      game.MakeObserver(kInfoStateObsType, {}), acting_player, max_move_limit));
 }
 
 std::shared_ptr<InfostateTree> MakeInfostateTree(
-    const std::vector<InfostateNode*>& start_nodes,
-    int max_move_ahead_limit) {
-  std::vector<const InfostateNode*> const_nodes(
-      start_nodes.begin(), start_nodes.end());
+    const std::vector<InfostateNode*>& start_nodes, int max_move_ahead_limit) {
+  std::vector<const InfostateNode*> const_nodes(start_nodes.begin(),
+                                                start_nodes.end());
   return MakeInfostateTree(const_nodes, max_move_ahead_limit);
 }
 
@@ -443,7 +435,7 @@ std::shared_ptr<InfostateTree> MakeInfostateTree(
   SPIEL_CHECK_FALSE(start_nodes.empty());
   const InfostateNode* some_node = start_nodes[0];
   const InfostateTree& originating_tree = some_node->tree();
-  SPIEL_DCHECK_TRUE([&](){
+  SPIEL_DCHECK_TRUE([&]() {
     for (const InfostateNode* node : start_nodes) {
       if (!node) return false;
       if (!node->is_leaf_node()) return false;
@@ -470,10 +462,8 @@ std::shared_ptr<InfostateTree> MakeInfostateTree(
   // Uses new instead of make_shared, because shared_ptr is not a friend and
   // can't call private constructors.
   return std::shared_ptr<InfostateTree>(new InfostateTree(
-      start_states, chance_reach_probs,
-      originating_tree.infostate_observer_,
-      originating_tree.acting_player_,
-      max_move_ahead_limit));
+      start_states, chance_reach_probs, originating_tree.infostate_observer_,
+      originating_tree.acting_player_, max_move_ahead_limit));
 }
 
 std::shared_ptr<InfostateTree> MakeInfostateTree(
@@ -481,9 +471,9 @@ std::shared_ptr<InfostateTree> MakeInfostateTree(
     const std::vector<double>& chance_reach_probs,
     std::shared_ptr<Observer> infostate_observer, Player acting_player,
     int max_move_ahead_limit) {
-  return std::shared_ptr<InfostateTree>(new InfostateTree(
-      start_states, chance_reach_probs, infostate_observer, acting_player,
-      max_move_ahead_limit));
+  return std::shared_ptr<InfostateTree>(
+      new InfostateTree(start_states, chance_reach_probs, infostate_observer,
+                        acting_player, max_move_ahead_limit));
 }
 
 SequenceId InfostateTree::empty_sequence() const {
@@ -528,8 +518,8 @@ std::vector<DecisionId> InfostateTree::DecisionIdsWithParentSeq(
   while (!open_set.empty()) {
     const InfostateNode* node = open_set.top();
     open_set.pop();
-    if (node->type() == kDecisionInfostateNode
-        && node->sequence_id() == sequence_id) {
+    if (node->type() == kDecisionInfostateNode &&
+        node->sequence_id() == sequence_id) {
       out.push_back(node->decision_id());
     } else {
       for (const InfostateNode* child : node->child_iterator()) {
@@ -577,16 +567,16 @@ void InfostateTree::LabelNodesWithIds() {
 // In this way the range iterator will be empty (start==end) and well defined.
 std::pair<size_t, size_t> InfostateTree::CollectStartEndSequenceIds(
     InfostateNode* node, const SequenceId parent_sequence) {
-  size_t min_index = kUndefinedNodeId; // This is a large number.
+  size_t min_index = kUndefinedNodeId;  // This is a large number.
   size_t max_index = 0;
   const SequenceId propagate_sequence_id =
       node->sequence_id_.is_undefined()
-      ? parent_sequence
-      : node->sequence_id();  // This becomes the parent for next nodes.
+          ? parent_sequence
+          : node->sequence_id();  // This becomes the parent for next nodes.
 
   for (InfostateNode* child : node->child_iterator()) {
-    auto[min_child, max_child] = CollectStartEndSequenceIds(
-        child, propagate_sequence_id);
+    auto [min_child, max_child] =
+        CollectStartEndSequenceIds(child, propagate_sequence_id);
     min_index = std::min(min_child, min_index);
     max_index = std::max(max_child, max_index);
   }
@@ -672,8 +662,8 @@ double InfostateTree::BestResponseValue(LeafVector<double>&& gradient) const {
          parent_idx++) {
       const InfostateNode* node = nodes_at_depths_[d][parent_idx];
       const int num_children = node->num_children();
-      const Range<LeafId> children_range = gradient.range(
-          left_offset, left_offset + num_children);
+      const Range<LeafId> children_range =
+          gradient.range(left_offset, left_offset + num_children);
       const LeafId parent_id(parent_idx, this);
 
       if (node->type() == kDecisionInfostateNode) {

@@ -27,16 +27,19 @@ namespace open_spiel {
 namespace algorithms {
 namespace {
 
-std::string iigs2 = "goofspiel("
-                      "num_cards=2,"
-                      "imp_info=True,"
-                      "points_order=ascending"
-                    ")";
-std::string iigs3 = "goofspiel("
-                      "num_cards=3,"
-                      "imp_info=True,"
-                      "points_order=ascending"
-                    ")";
+constexpr const char* kImperfectInfoGoofSpiel2(
+    "goofspiel("
+    "num_cards=2,"
+    "imp_info=True,"
+    "points_order=ascending"
+    ")");
+
+constexpr const char* kImperfectInfoGoofSpiel3(
+    "goofspiel("
+    "num_cards=3,"
+    "imp_info=True,"
+    "points_order=ascending"
+    ")");
 
 bool IsNodeBalanced(const InfostateNode& node, int height,
                     int current_depth = 0) {
@@ -55,10 +58,11 @@ bool RecomputeBalance(const InfostateTree& tree) {
   return IsNodeBalanced(tree.root(), tree.tree_height());
 }
 
-std::shared_ptr<InfostateTree> MakeTree(
-    const std::string& game_name, Player player, int max_move_limit = 1000) {
-  std::shared_ptr<InfostateTree> tree = MakeInfostateTree(
-      *LoadGame(game_name), player, max_move_limit);
+std::shared_ptr<InfostateTree> MakeTree(const std::string& game_name,
+                                        Player player,
+                                        int max_move_limit = 1000) {
+  std::shared_ptr<InfostateTree> tree =
+      MakeInfostateTree(*LoadGame(game_name), player, max_move_limit);
   SPIEL_CHECK_TRUE(RecomputeBalance(*tree));
   return tree;
 }
@@ -80,9 +84,9 @@ std::shared_ptr<InfostateTree> MakeTree(
   std::shared_ptr<Observer> infostate_observer =
       game->MakeObserver(kInfoStateObsType, {});
 
-  std::shared_ptr<InfostateTree> tree = MakeInfostateTree(
-      start_state_ptrs, start_reaches, infostate_observer,
-      player, max_move_limit);
+  std::shared_ptr<InfostateTree> tree =
+      MakeInfostateTree(start_state_ptrs, start_reaches, infostate_observer,
+                        player, max_move_limit);
   SPIEL_CHECK_TRUE(RecomputeBalance(*tree));
   return tree;
 }
@@ -90,10 +94,10 @@ std::shared_ptr<InfostateTree> MakeTree(
 void TestRootCertificates() {
   {
     std::string expected_certificate =
-      "(["
+        "(["
         "({}{})"  // Play Heads: HH, HT
         "({}{})"  // Play Tails: TH, TT
-      "])";
+        "])";
     for (int i = 0; i < 2; ++i) {
       std::shared_ptr<InfostateTree> tree = MakeTree("matrix_mp", /*player=*/i);
       SPIEL_CHECK_EQ(tree->root().MakeCertificate(), expected_certificate);
@@ -101,81 +105,83 @@ void TestRootCertificates() {
   }
   {
     std::string expected_certificate =
-      "(["
+        "(["
         "({}{})"  // Play 1: draw 1,1  lose 1,2
         "({}{})"  // Play 2: win  2,1  draw 2,2
-      "])";
+        "])";
     for (int i = 0; i < 2; ++i) {
-      std::shared_ptr<InfostateTree> tree = MakeTree(iigs2, /*player=*/i);
+      std::shared_ptr<InfostateTree> tree =
+          MakeTree(kImperfectInfoGoofSpiel2, /*player=*/i);
       SPIEL_CHECK_EQ(tree->root().MakeCertificate(), expected_certificate);
     }
   }
   {  // Full Kuhn test.
     std::shared_ptr<InfostateTree> tree = MakeTree("kuhn_poker", /*player=*/0);
     std::string expected_certificate =
-      // Notice all terminals are at the same depth (same indentation).
-      "((" // Root node, 1st is getting a card
-        "("  // 2nd is getting card
-          "["  // 1st acts
-            "(("  // 1st bet, and 2nd acts
-              "(({}))"
-              "(({}))"
-              "(({}))"
-              "(({}))"
-            "))"
-            "(("  // 1st checks, and 2nd acts
+        // Notice all terminals are at the same depth (same indentation).
+        "(("  // Root node, 1st is getting a card
+        "("   // 2nd is getting card
+        "["   // 1st acts
+        "(("  // 1st bet, and 2nd acts
+        "(({}))"
+        "(({}))"
+        "(({}))"
+        "(({}))"
+        "))"
+        "(("  // 1st checks, and 2nd acts
               // 2nd checked
-              "(({}))"
-              "(({}))"
-              // 2nd betted
-              "[({}"
-                "{})"
-               "({}"
-                "{})]"
-            "))"
-          "]"
+        "(({}))"
+        "(({}))"
+        // 2nd betted
+        "[({}"
+        "{})"
+        "({}"
+        "{})]"
+        "))"
+        "]"
         ")"
         // Just 2 more copies.
         "([(((({}))(({}))(({}))(({}))))(((({}))(({}))[({}{})({}{})]))])"
         "([(((({}))(({}))(({}))(({}))))(((({}))(({}))[({}{})({}{})]))])"
-      "))";
+        "))";
     SPIEL_CHECK_EQ(tree->root().MakeCertificate(), expected_certificate);
   }
   {
     std::string expected_certificate =
-    "((("  // Root node, distribute cards.
-      "("  // 1st acts
-        // 1st betted
+        "((("  // Root node, distribute cards.
+        "("    // 1st acts
+               // 1st betted
         "[(({})({}))(({})({}))]"
         // 1st checked
         "[(({})({}))(({}{}{}{}))]"
-      ")"
-      // Just 2 more copies.
-      "([(({})({}))(({})({}))][(({})({}))(({}{}{}{}))])"
-      "([(({})({}))(({})({}))][(({})({}))(({}{}{}{}))])"
-    ")))";
+        ")"
+        // Just 2 more copies.
+        "([(({})({}))(({})({}))][(({})({}))(({}{}{}{}))])"
+        "([(({})({}))(({})({}))][(({})({}))(({}{}{}{}))])"
+        ")))";
     std::shared_ptr<InfostateTree> tree = MakeTree("kuhn_poker", /*player=*/1);
     SPIEL_CHECK_EQ(tree->root().MakeCertificate(), expected_certificate);
   }
   {
     std::string expected_certificate =
-      "(["
-        "(" // Play 2
-          "[({}{})({}{})]"
-          "[({}{})({}{})]"
-          "[({}{})({}{})]"
+        "(["
+        "("  // Play 2
+        "[({}{})({}{})]"
+        "[({}{})({}{})]"
+        "[({}{})({}{})]"
         ")"
-        "(" // Play 1
-          "[({}{})({}{})]"
-          "[({}{}{}{})({}{}{}{})]"
+        "("  // Play 1
+        "[({}{})({}{})]"
+        "[({}{}{}{})({}{}{}{})]"
         ")"
-        "(" // Play 3
-          "[({}{})({}{})]"
-          "[({}{}{}{})({}{}{}{})]"
+        "("  // Play 3
+        "[({}{})({}{})]"
+        "[({}{}{}{})({}{}{}{})]"
         ")"
-      "])";
+        "])";
     for (int i = 0; i < 2; ++i) {
-      std::shared_ptr<InfostateTree> tree = MakeTree(iigs3, /*player=*/i);
+      std::shared_ptr<InfostateTree> tree =
+          MakeTree(kImperfectInfoGoofSpiel3, /*player=*/i);
       SPIEL_CHECK_EQ(tree->root().MakeCertificate(), expected_certificate);
     }
   }
@@ -186,52 +192,52 @@ void TestCertificatesFromStartHistories() {
     std::shared_ptr<InfostateTree> tree = MakeTree(
         "kuhn_poker", /*player=*/0, /*start_histories=*/{{0, 1, 0}}, {1 / 6.});
     std::string expected_certificate =
-      "(("
+        "(("
         "(({}))"      // 2nd player passes
         "[({})({})]"  // 2nd player bets
-      "))";
+        "))";
     SPIEL_CHECK_EQ(tree->root().MakeCertificate(), expected_certificate);
   }
   {
     std::string expected_certificate =
-      "("
+        "("
         "([(((({}))(({}))(({}))(({}))))(((({}))(({}))[({}{})({}{})]))])"
         "([(((({}))(({}))(({}))(({}))))(((({}))(({}))[({}{})({}{})]))])"
-      ")";
-    std::shared_ptr<InfostateTree> tree = MakeTree(
-        "kuhn_poker", /*player=*/0,
-        /*start_histories=*/{{0}, {2}}, {1/3., 1/3.});
+        ")";
+    std::shared_ptr<InfostateTree> tree =
+        MakeTree("kuhn_poker", /*player=*/0,
+                 /*start_histories=*/{{0}, {2}}, {1 / 3., 1 / 3.});
     SPIEL_CHECK_EQ(tree->root().MakeCertificate(), expected_certificate);
   }
   {
     std::string expected_certificate =
-      "("
+        "("
         "([(({}))(({}))][(({}))(({}{}))])"
         "([(({}))(({}))][(({}))(({}{}))])"
-      ")";
-    std::shared_ptr<InfostateTree> tree = MakeTree(
-        "kuhn_poker", /*player=*/1,
-        /*start_histories=*/{{1, 0}, {1, 2}}, {1/6., 1/6.});
+        ")";
+    std::shared_ptr<InfostateTree> tree =
+        MakeTree("kuhn_poker", /*player=*/1,
+                 /*start_histories=*/{{1, 0}, {1, 2}}, {1 / 6., 1 / 6.});
     SPIEL_CHECK_EQ(tree->root().MakeCertificate(), expected_certificate);
   }
   {
     std::string expected_certificate =
-      "("
+        "("
         "([(((({}))(({}))(({}))(({}))))(((({}))(({}))[({}{})({}{})]))])"
         "[((((({})))))((((({})))))]"
-      ")";
-    std::shared_ptr<InfostateTree> tree = MakeTree(
-        "kuhn_poker", /*player=*/0,
-        /*start_histories=*/{{0}, {2, 1, 0, 1}},
-        /*start_reaches=*/{1/3., 1/6.});
+        ")";
+    std::shared_ptr<InfostateTree> tree =
+        MakeTree("kuhn_poker", /*player=*/0,
+                 /*start_histories=*/{{0}, {2, 1, 0, 1}},
+                 /*start_reaches=*/{1 / 3., 1 / 6.});
     SPIEL_CHECK_EQ(tree->root().MakeCertificate(), expected_certificate);
   }
   {
     std::string expected_certificate =
-      "("
+        "("
         "(((({})))((({}))))"
         "([(({}))(({}))][(({}))(({}{}))])"
-      ")";
+        ")";
     std::shared_ptr<InfostateTree> tree = MakeTree(
         "kuhn_poker", /*player=*/1, /*start_histories=*/{{1, 0}, {1, 2, 0, 1}},
         /*start_reaches=*/{1 / 6., 1 / 6.});
@@ -239,42 +245,40 @@ void TestCertificatesFromStartHistories() {
   }
   {
     std::string expected_certificate =
-      "("
+        "("
         "[({}{})({}{})]"
-      ")";
-    std::shared_ptr<InfostateTree> tree = MakeTree(
-        "kuhn_poker", /*player=*/0,
-        /*start_histories=*/{{0, 1, 0, 1}, {0, 2, 0, 1}},
-        /*start_reaches=*/{1/6., 1/6.});
+        ")";
+    std::shared_ptr<InfostateTree> tree =
+        MakeTree("kuhn_poker", /*player=*/0,
+                 /*start_histories=*/{{0, 1, 0, 1}, {0, 2, 0, 1}},
+                 /*start_reaches=*/{1 / 6., 1 / 6.});
     SPIEL_CHECK_EQ(tree->root().MakeCertificate(), expected_certificate);
   }
   {
     std::string expected_certificate =
-      "("
+        "("
         "({}{})"
         "({}{})"
-      ")";
-    std::shared_ptr<InfostateTree> tree = MakeTree(
-        "kuhn_poker", /*player=*/1,
-        /*start_histories=*/{{0, 1, 0, 1}, {0, 2, 0, 1}},
-        /*start_reaches=*/{1/6., 1/6.});
+        ")";
+    std::shared_ptr<InfostateTree> tree =
+        MakeTree("kuhn_poker", /*player=*/1,
+                 /*start_histories=*/{{0, 1, 0, 1}, {0, 2, 0, 1}},
+                 /*start_reaches=*/{1 / 6., 1 / 6.});
     SPIEL_CHECK_EQ(tree->root().MakeCertificate(), expected_certificate);
   }
   {
     std::shared_ptr<InfostateTree> tree = MakeTree(
-        iigs3, /*player=*/0,
-        /*start_histories=*/{{0  /* = 0 0 */},
-                             {1  /* = 1 0 */, 3  /* = 2 2 */}},
+        kImperfectInfoGoofSpiel3, /*player=*/0,
+        /*start_histories=*/{{0 /* = 0 0 */}, {1 /* = 1 0 */, 3 /* = 2 2 */}},
         /*start_reaches=*/{1., 1.});
     std::string expected_certificate =
-      "("
+        "("
         "(({}))"
         "[({}{})({}{})]"
-      ")";
+        ")";
     SPIEL_CHECK_EQ(tree->root().MakeCertificate(), expected_certificate);
   }
 }
-
 
 void CheckTreeLeaves(const InfostateTree& tree, int move_limit) {
   for (InfostateNode* leaf_node : tree.leaf_nodes()) {
@@ -293,8 +297,8 @@ void CheckTreeLeaves(const InfostateTree& tree, int move_limit) {
     int terminal_cnt = 0;
     int max_move_number = std::numeric_limits<int>::min();
     int min_move_number = std::numeric_limits<int>::max();
-    for (const std::unique_ptr<State>
-          & state : leaf_node->corresponding_states()) {
+    for (const std::unique_ptr<State>& state :
+         leaf_node->corresponding_states()) {
       if (state->IsTerminal()) terminal_cnt++;
       max_move_number = std::max(max_move_number, state->MoveNumber());
       min_move_number = std::min(min_move_number, state->MoveNumber());
@@ -370,18 +374,18 @@ void BuildAllDepths(const std::string& game_name) {
 void TestDepthLimitedTrees() {
   {
     std::string expected_certificate =
-      "("  // <dummy>
+        "("  // <dummy>
         "("  // 1st is getting a card
-          "("  // 2nd is getting card
-            "["  // 1st acts - Node J
-                 // Depth cutoff.
-            "]"
-          ")"
-          // Repeat the same for the two other cards.
-          "([])" // Node Q
-          "([])" // Node K
+        "("  // 2nd is getting card
+        "["  // 1st acts - Node J
+             // Depth cutoff.
+        "]"
         ")"
-      ")";  // </dummy>
+        // Repeat the same for the two other cards.
+        "([])"  // Node Q
+        "([])"  // Node K
+        ")"
+        ")";  // </dummy>
     std::shared_ptr<InfostateTree> tree = MakeTree("kuhn_poker", 0, 2);
     SPIEL_CHECK_EQ(tree->root().MakeCertificate(), expected_certificate);
 
@@ -403,27 +407,25 @@ void TestDepthLimitedTrees() {
 void TestDepthLimitedSubgames() {
   {
     std::array<std::string, 4> expected_certificates = {
-      "(()()())",
-      "(([][])([][])([][]))",
-      "("
+        "(()()())", "(([][])([][])([][]))",
+        "("
         "([(())({}{})][({}{})({}{})])"
         "([(())({}{})][({}{})({}{})])"
         "([(())({}{})][({}{})({}{})])"
-      ")",
-      "("
+        ")",
+        "("
         "([(({})({}))(({})({}))][(({})({}))(({}{}{}{}))])"
         "([(({})({}))(({})({}))][(({})({}))(({}{}{}{}))])"
         "([(({})({}))(({})({}))][(({})({}))(({}{}{}{}))])"
-      ")"
-    };
+        ")"};
     std::array<int, 4> expected_leaf_counts = {3, 6, 21, 30};
 
     for (int move_limit = 0; move_limit < 4; ++move_limit) {
-      std::shared_ptr<InfostateTree> tree = MakeTree(
-          "kuhn_poker", /*player_id=*/1,
-          {{0, 1}, {0, 2}, {1, 0}, {1, 2}, {2, 0}, {2, 1}},
-          {1/6., 1/6., 1/6., 1/6., 1/6., 1/6.},
-          /*max_move_limit=*/move_limit);
+      std::shared_ptr<InfostateTree> tree =
+          MakeTree("kuhn_poker", /*player=*/1,
+                   {{0, 1}, {0, 2}, {1, 0}, {1, 2}, {2, 0}, {2, 1}},
+                   {1 / 6., 1 / 6., 1 / 6., 1 / 6., 1 / 6., 1 / 6.},
+                   /*max_move_limit=*/move_limit);
       SPIEL_CHECK_EQ(tree->root().MakeCertificate(),
                      expected_certificates[move_limit]);
       SPIEL_CHECK_EQ(tree->num_leaves(), expected_leaf_counts[move_limit]);
@@ -437,12 +439,12 @@ void TestDepthLimitedSubgames() {
 
 void TestSequenceIdLabeling() {
   for (int pl = 0; pl < 2; ++pl) {
-    std::shared_ptr<InfostateTree> tree = MakeTree(
-        "kuhn_poker", /*player_id=*/pl);
+    std::shared_ptr<InfostateTree> tree = MakeTree("kuhn_poker", /*player=*/pl);
 
     for (int depth = 0; depth <= tree->tree_height(); ++depth) {
       for (InfostateNode* node : tree->nodes_at_depth(depth)) {
-        SPIEL_CHECK_LE(node->start_sequence_id().id(), node->sequence_id().id());
+        SPIEL_CHECK_LE(node->start_sequence_id().id(),
+                       node->sequence_id().id());
         SPIEL_CHECK_LE(node->end_sequence_id().id(), node->sequence_id().id());
       }
     }
@@ -464,40 +466,40 @@ void TestSequenceIdLabeling() {
 }
 
 void TestBestResponse() {
-  std::shared_ptr<InfostateTree> tree0 = MakeTree("matrix_mp", /*player_id=*/0);
-  std::shared_ptr<InfostateTree> tree1 = MakeTree("matrix_mp", /*player_id=*/1);
+  std::shared_ptr<InfostateTree> tree0 = MakeTree("matrix_mp", /*player=*/0);
+  std::shared_ptr<InfostateTree> tree1 = MakeTree("matrix_mp", /*player=*/1);
   for (double alpha = 0; alpha < 1.; alpha += 0.1) {
-    const double br_value = std::fmax(2*alpha - 1, -2*alpha + 1);
+    const double br_value = std::fmax(2 * alpha - 1, -2 * alpha + 1);
     {
-      LeafVector<double> grad(tree0.get(), {
-         1. * alpha,         // Head, Head
-        -1. * (1. - alpha),  // Head, Tail
-        -1. *  alpha,        // Tail, Head
-         1. * (1. - alpha),  // Tail, Tail
-      });
+      LeafVector<double> grad(tree0.get(),
+                              {
+                                  1. * alpha,          // Head, Head
+                                  -1. * (1. - alpha),  // Head, Tail
+                                  -1. * alpha,         // Tail, Head
+                                  1. * (1. - alpha),   // Tail, Tail
+                              });
       SPIEL_CHECK_FLOAT_EQ(tree0->BestResponseValue(std::move(grad)), br_value);
     }
     {
-      LeafVector<double> grad(tree1.get(), {
-        -1. * alpha,         // Head, Head
-         1. * (1. - alpha),  // Tail, Head
-         1. * alpha,         // Head, Tail
-        -1. * (1. - alpha),  // Tail, Tail
-      });
+      LeafVector<double> grad(tree1.get(),
+                              {
+                                  -1. * alpha,         // Head, Head
+                                  1. * (1. - alpha),   // Tail, Head
+                                  1. * alpha,          // Head, Tail
+                                  -1. * (1. - alpha),  // Tail, Tail
+                              });
       SPIEL_CHECK_FLOAT_EQ(tree1->BestResponseValue(std::move(grad)), br_value);
     }
     {
-      TreeplexVector<double> grad(tree0.get(), {
-        -1. + 2. * alpha, 1. - 2. * alpha, 0.
-      });
+      TreeplexVector<double> grad(tree0.get(),
+                                  {-1. + 2. * alpha, 1. - 2. * alpha, 0.});
       std::pair<double, SfStrategy> actual_response =
           tree0->BestResponse(std::move(grad));
       SPIEL_CHECK_FLOAT_EQ(actual_response.first, br_value);
     }
     {
-      TreeplexVector<double> grad(tree1.get(), {
-        1. - 2. * alpha, -1. + 2. * alpha, 0.
-      });
+      TreeplexVector<double> grad(tree1.get(),
+                                  {1. - 2. * alpha, -1. + 2. * alpha, 0.});
       std::pair<double, SfStrategy> actual_response =
           tree1->BestResponse(std::move(grad));
       SPIEL_CHECK_FLOAT_EQ(actual_response.first, br_value);

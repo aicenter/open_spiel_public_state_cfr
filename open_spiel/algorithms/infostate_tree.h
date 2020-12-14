@@ -91,26 +91,24 @@ enum InfostateNodeType {
 // It can be interpreted as "the player observes the start of the game".
 // This node also corresponds to the empty sequence.
 // Following is the infostate string for this node.
-constexpr char* kDummyRootNodeInfostate = "(root)";
+constexpr const char* kDummyRootNodeInfostate = "(root)";
 
 // Sometimes we need to create infostate nodes that do not have a corresponding
 // game State, and therefore we cannot retrieve their string representations.
 // This happens in simultaneous move games or if we rebalance game trees.
-constexpr char* kFillerInfostate = "(fill)";
+constexpr const char* kFillerInfostate = "(fill)";
 
 // Forward declaration.
 class InfostateTree;
 
-namespace {
+namespace internal {
 
 // An implementation detail - Not to be used directly.
 //
 // We use various indexing schemes (SequenceId, DecisionId, LeafId) to access
 // specific nodes in the tree. Not all nodes can have an Id defined, for example
 // a DecisionId is not defined for decision nodes. In this case they will
-// default to the following value. We use this approach rather than
-// std::optional as optional creates pointers to the values, which would render
-// the following optimizations meaningless.
+// default to the following value.
 constexpr size_t kUndefinedNodeId = -1;  // This is a large number.
 
 // An implementation detail - Not to be used directly.
@@ -124,7 +122,7 @@ constexpr size_t kUndefinedNodeId = -1;  // This is a large number.
 // the ids on appropriate trees and we do not try to index any opponents' trees.
 //
 // We use CRTP as it allows us to reuse the implementation for derived classes.
-template<class Self>
+template <class Self>
 class NodeId {
   size_t identifier_ = kUndefinedNodeId;
 #ifndef NDEBUG  // Allow additional automatic debug-time checks.
@@ -133,13 +131,14 @@ class NodeId {
  public:
   NodeId(size_t id_value, const InfostateTree* tree_ptr)
       : identifier_(id_value), tree_(tree_ptr) {}
-  Self& operator=(Self&& rhs) {
-    SPIEL_CHECK_TRUE(tree_ == rhs.tree_ ||
+  NodeId& operator=(Self&& rhs) {
+    SPIEL_CHECK_TRUE(
+        tree_ == rhs.tree_ ||
         // The NodeId may be uninitialized, so allow to copy the rhs tree.
         tree_ == nullptr && rhs.tree_ != nullptr);
     identifier_ = rhs.id();
     tree_ == rhs.tree_;
-    return this;
+    return *this;
   }
   bool operator==(const Self& rhs) const {
     SPIEL_CHECK_EQ(tree_, rhs.tree_);
@@ -179,8 +178,7 @@ class NodeId {
   }
 };
 
-}  // namespace
-
+}  // namespace internal
 
 // `SequenceId` refers to an observation infostate that follows the decision
 // infostate after following some action. It indexes the decision space of
@@ -188,7 +186,7 @@ class NodeId {
 // the agent's sequences. See `TreeplexVector` for more details.
 // The smallest sequence ids correspond to the deepest nodes and the highest
 // value corresponds to the empty sequence.
-class SequenceId final : public NodeId<SequenceId> {
+class SequenceId final : public internal::NodeId<SequenceId> {
   using NodeId<SequenceId>::NodeId;
 };
 // When the tree is still under construction and a node doesn't
@@ -197,7 +195,7 @@ constexpr SequenceId kUndefinedSequenceId = SequenceId();
 
 // `DecisionId` refers to an infostate node where the player acts,
 // i.e. an infostate node with the type `kDecisionInfostateNode`.
-class DecisionId final : public NodeId<DecisionId> {
+class DecisionId final : public internal::NodeId<DecisionId> {
   using NodeId<DecisionId>::NodeId;
 };
 // When a node isn't a decision infostate, we use this value instead.
@@ -208,24 +206,28 @@ constexpr DecisionId kUndefinedDecisionId = DecisionId();
 // a leaf node.
 // Note that leaf decision nodes do not have assigned any `DecisionId`, and
 // similarly leaf observation nodes do not have assigned any `SequenceId`.
-class LeafId final : public NodeId<LeafId> {
-  using NodeId<LeafId>::NodeId;
+class LeafId final : public internal::NodeId<LeafId> {
+  using internal::NodeId<LeafId>::NodeId;
 };
 // When a node isn't a leaf, we use this value instead.
 constexpr LeafId kUndefinedLeafId = LeafId();
 
 // Each of the Ids can be used to index an appropriate vector.
 // See below for an implementation.
-template<typename T> class TreeplexVector;
-template<typename T> class LeafVector;
-template<typename T> class DecisionVector;
+template <typename T>
+class TreeplexVector;
+template <typename T>
+class LeafVector;
+template <typename T>
+class DecisionVector;
 using SfStrategy = class TreeplexVector<double>;
 
 // A convenience iterator over a contiguous range of node ids.
-template<class Id>
+template <class Id>
 class RangeIterator {
   size_t id_;
   const InfostateTree* tree_;
+
  public:
   RangeIterator(size_t id, const InfostateTree* tree) : id_(id), tree_(tree) {}
   RangeIterator& operator++() {
@@ -237,14 +239,17 @@ class RangeIterator {
   }
   Id operator*() { return Id(id_, tree_); }
 };
-template<class Id>
+template <class Id>
 class Range {
   const size_t start_;
   const size_t end_;
   const InfostateTree* tree_;
+
  public:
   Range(size_t start, size_t end, const InfostateTree* tree)
-      : start_(start), end_(end), tree_(tree) { SPIEL_CHECK_LE(start_, end_); }
+      : start_(start), end_(end), tree_(tree) {
+    SPIEL_CHECK_LE(start_, end_);
+  }
   RangeIterator<Id> begin() const { return RangeIterator<Id>(start_, tree_); }
   RangeIterator<Id> end() const { return RangeIterator<Id>(end_, tree_); }
 };
@@ -254,9 +259,9 @@ class InfostateNode;
 
 // Creates an infostate tree for a player based on the initial state
 // of the game, up to some move limit.
-std::shared_ptr<InfostateTree> MakeInfostateTree(
-    const Game& game, Player acting_player,
-    int max_move_limit = 1000);
+std::shared_ptr<InfostateTree> MakeInfostateTree(const Game& game,
+                                                 Player acting_player,
+                                                 int max_move_limit = 1000);
 
 // Creates an infostate tree for a player based on some start states,
 // up to some move limit from the deepest start state.
@@ -280,21 +285,19 @@ std::shared_ptr<InfostateTree> MakeInfostateTree(
     const std::vector<InfostateNode*>& start_nodes,
     int max_move_ahead_limit = 1000);
 
-
 class InfostateTree final {
   // Note that only MakeInfostateTree is allowed to call the constructor
   // to ensure the trees are always allocated on heap. We do this so that all
   // the collected pointers are valid throughout the tree's lifetime even if
   // they are moved around.
  private:
-  InfostateTree(
-      const std::vector<const State*>& start_states,
-      const std::vector<double>& chance_reach_probs,
-      std::shared_ptr<Observer> infostate_observer, Player acting_player,
-      int max_move_ahead_limit);
+  InfostateTree(const std::vector<const State*>& start_states,
+                const std::vector<double>& chance_reach_probs,
+                std::shared_ptr<Observer> infostate_observer,
+                Player acting_player, int max_move_ahead_limit);
   // Friend factories.
-  friend std::shared_ptr<InfostateTree> MakeInfostateTree(
-      const Game&, Player, int);
+  friend std::shared_ptr<InfostateTree> MakeInfostateTree(const Game&, Player,
+                                                          int);
   friend std::shared_ptr<InfostateTree> MakeInfostateTree(
       const std::vector<const State*>&, const std::vector<double>&,
       std::shared_ptr<Observer>, Player, int);
@@ -405,11 +408,13 @@ class InfostateTree final {
   std::vector<std::vector<InfostateNode*>> nodes_at_depths_;
 
   // Utility functions whenever we create a new node for the tree.
-  std::unique_ptr<InfostateNode> MakeNode(
-      InfostateNode* parent, InfostateNodeType type,
-      const std::string& infostate_string, double terminal_utility,
-      double terminal_ch_reach_prob, size_t depth,
-      const State* originating_state);
+  std::unique_ptr<InfostateNode> MakeNode(InfostateNode* parent,
+                                          InfostateNodeType type,
+                                          const std::string& infostate_string,
+                                          double terminal_utility,
+                                          double terminal_ch_reach_prob,
+                                          size_t depth,
+                                          const State* originating_state);
   std::unique_ptr<InfostateNode> MakeRootNode() const;
 
   // Makes sure that all tree leaves are at the same height.
@@ -440,13 +445,14 @@ class InfostateTree final {
 };
 
 // Iterate over a vector of unique pointers, but expose only the raw pointers.
-template<class T>
+template <class T>
 class VecWithUniquePtrsIterator {
   int pos_;
   const std::vector<std::unique_ptr<T>>& vec_;
+
  public:
-  explicit VecWithUniquePtrsIterator(
-      const std::vector<std::unique_ptr<T>>& vec, int pos = 0)
+  explicit VecWithUniquePtrsIterator(const std::vector<std::unique_ptr<T>>& vec,
+                                     int pos = 0)
       : pos_(pos), vec_(vec) {}
   VecWithUniquePtrsIterator& operator++() {
     pos_++;
@@ -530,11 +536,12 @@ class InfostateNode final {
   const std::vector<Action> terminal_history_;
 
   // Only InfostateTree is allowed to construct nodes.
-  InfostateNode(
-      const InfostateTree& tree, InfostateNode* parent, int incoming_index,
-      InfostateNodeType type, const std::string& infostate_string,
-      double terminal_utility, double terminal_ch_reach_prob, size_t depth,
-      std::vector<Action> legal_actions, std::vector<Action> terminal_history);
+  InfostateNode(const InfostateTree& tree, InfostateNode* parent,
+                int incoming_index, InfostateNodeType type,
+                const std::string& infostate_string, double terminal_utility,
+                double terminal_ch_reach_prob, size_t depth,
+                std::vector<Action> legal_actions,
+                std::vector<Action> terminal_history);
   friend class InfostateTree;
 
  public:
@@ -546,8 +553,8 @@ class InfostateNode final {
   size_t depth() const { return depth_; }
   bool is_root_node() const { return !parent_; }
   bool has_infostate_string() const {
-    return infostate_string_ != kFillerInfostate
-        && infostate_string_ != kDummyRootNodeInfostate;
+    return infostate_string_ != kFillerInfostate &&
+           infostate_string_ != kDummyRootNodeInfostate;
   }
   const std::string& infostate_string() const {
     // Avoid working with empty infostate strings.
@@ -559,7 +566,7 @@ class InfostateNode final {
   InfostateNode* child_at(int i) const { return children_.at(i).get(); }
   int num_children() const { return children_.size(); }
   VecWithUniquePtrsIterator<InfostateNode> child_iterator() const {
-    return VecWithUniquePtrsIterator(children_);
+    return VecWithUniquePtrsIterator<InfostateNode>(children_);
   }
 
   // -- Sequence operations. ---------------------------------------------------
@@ -576,8 +583,8 @@ class InfostateNode final {
     return end_sequence_id_;
   }
   Range<SequenceId> AllSequenceIds() const {
-    return Range<SequenceId>(start_sequence_id_.id(),
-                             end_sequence_id_.id(), &tree_);
+    return Range<SequenceId>(start_sequence_id_.id(), end_sequence_id_.id(),
+                             &tree_);
   }
 
   // -- Decision operations. ---------------------------------------------------
@@ -639,24 +646,25 @@ class InfostateNode final {
   // of the new parent. The node at the existing position will be freed.
   // We pass the unique ptr of itself, because calling Release might be
   // undefined: the node we want to swap a parent for can be root of a subtree.
-  void SwapParent(std::unique_ptr<InfostateNode> self,
-                  InfostateNode* target, int at_index);
+  void SwapParent(std::unique_ptr<InfostateNode> self, InfostateNode* target,
+                  int at_index);
 
   InfostateNode* AddChild(std::unique_ptr<InfostateNode> child);
   InfostateNode* GetChild(const std::string& infostate_string) const;
 };
 
-namespace {
+namespace internal {
 
 // An implementation detail - Not to be used directly.
 //
 // Create a common TreeVector container that can be indexed
 // with the respective NodeIds. This is later specialized for the individual
 // indexing of the trees.
-template<typename T, typename Id>
+template <typename T, typename Id>
 class TreeVector {
   const InfostateTree* tree_;
   std::vector<T> vec_;
+
  public:
   explicit TreeVector(const InfostateTree* tree)
       : tree_(tree), vec_(tree_->num_ids(Id(kUndefinedNodeId, tree))) {}
@@ -685,34 +693,34 @@ class TreeVector {
   const InfostateTree* tree() const { return tree_; }
 };
 
-}  // namespace
+}  // namespace internal
 
 // Arrays that can be easily indexed by SequenceIds.
 // The space of all such arrays forms a treeplex [3].
 //
 // [3]: Smoothing Techniques for Computing Nash Equilibria of Sequential Games
 //      http://www.cs.cmu.edu/~sandholm/proxtreeplex.MathOfOR.pdf
-template<typename T>
-class TreeplexVector final : public TreeVector<T, SequenceId> {
-  using TreeVector<T, SequenceId>::TreeVector;
+template <typename T>
+class TreeplexVector final : public internal::TreeVector<T, SequenceId> {
+  using internal::TreeVector<T, SequenceId>::TreeVector;
 };
 
 // Arrays that can be easily indexed by LeafIds.
-template<typename T>
-class LeafVector final : public TreeVector<T, LeafId> {
-  using TreeVector<T, LeafId>::TreeVector;
+template <typename T>
+class LeafVector final : public internal::TreeVector<T, LeafId> {
+  using internal::TreeVector<T, LeafId>::TreeVector;
 };
 
 // Arrays that can be easily indexed by DecisionIds.
-template<typename T>
-class DecisionVector final : public TreeVector<T, DecisionId> {
-  using TreeVector<T, DecisionId>::TreeVector;
+template <typename T>
+class DecisionVector final : public internal::TreeVector<T, DecisionId> {
+  using internal::TreeVector<T, DecisionId>::TreeVector;
 };
 
 // Returns whether the supplied vector is a valid sequence-form strategy:
 // The probability flow has to sum up to 1 and each sequence's incoming
 // probability must be equal to outgoing probabilities.
-bool IsValidSfStrategy(const SfStrategy& stategy);
+bool IsValidSfStrategy(const SfStrategy& strategy);
 
 }  // namespace algorithms
 }  // namespace open_spiel
