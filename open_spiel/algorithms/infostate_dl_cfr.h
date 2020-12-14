@@ -133,7 +133,8 @@ class DepthLimitedCFR {
                   std::vector<std::shared_ptr<InfostateTree>> depth_lim_trees,
                   std::shared_ptr<const LeafEvaluator> leaf_evaluator,
                   std::shared_ptr<const LeafEvaluator> terminal_evaluator,
-                  std::shared_ptr<Observer> public_observer);
+                  std::shared_ptr<Observer> public_observer,
+                  std::vector<BanditVector> bandits);
 
   void RunSimultaneousIterations(int iterations);
   void PrepareRootReachProbs();
@@ -206,6 +207,7 @@ struct CFREvaluator : public LeafEvaluator {
   std::shared_ptr<Observer> public_observer;
   std::shared_ptr<Observer> infostate_observer;
   int num_cfr_iterations = 1;
+  std::string bandit_name = "PredictiveRegretMatchingPlus";
 
   CFREvaluator(std::shared_ptr<const Game> game, int depth_limit,
                std::shared_ptr<const LeafEvaluator> leaf_evaluator,

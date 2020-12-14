@@ -27,7 +27,8 @@ DepthLimitedCFR::DepthLimitedCFR(
     std::vector<std::shared_ptr<InfostateTree>> depth_lim_trees,
     std::shared_ptr<const LeafEvaluator> leaf_evaluator,
     std::shared_ptr<const LeafEvaluator> terminal_evaluator,
-    std::shared_ptr<Observer> public_observer
+    std::shared_ptr<Observer> public_observer,
+    std::vector<BanditVector> bandits
 ) :
     game_(std::move(game)),
     trees_(std::move(depth_lim_trees)),
@@ -46,7 +47,7 @@ DepthLimitedCFR::DepthLimitedCFR(
       std::vector<double>(trees_[0]->root_branching_factor(), 1.),
       std::vector<double>(trees_[1]->root_branching_factor(), 1.)
     }),
-    bandits_(MakeBanditVectors(trees_)) {
+    bandits_(std::move(bandits)) {
   SPIEL_CHECK_TRUE(public_observer_->HasTensor());
   PrepareLeafNodesForPublicStates();
   PrepareRangesAndValuesForPublicStates();
@@ -57,13 +58,15 @@ DepthLimitedCFR::DepthLimitedCFR(
     std::shared_ptr<const Game> game, int max_depth_limit,
     std::shared_ptr<const LeafEvaluator> leaf_evaluator,
     std::shared_ptr<const LeafEvaluator> terminal_evaluator
-) : DepthLimitedCFR(game,
-                    {MakeInfostateTree(*game, 0, max_depth_limit),
-                     MakeInfostateTree(*game, 1, max_depth_limit)},
-                    std::move(leaf_evaluator),
-                    std::move(terminal_evaluator),
-                    game->MakeObserver(kPublicStateObsType, {})) {}
-
+) {
+  auto trees = {MakeInfostateTree(*game, 0, max_depth_limit),
+                MakeInfostateTree(*game, 1, max_depth_limit)};
+  return new(this) DepthLimitedCFR(game, trees,
+                                   std::move(leaf_evaluator),
+                                   std::move(terminal_evaluator),
+                                   game->MakeObserver(kPublicStateObsType, {}),
+                                   MakeBanditVectors(trees));
+}
 
 std::array<std::shared_ptr<InfostateTree>, 2> CreateTrees(
     std::array<absl::Span<const InfostateNode* const>, 2> start_nodes,
@@ -354,15 +357,16 @@ CFREvaluator::CFREvaluator(std::shared_ptr<const Game> game, int depth_limit,
 
 std::unique_ptr<PublicStateContext> CFREvaluator::CreateContext(
     const LeafPublicState& state) const {
+  auto subgame_trees = std::vector{
+      MakeInfostateTree(state.leaf_nodes[0], depth_limit),
+      MakeInfostateTree(state.leaf_nodes[1], depth_limit)
+  };
+  auto subgame_bandits = MakeBanditVectors(subgame_trees, bandit_name);
   auto dlcfr = std::make_unique<DepthLimitedCFR>(
-      game, std::vector{
-          MakeInfostateTree(state.leaf_nodes[0], depth_limit),
-          MakeInfostateTree(state.leaf_nodes[1], depth_limit)
-      },
-      leaf_evaluator, terminal_evaluator, public_observer);
+      game, subgame_trees, leaf_evaluator, terminal_evaluator, public_observer,
+      std::move(subgame_bandits));
   auto cfr_public_state = std::make_unique<CFRPublicState>(std::move(dlcfr));
-  SPIEL_DCHECK_TRUE(
-      CheckChildPublicStateConsistency(*cfr_public_state, state));
+  SPIEL_DCHECK_TRUE(CheckChildPublicStateConsistency(*cfr_public_state, state));
   return cfr_public_state;
 }
 
