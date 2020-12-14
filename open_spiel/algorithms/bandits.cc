@@ -357,6 +357,9 @@ std::unique_ptr<bandits::Bandit> MakeBandit(
   if (bandit_name == "UniformStrategy") {
     return std::make_unique<bandits::UniformStrategy>(num_actions);
   }
+  if (bandit_name == "FixableStrategy") {
+    return std::make_unique<bandits::FixableStrategy>(num_actions);
+  }
   // TODO: finish
   SpielFatalError("Exhausted pattern match!");
 }

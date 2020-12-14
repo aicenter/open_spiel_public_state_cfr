@@ -133,6 +133,15 @@ class FixedStrategy final : public Bandit {
   void Reset() override {}  // No need to reset anything.
 };
 
+// A bandit that can be dynamically set to return a requested strategy.
+class FixableStrategy final : public Bandit {
+ public:
+  FixableStrategy(size_t num_actions) : Bandit(num_actions) {}
+  std::vector<double>& mutable_strategy() { return current_strategy_; }
+  void ComputeStrategy(size_t current_time, double weight = 1.) override {}
+  void ObserveRewards(absl::Span<const double> rewards) override {}
+};
+
 // A bandit that chooses an action with the highest reward.
 // In time t=1, it chooses uniform strategy.
 class BestResponse final : public Bandit {
