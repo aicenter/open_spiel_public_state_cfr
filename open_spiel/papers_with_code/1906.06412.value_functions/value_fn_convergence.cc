@@ -21,7 +21,11 @@
 
 ABSL_FLAG(std::string, game_name, "kuhn_poker", "Game to run.");
 ABSL_FLAG(int, depth, 3, "Max depth of the trunk.");
+ABSL_FLAG(int, subgame_cfr_iterations, 100,
+          "Number of CFR iterations in the subgame");
 ABSL_FLAG(std::string, evaluator, "oracle", "Which evaluator to use");
+ABSL_FLAG(std::string, bandit_name, "PredictiveRegretMatchingPlus",
+          "Bandits to use");
 
 #include "open_spiel/algorithms/ortools/dl_oracle_evaluator.h"
 #include "open_spiel/games/goofspiel.h"
@@ -35,9 +39,8 @@ namespace algorithms {
 namespace ortools {
 namespace {
 
-void RunTrunkIterationsWithValueOracle(std::string game_name, int depth) {
-  std::shared_ptr<const Game> game = LoadGame(game_name);
-
+void RunTrunkIterationsWithValueOracle(
+    std::shared_ptr<const open_spiel::Game> game, int depth) {
   std::shared_ptr<const dlcfr::LeafEvaluator> terminal_evaluator =
       dlcfr::MakeTerminalEvaluator();
   std::shared_ptr<Observer> public_observer =
@@ -67,9 +70,9 @@ void RunTrunkIterationsWithValueOracle(std::string game_name, int depth) {
   }
 }
 
-void RunTrunkIterationsWithCfrEvaluator(std::string game_name, int depth) {
-  std::shared_ptr<const Game> game = LoadGame(game_name);
-
+void RunTrunkIterationsWithCfrEvaluator(
+    std::shared_ptr<const open_spiel::Game> game,
+    const std::string& bandit_name, int depth, int subgame_cfr_iterations) {
   std::shared_ptr<const dlcfr::LeafEvaluator> terminal_evaluator =
       dlcfr::MakeTerminalEvaluator();
   std::shared_ptr<Observer> public_observer =
@@ -80,18 +83,28 @@ void RunTrunkIterationsWithCfrEvaluator(std::string game_name, int depth) {
   auto leaf_evaluator = std::make_shared<dlcfr::CFREvaluator>(
       game, 100, nullptr, terminal_evaluator,
       public_observer, infostate_observer);
-  leaf_evaluator->num_cfr_iterations = 100;
+  leaf_evaluator->num_cfr_iterations = subgame_cfr_iterations;
+  leaf_evaluator->bandit_name = bandit_name;
 
-  dlcfr::DepthLimitedCFR dl_solver(
-      game, depth, leaf_evaluator, terminal_evaluator);
+  std::vector<std::shared_ptr<InfostateTree>> depth_lim_trees = {
+      MakeInfostateTree(*game, 0, depth),
+      MakeInfostateTree(*game, 1, depth)
+  };
+  std::vector<BanditVector> trunk_bandits =
+      MakeBanditVectors(depth_lim_trees, bandit_name);
 
-  SequenceFormLpSpecification whole_game(*game);
+  dlcfr::DepthLimitedCFR dl_solver(game, depth_lim_trees, leaf_evaluator,
+                                   terminal_evaluator, public_observer,
+                                   std::move(trunk_bandits));
+
+  SequenceFormLpSpecification whole_game(
+      {MakeInfostateTree(*game, 0), MakeInfostateTree(*game, 1)}, "CLP");
   auto current_policy = dl_solver.CurrentPolicy();
   auto average_policy = dl_solver.AveragePolicy();
   int num_iters = 10;
 
   std::cout << "iters,cur_expl,avg_expl" << std::endl;
-  for (int i = 0; i < 1000; ++i) {
+  for (int i = 0; i < 200; ++i) {
     double cur_expl = TrunkExploitability(&whole_game, *current_policy);
     double avg_expl = TrunkExploitability(&whole_game, *average_policy);
     std::cout << i * num_iters << ","
@@ -106,20 +119,33 @@ void RunTrunkIterationsWithCfrEvaluator(std::string game_name, int depth) {
 }  // namespace algorithms
 }  // namespace open_spiel
 
+
 int main(int argc, char** argv) {
+  namespace algorithms = open_spiel::algorithms::ortools;
+
   absl::SetProgramUsageMessage(
       "Experiment runner for the convergence of trunk strategies using "
       "the counterfactually (optimal) value functions. "
       "All games should have exploitability approaching zero.");
   absl::ParseCommandLine(argc, argv);
 
+  std::shared_ptr<const open_spiel::Game> game =
+      open_spiel::LoadGame(absl::GetFlag(FLAGS_game_name));
+  int depth = absl::GetFlag(FLAGS_depth);
+  int subgame_cfr_iterations = absl::GetFlag(FLAGS_subgame_cfr_iterations);
+  std::string bandit_name = absl::GetFlag(FLAGS_bandit_name);
   std::string evaluator = absl::GetFlag(FLAGS_evaluator);
+
+  if (depth > game->MaxHistoryLength()) {
+    std::cerr << "Depth too large. Quitting." << std::endl;
+    return 1;
+  }
+
   if (evaluator == "oracle") {
-    open_spiel::algorithms::ortools::RunTrunkIterationsWithValueOracle(
-        absl::GetFlag(FLAGS_game_name), absl::GetFlag(FLAGS_depth));
+    algorithms::RunTrunkIterationsWithValueOracle(game, depth);
   } else if (evaluator == "cfr") {
-    open_spiel::algorithms::ortools::RunTrunkIterationsWithCfrEvaluator(
-        absl::GetFlag(FLAGS_game_name), absl::GetFlag(FLAGS_depth));
+    algorithms::RunTrunkIterationsWithCfrEvaluator(game, bandit_name, depth,
+                                                   subgame_cfr_iterations);
   } else {
     open_spiel::SpielFatalError("Exhausted pattern match: no such evaluator");
   }
