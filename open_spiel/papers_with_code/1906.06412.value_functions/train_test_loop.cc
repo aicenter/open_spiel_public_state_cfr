@@ -25,6 +25,7 @@ ABSL_FLAG(int, depth, 3, "Max depth of the trunk.");
 
 #include "absl/random/random.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/generate_data.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/neural_nets.h"
 #include "open_spiel/utils/format_observation.h"
 #include "torch/torch.h"
 
@@ -35,28 +36,8 @@ namespace papers_with_code {
 constexpr size_t kSeed = 0;
 constexpr char* kUseBanditsForCfr = "PredictiveRegretMatchingPlus";
 
-// A simple 3-layer MLP neural network.
-struct Net : torch::nn::Module {
-  torch::nn::Linear fc1;
-  torch::nn::Linear fc2;
-  torch::nn::Linear fc3;
-  Net(size_t inputs_size, size_t outputs_size, size_t hidden_size) :
-      fc1(inputs_size, hidden_size),
-      fc2(hidden_size, hidden_size),
-      fc3(hidden_size, outputs_size) {
-    register_module("fc1", fc1);
-    register_module("fc2", fc2);
-    register_module("fc3", fc3);
-  }
 
-  torch::Tensor forward(torch::Tensor x) {
-    x = torch::relu(fc1->forward(x));
-    x = torch::relu(fc2->forward(x));
-    return torch::relu(fc3->forward(x));
-  }
-};
-
-torch::Tensor TrainNetwork(Net* model, torch::Device* device,
+torch::Tensor TrainNetwork(ValueNet* model, torch::Device* device,
                            torch::optim::Optimizer* optimizer,
                            BatchData* batch) {
   torch::Tensor data = batch->data_tensor().to(*device);
@@ -71,7 +52,7 @@ torch::Tensor TrainNetwork(Net* model, torch::Device* device,
 }
 
 class NetEvaluator final : public dlcfr::LeafEvaluator {
-  Net* model_;
+  ValueNet* model_;
   torch::Device* device_;
   std::shared_ptr<const Game> game_;
   std::shared_ptr<Observer> infostate_observer_;
@@ -79,7 +60,7 @@ class NetEvaluator final : public dlcfr::LeafEvaluator {
   BatchData* batch_;
 
  public:
-  NetEvaluator(Net* model, torch::Device* device,
+  NetEvaluator(ValueNet* model, torch::Device* device,
                std::shared_ptr<const Game> game,
                std::shared_ptr<Observer> infostate_observer,
                const std::array<RangeTable, 2>& tables,
@@ -204,7 +185,7 @@ void TrainEvalLoop(const std::string& game_name,
   // 4. Create network and optimizer.
   torch::manual_seed(kSeed);
   torch::Device device = FindDevice();
-  Net model(input_size, output_size, input_size * 3);
+  PositionalValueNet model(input_size, output_size, input_size * 3);
   model.to(device);
   torch::optim::SGD optimizer(model.parameters(),
                               torch::optim::SGDOptions(0.01).momentum(0.5));
