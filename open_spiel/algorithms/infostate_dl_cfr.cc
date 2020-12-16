@@ -89,7 +89,7 @@ void DepthLimitedCFR::PrepareLeafNodesForPublicStates() {
       public_observation.SetFrom(*some_state, kDefaultPlayerId);
       SPIEL_DCHECK_TRUE(DoStatesProduceEqualPublicObservations(
           *leaf_node, public_observation.Tensor()));
-      LeafPublicState* leaf_state = GetPublicLeaf(public_observation.Tensor());
+      LeafPublicState* leaf_state = GetPublicLeaf(public_observation);
       leaf_state->leaf_nodes[pl].push_back(leaf_node);
       leaf_positions_[leaf_node] = leaf_position;
       leaf_position++;
@@ -122,12 +122,12 @@ void DepthLimitedCFR::CreateContexts() {
 }
 
 LeafPublicState* DepthLimitedCFR::GetPublicLeaf(
-    absl::Span<float> public_tensor) {
+    const Observation& public_observation) {
   for (LeafPublicState& state : public_leaves_) {
-    if (state.public_tensor == public_tensor) return &state;
+    if (state.public_tensor == public_observation) return &state;
   }
   // None found: create and return the pointer.
-  public_leaves_.emplace_back(public_tensor);
+  public_leaves_.emplace_back(public_observation);
   LeafPublicState* state = &public_leaves_.back();
   state->public_id = public_leaves_.size() - 1;
   return state;
@@ -326,7 +326,7 @@ bool LeafPublicState::IsTerminal() const {
 }
 
 bool CheckChildPublicStateConsistency(
-    const CFRPublicState& cfr_public_state, const LeafPublicState& leaf_state) {
+    const CFRContext& cfr_public_state, const LeafPublicState& leaf_state) {
   auto trees = cfr_public_state.dlcfr->trees();
   for (int pl = 0; pl < 2; ++pl) {
     const InfostateNode& root = trees[pl]->root();
@@ -365,14 +365,14 @@ std::unique_ptr<PublicStateContext> CFREvaluator::CreateContext(
   auto dlcfr = std::make_unique<DepthLimitedCFR>(
       game, subgame_trees, leaf_evaluator, terminal_evaluator, public_observer,
       std::move(subgame_bandits));
-  auto cfr_public_state = std::make_unique<CFRPublicState>(std::move(dlcfr));
+  auto cfr_public_state = std::make_unique<CFRContext>(std::move(dlcfr));
   SPIEL_DCHECK_TRUE(CheckChildPublicStateConsistency(*cfr_public_state, state));
   return cfr_public_state;
 }
 
 void CFREvaluator::EvaluatePublicState(LeafPublicState* public_state,
                                        PublicStateContext* context) const {
-  auto* cfr_state = open_spiel::down_cast<CFRPublicState*>(context);
+  auto* cfr_state = open_spiel::down_cast<CFRContext*>(context);
   DepthLimitedCFR* dlcfr = cfr_state->dlcfr.get();
   dlcfr->SetPlayerRanges(public_state->ranges);
   dlcfr->RunSimultaneousIterations(num_cfr_iterations);

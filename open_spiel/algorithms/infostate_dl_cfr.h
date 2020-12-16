@@ -53,7 +53,7 @@ namespace dlcfr {
 struct LeafPublicState final {
   // An identification of the public state: a tensor of perfect recall
   // public observation.
-  const std::vector<float> public_tensor;
+  const Observation public_tensor;
   // For each player, store a pointer to a leaf node for this public state,
   // within the depth-limited infostate tree. If needed, you can get access
   // to its `State`s via `CFRNode::CorrespondingStates()`.
@@ -65,8 +65,8 @@ struct LeafPublicState final {
   // Position in the vector of DepthLimitedCFR::public_leaves_
   size_t public_id;
 
-  explicit LeafPublicState(absl::Span<float> tensor)
-      : public_tensor(tensor.begin(), tensor.end()) {}
+  explicit LeafPublicState(const Observation& public_observation)
+      : public_tensor(public_observation) {}
 
   // Check if the public state is terminal, i.e. it contains only states
   // that satisfy `State::IsTerminal()`.
@@ -184,7 +184,7 @@ class DepthLimitedCFR {
   void PrepareLeafNodesForPublicStates();
   void PrepareRangesAndValuesForPublicStates();
   void CreateContexts();
-  LeafPublicState* GetPublicLeaf(absl::Span<float> public_tensor);
+  LeafPublicState* GetPublicLeaf(const Observation& public_observation);
 
   // Internal checks.
   bool DoStatesProduceEqualPublicObservations(
@@ -194,9 +194,9 @@ class DepthLimitedCFR {
 
 // -- CFR evaluator ------------------------------------------------------------
 
-struct CFRPublicState : public PublicStateContext {
+struct CFRContext : public PublicStateContext {
   std::unique_ptr<DepthLimitedCFR> dlcfr;
-  explicit CFRPublicState(std::unique_ptr<DepthLimitedCFR> d)
+  explicit CFRContext(std::unique_ptr<DepthLimitedCFR> d)
       : dlcfr(std::move(d)) {}
 };
 
