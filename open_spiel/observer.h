@@ -127,6 +127,11 @@ struct TensorInfo {
   bool operator==(const TensorInfo& other) const {
     return name == other.name && shape == other.shape;
   }
+  size_t size() const {
+    size_t prod = 1;
+    for (int dim_size : shape) prod *= dim_size;
+    return prod;
+  }
 };
 
 // Allocates new memory for each allocation request and keeps track
@@ -260,6 +265,13 @@ inline constexpr IIGObservationType kHandObsType{
     .perfect_recall = false,
     .private_info = PrivateInfoType::kSinglePlayer};
 
+// Current private observation of a player.
+// In a card game like Poker this would be what it sees in its hand.
+inline constexpr IIGObservationType kHandHistoryObsType{
+    .public_info = false,
+    .perfect_recall = true,
+    .private_info = PrivateInfoType::kSinglePlayer};
+
 // An Observer is something which can produce an observation of a State,
 // e.g. a Tensor or collection of Tensors or a string.
 // Observers are game-specific. They are created by a Game object, and
@@ -299,6 +311,29 @@ class Observation {
 
   // Returns the internal buffer into which observations are written.
   absl::Span<float> Tensor() { return absl::MakeSpan(buffer_); }
+  absl::Span<const float> Tensor() const { return absl::MakeSpan(buffer_); }
+  absl::Span<float> Tensor(const std::string& name) {
+    size_t offset = 0;
+    size_t size = 0;
+    for (const TensorInfo& tensor : tensors_) {
+      size = tensor.size();
+      if (tensor.name == name) {
+        return absl::Span<float>(&buffer_[offset], size);
+      }
+      offset += size;
+    }
+  }
+  absl::Span<const float> Tensor(const std::string& name) const {
+    size_t offset = 0;
+    size_t size = 0;
+    for (const TensorInfo& tensor : tensors_) {
+      size = tensor.size();
+      if (tensor.name == name) {
+        return absl::Span<const float>(&buffer_[offset], size);
+      }
+      offset += size;
+    }
+  }
 
   // Returns information on the component tensors of the observation.
   const std::vector<TensorInfo>& tensor_info() const { return tensors_; }
