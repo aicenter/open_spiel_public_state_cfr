@@ -110,21 +110,11 @@ struct BatchData {
         // Pre-allocate all vectors.
         data(batch_size * input_size, 0.),
         targets(batch_size * output_size, 0.) {
-    std::cout << "# Made BatchData with sizes:\n"
-              << "#   batch_size=" << batch_size << "\n"
-              << "#   input_size=" << input_size << "\n"
-              << "#   output_size=" << output_size << "\n"
-              << "#   public_features_size=" << public_features_size << "\n"
-              << "#   ranges_size=" << ranges_size << "\n";
-    std::cout << "# Public features:\n";
     for (int i = 0; i < states.size(); ++i) {
       CopyFeatures(i, states[i]);
-      std::cout << "#   states[" << i << "].public_tensor\n#     "
-                << ObservationToString(states[i].public_tensor, "\n#     ") << "\n";
     }
-    std::cout << "# BatchData after feature copying:\n";
-    std::cout << "#   " << data << "\n";
   }
+
   // Copy public state features
   void CopyFeatures(int batch_index, const dlcfr::LeafPublicState& state) {
     const auto tensor = state.public_tensor.Tensor();

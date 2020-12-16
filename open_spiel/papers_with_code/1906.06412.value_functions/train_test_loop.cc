@@ -117,6 +117,8 @@ torch::Device FindDevice() {
   }
 }
 
+// <editor-fold desc=" Debugging functions ">
+
 void PrintRangeTables(const std::array<RangeTable, 2>& tables) {
   for (int pl = 0; pl < 2; ++pl) {
     std::cout << "# List of private hands for pl " << pl << "\n";
@@ -137,6 +139,25 @@ void PrintRangeTables(const std::array<RangeTable, 2>& tables) {
     }
   }
 }
+
+void PrintBatchData(const BatchData& batch,
+                    const std::vector<dlcfr::LeafPublicState>& states) {
+  std::cout << "# Made BatchData with sizes:\n"
+            << "#   batch_size=" << batch.batch_size << "\n"
+            << "#   input_size=" << batch.input_size << "\n"
+            << "#   output_size=" << batch.output_size << "\n"
+            << "#   public_features_size=" << batch.public_features_size << "\n"
+            << "#   ranges_size=" << batch.ranges_size << "\n";
+  std::cout << "# Public features:\n";
+  for (int i = 0; i < states.size(); ++i) {
+    std::cout << "#   states[" << i << "].public_tensor\n#     "
+              << ObservationToString(states[i].public_tensor, "\n#     ") << "\n";
+  }
+  std::cout << "# BatchData after feature copying:\n";
+  std::cout << "#   " << batch.data << "\n";
+}
+
+// </editor-fold>
 
 void TrainEvalLoop(const std::string& game_name,
                    int trunk_depth, int train_batches, int num_loops,
@@ -181,6 +202,7 @@ void TrainEvalLoop(const std::string& game_name,
   const size_t output_size = range_size_sum;
   BatchData batch(trunk_with_oracle->public_leaves(),
                   input_size, output_size, encoding_size, ranges_size);
+  PrintBatchData(batch, trunk_with_oracle->public_leaves());
 
   // 4. Create network and optimizer.
   torch::manual_seed(kSeed);
