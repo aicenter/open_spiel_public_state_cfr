@@ -13,10 +13,19 @@
 // limitations under the License.
 
 
+
+#include "open_spiel/abseil-cpp/absl/flags/flag.h"
+#include "open_spiel/abseil-cpp/absl/flags/usage.h"
+#include "open_spiel/abseil-cpp/absl/flags/parse.h"
+
+ABSL_FLAG(std::string, game_name, "kuhn_poker", "Game to run.");
+ABSL_FLAG(int, depth, 3, "Max depth of the trunk.");
+
 #include <random>
 
-#include "open_spiel/papers_with_code/1906.06412.value_functions/generate_data.h"
 #include "absl/random/random.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/generate_data.h"
+#include "open_spiel/utils/format_observation.h"
 #include "torch/torch.h"
 
 
@@ -83,22 +92,22 @@ class NetEvaluator final : public dlcfr::LeafEvaluator {
   void EvaluatePublicState(dlcfr::LeafPublicState* state,
                            dlcfr::PublicStateContext* context) const override {
     for (int pl = 0; pl < 2; ++pl) {
-      PlacementCopy<cfr_float, net_float>(
+      PlacementCopy<float_cfr, float_net>(
           absl::MakeSpan(state->ranges[pl]),
           batch_->ranges_at(state->public_id, pl),
-          tables_[pl].bijections[state->public_id].forward());
+          tables_[pl].bijections[state->public_id].tree_to_net());
     }
 
     torch::Tensor data = batch_->data_tensor_at(state->public_id).to(*device_);
     torch::Tensor output = model_->forward(data);
 
-//    std::cout << state->public_id << " " << data << " " << output << std::endl;
-
+    auto raw_output = (float*) output.data_ptr();
     for (int pl = 0; pl < 2; ++pl) {
-      PlacementCopy<net_float, cfr_float>(
-          absl::MakeSpan((float*) output.data_ptr(), batch_->ranges_size[pl]),
+      PlacementCopy<float_net, float_cfr>(
+          absl::MakeSpan(&raw_output[batch_->range_offset(pl)],
+                         batch_->ranges_size[pl]),
           absl::MakeSpan(state->values[pl]),
-          tables_[pl].bijections[state->public_id].backward());
+          tables_[pl].bijections[state->public_id].net_to_tree());
     }
   }
 };
@@ -127,9 +136,31 @@ torch::Device FindDevice() {
   }
 }
 
+void PrintRangeTables(const std::array<RangeTable, 2>& tables) {
+  for (int pl = 0; pl < 2; ++pl) {
+    std::cout << "# List of private hands for pl " << pl << "\n";
+    const RangeTable& table = tables[pl];
+    for (int i = 0; i < table.private_hands.size(); ++i) {
+      std::cout << "#   private_hand[" << i << "]:\n#      "
+                << ObservationToString(table.private_hands[i], "\n#      ") << "\n";
+    }
+
+    std::cout << "# List of bijections (tree -> net) for pl " << pl << "\n";
+    for (size_t i = 0; i < table.bijections.size(); ++i) {
+      std::cout << "#  Public state " << i << "\n";
+      const std::map<size_t, size_t>& tree_to_net =
+          table.bijections[i].tree_to_net();
+      for (auto&[key, val] : tree_to_net) {
+        std::cout << "#   " << key << " -> " << val << "\n";
+      }
+    }
+  }
+}
+
 void TrainEvalLoop(const std::string& game_name,
                    int trunk_depth, int train_batches, int num_loops,
-                   int trunk_eval_iterations) {
+                   int cfr_oracle_iterations, int trunk_eval_iterations,
+                   bool verbose_every_loop) {
 
   // 1. Prepare the game, observers and depth-limited (trunk) trees.
   std::shared_ptr<const Game> game = LoadGame(game_name);
@@ -138,7 +169,7 @@ void TrainEvalLoop(const std::string& game_name,
   std::shared_ptr<Observer> public_observer =
       game->MakeObserver(kPublicStateObsType, {});
   std::shared_ptr<Observer> hand_observer =
-      game->MakeObserver(kHandObsType, {});
+      game->MakeObserver(kHandHistoryObsType, {});
   std::vector<std::shared_ptr<InfostateTree>> trunk_trees = {
       MakeInfostateTree(*game, 0, trunk_depth),
       MakeInfostateTree(*game, 1, trunk_depth)
@@ -147,8 +178,10 @@ void TrainEvalLoop(const std::string& game_name,
   // 2. Create value oracle for the trunk.
   std::shared_ptr<const dlcfr::LeafEvaluator> terminal_evaluator =
       dlcfr::MakeTerminalEvaluator();
-  auto oracle_evaluator = std::make_shared<ortools::OracleEvaluator>(
-      game, infostate_observer);
+  auto oracle_evaluator = std::make_shared<dlcfr::CFREvaluator>(
+      game, /*full_subgame_depth=*/100, /*no_leaf_evaluator=*/nullptr,
+      terminal_evaluator, public_observer, infostate_observer);
+  oracle_evaluator->num_cfr_iterations = cfr_oracle_iterations;
   auto trunk_with_oracle = std::make_unique<dlcfr::DepthLimitedCFR>(
       game, trunk_trees, oracle_evaluator, terminal_evaluator, public_observer,
       MakeBanditVectors(trunk_trees, "FixableStrategy"));
@@ -156,9 +189,10 @@ void TrainEvalLoop(const std::string& game_name,
   // 3. Make a Batch of data that encompasses all leaf public states.
   std::array<RangeTable, 2> tables = CreateRangeTables(
       *game, hand_observer, trunk_with_oracle->public_leaves());
+  PrintRangeTables(tables);
   const dlcfr::LeafPublicState& some_leaf =
       trunk_with_oracle->public_leaves().at(0);
-  const size_t encoding_size = some_leaf.public_tensor.size();
+  const size_t encoding_size = some_leaf.public_tensor.Tensor().size();
   std::array<size_t, 2> ranges_size = {tables[0].largest_range(),
                                        tables[1].largest_range()};
   const size_t range_size_sum = ranges_size[0] + ranges_size[1];
@@ -193,10 +227,11 @@ void TrainEvalLoop(const std::string& game_name,
     double cumul_loss = 0.;
     std::cout << "# Training  ";
     for (int i = 0; i < train_batches; ++i) {
-      std::cout << '.' << std::flush;
-      GenerateData(tables, trunk_with_oracle.get(), &batch, rnd_gen);
+      GenerateData(tables, trunk_with_oracle.get(), &batch, rnd_gen,
+          /*verbose=*/(i == 0 && verbose_every_loop) || (i == 0 && loop == 0));
       torch::Tensor loss = TrainNetwork(&model, &device, &optimizer, &batch);
       cumul_loss += loss.item().to<double>();
+      std::cout << '.' << std::flush;
     }
     std::cout << std::endl;
 
@@ -216,9 +251,14 @@ void TrainEvalLoop(const std::string& game_name,
 }  // namespace open_spiel
 
 int main(int argc, char** argv) {
-  open_spiel::papers_with_code::TrainEvalLoop("kuhn_poker",
-      /*trunk_depth=*/3,
+  absl::ParseCommandLine(argc, argv);
+
+  open_spiel::papers_with_code::TrainEvalLoop(
+      absl::GetFlag(FLAGS_game_name),
+      /*trunk_depth=*/absl::GetFlag(FLAGS_depth),
       /*train_batches=*/8,
       /*num_loops=*/100,
-      /*trunk_eval_iterations=*/1000);
+      /*cfr_oracle_iterations=*/100,
+      /*trunk_eval_iterations=*/100,
+      /*verbose_every_loop*/false);
 }

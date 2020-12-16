@@ -26,6 +26,7 @@
 
 #include "open_spiel/algorithms/infostate_dl_cfr.h"
 #include "open_spiel/algorithms/ortools/dl_oracle_evaluator.h"
+#include "open_spiel/utils/format_observation.h"
 
 namespace open_spiel {
 namespace papers_with_code {
@@ -45,8 +46,13 @@ struct BijectiveContainer {
     x2y[x] = y;
     y2x[y] = x;
   }
-  const std::map<T, T>& forward() const { return x2y; }
-  const std::map<T, T>& backward() const { return y2x; }
+  const std::map<T, T>& tree_to_net() const { return x2y; }
+  const std::map<T, T>& net_to_tree() const { return y2x; }
+
+  size_t size() const {
+    SPIEL_CHECK_EQ(x2y.size(), y2x.size());
+    return x2y.size();
+  }
 };
 
 
@@ -64,7 +70,7 @@ struct RangeTable {
 
   RangeTable(int num_public_states) : bijections(num_public_states) {}
   int largest_range() const;
-  int hand_index(const Observation& obs);
+  size_t hand_index(const Observation& obs);
 };
 
 std::array<RangeTable, 2> CreateRangeTables(
@@ -72,18 +78,16 @@ std::array<RangeTable, 2> CreateRangeTables(
     const std::shared_ptr<Observer>& hand_observer,
     const std::vector<dlcfr::LeafPublicState>& public_leaves);
 
-using net_float = float;   // Floats used in the neural network.
-using cfr_float = double;  // Floats used in the cfr computation.
+using float_net = float;   // Floats used in the neural network.
+using float_cfr = double;  // Floats used in the cfr computation.
 
 // Copy non-contiguous vectors using a permutation map.
 // This also converts float <-> double as needed.
 template<typename From, typename To>
 void PlacementCopy(absl::Span<const From> from, absl::Span<To> to,
                    std::map<size_t, size_t> from_to) {
-  SPIEL_CHECK_EQ(from.size(), from_to.size());
-  for (size_t i = 0; i < from.size(); ++i) {
-    const int j = from_to[i];
-    to[j] = from[i];
+  for (const auto& [f, t] : from_to) {
+    to[t] = from[f];
   }
 }
 
@@ -106,16 +110,40 @@ struct BatchData {
         // Pre-allocate all vectors.
         data(batch_size * input_size, 0.),
         targets(batch_size * output_size, 0.) {
+    std::cout << "# Made BatchData with sizes:\n"
+              << "#   batch_size=" << batch_size << "\n"
+              << "#   input_size=" << input_size << "\n"
+              << "#   output_size=" << output_size << "\n"
+              << "#   public_features_size=" << public_features_size << "\n"
+              << "#   ranges_size=" << ranges_size << "\n";
+    std::cout << "# Public features:\n";
     for (int i = 0; i < states.size(); ++i) {
       CopyFeatures(i, states[i]);
+      std::cout << "#   states[" << i << "].public_tensor\n#     "
+                << ObservationToString(states[i].public_tensor, "\n#     ") << "\n";
     }
+    std::cout << "# BatchData after feature copying:\n";
+    std::cout << "#   " << data << "\n";
   }
   // Copy public state features
   void CopyFeatures(int batch_index, const dlcfr::LeafPublicState& state) {
-    std::copy(state.public_tensor.begin(),
-              state.public_tensor.end(),
-              data.begin() + batch_index * input_size);
+    const auto tensor = state.public_tensor.Tensor();
+    std::copy(tensor.begin(), tensor.end(),
+              data.begin() + (batch_index * input_size));
   }
+  // Zero-out ranges and values, keep the features.
+  void Reset() {
+    for (int batch_index = 0; batch_index < batch_size; ++batch_index) {
+      // Ranges are tricky: skip over the public features.
+      size_t begin_offset = batch_index * input_size + public_features_size;
+      size_t end_offset = (batch_index + 1) * input_size;
+      std::fill(data.begin() + begin_offset,
+                data.begin() + end_offset, 0.);
+    }
+    // Values are easy: put zeros everywhere.
+    std::fill(targets.begin(), targets.end(), 0.);
+  }
+
   torch::Tensor data_tensor() {
     return at::from_blob((void*) data.data(),
                          {batch_size, input_size}, at::kFloat);
@@ -135,21 +163,30 @@ struct BatchData {
     return absl::MakeSpan(&targets[batch_index * output_size], output_size);
   }
   absl::Span<float> ranges_at(int batch_index, Player pl) {
-    const size_t offset = pl == 1 ? ranges_size[0] : 0;
+    const size_t offset = range_offset(pl);
     return absl::MakeSpan(
         &data[batch_index * input_size + public_features_size + offset],
         ranges_size[pl]);
   }
   absl::Span<float> values_at(int batch_index, Player pl) {
-    const size_t offset = pl == 1 ? ranges_size[0] : 0;
-    return absl::MakeSpan(&data[batch_index * output_size + offset],
+    const size_t offset = values_offset(pl);
+    return absl::MakeSpan(&targets[batch_index * output_size + offset],
                           ranges_size[pl]);
+  }
+  size_t range_offset(Player pl) const {
+    return pl == 1 ? ranges_size[0] : 0;
+  }
+  size_t values_offset(Player pl) const {
+    return pl == 1 ? ranges_size[0] : 0;
   }
 };
 
+void RandomizeTrunkStrategy(std::vector<BanditVector>& bandits,
+                            std::mt19937& rnd_gen, double prob_pure_strat);
+
 void GenerateData(const std::array<RangeTable, 2>& tables,
                   dlcfr::DepthLimitedCFR* trunk, BatchData* batch,
-                  std::mt19937 rnd_gen);
+                  std::mt19937& rnd_gen, bool verbose = false);
 
 }  // papers_with_code
 }  // open_spiel

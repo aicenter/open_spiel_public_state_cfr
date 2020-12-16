@@ -27,10 +27,8 @@ namespace papers_with_code {
 
 using namespace open_spiel::algorithms;
 
-namespace {
-
 void RandomizeTrunkStrategy(std::vector<BanditVector>& bandits,
-                            std::mt19937 rnd_gen, double prob_pure_strat) {
+                            std::mt19937& rnd_gen, double prob_pure_strat) {
   for (int pl = 0; pl < 2; ++pl) {
     for (DecisionId id : bandits[pl].range()) {
       // Randomize current policy
@@ -62,29 +60,47 @@ void RandomizeTrunkStrategy(std::vector<BanditVector>& bandits,
   }
 }
 
-} // namespace
-
-// Copy train data into network batch.
+// Copy generated train data into a network batch.
 void CopyRangesAndValues(dlcfr::DepthLimitedCFR* trunk,
                          const std::array<RangeTable, 2>& tables,
-                         BatchData* batch) {
+                         BatchData* batch, bool verbose = false) {
   const std::vector<dlcfr::LeafPublicState>& leaves = trunk->public_leaves();
+  SPIEL_DCHECK_EQ(batch->batch_size, leaves.size());
   for (int i = 0; i < leaves.size(); ++i) {
     for (int pl = 0; pl < 2; ++pl) {
-      PlacementCopy<cfr_float, net_float>(
+      PlacementCopy<float_cfr, float_net>(
           absl::MakeSpan(leaves[i].ranges[pl]),
           batch->ranges_at(i, pl),
-          tables[pl].bijections[i].forward());
-      PlacementCopy<cfr_float, net_float>(
+          tables[pl].bijections[i].tree_to_net());
+      PlacementCopy<float_cfr, float_net>(
           leaves[i].values[pl], batch->values_at(i, pl),
-          tables[pl].bijections[i].forward());
+          tables[pl].bijections[i].tree_to_net());
     }
+  }
+
+  if (verbose) {
+    std::cout << "\n# BatchData copying ranges and values:\n";
+    for (int i = 0; i < leaves.size(); ++i) {
+      for (int pl = 0; pl < 2; ++pl) {
+        std::cout << "#   leaves[" << i << "].ranges[" << pl << "]    = "
+                  << leaves[i].ranges[pl] << "\n";
+        std::cout << "#   batch->ranges_at(" << i << ", " << pl << ") = "
+                  << batch->ranges_at(i, pl) << "\n";
+        std::cout << "#   leaves[" << i << "].values[" << pl << "]    = "
+                  << leaves[i].values[pl] << "\n";
+        std::cout << "#   batch->values_at(" << i << ", " << pl << ") = "
+                  << batch->values_at(i, pl) << "\n";
+      }
+    }
+    std::cout << "#\n";
+    std::cout << "#   batch->data    = " << batch->data << "\n";
+    std::cout << "#   batch->targets = " << batch->targets << "\n";
   }
 }
 
 int RangeTable::largest_range() const { return private_hands.size(); }
 
-int RangeTable::hand_index(const Observation& obs) {
+size_t RangeTable::hand_index(const Observation& obs) {
   auto it = std::find(private_hands.begin(), private_hands.end(), obs);
   if (it == private_hands.end()) {
     private_hands.push_back(obs);
@@ -99,14 +115,16 @@ std::array<RangeTable, 2> CreateRangeTables(
     const std::vector<dlcfr::LeafPublicState>& public_leaves) {
   std::array<RangeTable, 2> tables{public_leaves.size(), public_leaves.size()};
   Observation hand(game, hand_observer);
-  for (int i = 0; i < public_leaves.size(); ++i) {
-    const dlcfr::LeafPublicState& state = public_leaves[i];
+  for (int state_idx = 0; state_idx < public_leaves.size(); ++state_idx) {
+    const dlcfr::LeafPublicState& state = public_leaves[state_idx];
     for (int pl = 0; pl < 2; ++pl) {
-      for (int j = 0; j < state.leaf_nodes[pl].size(); ++j) {
-        const InfostateNode* node = state.leaf_nodes[pl][j];
+      for (int i = 0; i < state.leaf_nodes[pl].size(); ++i) {
+        const InfostateNode* node = state.leaf_nodes[pl][i];
+        // All states within an infostate should have the same hands.
         const State& some_state = *node->corresponding_states().at(0);
         hand.SetFrom(some_state, pl);
-        tables[pl].bijections[i].put({tables[pl].hand_index(hand), j});
+        size_t j = tables[pl].hand_index(hand);
+        tables[pl].bijections[state_idx].put({i, j});
       }
     }
   }
@@ -114,14 +132,19 @@ std::array<RangeTable, 2> CreateRangeTables(
 }
 void GenerateData(const std::array<RangeTable, 2>& tables,
                   dlcfr::DepthLimitedCFR* trunk, BatchData* batch,
-                  std::mt19937 rnd_gen) {
+                  std::mt19937& rnd_gen, bool verbose) {
   RandomizeTrunkStrategy(trunk->bandits(), rnd_gen, /*prob_pure_strat=*/0.9);
   trunk->RunSimultaneousIterations(1);
-  CopyRangesAndValues(trunk, tables, batch);
-//  for (int i = 0; i < batch->batch_size; ++i) {
-//    std::cout << "Inputs: " << batch->data_at(i) << std::endl;
-//    std::cout << "Outputs: " << batch->targets_at(i) << std::endl;
-//  }
+  CopyRangesAndValues(trunk, tables, batch, verbose);
+
+  if (verbose) {
+    for (int i = 0; i < batch->batch_size; ++i) {
+      std::cout << "# Public state " << i << std::endl;
+      std::cout << "#   Inputs:  " << batch->data_at(i) << std::endl;
+      std::cout << "#   Outputs: " << batch->targets_at(i) << std::endl;
+    }
+    std::cout << "\n# ";
+  }
 }
 
 }  // papers_with_code
