@@ -1,7 +1,9 @@
 add_library(paper_value_functions OBJECT
   generate_data.h
   generate_data.cc
-  neural_nets.h
+  net_architectures.h
+  net_dl_evaluator.h
+  torch_utils.h
   )
 
 add_executable(value_functions_train_test_loop train_test_loop.cc

@@ -72,10 +72,14 @@ void CopyRangesAndValues(dlcfr::DepthLimitedCFR* trunk,
           /*tree=*/ leaves[i].ranges[pl],
           /*net=*/  batch->ranges_at(i, pl),
           tables[pl].bijections[i].tree_to_net());
-      PlacementCopy<float_tree, float_net>(
-          /*tree=*/ leaves[i].values[pl],
-          /*net=*/  batch->values_at(i, pl),
-          tables[pl].bijections[i].tree_to_net());
+      // TODO: revert!!
+      for (int j = 0; j < batch->values_at(i, pl).size(); ++j) {
+        batch->values_at(i, pl)[j] = 1.;
+      }
+//      PlacementCopy<float_tree, float_net>(
+//          /*tree=*/ leaves[i].values[pl],
+//          /*net=*/  batch->values_at(i, pl),
+//          tables[pl].bijections[i].tree_to_net());
     }
   }
 

@@ -25,7 +25,9 @@ ABSL_FLAG(int, depth, 3, "Max depth of the trunk.");
 
 #include "absl/random/random.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/generate_data.h"
-#include "open_spiel/papers_with_code/1906.06412.value_functions/neural_nets.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/net_architectures.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/net_dl_evaluator.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/torch_utils.h"
 #include "open_spiel/utils/format_observation.h"
 #include "torch/torch.h"
 
@@ -51,50 +53,6 @@ torch::Tensor TrainNetwork(ValueNet* model, torch::Device* device,
   return loss;
 }
 
-class NetEvaluator final : public dlcfr::LeafEvaluator {
-  ValueNet* model_;
-  torch::Device* device_;
-  std::shared_ptr<const Game> game_;
-  std::shared_ptr<Observer> infostate_observer_;
-  const std::array<RangeTable, 2>& tables_;
-  BatchData* batch_;
-
- public:
-  NetEvaluator(ValueNet* model, torch::Device* device,
-               std::shared_ptr<const Game> game,
-               std::shared_ptr<Observer> infostate_observer,
-               const std::array<RangeTable, 2>& tables,
-               BatchData* batch)
-      : model_(model), device_(device), game_(std::move(game)),
-        infostate_observer_(std::move(infostate_observer)),
-        tables_(tables), batch_(batch) {}
-
-
-  void EvaluatePublicState(dlcfr::LeafPublicState* state,
-                           dlcfr::PublicStateContext* context) const override {
-    for (int pl = 0; pl < 2; ++pl) {
-      PlacementCopy<float_tree, float_net>(
-          /*tree=*/ state->ranges[pl],
-          /*net=*/  batch_->ranges_at(state->public_id, pl),
-          tables_[pl].bijections[state->public_id].tree_to_net());
-    }
-
-    torch::Tensor data = batch_->data_tensor_at(state->public_id).to(*device_);
-    torch::Tensor output = model_->forward(data);
-
-    auto raw_output = (float*) output.data_ptr();
-    for (int pl = 0; pl < 2; ++pl) {
-      const size_t player_offset = batch_->range_offset(pl);
-      absl::Span<const float_net> net_values(&raw_output[player_offset],
-                                             batch_->ranges_size[pl]);
-      PlacementCopy<float_net, float_tree>(
-          /*net= */ net_values,
-          /*tree=*/ absl::MakeSpan(state->values[pl]),
-          tables_[pl].bijections[state->public_id].net_to_tree());
-    }
-  }
-};
-
 double EvaluateNetwork(dlcfr::DepthLimitedCFR* trunk_with_net, int iterations,
                        ortools::SequenceFormLpSpecification* whole_game) {
   for (BanditVector& bandits : trunk_with_net->bandits()) {
@@ -107,16 +65,6 @@ double EvaluateNetwork(dlcfr::DepthLimitedCFR* trunk_with_net, int iterations,
   std::cout << " (trunk expl) ";
   return ortools::TrunkExploitability(
       whole_game, *trunk_with_net->AveragePolicy());
-}
-
-torch::Device FindDevice() {
-  if (torch::cuda::is_available()) {
-    std::cerr << "# CUDA available! Training on GPU." << std::endl;
-    return torch::Device(torch::kCUDA);
-  } else {
-    std::cerr << "# Training on CPU." << std::endl;
-    return torch::Device(torch::kCPU);
-  }
 }
 
 // <editor-fold desc=" Debugging functions ">
@@ -211,8 +159,8 @@ void TrainEvalLoop(const std::string& game_name,
   torch::Device device = FindDevice();
   PositionalValueNet model(input_size, output_size, input_size * 3);
   model.to(device);
-  torch::optim::SGD optimizer(model.parameters(),
-                              torch::optim::SGDOptions(0.01).momentum(0.5));
+  torch::optim::SGD optimizer(
+      model.parameters(), torch::optim::SGDOptions(/*lr=*/0.01));
 
   // 5. Create trunk net evaluator.
   auto net_evaluator = std::make_shared<NetEvaluator>(
@@ -262,7 +210,7 @@ int main(int argc, char** argv) {
       absl::GetFlag(FLAGS_game_name),
       /*trunk_depth=*/absl::GetFlag(FLAGS_depth),
       /*train_batches=*/8,
-      /*num_loops=*/100,
+      /*num_loops=*/1000,
       /*cfr_oracle_iterations=*/100,
       /*trunk_eval_iterations=*/100,
       /*verbose_every_loop*/false);

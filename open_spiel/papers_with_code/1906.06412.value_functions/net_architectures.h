@@ -41,9 +41,9 @@ struct PositionalValueNet final : public ValueNet {
   }
 
   torch::Tensor forward(torch::Tensor x) {
-    x = torch::relu(fc1->forward(x));
-    x = torch::relu(fc2->forward(x));
-    return torch::relu(fc3->forward(x));
+    x = torch::sigmoid(fc1->forward(x));
+    x = torch::sigmoid(fc2->forward(x));
+    return torch::sigmoid(fc3->forward(x));
   }
 };
 
