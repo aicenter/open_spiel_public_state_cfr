@@ -66,21 +66,22 @@ void CopyRangesAndValues(dlcfr::DepthLimitedCFR* trunk,
                          BatchData* batch, bool verbose = false) {
   const std::vector<dlcfr::LeafPublicState>& leaves = trunk->public_leaves();
   SPIEL_DCHECK_EQ(batch->batch_size, leaves.size());
-  for (int i = 0; i < leaves.size(); ++i) {
+  for (size_t i = 0; i < leaves.size(); ++i) {
     for (int pl = 0; pl < 2; ++pl) {
-      PlacementCopy<float_cfr, float_net>(
-          absl::MakeSpan(leaves[i].ranges[pl]),
-          batch->ranges_at(i, pl),
+      PlacementCopy<float_tree, float_net>(
+          /*tree=*/ leaves[i].ranges[pl],
+          /*net=*/  batch->ranges_at(i, pl),
           tables[pl].bijections[i].tree_to_net());
-      PlacementCopy<float_cfr, float_net>(
-          leaves[i].values[pl], batch->values_at(i, pl),
+      PlacementCopy<float_tree, float_net>(
+          /*tree=*/ leaves[i].values[pl],
+          /*net=*/  batch->values_at(i, pl),
           tables[pl].bijections[i].tree_to_net());
     }
   }
 
   if (verbose) {
     std::cout << "\n# BatchData copying ranges and values:\n";
-    for (int i = 0; i < leaves.size(); ++i) {
+    for (size_t i = 0; i < leaves.size(); ++i) {
       for (int pl = 0; pl < 2; ++pl) {
         std::cout << "#   leaves[" << i << "].ranges[" << pl << "]    = "
                   << leaves[i].ranges[pl] << "\n";
@@ -110,6 +111,18 @@ size_t RangeTable::hand_index(const Observation& obs) {
   }
 }
 
+bool AllStatesHaveSameHands(const Observation& expected_hand, Player player,
+                            const std::vector<std::unique_ptr<State>>& states) {
+  Observation actual_hand(expected_hand);
+  for (const std::unique_ptr<State>& state : states) {
+    actual_hand.SetFrom(*state, player);
+    if (actual_hand != expected_hand) {
+      return false;
+    }
+  }
+  return true;
+}
+
 std::array<RangeTable, 2> CreateRangeTables(
     const Game& game, const std::shared_ptr<Observer>& hand_observer,
     const std::vector<dlcfr::LeafPublicState>& public_leaves) {
@@ -120,9 +133,10 @@ std::array<RangeTable, 2> CreateRangeTables(
     for (int pl = 0; pl < 2; ++pl) {
       for (int i = 0; i < state.leaf_nodes[pl].size(); ++i) {
         const InfostateNode* node = state.leaf_nodes[pl][i];
-        // All states within an infostate should have the same hands.
         const State& some_state = *node->corresponding_states().at(0);
         hand.SetFrom(some_state, pl);
+        SPIEL_DCHECK_TRUE(  // Should hold for all states within an infostate.
+            AllStatesHaveSameHands(hand, pl, node->corresponding_states()));
         size_t j = tables[pl].hand_index(hand);
         tables[pl].bijections[state_idx].put({i, j});
       }

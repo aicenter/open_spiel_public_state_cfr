@@ -365,6 +365,7 @@ class Observation {
     return buffer_ == other.buffer_
         && tensors_ == other.tensors_;
   }
+  bool operator!=(const Observation& other) const { return !(*this == other); }
 
  private:
   std::shared_ptr<Observer> observer_;

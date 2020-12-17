@@ -73,9 +73,9 @@ class NetEvaluator final : public dlcfr::LeafEvaluator {
   void EvaluatePublicState(dlcfr::LeafPublicState* state,
                            dlcfr::PublicStateContext* context) const override {
     for (int pl = 0; pl < 2; ++pl) {
-      PlacementCopy<float_cfr, float_net>(
-          absl::MakeSpan(state->ranges[pl]),
-          batch_->ranges_at(state->public_id, pl),
+      PlacementCopy<float_tree, float_net>(
+          /*tree=*/ state->ranges[pl],
+          /*net=*/  batch_->ranges_at(state->public_id, pl),
           tables_[pl].bijections[state->public_id].tree_to_net());
     }
 
@@ -84,10 +84,12 @@ class NetEvaluator final : public dlcfr::LeafEvaluator {
 
     auto raw_output = (float*) output.data_ptr();
     for (int pl = 0; pl < 2; ++pl) {
-      PlacementCopy<float_net, float_cfr>(
-          absl::MakeSpan(&raw_output[batch_->range_offset(pl)],
-                         batch_->ranges_size[pl]),
-          absl::MakeSpan(state->values[pl]),
+      const size_t player_offset = batch_->range_offset(pl);
+      absl::Span<const float_net> net_values(&raw_output[player_offset],
+                                             batch_->ranges_size[pl]);
+      PlacementCopy<float_net, float_tree>(
+          /*net= */ net_values,
+          /*tree=*/ absl::MakeSpan(state->values[pl]),
           tables_[pl].bijections[state->public_id].net_to_tree());
     }
   }

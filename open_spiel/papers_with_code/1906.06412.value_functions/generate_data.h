@@ -78,8 +78,8 @@ std::array<RangeTable, 2> CreateRangeTables(
     const std::shared_ptr<Observer>& hand_observer,
     const std::vector<dlcfr::LeafPublicState>& public_leaves);
 
-using float_net = float;   // Floats used in the neural network.
-using float_cfr = double;  // Floats used in the cfr computation.
+using float_net = float;    // Floats used in the neural network.
+using float_tree = double;  // Floats used in the cfr computation.
 
 // Copy non-contiguous vectors using a permutation map.
 // This also converts float <-> double as needed.
