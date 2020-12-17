@@ -43,7 +43,7 @@ struct BatchData {
       // Pre-allocate all vectors.
         data(batch_size * input_size, 0.),
         targets(batch_size * output_size, 0.) {
-    for (int i = 0; i < states.size(); ++i) {
+    for (size_t i = 0; i < states.size(); ++i) {
       CopyFeatures(i, states[i]);
     }
   }
@@ -56,7 +56,7 @@ struct BatchData {
   }
   // Zero-out ranges and values, keep the features.
   void Reset() {
-    for (int batch_index = 0; batch_index < batch_size; ++batch_index) {
+    for (size_t batch_index = 0; batch_index < batch_size; ++batch_index) {
       // Ranges are tricky: skip over the public features.
       size_t begin_offset = batch_index * input_size + public_features_size;
       size_t end_offset = (batch_index + 1) * input_size;

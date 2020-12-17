@@ -20,7 +20,7 @@ namespace bandits {
 
 // -- RegretMatching -----------------------------------------------------------
 
-RegretMatching::RegretMatching(size_t num_actions)
+RegretMatching::RegretMatching(int num_actions)
     : Bandit(num_actions),
       cumulative_regrets_(num_actions, 0.),
       cumulative_strategy_(num_actions, 0.)  {}
@@ -85,7 +85,7 @@ void RegretMatching::Reset() {
 
 // -- RegretMatchingPlus -------------------------------------------------------
 
-RegretMatchingPlus::RegretMatchingPlus(size_t num_actions)
+RegretMatchingPlus::RegretMatchingPlus(int num_actions)
     : Bandit(num_actions),
       cumulative_regrets_(num_actions, 0.),
       cumulative_strategy_(num_actions, 0.) {}
@@ -152,7 +152,7 @@ void RegretMatchingPlus::Reset() {
 
 // -- PredictiveRegretMatching -------------------------------------------------
 
-PredictiveRegretMatching::PredictiveRegretMatching(size_t num_actions)
+PredictiveRegretMatching::PredictiveRegretMatching(int num_actions)
     : Bandit(num_actions),
       cumulative_regrets_(num_actions, 0.),
       cumulative_strategy_(num_actions, 0.),
@@ -239,7 +239,7 @@ void PredictiveRegretMatching::Reset() {
 // -- PredictiveRegretMatchingPlus ---------------------------------------------
 
 
-PredictiveRegretMatchingPlus::PredictiveRegretMatchingPlus(size_t num_actions)
+PredictiveRegretMatchingPlus::PredictiveRegretMatchingPlus(int num_actions)
     : Bandit(num_actions),
       cumulative_regrets_(num_actions, 0.),
       cumulative_strategy_(num_actions, 0.),
@@ -340,7 +340,7 @@ void PredictiveRegretMatchingPlus::Reset() {
 }  // namespace bandits
 
 std::unique_ptr<bandits::Bandit> MakeBandit(
-    const std::string& bandit_name, size_t num_actions,
+    const std::string& bandit_name, int num_actions,
     GameParameters bandit_params) {
   if (bandit_name == "RegretMatching") {
     return std::make_unique<bandits::RegretMatching>(num_actions);

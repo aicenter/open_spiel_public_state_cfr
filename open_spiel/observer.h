@@ -322,6 +322,7 @@ class Observation {
       }
       offset += size;
     }
+    SpielFatalError("Tensor not found");
   }
   absl::Span<const float> Tensor(const std::string& name) const {
     size_t offset = 0;
@@ -333,6 +334,7 @@ class Observation {
       }
       offset += size;
     }
+    SpielFatalError("Tensor not found");
   }
 
   // Returns information on the component tensors of the observation.

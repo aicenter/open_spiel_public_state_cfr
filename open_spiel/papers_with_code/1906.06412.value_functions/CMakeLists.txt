@@ -1,3 +1,5 @@
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-everything")
+
 add_library(paper_value_functions OBJECT
   generate_data.h
   generate_data.cc

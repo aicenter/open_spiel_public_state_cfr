@@ -674,13 +674,13 @@ class TreeVector {
   }
   T& operator[](const Id& id) {
     SPIEL_DCHECK_TRUE(id.BelongsToTree(tree_));
-    SPIEL_DCHECK_LE(0, id.id());
+    SPIEL_DCHECK_LE(size_t{0}, id.id());
     SPIEL_DCHECK_LT(id.id(), vec_.size());
     return vec_[id.id()];
   }
   const T& operator[](const Id& id) const {
     SPIEL_DCHECK_TRUE(id.BelongsToTree(tree_));
-    SPIEL_DCHECK_LE(0, id.id());
+    SPIEL_DCHECK_LE(size_t{0}, id.id());
     SPIEL_DCHECK_LT(id.id(), vec_.size());
     return vec_[id.id()];
   }

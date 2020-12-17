@@ -29,9 +29,7 @@ namespace papers_with_code {
 
 using namespace algorithms;
 
-constexpr size_t kSeed = 1;
-constexpr char* kUseBanditsForCfr = "PredictiveRegretMatchingPlus";
-
+constexpr size_t kSeed = 0;
 
 torch::Tensor TrainNetwork(ValueNet* model, torch::Device* device,
                            torch::optim::Optimizer* optimizer,
@@ -62,7 +60,7 @@ void PrepareTestData(const std::vector<dlcfr::RangeTable>& tables,
           /*net=*/  batch->ranges_at(i, pl),
                     tables[pl].bijections[i].tree_to_net());
       // Set fixed values.
-      for (int j = 0; j < batch->values_at(i, pl).size(); ++j) {
+      for (size_t j = 0; j < batch->values_at(i, pl).size(); ++j) {
         batch->values_at(i, pl)[j] = 1.;
       }
     }
@@ -71,9 +69,9 @@ void PrepareTestData(const std::vector<dlcfr::RangeTable>& tables,
 
 void LearnFixedValuesTest(std::unique_ptr<Trunk> t,
                           int train_batches, int num_loops) {
-  // 1. Create network and optimizer.
   std::mt19937 rnd_gen(kSeed);
-  torch::manual_seed(kSeed);
+
+  // 1. Create network and optimizer.
   torch::Device device = FindDevice();
   PositionalValueNet model(t->batch->input_size, t->batch->output_size,
                            t->batch->input_size * 3);
@@ -82,7 +80,8 @@ void LearnFixedValuesTest(std::unique_ptr<Trunk> t,
                               torch::optim::SGDOptions(/*lr=*/0.4));
 
   // 2. Make a single target.
-  PrepareTestData(t->tables, t->trunk_with_oracle.get(), t->batch.get(), rnd_gen);
+  PrepareTestData(t->tables, t->trunk_with_oracle.get(),
+                  t->batch.get(), rnd_gen);
 
   // 3. Train the network.
   double avg_loss;
@@ -108,7 +107,7 @@ void LearnFixedValuesTest(std::unique_ptr<Trunk> t,
 
   SPIEL_CHECK_LT(avg_loss, 1e-3);
   for (int pl = 0; pl < 2; ++pl) {
-    for (int i = 0; i < some_leaf.values[pl].size(); ++i) {
+    for (size_t i = 0; i < some_leaf.values[pl].size(); ++i) {
       SPIEL_CHECK_TRUE(Near<double>(some_leaf.values[pl][i], 1., 0.03));
     }
   }

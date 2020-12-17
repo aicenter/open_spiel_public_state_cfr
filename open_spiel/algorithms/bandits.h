@@ -58,13 +58,13 @@ class Bandit {
  protected:
   std::vector<double> current_strategy_;
  public:
-  Bandit(size_t num_actions) :
+  Bandit(int num_actions) :
       current_strategy_(num_actions, 1. / num_actions) {
     SPIEL_CHECK_GT(num_actions, 0);
   }
   virtual ~Bandit() = default;
   // Return the positive number of actions (arms) available to the bandit.
-  size_t num_actions() const { return current_strategy_.size(); }
+  int num_actions() const { return current_strategy_.size(); }
 
   // Reset the bandit to the same state as when it was constructed.
   virtual void Reset() {
@@ -114,7 +114,7 @@ class Bandit {
 // A bandit that always a uniform strategy.
 class UniformStrategy final : public Bandit {
  public:
-  UniformStrategy(size_t num_actions) : Bandit(num_actions) {}
+  UniformStrategy(int num_actions) : Bandit(num_actions) {}
   void ComputeStrategy(size_t current_time, double weight = 1.) override {}
   void ObserveRewards(absl::Span<const double> rewards) override {}
   void Reset() override {}  // No need to reset anything.
@@ -136,7 +136,7 @@ class FixedStrategy final : public Bandit {
 // A bandit that can be dynamically set to return a requested strategy.
 class FixableStrategy final : public Bandit {
  public:
-  FixableStrategy(size_t num_actions) : Bandit(num_actions) {}
+  FixableStrategy(int num_actions) : Bandit(num_actions) {}
   std::vector<double>& mutable_strategy() { return current_strategy_; }
   void ComputeStrategy(size_t current_time, double weight = 1.) override {}
   void ObserveRewards(absl::Span<const double> rewards) override {}
@@ -147,7 +147,7 @@ class FixableStrategy final : public Bandit {
 class BestResponse final : public Bandit {
   size_t response_index_ = 0;
  public:
-  BestResponse(size_t num_actions) : Bandit(num_actions) {}
+  BestResponse(int num_actions) : Bandit(num_actions) {}
   void ComputeStrategy(size_t current_time, double weight = 1.) override {
     if (current_time == 1) return;
     std::fill(current_strategy_.begin(), current_strategy_.end(), 0.);
@@ -171,7 +171,7 @@ class RegretMatching final : public Bandit {
   std::vector<double> cumulative_regrets_;
   std::vector<double> cumulative_strategy_;
  public:
-  RegretMatching(size_t num_actions);
+  RegretMatching(int num_actions);
   bool uses_average_strategy() const override { return true; }
 
   void ComputeStrategy(size_t current_time, double weight = 1.) override;
@@ -187,7 +187,7 @@ class RegretMatchingPlus final : public Bandit {
   std::vector<double> cumulative_regrets_;
   std::vector<double> cumulative_strategy_;
  public:
-  RegretMatchingPlus(size_t num_actions);
+  RegretMatchingPlus(int num_actions);
   bool uses_average_strategy() const override { return true; }
 
   void ComputeStrategy(size_t current_time, double weight = 1.) override;
@@ -205,7 +205,7 @@ class PredictiveRegretMatching final : public Bandit {
   std::vector<double> cumulative_strategy_;
   std::vector<double> prediction_;
  public:
-  PredictiveRegretMatching(size_t num_actions);
+  PredictiveRegretMatching(int num_actions);
   void ComputeStrategy(size_t current_time, double weight = 1.) override;
   void ObserveRewards(absl::Span<const double> rewards) override;
 
@@ -226,7 +226,7 @@ class PredictiveRegretMatchingPlus final : public Bandit {
   std::vector<double> cumulative_strategy_;
   std::vector<double> prediction_;
  public:
-  PredictiveRegretMatchingPlus(size_t num_actions);
+  PredictiveRegretMatchingPlus(int num_actions);
   void ComputeStrategy(size_t current_time, double weight = 1.) override;
   void ObserveRewards(absl::Span<const double> rewards) override;
 
@@ -244,7 +244,7 @@ class PredictiveRegretMatchingPlus final : public Bandit {
 // Isn't that just greedy??
 class FollowTheLeader final : public Bandit {
  public:
-  FollowTheLeader(size_t num_actions);
+  FollowTheLeader(int num_actions);
   bool uses_average_strategy() const override { return true; }
   bool uses_predictions() const override { return true; }
 
@@ -260,7 +260,7 @@ class FollowTheLeader final : public Bandit {
 // https://courses.cs.washington.edu/courses/cse599s/14sp/scribes/lecture3/lecture3.pdf
 class FollowTheRegularizedLeader final : public Bandit {
  public:
-  FollowTheRegularizedLeader(size_t num_actions,
+  FollowTheRegularizedLeader(int num_actions,
                              std::function<double(
                                  std::vector<double>/*weight*/)> regularizer);
   bool uses_average_strategy() const override { return true; }
@@ -278,7 +278,7 @@ class FollowTheRegularizedLeader final : public Bandit {
 // https://arxiv.org/abs/2007.14358
 class PredictiveFollowTheRegularizedLeader final : public Bandit {
  public:
-  PredictiveFollowTheRegularizedLeader(size_t num_actions);
+  PredictiveFollowTheRegularizedLeader(int num_actions);
   bool uses_average_strategy() const override { return true; }
   bool uses_predictions() const override { return true; }
 
@@ -290,7 +290,7 @@ class PredictiveFollowTheRegularizedLeader final : public Bandit {
 
 class OptimisticMirrorDescent final : public Bandit {
  public:
-  OptimisticMirrorDescent(size_t num_actions);
+  OptimisticMirrorDescent(int num_actions);
   bool uses_average_strategy() const override { return true; }
   bool uses_predictions() const override { return true; }
 
@@ -302,7 +302,7 @@ class OptimisticMirrorDescent final : public Bandit {
 
 class PredictiveOptimisticMirrorDescent final : public Bandit {
  public:
-  PredictiveOptimisticMirrorDescent(size_t num_actions);
+  PredictiveOptimisticMirrorDescent(int num_actions);
   bool uses_average_strategy() const override { return true; }
   bool uses_predictions() const override { return true; }
 
@@ -314,7 +314,7 @@ class PredictiveOptimisticMirrorDescent final : public Bandit {
 
 class Exp3 final : public Bandit {
  public:
-  Exp3(size_t num_actions);
+  Exp3(int num_actions);
   bool uses_average_strategy() const override { return true; }
   bool uses_predictions() const override { return true; }
 
@@ -326,7 +326,7 @@ class Exp3 final : public Bandit {
 
 class Exp4 final : public Bandit {
  public:
-  Exp4(size_t num_actions);
+  Exp4(int num_actions);
   bool uses_average_strategy() const override { return true; }
   bool uses_predictions() const override { return true; }
 
@@ -341,7 +341,7 @@ class Exp4 final : public Bandit {
 // https://arxiv.org/pdf/1809.04040v3.pdf
 class DiscountedRegretMatching final : public Bandit {
  public:
-  DiscountedRegretMatching(size_t num_actions, double alpha, double beta,
+  DiscountedRegretMatching(int num_actions, double alpha, double beta,
                            double gamma);
   bool uses_average_strategy() const override { return true; }
 
@@ -353,7 +353,7 @@ class DiscountedRegretMatching final : public Bandit {
 
 class Hedge final : public Bandit {
  public:
-  Hedge(size_t num_actions);
+  Hedge(int num_actions);
   bool uses_average_strategy() const override { return true; }
 
   void ComputeStrategy(size_t current_time, double weight = 1.) override;
@@ -365,7 +365,7 @@ class Hedge final : public Bandit {
 // https://arxiv.org/pdf/1507.00407.pdf
 class OptimisticHedge final : public Bandit {
  public:
-  OptimisticHedge(size_t num_actions);
+  OptimisticHedge(int num_actions);
   bool uses_average_strategy() const override { return true; }
 
   void ComputeStrategy(size_t current_time, double weight = 1.) override;
@@ -376,7 +376,7 @@ class OptimisticHedge final : public Bandit {
 
 class UpperConfidenceBounds final : public Bandit {
  public:
-  UpperConfidenceBounds(size_t num_actions);
+  UpperConfidenceBounds(int num_actions);
   bool uses_average_strategy() const override { return true; }
   bool uses_predictions() const override { return true; }
 
@@ -389,7 +389,7 @@ class UpperConfidenceBounds final : public Bandit {
 }  // namespace bandits
 
 std::unique_ptr<bandits::Bandit> MakeBandit(
-    const std::string& bandit_name, size_t num_actions,
+    const std::string& bandit_name, int num_actions,
     GameParameters bandit_params);
 
 }  // namespace algorithms

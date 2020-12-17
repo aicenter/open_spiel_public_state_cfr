@@ -73,10 +73,12 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
                    bool verbose_every_loop) {
   PrintRangeTables(t->tables);
   PrintBatchData(*t->batch, t->trunk_with_oracle->public_leaves());
+
   t->oracle_evaluator->num_cfr_iterations = cfr_oracle_iterations;
+  torch::manual_seed(kSeed);
+  std::mt19937 rnd_gen(kSeed);
 
   // 1. Create network and optimizer.
-  torch::manual_seed(kSeed);
   torch::Device device = FindDevice();
   PositionalValueNet model(t->batch->input_size,
                            t->batch->output_size,
@@ -98,7 +100,6 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
 
   // 4. The train-eval loop.
   std::cout << "loop,avg_loss,exploitability" << std::endl;
-  std::mt19937 rnd_gen(kSeed);
   for (int loop = 0; loop < num_loops; ++loop) {
     // Train.
     double cumul_loss = 0.;
