@@ -17,6 +17,7 @@
 #include "open_spiel/algorithms/infostate_dl_cfr.h"
 #include "open_spiel/algorithms/bandits.h"
 #include "open_spiel/algorithms/bandits_policy.h"
+#include "open_spiel/utils/format_observation.h"
 
 namespace open_spiel {
 namespace algorithms {
@@ -407,6 +408,41 @@ size_t RangeTable::hand_index(const Observation& obs) {
   }
 }
 
+bool AllInfoStatesHaveDistinctHands(
+    const Game& game, const std::shared_ptr<Observer>& hand_observer,
+    Player pl, const dlcfr::LeafPublicState& state) {
+  const std::vector<const InfostateNode*>& info_states = state.leaf_nodes[pl];
+  std::unordered_map<Observation, const InfostateNode*> hands_for_infostates;
+
+  Observation hand(game, hand_observer);
+  for (const InfostateNode* info_state : info_states) {
+    const State& some_state = *info_state->corresponding_states().at(0);
+    hand.SetFrom(some_state, pl);
+    if (hands_for_infostates.find(hand) == hands_for_infostates.end()) {
+      hands_for_infostates[hand] = info_state;
+    } else {
+      std::cerr << "Not all hands are unique in public state: \n"
+                << ObservationToString(state.public_tensor) << "\n"
+                << "Printing out the hands.\n-----\n";
+      for (const auto& [hand, info_state] : hands_for_infostates) {
+        std::cerr << "Infostate string: " << info_state->infostate_string() << "\n"
+                  << "Hand observation: " << ObservationToString(hand) << "\n"
+                  << "Some history in infostate: "
+                  << info_state->corresponding_states()[0]->HistoryString() << "\n"
+                  << "-----\n";
+      }
+      std::cerr << "Offending infostate: \n"
+                << "Infostate string: " << info_state->infostate_string() << "\n"
+                << "Hand observation: " << ObservationToString(hand) << "\n"
+                << "Some history in infostate: "
+                << info_state->corresponding_states()[0]->HistoryString() << "\n"
+                << "-----\n";
+      return false;
+    }
+  }
+  return true;
+}
+
 bool AllStatesHaveSameHands(const Observation& expected_hand, Player player,
                             const std::vector<std::unique_ptr<State>>& states) {
   Observation actual_hand(expected_hand);
@@ -426,7 +462,13 @@ std::vector<RangeTable> CreateRangeTables(
   Observation hand(game, hand_observer);
   for (int state_idx = 0; state_idx < public_leaves.size(); ++state_idx) {
     const dlcfr::LeafPublicState& state = public_leaves[state_idx];
+    if (state.IsTerminal()) {
+      continue;
+    }
+
     for (int pl = 0; pl < 2; ++pl) {
+      SPIEL_DCHECK_TRUE(  // Holds within public state.
+          AllInfoStatesHaveDistinctHands(game, hand_observer, pl, state));
       for (int i = 0; i < state.leaf_nodes[pl].size(); ++i) {
         const InfostateNode* node = state.leaf_nodes[pl][i];
         const State& some_state = *node->corresponding_states().at(0);

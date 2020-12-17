@@ -377,4 +377,16 @@ class Observation {
 
 }  // namespace open_spiel
 
+// TODO: remove
+namespace std {
+
+template<>
+struct hash<open_spiel::Observation> {
+inline size_t operator()(const open_spiel::Observation& v) const {
+  return v.Tensor().size();
+}
+};
+
+}  // namespace std
+
 #endif  // OPEN_SPIEL_OBSERVER_H_

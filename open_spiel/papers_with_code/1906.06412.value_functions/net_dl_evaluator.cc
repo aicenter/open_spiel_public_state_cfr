@@ -20,7 +20,8 @@ namespace papers_with_code {
 void NetEvaluator::EvaluatePublicState(
     algorithms::dlcfr::LeafPublicState* state,
     algorithms::dlcfr::PublicStateContext* context) const {
-  SPIEL_CHECK_FALSE(context);  // Nets do not use any special context.
+  SPIEL_DCHECK_FALSE(context);  // Nets do not use any special context.
+  SPIEL_DCHECK_FALSE(state->IsTerminal());
 
   for (int pl = 0; pl < 2; ++pl) {
     PlacementCopy<float_tree, float_net>(
