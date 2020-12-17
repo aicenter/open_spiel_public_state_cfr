@@ -24,48 +24,27 @@
 namespace open_spiel {
 namespace papers_with_code {
 
-class NetEvaluator final : public dlcfr::LeafEvaluator {
+class NetEvaluator final : public algorithms::dlcfr::LeafEvaluator {
   ValueNet* model_;
   torch::Device* device_;
   std::shared_ptr<const Game> game_;
   std::shared_ptr<Observer> infostate_observer_;
-  const std::array<RangeTable, 2>& tables_;
+  const std::vector<algorithms::dlcfr::RangeTable>& tables_;
   BatchData* batch_;
 
  public:
   NetEvaluator(ValueNet* model, torch::Device* device,
                std::shared_ptr<const Game> game,
                std::shared_ptr<Observer> infostate_observer,
-               const std::array<RangeTable, 2>& tables,
+               const std::vector<algorithms::dlcfr::RangeTable>& tables,
                BatchData* batch)
       : model_(model), device_(device), game_(std::move(game)),
         infostate_observer_(std::move(infostate_observer)),
         tables_(tables), batch_(batch) {}
 
-
-  void EvaluatePublicState(dlcfr::LeafPublicState* state,
-                           dlcfr::PublicStateContext* context) const override {
-    for (int pl = 0; pl < 2; ++pl) {
-      PlacementCopy<float_tree, float_net>(
-          /*tree=*/ state->ranges[pl],
-          /*net=*/  batch_->ranges_at(state->public_id, pl),
-                    tables_[pl].bijections[state->public_id].tree_to_net());
-    }
-
-    torch::Tensor data = batch_->data_tensor_at(state->public_id).to(*device_);
-    torch::Tensor output = model_->forward(data);
-
-    auto raw_output = (float*) output.data_ptr();
-    for (int pl = 0; pl < 2; ++pl) {
-      const size_t player_offset = batch_->range_offset(pl);
-      absl::Span<const float_net> net_values(&raw_output[player_offset],
-                                             batch_->ranges_size[pl]);
-      PlacementCopy<float_net, float_tree>(
-          /*net= */ net_values,
-          /*tree=*/ absl::MakeSpan(state->values[pl]),
-                    tables_[pl].bijections[state->public_id].net_to_tree());
-    }
-  }
+  void EvaluatePublicState(
+      algorithms::dlcfr::LeafPublicState* state,
+      algorithms::dlcfr::PublicStateContext* context) const override;
 };
 
 }  // namespace papers_with_code

@@ -222,6 +222,53 @@ struct CFREvaluator : public LeafEvaluator {
                            PublicStateContext* context) const override;
 };
 
+// -- Range table --------------------------------------------------------------
+
+
+template<class T>
+struct BijectiveContainer {
+  std::map<T, T> x2y;
+  std::map<T, T> y2x;
+
+  void put(std::pair<T, T> xy) {
+    const T& x = xy.first;
+    const T& y = xy.second;
+    SPIEL_CHECK_TRUE(x2y.find(x) == x2y.end());
+    SPIEL_CHECK_TRUE(y2x.find(y) == y2x.end());
+    x2y[x] = y;
+    y2x[y] = x;
+  }
+  const std::map<T, T>& tree_to_net() const { return x2y; }
+  const std::map<T, T>& net_to_tree() const { return y2x; }
+
+  size_t size() const {
+    SPIEL_CHECK_EQ(x2y.size(), y2x.size());
+    return x2y.size();
+  }
+};
+
+struct RangeTable {
+  // Bijection between ranges coming from infostate tree (x)
+  // and the input position (y), called also hand, for each public state.
+  // This is used for encoding NN inputs (resp. outputs).
+  // Forward:  tree  -> input positions
+  // Backward: output positions -> tree
+  std::vector<BijectiveContainer<size_t>> bijections;
+
+  // List all possible private observations ("hands") for each player.
+  // Their vector indices represent the input position for each public state.
+  std::vector<Observation> private_hands;
+
+  RangeTable(int num_public_states) : bijections(num_public_states) {}
+  int largest_range() const;
+  size_t hand_index(const Observation& obs);
+};
+
+std::vector<RangeTable> CreateRangeTables(
+    const Game& game,
+    const std::shared_ptr<Observer>& hand_observer,
+    const std::vector<dlcfr::LeafPublicState>& public_leaves);
+
 }  // namespace dlcfr
 }  // namespace algorithms
 }  // namespace open_spiel

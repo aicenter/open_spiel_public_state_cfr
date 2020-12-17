@@ -12,17 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_TORCH_UTILS_
-#define OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_TORCH_UTILS_
+#include "open_spiel/papers_with_code/1906.06412.value_functions/torch_utils.h"
+
 
 #include "torch/torch.h"
 
 namespace open_spiel {
 namespace papers_with_code {
 
-torch::Device FindDevice();
+torch::Device FindDevice() {
+  if (torch::cuda::is_available()) {
+    std::cerr << "# CUDA available! Training on GPU." << std::endl;
+    return torch::Device(torch::kCUDA);
+  } else {
+    std::cerr << "# Training on CPU." << std::endl;
+    return torch::Device(torch::kCPU);
+  }
+}
 
 }  // papers_with_code
 }  // open_spiel
-
-#endif  // OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_TORCH_UTILS_

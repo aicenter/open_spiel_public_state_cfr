@@ -393,6 +393,54 @@ double DepthLimitedCFR::RootValue(Player pl) const {
       player_ranges_[pl]);
 }
 
+// -- Range table --------------------------------------------------------------
+
+int RangeTable::largest_range() const { return private_hands.size(); }
+
+size_t RangeTable::hand_index(const Observation& obs) {
+  auto it = std::find(private_hands.begin(), private_hands.end(), obs);
+  if (it == private_hands.end()) {
+    private_hands.push_back(obs);
+    return private_hands.size() - 1;
+  } else {
+    return std::distance(private_hands.begin(), it);
+  }
+}
+
+bool AllStatesHaveSameHands(const Observation& expected_hand, Player player,
+                            const std::vector<std::unique_ptr<State>>& states) {
+  Observation actual_hand(expected_hand);
+  for (const std::unique_ptr<State>& state : states) {
+    actual_hand.SetFrom(*state, player);
+    if (actual_hand != expected_hand) {
+      return false;
+    }
+  }
+  return true;
+}
+
+std::vector<RangeTable> CreateRangeTables(
+    const Game& game, const std::shared_ptr<Observer>& hand_observer,
+    const std::vector<dlcfr::LeafPublicState>& public_leaves) {
+  std::vector<RangeTable> tables{public_leaves.size(), public_leaves.size()};
+  Observation hand(game, hand_observer);
+  for (int state_idx = 0; state_idx < public_leaves.size(); ++state_idx) {
+    const dlcfr::LeafPublicState& state = public_leaves[state_idx];
+    for (int pl = 0; pl < 2; ++pl) {
+      for (int i = 0; i < state.leaf_nodes[pl].size(); ++i) {
+        const InfostateNode* node = state.leaf_nodes[pl][i];
+        const State& some_state = *node->corresponding_states().at(0);
+        hand.SetFrom(some_state, pl);
+        SPIEL_DCHECK_TRUE(  // Should hold for all states within an infostate.
+            AllStatesHaveSameHands(hand, pl, node->corresponding_states()));
+        size_t j = tables[pl].hand_index(hand);
+        tables[pl].bijections[state_idx].put({i, j});
+      }
+    }
+  }
+  return tables;
+}
+
 }  // namespace dlcfr
 }  // namespace algorithms
 }  // namespace open_spiel

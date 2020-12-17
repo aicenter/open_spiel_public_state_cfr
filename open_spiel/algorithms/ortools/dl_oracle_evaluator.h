@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifndef OPEN_SPIEL_ALGORITHMS_ORTOOLS_DL_ORACLE_EVALUATOR_H_
+#define OPEN_SPIEL_ALGORITHMS_ORTOOLS_DL_ORACLE_EVALUATOR_H_
 
 #include "open_spiel/algorithms/history_tree.h"
 #include "open_spiel/algorithms/infostate_dl_cfr.h"
@@ -71,3 +73,5 @@ double TrunkPlayerExploitability(
 }  // namespace ortools
 }  // namespace algorithms
 }  // namespace open_spiel
+
+#endif  // OPEN_SPIEL_ALGORITHMS_ORTOOLS_DL_ORACLE_EVALUATOR_H_

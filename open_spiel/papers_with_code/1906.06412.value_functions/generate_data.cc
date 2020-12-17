@@ -62,7 +62,7 @@ void RandomizeTrunkStrategy(std::vector<BanditVector>& bandits,
 
 // Copy generated train data into a network batch.
 void CopyRangesAndValues(dlcfr::DepthLimitedCFR* trunk,
-                         const std::array<RangeTable, 2>& tables,
+                         const std::vector<dlcfr::RangeTable>& tables,
                          BatchData* batch, bool verbose = false) {
   const std::vector<dlcfr::LeafPublicState>& leaves = trunk->public_leaves();
   SPIEL_DCHECK_EQ(batch->batch_size, leaves.size());
@@ -72,14 +72,10 @@ void CopyRangesAndValues(dlcfr::DepthLimitedCFR* trunk,
           /*tree=*/ leaves[i].ranges[pl],
           /*net=*/  batch->ranges_at(i, pl),
           tables[pl].bijections[i].tree_to_net());
-      // TODO: revert!!
-      for (int j = 0; j < batch->values_at(i, pl).size(); ++j) {
-        batch->values_at(i, pl)[j] = 1.;
-      }
-//      PlacementCopy<float_tree, float_net>(
-//          /*tree=*/ leaves[i].values[pl],
-//          /*net=*/  batch->values_at(i, pl),
-//          tables[pl].bijections[i].tree_to_net());
+      PlacementCopy<float_tree, float_net>(
+          /*tree=*/ leaves[i].values[pl],
+          /*net=*/  batch->values_at(i, pl),
+          tables[pl].bijections[i].tree_to_net());
     }
   }
 
@@ -103,52 +99,7 @@ void CopyRangesAndValues(dlcfr::DepthLimitedCFR* trunk,
   }
 }
 
-int RangeTable::largest_range() const { return private_hands.size(); }
-
-size_t RangeTable::hand_index(const Observation& obs) {
-  auto it = std::find(private_hands.begin(), private_hands.end(), obs);
-  if (it == private_hands.end()) {
-    private_hands.push_back(obs);
-    return private_hands.size() - 1;
-  } else {
-    return std::distance(private_hands.begin(), it);
-  }
-}
-
-bool AllStatesHaveSameHands(const Observation& expected_hand, Player player,
-                            const std::vector<std::unique_ptr<State>>& states) {
-  Observation actual_hand(expected_hand);
-  for (const std::unique_ptr<State>& state : states) {
-    actual_hand.SetFrom(*state, player);
-    if (actual_hand != expected_hand) {
-      return false;
-    }
-  }
-  return true;
-}
-
-std::array<RangeTable, 2> CreateRangeTables(
-    const Game& game, const std::shared_ptr<Observer>& hand_observer,
-    const std::vector<dlcfr::LeafPublicState>& public_leaves) {
-  std::array<RangeTable, 2> tables{public_leaves.size(), public_leaves.size()};
-  Observation hand(game, hand_observer);
-  for (int state_idx = 0; state_idx < public_leaves.size(); ++state_idx) {
-    const dlcfr::LeafPublicState& state = public_leaves[state_idx];
-    for (int pl = 0; pl < 2; ++pl) {
-      for (int i = 0; i < state.leaf_nodes[pl].size(); ++i) {
-        const InfostateNode* node = state.leaf_nodes[pl][i];
-        const State& some_state = *node->corresponding_states().at(0);
-        hand.SetFrom(some_state, pl);
-        SPIEL_DCHECK_TRUE(  // Should hold for all states within an infostate.
-            AllStatesHaveSameHands(hand, pl, node->corresponding_states()));
-        size_t j = tables[pl].hand_index(hand);
-        tables[pl].bijections[state_idx].put({i, j});
-      }
-    }
-  }
-  return tables;
-}
-void GenerateData(const std::array<RangeTable, 2>& tables,
+void GenerateData(const std::vector<dlcfr::RangeTable>& tables,
                   dlcfr::DepthLimitedCFR* trunk, BatchData* batch,
                   std::mt19937& rnd_gen, bool verbose) {
   RandomizeTrunkStrategy(trunk->bandits(), rnd_gen, /*prob_pure_strat=*/0.9);
