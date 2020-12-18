@@ -25,25 +25,29 @@ struct ValueNet : public torch::nn::Module {
   virtual torch::Tensor forward(torch::Tensor x) = 0;
 };
 
-// A simple 3-layer MLP neural network.
+// A simple MLP neural network.
 struct PositionalValueNet final : public ValueNet {
   torch::nn::Linear fc1;
   torch::nn::Linear fc2;
   torch::nn::Linear fc3;
+  torch::nn::Linear fc4;
   PositionalValueNet(size_t inputs_size, size_t outputs_size,
                      size_t hidden_size) :
       fc1(inputs_size, hidden_size),
       fc2(hidden_size, hidden_size),
-      fc3(hidden_size, outputs_size) {
+      fc3(hidden_size, hidden_size),
+      fc4(hidden_size, outputs_size) {
     register_module("fc1", fc1);
     register_module("fc2", fc2);
     register_module("fc3", fc3);
+    register_module("fc4", fc4);
   }
 
   torch::Tensor forward(torch::Tensor x) {
     x = torch::relu(fc1->forward(x));
     x = torch::relu(fc2->forward(x));
-    return fc3->forward(x);
+    x = torch::relu(fc3->forward(x));
+    return fc4->forward(x);
   }
 };
 
