@@ -69,15 +69,6 @@ DepthLimitedCFR::DepthLimitedCFR(
                                    MakeBanditVectors(trees));
 }
 
-std::array<std::shared_ptr<InfostateTree>, 2> CreateTrees(
-    std::array<absl::Span<const InfostateNode* const>, 2> start_nodes,
-    int max_move_limit) {
-
-  return {
-
-  };
-}
-
 void DepthLimitedCFR::PrepareLeafNodesForPublicStates() {
   Observation public_observation(*game_, public_observer_);
 
@@ -288,6 +279,33 @@ const {
   };
 }
 
+void DepthLimitedCFR::Reset() {
+  // Reset trunk
+  num_iterations_ = 0;
+  for (int pl = 0; pl < 2; ++pl) {
+    std::fill(cf_values_[pl].begin(), cf_values_[pl].end(), 0.);
+    std::fill(reach_probs_[pl].begin(), reach_probs_[pl].end(), 0.);
+    std::fill(player_ranges_[pl].begin(), player_ranges_[pl].end(), 1.);
+  }
+  for (BanditVector& bandits : bandits_) {
+    for (DecisionId id : bandits.range()) {
+      bandits[id]->Reset();
+    }
+  }
+  // Reset subgames
+  for (int i = 0; i < public_leaves_.size(); ++i) {
+    LeafPublicState& state = public_leaves_[i];
+    for (int pl = 0; pl < 2; ++pl) {
+      std::fill(state.ranges[pl].begin(), state.ranges[pl].begin(), 0.);
+      std::fill(state.values[pl].begin(), state.values[pl].begin(), 0.);
+    }
+    std::unique_ptr<PublicStateContext>& context = contexts_[i];
+    if (!state.IsTerminal() && context && leaf_evaluator_) {
+      leaf_evaluator_->ResetContext(context.get());
+    }
+  }
+}
+
 bool LeafPublicState::IsConsistent() const {
   // All leaf nodes must be indeed leaf nodes and belong to correct players.
   // They should all be terminal or non-terminal.
@@ -352,7 +370,8 @@ CFREvaluator::CFREvaluator(std::shared_ptr<const Game> game, int depth_limit,
       leaf_evaluator(std::move(leaf_evaluator)),
       terminal_evaluator(std::move(terminal_evaluator)),
       public_observer(std::move(public_observer)),
-      infostate_observer(std::move(infostate_observer)) {
+      infostate_observer(std::move(infostate_observer)),
+      reset_subgames_on_evaluation(reset_subgames_on_evaluation) {
   SPIEL_CHECK_GT(depth_limit, 0);
 }
 
@@ -371,10 +390,18 @@ std::unique_ptr<PublicStateContext> CFREvaluator::CreateContext(
   return cfr_public_state;
 }
 
+void CFREvaluator::ResetContext(PublicStateContext* context) const {
+  auto* cfr_state = open_spiel::down_cast<CFRContext*>(context);
+  cfr_state->dlcfr->Reset();
+}
+
 void CFREvaluator::EvaluatePublicState(LeafPublicState* public_state,
                                        PublicStateContext* context) const {
   auto* cfr_state = open_spiel::down_cast<CFRContext*>(context);
   DepthLimitedCFR* dlcfr = cfr_state->dlcfr.get();
+  if (reset_subgames_on_evaluation) {
+    dlcfr->Reset();
+  }
   dlcfr->SetPlayerRanges(public_state->ranges);
   dlcfr->RunSimultaneousIterations(num_cfr_iterations);
   std::array<absl::Span<const double>, 2> resulting_values =

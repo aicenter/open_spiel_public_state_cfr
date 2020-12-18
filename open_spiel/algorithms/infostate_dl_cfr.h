@@ -96,6 +96,7 @@ class LeafEvaluator {
   virtual ~LeafEvaluator() = default;
   virtual std::unique_ptr<PublicStateContext> CreateContext(
       const LeafPublicState& leaf_state) const { return nullptr; };
+  virtual void ResetContext(PublicStateContext* context) const {}
   virtual void EvaluatePublicState(
       LeafPublicState* public_state, PublicStateContext* context) const = 0;
 };
@@ -144,6 +145,7 @@ class DepthLimitedCFR {
   void SetPlayerRanges(const std::array<std::vector<double>, 2>& ranges);
   double RootValue(Player pl = 0) const;
   std::array<absl::Span<const double>, 2> RootChildrenCfValues() const;
+  void Reset();
 
   // Accessors.
   std::vector<std::shared_ptr<InfostateTree>>& trees() { return trees_; }
@@ -207,6 +209,7 @@ struct CFREvaluator : public LeafEvaluator {
   std::shared_ptr<const LeafEvaluator> terminal_evaluator;
   std::shared_ptr<Observer> public_observer;
   std::shared_ptr<Observer> infostate_observer;
+  bool reset_subgames_on_evaluation = true;
   int num_cfr_iterations = 1;
   std::string bandit_name = "PredictiveRegretMatchingPlus";
 
@@ -218,6 +221,7 @@ struct CFREvaluator : public LeafEvaluator {
 
   std::unique_ptr<PublicStateContext> CreateContext(
       const LeafPublicState& state) const override;
+  void ResetContext(PublicStateContext* context) const override;
   void EvaluatePublicState(LeafPublicState* public_state,
                            PublicStateContext* context) const override;
 };

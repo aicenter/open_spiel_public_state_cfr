@@ -100,11 +100,13 @@ void CopyRangesAndValues(dlcfr::DepthLimitedCFR* trunk,
 }
 
 void GenerateData(const std::vector<dlcfr::RangeTable>& tables,
-                  dlcfr::DepthLimitedCFR* trunk, BatchData* batch,
+                  dlcfr::DepthLimitedCFR* trunk_with_oracle, BatchData* batch,
                   std::mt19937& rnd_gen, bool verbose) {
-  RandomizeTrunkStrategy(trunk->bandits(), rnd_gen, /*prob_pure_strat=*/0.9);
-  trunk->RunSimultaneousIterations(1);
-  CopyRangesAndValues(trunk, tables, batch, verbose);
+  RandomizeTrunkStrategy(trunk_with_oracle->bandits(), rnd_gen,
+                         /*prob_pure_strat=*/0.3);
+  // This call invokes public state evaluation under the hood.
+  trunk_with_oracle->RunSimultaneousIterations(1);
+  CopyRangesAndValues(trunk_with_oracle, tables, batch, verbose);
 
   if (verbose) {
     for (int i = 0; i < batch->batch_size; ++i) {

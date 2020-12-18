@@ -56,14 +56,10 @@ torch::Tensor TrainNetwork(ValueNet* model, torch::Device* device,
 
 double EvaluateNetwork(dlcfr::DepthLimitedCFR* trunk_with_net, int iterations,
                        ortools::SequenceFormLpSpecification* whole_game) {
-  for (BanditVector& bandits : trunk_with_net->bandits()) {
-    for (DecisionId id : bandits.range()) {
-      bandits[id]->Reset();
-    }
-  }
-  std::cout << " (trunk iters) ";
+  trunk_with_net->Reset();
+  std::cout << " (trunk iters) " << std::flush;
   trunk_with_net->RunSimultaneousIterations(iterations);
-  std::cout << " (trunk expl) ";
+  std::cout << " (trunk expl) " << std::endl;
   return ortools::TrunkExploitability(
       whole_game, *trunk_with_net->AveragePolicy());
 }
@@ -115,11 +111,10 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
     std::cout << std::endl;
 
     // Eval.
-    std::cout << "# Evaluating  ";
+    std::cout << "# Evaluating  " << std::flush;
     const double exploitability = EvaluateNetwork(
         trunk_with_net.get(), trunk_eval_iterations, &whole_game);
     const double avg_loss = cumul_loss / train_batches;
-    std::cout << std::endl;
 
     // Print.
     std::cout << loop << ',' << avg_loss << ',' << exploitability << std::endl;
@@ -135,9 +130,9 @@ int main(int argc, char** argv) {
   absl::ParseCommandLine(argc, argv);
   TrainEvalLoop(
       MakeTrunk(absl::GetFlag(FLAGS_game_name), absl::GetFlag(FLAGS_depth)),
-      /*train_batches=*/8,
+      /*train_batches=*/64,
       /*num_loops=*/1000,
-      /*cfr_oracle_iterations=*/100,
-      /*trunk_eval_iterations=*/100,
+      /*cfr_oracle_iterations=*/300,
+      /*trunk_eval_iterations=*/300,
       /*verbose_every_loop*/false);
 }
