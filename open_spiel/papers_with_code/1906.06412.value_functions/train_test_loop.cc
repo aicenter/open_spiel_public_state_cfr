@@ -18,7 +18,14 @@
 #include "open_spiel/abseil-cpp/absl/flags/parse.h"
 
 ABSL_FLAG(std::string, game_name, "kuhn_poker", "Game to run.");
-ABSL_FLAG(int, depth, 3, "Max depth of the trunk.");
+ABSL_FLAG(int, depth, 3, "Depth of the trunk.");
+ABSL_FLAG(int, train_batches, 32, "Number of training batches before the evalution is run.");
+ABSL_FLAG(int, num_loops, 5000, "Number of train-eval loops.");
+ABSL_FLAG(int, cfr_oracle_iterations, 100, "Number of oracle iterations.");
+ABSL_FLAG(int, trunk_eval_iterations, 100, "Number of trunk iterations.");
+ABSL_FLAG(int, seed, 0, "Seed.");
+ABSL_FLAG(std::string, use_bandits_for_cfr, "PredictiveRegretMatchingPlus", "Which bandit should be used in the trunk.");
+ABSL_FLAG(bool, verbose_every_loop, false, "Make verbose output at the start of every loop.");
 
 #include <random>
 
@@ -36,9 +43,6 @@ namespace open_spiel {
 namespace papers_with_code {
 
 using namespace algorithms;
-
-constexpr size_t kSeed = 0;
-constexpr char* kUseBanditsForCfr = "PredictiveRegretMatchingPlus";
 
 torch::Tensor TrainNetwork(ValueNet* model, torch::Device* device,
                            torch::optim::Optimizer* optimizer,
@@ -66,13 +70,14 @@ double EvaluateNetwork(dlcfr::DepthLimitedCFR* trunk_with_net, int iterations,
 
 void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
                    int cfr_oracle_iterations, int trunk_eval_iterations,
+                   std::string use_bandits_for_cfr, int seed,
                    bool verbose_every_loop) {
   PrintRangeTables(t->tables);
   PrintBatchData(*t->batch, t->trunk_with_oracle->public_leaves());
 
   t->oracle_evaluator->num_cfr_iterations = cfr_oracle_iterations;
-  torch::manual_seed(kSeed);
-  std::mt19937 rnd_gen(kSeed);
+  torch::manual_seed(seed);
+  std::mt19937 rnd_gen(seed);
 
   // 1. Create network and optimizer.
   torch::Device device = FindDevice();
@@ -81,7 +86,8 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
                            /*hidden_size=*/t->batch->input_size * 3);
   model.to(device);
   torch::optim::SGD optimizer(model.parameters(),
-                              torch::optim::SGDOptions(/*lr=*/0.01));
+                              torch::optim::SGDOptions(/*lr=*/0.01)
+                                  .momentum(0.5));
 
   // 2. Create trunk net evaluator.
   auto net_evaluator = std::make_shared<NetEvaluator>(
@@ -89,7 +95,7 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
       t->tables, t->batch.get());
   auto trunk_with_net = std::make_unique<dlcfr::DepthLimitedCFR>(
       t->game, t->trunk_trees, net_evaluator, t->terminal_evaluator,
-      t->public_observer, MakeBanditVectors(t->trunk_trees, kUseBanditsForCfr));
+      t->public_observer, MakeBanditVectors(t->trunk_trees, use_bandits_for_cfr));
 
   // 3. Create the LP spec for the whole game.
   ortools::SequenceFormLpSpecification whole_game(*t->game, "CLP");
@@ -130,9 +136,11 @@ int main(int argc, char** argv) {
   absl::ParseCommandLine(argc, argv);
   TrainEvalLoop(
       MakeTrunk(absl::GetFlag(FLAGS_game_name), absl::GetFlag(FLAGS_depth)),
-      /*train_batches=*/64,
-      /*num_loops=*/1000,
-      /*cfr_oracle_iterations=*/300,
-      /*trunk_eval_iterations=*/300,
-      /*verbose_every_loop*/false);
+      absl::GetFlag(FLAGS_train_batches),
+      absl::GetFlag(FLAGS_num_loops),
+      absl::GetFlag(FLAGS_cfr_oracle_iterations),
+      absl::GetFlag(FLAGS_trunk_eval_iterations),
+      absl::GetFlag(FLAGS_use_bandits_for_cfr),
+      absl::GetFlag(FLAGS_seed),
+      absl::GetFlag(FLAGS_verbose_every_loop));
 }
