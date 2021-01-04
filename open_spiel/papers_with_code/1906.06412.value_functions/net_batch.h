@@ -46,6 +46,14 @@ struct BatchData {
       // Pre-allocate all vectors.
         data(batch_size * input_size, 0.),
         targets(batch_size * output_size, 0.) {
+
+    SPIEL_CHECK_GT(batch_size, 0);
+    SPIEL_CHECK_GT(input_size, 0);
+    SPIEL_CHECK_GT(output_size, 0);
+    SPIEL_CHECK_GT(public_features_size, 0);
+    SPIEL_CHECK_GT(ranges_size[0], 0);
+    SPIEL_CHECK_GT(ranges_size[1], 0);
+
     for (size_t i = 0; i < states.size(); ++i) {
       CopyFeatures(i, states[i]);
     }

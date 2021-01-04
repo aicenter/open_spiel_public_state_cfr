@@ -79,6 +79,7 @@ LearnFixedValues(BatchData* batch, ValueNet* model, torch::Device* device,
 
 void FillRanges(std::vector<dlcfr::LeafPublicState>& states, float_tree value) {
   for (auto& state: states) {
+    if (state.IsTerminal()) continue;
     for (int pl = 0; pl < 2; ++pl) {
       std::fill(state.ranges[pl].begin(), state.ranges[pl].end(), value);
     }
@@ -87,6 +88,7 @@ void FillRanges(std::vector<dlcfr::LeafPublicState>& states, float_tree value) {
 
 void FillValues(std::vector<dlcfr::LeafPublicState>& states, float_tree value) {
   for (auto& state: states) {
+    if (state.IsTerminal()) continue;
     for (int pl = 0; pl < 2; ++pl) {
       std::fill(state.values[pl].begin(), state.values[pl].end(), value);
     }
@@ -96,6 +98,7 @@ void FillValues(std::vector<dlcfr::LeafPublicState>& states, float_tree value) {
 void CheckRanges(std::vector<dlcfr::LeafPublicState>& states, float_tree value,
                  double eps = 0.03) {
   for (auto& state: states) {
+    if (state.IsTerminal()) continue;
     for (int pl = 0; pl < 2; ++pl) {
       for (size_t i = 0; i < state.ranges[pl].size(); ++i) {
         SPIEL_CHECK_FLOAT_NEAR(state.ranges[pl][i], value, eps);
@@ -107,6 +110,7 @@ void CheckRanges(std::vector<dlcfr::LeafPublicState>& states, float_tree value,
 void CheckValues(std::vector<dlcfr::LeafPublicState>& states, float_tree value,
                  double eps = 0.03) {
   for (auto& state: states) {
+    if (state.IsTerminal()) continue;
     for (int pl = 0; pl < 2; ++pl) {
       for (size_t i = 0; i < state.values[pl].size(); ++i) {
         SPIEL_CHECK_FLOAT_NEAR(state.values[pl][i], value, eps);
@@ -133,7 +137,7 @@ void LearnFixedValuesTest(std::unique_ptr<Trunk> t) {
 
   CopyRangesAndValues(t.get());
   double avg_loss = LearnFixedValues(t->batch.get(), &model, &device);
-  SPIEL_CHECK_LT(avg_loss, 1e-3);
+  SPIEL_CHECK_LT(avg_loss, 1e-5);
 
   // Test that training did not touch batch data.
   CheckRanges(public_leaves, fixed_range_input);
@@ -164,7 +168,9 @@ void LearnFixedValuesTest(std::unique_ptr<Trunk> t) {
 int main(int argc, char** argv) {
   using namespace open_spiel::papers_with_code;
 
+  LearnFixedValuesTest(MakeTrunk("matrix_mp", /*trunk_depth=*/0));
   LearnFixedValuesTest(MakeTrunk("kuhn_poker", /*trunk_depth=*/3));
   LearnFixedValuesTest(MakeTrunk("leduc_poker", /*trunk_depth=*/4));
-  LearnFixedValuesTest(MakeTrunk("goofspiel(players=2,num_cards=3,imp_info=True)", /*trunk_depth=*/1));
+  LearnFixedValuesTest(MakeTrunk(
+      "goofspiel(players=2,num_cards=3,imp_info=True)", /*trunk_depth=*/1));
 }
