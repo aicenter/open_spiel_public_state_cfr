@@ -41,14 +41,15 @@ struct Trunk {
 
 std::unique_ptr<Trunk> MakeTrunk(const std::string& game_name, int trunk_depth);
 
-// Debugging utils.
+void CopyRangesAndValues(
+    algorithms::dlcfr::DepthLimitedCFR* trunk,
+    const std::vector<algorithms::dlcfr::RangeTable>& tables,
+    BatchData* batch, bool verbose = false);
 
-void PrintRangeTables(const std::vector<algorithms::dlcfr::RangeTable>& tables);
-
-void PrintBatchData(
-    const BatchData& batch,
-    const std::vector<algorithms::dlcfr::LeafPublicState>& states);
-
+inline void CopyRangesAndValues(Trunk* trunk, bool verbose = false) {
+  CopyRangesAndValues(trunk->trunk_with_oracle.get(), trunk->tables,
+                      trunk->batch.get(), verbose);
+}
 
 }  // namespace papers_with_code
 }  // namespace open_spiel

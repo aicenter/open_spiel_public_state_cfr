@@ -15,20 +15,21 @@
 #ifndef OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_GENERATE_DATA_
 #define OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_GENERATE_DATA_
 
+#include <map>
+
 #include "open_spiel/algorithms/infostate_dl_cfr.h"
+
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_batch.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/trunk.h"
 
 namespace open_spiel {
 namespace papers_with_code {
-
-using float_net = float;    // Floats used in the neural network.
-using float_tree = double;  // Floats used in the cfr computation.
 
 // Copy non-contiguous vectors using a permutation map.
 // This also converts float <-> double as needed.
 template<typename From, typename To>
 void PlacementCopy(absl::Span<const From> from, absl::Span<To> to,
-                   std::map<size_t, size_t> from_to) {
+                   const std::map<size_t, size_t>& from_to) {
   for (const auto&[f, t] : from_to) {
     to[t] = from[f];
   }

@@ -22,6 +22,9 @@
 namespace open_spiel {
 namespace papers_with_code {
 
+using float_net = float;    // Floats used in the neural network.
+using float_tree = double;  // Floats used in the cfr computation.
+
 struct BatchData {
   using LeafPublicState = algorithms::dlcfr::LeafPublicState;
 
@@ -31,8 +34,8 @@ struct BatchData {
   const size_t public_features_size;
   const std::array<size_t, 2> ranges_size;
 
-  std::vector<float> data;
-  std::vector<float> targets;
+  std::vector<float_net> data;
+  std::vector<float_net> targets;
 
   BatchData(const std::vector<LeafPublicState>& states,
             size_t input_size, size_t output_size,
@@ -81,19 +84,19 @@ struct BatchData {
     return at::from_blob((void*) &data[batch_index * input_size],
                          {static_cast<long>(input_size)}, at::kFloat);
   }
-  absl::Span<float> data_at(int batch_index) {
+  absl::Span<float_net> data_at(int batch_index) {
     return absl::MakeSpan(&data[batch_index * input_size], input_size);
   }
-  absl::Span<float> targets_at(int batch_index) {
+  absl::Span<float_net> targets_at(int batch_index) {
     return absl::MakeSpan(&targets[batch_index * output_size], output_size);
   }
-  absl::Span<float> ranges_at(int batch_index, Player pl) {
+  absl::Span<float_net> ranges_at(int batch_index, Player pl) {
     const size_t offset = range_offset(pl);
     return absl::MakeSpan(
         &data[batch_index * input_size + public_features_size + offset],
         ranges_size[pl]);
   }
-  absl::Span<float> values_at(int batch_index, Player pl) {
+  absl::Span<float_net> values_at(int batch_index, Player pl) {
     const size_t offset = values_offset(pl);
     return absl::MakeSpan(&targets[batch_index * output_size + offset],
                           ranges_size[pl]);

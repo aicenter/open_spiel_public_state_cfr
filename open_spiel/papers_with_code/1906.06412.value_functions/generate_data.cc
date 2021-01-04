@@ -20,7 +20,6 @@
 #include <memory>
 
 #include "absl/random/random.h"
-#include "open_spiel/algorithms/infostate_dl_cfr.h"
 
 namespace open_spiel {
 namespace papers_with_code {
@@ -59,44 +58,6 @@ void RandomizeTrunkStrategy(std::vector<BanditVector>& bandits,
   }
 }
 
-// Copy generated train data into a network batch.
-void CopyRangesAndValues(dlcfr::DepthLimitedCFR* trunk,
-                         const std::vector<dlcfr::RangeTable>& tables,
-                         BatchData* batch, bool verbose = false) {
-  const std::vector<dlcfr::LeafPublicState>& leaves = trunk->public_leaves();
-  SPIEL_DCHECK_EQ(batch->batch_size, leaves.size());
-  for (size_t i = 0; i < leaves.size(); ++i) {
-    for (int pl = 0; pl < 2; ++pl) {
-      PlacementCopy<float_tree, float_net>(
-          /*tree=*/ leaves[i].ranges[pl],
-          /*net=*/  batch->ranges_at(i, pl),
-          tables[pl].bijections[i].tree_to_net());
-      PlacementCopy<float_tree, float_net>(
-          /*tree=*/ leaves[i].values[pl],
-          /*net=*/  batch->values_at(i, pl),
-          tables[pl].bijections[i].tree_to_net());
-    }
-  }
-
-  if (verbose) {
-    std::cout << "\n# BatchData copying ranges and values:\n";
-    for (size_t i = 0; i < leaves.size(); ++i) {
-      for (int pl = 0; pl < 2; ++pl) {
-        std::cout << "#   leaves[" << i << "].ranges[" << pl << "]    = "
-                  << leaves[i].ranges[pl] << "\n";
-        std::cout << "#   batch->ranges_at(" << i << ", " << pl << ") = "
-                  << batch->ranges_at(i, pl) << "\n";
-        std::cout << "#   leaves[" << i << "].values[" << pl << "]    = "
-                  << leaves[i].values[pl] << "\n";
-        std::cout << "#   batch->values_at(" << i << ", " << pl << ") = "
-                  << batch->values_at(i, pl) << "\n";
-      }
-    }
-    std::cout << "#\n";
-    std::cout << "#   batch->data    = " << batch->data << "\n";
-    std::cout << "#   batch->targets = " << batch->targets << "\n";
-  }
-}
 
 void GenerateData(const std::vector<dlcfr::RangeTable>& tables,
                   dlcfr::DepthLimitedCFR* trunk_with_oracle, BatchData* batch,

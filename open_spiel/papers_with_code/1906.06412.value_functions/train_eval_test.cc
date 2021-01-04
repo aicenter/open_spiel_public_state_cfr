@@ -53,50 +53,109 @@ void PrepareTestData(const std::vector<dlcfr::RangeTable>& tables,
   }
 }
 
-void LearnFixedValuesTest(std::unique_ptr<Trunk> t,
-                          int train_batches, int num_loops) {
-  std::mt19937 rnd_gen(kSeed);
-
-  // 1. Create network and optimizer.
-  torch::Device device = FindDevice();
-  PositionalValueNet model(t->batch->input_size, t->batch->output_size,
-                           t->batch->input_size * 3);
-  model.to(device);
-  torch::optim::SGD optimizer(model.parameters(),
+double
+LearnFixedValues(BatchData* batch, ValueNet* model, torch::Device* device,
+                 int train_batches = 32, int num_loops = 20) {
+  // 1. Create the optimizer.
+  torch::optim::SGD optimizer(model->parameters(),
                               torch::optim::SGDOptions(/*lr=*/0.4));
 
-  // 2. Make a single target.
-  PrepareTestData(t->tables, t->trunk_with_oracle.get(),
-                  t->batch.get(), rnd_gen);
+  // 2. Move to device.
+  model->to(*device);
 
   // 3. Train the network.
   double avg_loss;
   for (int loop = 0; loop < num_loops; ++loop) {
     double cumul_loss = 0.;
     for (int i = 0; i < train_batches; ++i) {
-      torch::Tensor loss = TrainNetwork(&model, &device, &optimizer,
-                                        t->batch.get());
+      torch::Tensor loss = TrainNetwork(model, device, &optimizer, batch);
       cumul_loss += loss.item().to<double>();
     }
     avg_loss = cumul_loss / train_batches;
     std::cout << loop << "," << avg_loss << std::endl;
   }
+  return avg_loss;
+}
 
-  // 4. Create the net evaluator.
-  auto net_evaluator = std::make_shared<NetEvaluator>(
-      &model, &device, t->game, t->infostate_observer, t->tables, t->batch.get());
-
-  // 5. Run the network, check outputs.
-  dlcfr::LeafPublicState& some_leaf = t->trunk_with_oracle->public_leaves()[0];
-  net_evaluator->EvaluatePublicState(&some_leaf, nullptr);
-  std::cout << "Values outputs: " << some_leaf.values << "\n";
-
-  SPIEL_CHECK_LT(avg_loss, 1e-3);
-  for (int pl = 0; pl < 2; ++pl) {
-    for (size_t i = 0; i < some_leaf.values[pl].size(); ++i) {
-      SPIEL_CHECK_TRUE(Near<double>(some_leaf.values[pl][i], 1., 0.03));
+void FillRanges(std::vector<dlcfr::LeafPublicState>& states, float_tree value) {
+  for (auto& state: states) {
+    for (int pl = 0; pl < 2; ++pl) {
+      std::fill(state.ranges[pl].begin(), state.ranges[pl].end(), value);
     }
   }
+}
+
+void FillValues(std::vector<dlcfr::LeafPublicState>& states, float_tree value) {
+  for (auto& state: states) {
+    for (int pl = 0; pl < 2; ++pl) {
+      std::fill(state.values[pl].begin(), state.values[pl].end(), value);
+    }
+  }
+}
+
+void CheckRanges(std::vector<dlcfr::LeafPublicState>& states, float_tree value,
+                 double eps = 0.03) {
+  for (auto& state: states) {
+    for (int pl = 0; pl < 2; ++pl) {
+      for (size_t i = 0; i < state.ranges[pl].size(); ++i) {
+        SPIEL_CHECK_FLOAT_NEAR(state.ranges[pl][i], value, eps);
+      }
+    }
+  }
+}
+
+void CheckValues(std::vector<dlcfr::LeafPublicState>& states, float_tree value,
+                 double eps = 0.03) {
+  for (auto& state: states) {
+    for (int pl = 0; pl < 2; ++pl) {
+      for (size_t i = 0; i < state.values[pl].size(); ++i) {
+        SPIEL_CHECK_FLOAT_NEAR(state.values[pl][i], value, eps);
+      }
+    }
+  }
+}
+
+void LearnFixedValuesTest(std::unique_ptr<Trunk> t) {
+  const float_net fixed_range_input = 0.5;
+  const float_net fixed_value_ouput = 1.0;
+
+  torch::Device device = FindDevice();
+  PositionalValueNet model(t->batch->input_size, t->batch->output_size,
+                           t->batch->input_size * 3);
+
+  // Make a single target -- all values are 1.0, all ranges are 0.5
+  std::vector<dlcfr::LeafPublicState>& public_leaves =
+      t->trunk_with_oracle->public_leaves();
+  FillRanges(public_leaves, fixed_range_input);
+  CheckRanges(public_leaves, fixed_range_input);  // Test the test.
+  FillValues(public_leaves, fixed_value_ouput);
+  CheckValues(public_leaves, fixed_value_ouput);  // Test the test.
+
+  CopyRangesAndValues(t.get());
+  double avg_loss = LearnFixedValues(t->batch.get(), &model, &device);
+  SPIEL_CHECK_LT(avg_loss, 1e-3);
+
+  // Test that training did not touch batch data.
+  CheckRanges(public_leaves, fixed_range_input);
+  CheckValues(public_leaves, fixed_value_ouput);
+
+  // Check if the value network indeed learned anything.
+  FillValues(public_leaves, 0.0);
+  CheckValues(public_leaves, 0.0);  // Test the test.
+
+  NetEvaluator net_evaluator(&model, &device,
+                             t->game, t->infostate_observer,
+                             t->tables, t->batch.get());
+
+  for (int i = 0; i < t->trunk_with_oracle->public_leaves().size(); ++i) {
+    dlcfr::LeafPublicState* state = &t->trunk_with_oracle->public_leaves()[i];
+    if (!state->IsTerminal()) net_evaluator.EvaluatePublicState(state, nullptr);
+  }
+
+  // Evaluation should not change ranges.
+  CheckRanges(public_leaves, fixed_range_input);
+  // Finally, check the learned values.
+  CheckValues(public_leaves, fixed_value_ouput);
 }
 
 }  // namespace papers_with_code
@@ -105,6 +164,7 @@ void LearnFixedValuesTest(std::unique_ptr<Trunk> t,
 int main(int argc, char** argv) {
   using namespace open_spiel::papers_with_code;
 
-  LearnFixedValuesTest(MakeTrunk("kuhn_poker", /*trunk_depth=*/3),
-                       /*train_batches=*/32, /*num_loops=*/20);
+  LearnFixedValuesTest(MakeTrunk("kuhn_poker", /*trunk_depth=*/3));
+  LearnFixedValuesTest(MakeTrunk("leduc_poker", /*trunk_depth=*/4));
+  LearnFixedValuesTest(MakeTrunk("goofspiel(players=2,num_cards=3,imp_info=True)", /*trunk_depth=*/1));
 }
