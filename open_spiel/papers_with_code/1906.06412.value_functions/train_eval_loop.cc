@@ -13,27 +13,32 @@
 // limitations under the License.
 
 
+// -- FLAGS --------------------------------------------------------------------
+
 #include "open_spiel/abseil-cpp/absl/flags/flag.h"
 #include "open_spiel/abseil-cpp/absl/flags/usage.h"
 #include "open_spiel/abseil-cpp/absl/flags/parse.h"
 
 ABSL_FLAG(std::string, game_name, "kuhn_poker", "Game to run.");
 ABSL_FLAG(int, depth, 3, "Depth of the trunk.");
-ABSL_FLAG(int, train_batches, 32, "Number of training batches before the evalution is run.");
+ABSL_FLAG(int, train_batches, 32,
+          "Number of training batches before the evalution is run.");
 ABSL_FLAG(int, num_loops, 5000, "Number of train-eval loops.");
 ABSL_FLAG(int, cfr_oracle_iterations, 100, "Number of oracle iterations.");
 ABSL_FLAG(int, trunk_eval_iterations, 100, "Number of trunk iterations.");
 ABSL_FLAG(int, seed, 0, "Seed.");
-ABSL_FLAG(std::string, use_bandits_for_cfr, "PredictiveRegretMatchingPlus", "Which bandit should be used in the trunk.");
-ABSL_FLAG(bool, verbose_every_loop, false, "Make verbose output at the start of every loop.");
+ABSL_FLAG(std::string, use_bandits_for_cfr, "PredictiveRegretMatchingPlus",
+          "Which bandit should be used in the trunk.");
+ABSL_FLAG(bool, verbose_every_loop, false,
+          "Make verbose output at the start of every loop.");
 
-#include <random>
+// -----------------------------------------------------------------------------
 
 #include "absl/random/random.h"
 #include "torch/torch.h"
 
+#include "open_spiel/papers_with_code/1906.06412.value_functions/train_eval.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/generate_data.h"
-#include "open_spiel/papers_with_code/1906.06412.value_functions/net_architectures.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_dl_evaluator.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/torch_utils.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/trunk.h"
@@ -44,29 +49,6 @@ namespace papers_with_code {
 
 using namespace algorithms;
 
-torch::Tensor TrainNetwork(ValueNet* model, torch::Device* device,
-                           torch::optim::Optimizer* optimizer,
-                           BatchData* batch) {
-  torch::Tensor data = batch->data_tensor().to(*device);
-  torch::Tensor targets = batch->targets_tensor().to(*device);
-  optimizer->zero_grad();
-  torch::Tensor output = model->forward(data);
-  torch::Tensor loss = torch::mse_loss(output, targets);
-  AT_ASSERT(!std::isnan(loss.template item<float>()));
-  loss.backward();
-  optimizer->step();
-  return loss;
-}
-
-double EvaluateNetwork(dlcfr::DepthLimitedCFR* trunk_with_net, int iterations,
-                       ortools::SequenceFormLpSpecification* whole_game) {
-  trunk_with_net->Reset();
-  std::cout << " (trunk iters) " << std::flush;
-  trunk_with_net->RunSimultaneousIterations(iterations);
-  std::cout << " (trunk expl) " << std::endl;
-  return ortools::TrunkExploitability(
-      whole_game, *trunk_with_net->AveragePolicy());
-}
 
 void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
                    int cfr_oracle_iterations, int trunk_eval_iterations,
@@ -83,7 +65,7 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   torch::Device device = FindDevice();
   PositionalValueNet model(t->batch->input_size,
                            t->batch->output_size,
-                           /*hidden_size=*/t->batch->input_size * 3);
+      /*hidden_size=*/t->batch->input_size * 3);
   model.to(device);
   torch::optim::SGD optimizer(model.parameters(),
                               torch::optim::SGDOptions(/*lr=*/0.01)
@@ -95,7 +77,8 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
       t->tables, t->batch.get());
   auto trunk_with_net = std::make_unique<dlcfr::DepthLimitedCFR>(
       t->game, t->trunk_trees, net_evaluator, t->terminal_evaluator,
-      t->public_observer, MakeBanditVectors(t->trunk_trees, use_bandits_for_cfr));
+      t->public_observer,
+      MakeBanditVectors(t->trunk_trees, use_bandits_for_cfr));
 
   // 3. Create the LP spec for the whole game.
   ortools::SequenceFormLpSpecification whole_game(*t->game, "CLP");
@@ -107,7 +90,8 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
     double cumul_loss = 0.;
     std::cout << "# Training  ";
     for (int i = 0; i < train_batches; ++i) {
-      GenerateData(t->tables, t->trunk_with_oracle.get(), t->batch.get(), rnd_gen,
+      GenerateData(t->tables, t->trunk_with_oracle.get(), t->batch.get(),
+                   rnd_gen,
           /*verbose=*/(i == 0 && verbose_every_loop) || (i == 0 && loop == 0));
       torch::Tensor loss = TrainNetwork(&model, &device,
                                         &optimizer, t->batch.get());

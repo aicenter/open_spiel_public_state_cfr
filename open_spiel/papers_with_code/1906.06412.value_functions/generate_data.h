@@ -29,7 +29,7 @@ using float_tree = double;  // Floats used in the cfr computation.
 template<typename From, typename To>
 void PlacementCopy(absl::Span<const From> from, absl::Span<To> to,
                    std::map<size_t, size_t> from_to) {
-  for (const auto& [f, t] : from_to) {
+  for (const auto&[f, t] : from_to) {
     to[t] = from[f];
   }
 }

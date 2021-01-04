@@ -12,11 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <random>
-
 #include "absl/random/random.h"
 #include "torch/torch.h"
 
+#include "open_spiel/papers_with_code/1906.06412.value_functions/train_eval.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/generate_data.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_architectures.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_dl_evaluator.h"
@@ -31,19 +30,6 @@ using namespace algorithms;
 
 constexpr size_t kSeed = 0;
 
-torch::Tensor TrainNetwork(ValueNet* model, torch::Device* device,
-                           torch::optim::Optimizer* optimizer,
-                           BatchData* batch) {
-  torch::Tensor data = batch->data_tensor().to(*device);
-  torch::Tensor targets = batch->targets_tensor().to(*device);
-  optimizer->zero_grad();
-  torch::Tensor output = model->forward(data);
-  torch::Tensor loss = torch::mse_loss(output, targets);
-  AT_ASSERT(!std::isnan(loss.template item<float>()));
-  loss.backward();
-  optimizer->step();
-  return loss;
-}
 
 void PrepareTestData(const std::vector<dlcfr::RangeTable>& tables,
                      dlcfr::DepthLimitedCFR* trunk, BatchData* batch,
