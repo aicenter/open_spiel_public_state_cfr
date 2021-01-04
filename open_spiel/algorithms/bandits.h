@@ -111,6 +111,10 @@ class Bandit {
   }
 };
 
+// -----------------------------------------------------------------------------
+// Specific bandits.
+// -----------------------------------------------------------------------------
+
 // A bandit that always a uniform strategy.
 class UniformStrategy final : public Bandit {
  public:
@@ -133,11 +137,15 @@ class FixedStrategy final : public Bandit {
   void Reset() override {}  // No need to reset anything.
 };
 
-// A bandit that can be dynamically set to return a requested strategy.
+// A bandit that can be dynamically set to return a requested strategy,
+// via mutable_strategy(). Reset() makes it to be uniform.
 class FixableStrategy final : public Bandit {
  public:
   FixableStrategy(int num_actions) : Bandit(num_actions) {}
-  std::vector<double>& mutable_strategy() { return current_strategy_; }
+  // Return a writable view for the strategy.
+  absl::Span<double> mutable_strategy() {
+    return absl::MakeSpan(current_strategy_);
+  }
   void ComputeStrategy(size_t current_time, double weight = 1.) override {}
   void ObserveRewards(absl::Span<const double> rewards) override {}
 };

@@ -36,7 +36,7 @@ void RandomizeTrunkStrategy(std::vector<BanditVector>& bandits,
       const size_t num_actions = bandit->num_actions();
       auto* fixable_bandit =
           open_spiel::down_cast<bandits::FixableStrategy*>(bandit);
-      std::vector<double>& policy = fixable_bandit->mutable_strategy();
+      absl::Span<double> policy = fixable_bandit->mutable_strategy();
 
       const bool single_pure_strategy =
           std::bernoulli_distribution(prob_pure_strat)(rnd_gen);
@@ -55,7 +55,6 @@ void RandomizeTrunkStrategy(std::vector<BanditVector>& bandits,
         }
         Normalize(absl::MakeSpan(policy));
       }
-      SPIEL_DCHECK_TRUE(IsValidProbDistribution(policy));
     }
   }
 }
