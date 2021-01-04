@@ -17,6 +17,10 @@ add_library(paper_value_functions OBJECT
 add_executable(train_eval_loop train_eval_loop.cc
   $<TARGET_OBJECTS:paper_value_functions> $<TARGET_OBJECTS:open_spiel_ortools> ${OPEN_SPIEL_OBJECTS})
 target_link_libraries(train_eval_loop ${ORTOOLS_LIBS} ${TORCH_LIBRARIES})
+# Delete -Wall -Werror in
+# - /home/michal/Code/open_spiel/open_spiel/libtorch/libtorch/share/cmake/Caffe2/Caffe2Targets.cmake torch_cpu
+# if warnings happen.
+
 
 add_executable(value_functions_train_eval_test train_eval_test.cc
   $<TARGET_OBJECTS:paper_value_functions> $<TARGET_OBJECTS:open_spiel_ortools> ${OPEN_SPIEL_OBJECTS})
@@ -25,5 +29,4 @@ target_link_libraries(value_functions_train_eval_test ${ORTOOLS_LIBS} ${TORCH_LI
 add_executable(value_fn_convergence value_fn_convergence.cc
   $<TARGET_OBJECTS:open_spiel_ortools> ${OPEN_SPIEL_OBJECTS})
 target_link_libraries(value_fn_convergence
-  absl::flags_parse absl::flags
-  ${ORTOOLS_LIBS})
+  absl::flags_parse absl::flags ${ORTOOLS_LIBS})

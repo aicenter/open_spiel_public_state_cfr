@@ -69,15 +69,17 @@ struct BatchData {
 
   torch::Tensor data_tensor() {
     return at::from_blob((void*) data.data(),
-                         {batch_size, input_size}, at::kFloat);
+                         {static_cast<long>(batch_size),
+                          static_cast<long>(input_size)}, at::kFloat);
   }
   torch::Tensor targets_tensor() {
     return at::from_blob((void*) targets.data(),
-                         {batch_size, output_size}, at::kFloat);
+                         {static_cast<long>(batch_size),
+                          static_cast<long>(output_size)}, at::kFloat);
   }
   torch::Tensor data_tensor_at(int batch_index) {
     return at::from_blob((void*) &data[batch_index * input_size],
-                         {input_size}, at::kFloat);
+                         {static_cast<long>(input_size)}, at::kFloat);
   }
   absl::Span<float> data_at(int batch_index) {
     return absl::MakeSpan(&data[batch_index * input_size], input_size);

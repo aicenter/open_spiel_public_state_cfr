@@ -27,9 +27,9 @@ namespace open_spiel {
 
 inline void _format_binary_value(std::ostream& os, const float& v) {
   if (v == 0) {
-    return os << "◯";
+    os << "◯";
   } else if (v == 1) {
-    return os << "◉";
+    os << "◉";
   }
   SpielFatalError("Values must all be 0 or 1");
 }
@@ -155,4 +155,4 @@ inline std::string ObservationToString(const Observation& observation, std::stri
 
 }  // open_spiel
 
-#endif OPEN_SPIEL_UTILS_FORMAT_OBSERVATION_H_
+#endif  // OPEN_SPIEL_UTILS_FORMAT_OBSERVATION_H_

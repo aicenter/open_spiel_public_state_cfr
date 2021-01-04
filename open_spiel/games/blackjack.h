@@ -88,7 +88,7 @@ class BlackjackGame : public Game {
     return std::unique_ptr<State>(new BlackjackState(shared_from_this()));
   }
   int MaxChanceOutcomes() const override { return kDeckSize; }
-  int MaxGameLength() const { return 12; }
+  int MaxGameLength() const override { return 12; }
 
   int NumPlayers() const override { return 1; }
   double MinUtility() const override { return -1; }

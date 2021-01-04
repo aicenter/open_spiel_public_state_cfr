@@ -179,8 +179,8 @@ class NegotiationGame : public Game {
 
   std::unique_ptr<State> DeserializeState(
       const std::string& str) const override;
-  std::string GetRNGState() const;
-  void SetRNGState(const std::string& rng_state) const;
+  std::string GetRNGState() const override;
+  void SetRNGState(const std::string& rng_state) const override;
 
   std::mt19937* RNG() const { return rng_.get(); }
   bool EnableProposals() const { return enable_proposals_; }

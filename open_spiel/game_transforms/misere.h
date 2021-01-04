@@ -55,7 +55,6 @@ class MisereGame : public WrappedGame {
  public:
   MisereGame(std::shared_ptr<const Game> game, GameType game_type,
              GameParameters game_parameters);
-  MisereGame(const MisereGame& other) = default;
 
   std::unique_ptr<State> NewInitialState() const override {
     return std::unique_ptr<State>(

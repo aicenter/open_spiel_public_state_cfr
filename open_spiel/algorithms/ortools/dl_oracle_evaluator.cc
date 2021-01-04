@@ -387,7 +387,7 @@ std::unique_ptr<dlcfr::PublicStateContext> OracleEvaluator::CreateContext(
     const InfostateNode* leaf_node = leaf_state.leaf_nodes[0][i];
     for (const std::unique_ptr<State>& s : leaf_node->corresponding_states()) {
       SPIEL_CHECK_FALSE(s->IsTerminal());
-      subgame_histories.emplace_back(std::move(s->Clone()));
+      subgame_histories.emplace_back(s->Clone());
       subgame_ranges[s->HistoryString()][0] = i;
     }
   }

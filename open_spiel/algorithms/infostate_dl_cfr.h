@@ -266,7 +266,7 @@ struct RangeTable {
   std::vector<Observation> private_hands;
 
   RangeTable(int num_public_states) : bijections(num_public_states) {}
-  int largest_range() const;
+  size_t largest_range() const;
   size_t hand_index(const Observation& obs);
 };
 

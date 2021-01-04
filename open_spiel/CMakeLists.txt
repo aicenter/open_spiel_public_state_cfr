@@ -3,6 +3,9 @@
 cmake_minimum_required (VERSION 3.12)
 project (open_spiel)
 
+# Uncomment for detailed compilation messages.
+# set(CMAKE_VERBOSE_MAKEFILE ON)
+
 # Define some nice terminal colors.
 if(NOT WIN32)
   string(ASCII 27 Esc)
@@ -50,7 +53,7 @@ endif()
 if(${BUILD_TYPE} EQUAL "Release")
   # Optimized release build: turn off debug runtime checks (assert,
   # SPIEL_DCHECK_*) and turn on highest speed optimizations.
-  # The difference in perfomance can be up to 10x higher.
+  # The difference in performance can be up to 10x higher.
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNDEBUG -O3")
 endif()
 
@@ -63,7 +66,22 @@ if(APPLE)
   # has a virtual environment active
   set (CMAKE_FIND_FRAMEWORK LAST)
 else()
-  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-everything")
+  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pedantic -Wall -Werror -Wno-sign-compare -Wno-macro-redefined -Wno-tautological-type-limit-compare -Wno-unused-template -Wno-unused-value -Wno-potentially-evaluated-expression -Wno-gnu-zero-variadic-macro-arguments -Wno-c99-extensions -Wno-gcc-compat -Wno-gnu-case-range -Wno-extra-semi -Wno-unused-const-variable -Wno-unused-variable -Wno-unused-private-field"
+    )
+  # -Wno-c99-extensions : A nice convenience used by most compilers.
+  # -Wno-extra-semi : open_spiel/libtorch/libtorch/include/ATen/core/jit_type.h:1945:1: warning: extra ';' inside a struct
+  # -Wno-gcc-compat : open_spiel/abseil-cpp/absl/strings/internal/str_format/parser.h:293:11: warning: 'enable_if' is a clang extension
+  # -Wno-gnu-case-range : open_spiel/games/solitaire.cc:1365:25: warning: use of GNU case range extension
+  # -Wno-gnu-zero-variadic-macro-arguments : Used extensively by Torch JIT.
+  # -Wno-macro-redefined"  # both libtorch and ortools have LOG()
+  # -Wno-potentially-evaluated-expression" #open_spiel/algorithms/trajectories.cc:173:20: warning: expression with side effects will be evaluated despite being used as an operand to 'typeid' [-Wpotentially-evaluated-expression]
+  # -Wno-sign-compare : Many places in OpenSpiel code base.
+  # -Wno-tautological-type-limit-compare"  # open_spiel/abseil-cpp/absl/time/internal/cctz/src/time_zone_libc.cc:193:9: warning: result of comparison 'const std::int_fast64_t' (aka 'const long') < -9223372036854775808 is always false
+  # -Wno-unused-const-variable : open_spiel/games/bridge/double_dummy_solver/src/Moves.cpp:24:14: warning: unused variable 'RegisterList'
+  # -Wno-unused-private-field : open_spiel/games/bridge/double_dummy_solver/src/System.h:40:9: warning: private field 'thrMax_MB' is not used
+  # -Wno-unused-template"  # open_spiel/abseil-cpp/absl/time/internal/cctz/src/time_zone_libc.cc:100:6: warning: unused function template 'tm_zone'
+  # -Wno-unused-value"  # open_spiel/games/bridge/double_dummy_solver/src/Init.cpp:364:12: warning: expression result unused
+  # -Wno-unused-variable : open_spiel/games/bridge/double_dummy_solver/src/System.cpp:229:7: warning: unused variable 'ignore'
 endif()
 
 # Position-independent code is needed for Python extension modules.

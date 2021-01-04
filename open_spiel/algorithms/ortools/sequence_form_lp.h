@@ -76,7 +76,7 @@ struct NodeSpecification {
   operations_research::MPConstraint* ct_parent_reach_prob;
 };
 
-constexpr char* kDefaultLinProgSolver = "GLOP";
+constexpr const char* kDefaultLinProgSolver = "GLOP";
 
 class SequenceFormLpSpecification {
  using MPSolver = operations_research::MPSolver;

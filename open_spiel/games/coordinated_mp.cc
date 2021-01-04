@@ -65,7 +65,7 @@ class PenniesObserver : public Observer {
     SpielFatalError("Unimplemented");
   }
 
-  std::string StringFrom(const State &observed_state, int player) const {
+  std::string StringFrom(const State &observed_state, int player) const override {
     const PenniesState &state =
         open_spiel::down_cast<const PenniesState &>(observed_state);
     SPIEL_CHECK_GE(player, 0);

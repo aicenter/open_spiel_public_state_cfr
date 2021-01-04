@@ -140,14 +140,14 @@ double RootCfValue(int root_branching_factor,
 InfostateCFR::InfostateCFR(std::vector<std::shared_ptr<InfostateTree>> trees,
                            std::vector<BanditVector> bandits)
     : trees_(std::move(trees)),
-      cf_values_({
-                     std::vector<double>(trees_[0]->num_leaves(), 0.),
-                     std::vector<double>(trees_[1]->num_leaves(), 0.)
-                 }),
       reach_probs_({
-                       std::vector<double>(trees_[0]->num_leaves(), 0.),
-                       std::vector<double>(trees_[1]->num_leaves(), 0.)
-                   }),
+          std::vector<double>(trees_[0]->num_leaves(), 0.),
+          std::vector<double>(trees_[1]->num_leaves(), 0.)
+      }),
+      cf_values_({
+          std::vector<double>(trees_[0]->num_leaves(), 0.),
+          std::vector<double>(trees_[1]->num_leaves(), 0.)
+      }),
       bandits_(std::move(bandits)) {
   SPIEL_CHECK_EQ(trees_.size(), 2);
   PrepareTerminals();

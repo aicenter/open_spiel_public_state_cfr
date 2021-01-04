@@ -128,8 +128,8 @@ class GamePicker : public Game {
 class GamePickerObserver : public Observer {
   const std::shared_ptr<const GamePicker> picking_game_;
   const IIGObservationType iig_obs_type_;
-  size_t max_tensor_size_;
-  std::vector<size_t> game_tensor_sizes_;
+  int max_tensor_size_;
+  std::vector<int> game_tensor_sizes_;
   std::vector<std::shared_ptr<Observer>> game_observers_;
  public:
   GamePickerObserver(std::shared_ptr<const Game> picking_game,

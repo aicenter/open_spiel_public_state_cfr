@@ -33,8 +33,6 @@ namespace nfg_game {
 namespace {
 using std::shared_ptr;
 
-constexpr int kBuffSize = 1024;
-
 // Facts about the game. These are defaults that will differ depending on the
 // game's descriptions. Using dummy defaults just to register the game.
 const GameType kGameType{/*short_name=*/"nfg_game",

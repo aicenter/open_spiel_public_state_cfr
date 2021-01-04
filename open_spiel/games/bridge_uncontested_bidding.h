@@ -228,8 +228,8 @@ class UncontestedBiddingGame : public Game {
   int MaxChanceNodesInHistory() const override { return 1; }
   std::unique_ptr<State> DeserializeState(
       const std::string& str) const override;
-  std::string GetRNGState() const;
-  void SetRNGState(const std::string& rng_state) const;
+  std::string GetRNGState() const override;
+  void SetRNGState(const std::string& rng_state) const override;
 
  private:
   std::vector<Contract> reference_contracts_;

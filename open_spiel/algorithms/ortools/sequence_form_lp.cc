@@ -268,7 +268,7 @@ void SequenceFormLpSpecification::PrintProblemSpecification() {
   std::cout << std::endl;
 
   std::cout << "Constraints:" << std::endl;
-  for (auto& ct : solver_->constraints()) {
+  for (auto& ct : constraints) {
     std::cout << ct->lb() << " <= ";
     bool first_ct = true;
     for (int i = 0; i < variables.size(); ++i) {

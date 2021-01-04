@@ -82,11 +82,9 @@ class NFGState : public SimMoveState {
 };
 
 class NFGObserver : public Observer {
-  IIGObservationType iig_obs_type_;
  public:
   explicit NFGObserver(IIGObservationType iig_obs_type)
-      : Observer(/*has_string=*/true, /*has_tensor=*/true),
-        iig_obs_type_(iig_obs_type) {}
+      : Observer(/*has_string=*/true, /*has_tensor=*/true) {}
   void WriteTensor(const State& state, Player player,
                    Allocator* allocator) const override {
     const NFGState& nfg_state = open_spiel::down_cast<const NFGState&>(state);

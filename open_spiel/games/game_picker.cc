@@ -130,7 +130,7 @@ GamePickerObserver::GamePickerObserver(
         game->MakeObserver(iig_obs_type_, {});
     game_observers_.push_back(game_observer);
     Observation game_observation(*game, game_observer);
-    size_t game_tensor_size = game_observation.Tensor().size();
+    int game_tensor_size = game_observation.Tensor().size();
     max_tensor_size_ = std::max(game_tensor_size, max_tensor_size_);
     game_tensor_sizes_.push_back(game_tensor_size);
   }
@@ -142,7 +142,7 @@ void GamePickerObserver::WriteTensor(const State& state,
   const auto& wrapper = open_spiel::down_cast<const WrappedState&>(state);
   const auto& wrapped_state = wrapper.GetWrappedState();
 
-  const size_t num_games = game_observers_.size();
+  const int num_games = game_observers_.size();
   const std::vector<State::PlayerAction>& full_history = state.FullHistory();
   absl::optional<size_t> picked_game = {};
   if (!full_history.empty()) {

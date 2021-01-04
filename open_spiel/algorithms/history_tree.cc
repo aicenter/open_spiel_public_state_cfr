@@ -54,7 +54,7 @@ std::unique_ptr<HistoryNode> RecursivelyBuildGameTree(
     case StateType::kDecision: {
       for (const auto& action : state_ptr->LegalActions()) {
         std::unique_ptr<HistoryNode> child_history = RecursivelyBuildGameTree(
-            std::move(state_ptr->Child(action)), state_to_node);
+            state_ptr->Child(action), state_to_node);
         // Note: The probabilities here are meaningless if state.CurrentPlayer()
         // != player_id, as we'll be getting the probabilities from the policy
         // during the call to Value. For state.CurrentPlayer() == player_id,
@@ -78,9 +78,9 @@ std::unique_ptr<HistoryNode> RecursivelyBuildGameTree(
 
 HistoryNode::HistoryNode(std::unique_ptr<State> game_state)
     : state_(std::move(game_state)),
-      action_view_(*state_),
       history_(state_->HistoryString()),
-      type_(state_->GetType()) {
+      type_(state_->GetType()),
+      action_view_(*state_) {
   infostates_.reserve(state_->NumPlayers());
   for (int pl = 0; pl < state_->NumPlayers(); ++pl) {
     infostates_.push_back(state_->InformationStateString(pl));

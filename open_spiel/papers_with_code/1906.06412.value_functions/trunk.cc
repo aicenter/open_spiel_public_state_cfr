@@ -54,8 +54,10 @@ Trunk::Trunk(const std::string& game_name, int trunk_depth) {
   const dlcfr::LeafPublicState& some_leaf =
       trunk_with_oracle->public_leaves().at(0);
   const size_t encoding_size = some_leaf.public_tensor.Tensor().size();
-  std::array<size_t, 2> ranges_size = {tables[0].largest_range(),
-                                       tables[1].largest_range()};
+  std::array<size_t, 2> ranges_size = {
+      tables[0].largest_range(),
+      tables[1].largest_range()
+  };
   const size_t range_size_sum = ranges_size[0] + ranges_size[1];
   const size_t input_size = encoding_size + range_size_sum;
   const size_t output_size = range_size_sum;

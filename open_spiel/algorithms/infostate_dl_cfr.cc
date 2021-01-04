@@ -33,14 +33,6 @@ DepthLimitedCFR::DepthLimitedCFR(
 ) :
     game_(std::move(game)),
     trees_(std::move(depth_lim_trees)),
-    cf_values_({
-      std::vector<double>(trees_[0]->num_leaves(), 0.),
-      std::vector<double>(trees_[1]->num_leaves(), 0.)
-    }),
-    reach_probs_({
-      std::vector<double>(trees_[0]->num_leaves(), 0.),
-      std::vector<double>(trees_[1]->num_leaves(), 0.)
-    }),
     public_observer_(std::move(public_observer)),
     leaf_evaluator_(std::move(leaf_evaluator)),
     terminal_evaluator_(std::move(terminal_evaluator)),
@@ -48,6 +40,14 @@ DepthLimitedCFR::DepthLimitedCFR(
       std::vector<double>(trees_[0]->root_branching_factor(), 1.),
       std::vector<double>(trees_[1]->root_branching_factor(), 1.)
     }),
+    reach_probs_({
+                     std::vector<double>(trees_[0]->num_leaves(), 0.),
+                     std::vector<double>(trees_[1]->num_leaves(), 0.)
+                 }),
+    cf_values_({
+                   std::vector<double>(trees_[0]->num_leaves(), 0.),
+                   std::vector<double>(trees_[1]->num_leaves(), 0.)
+               }),
     bandits_(std::move(bandits)) {
   SPIEL_CHECK_TRUE(public_observer_->HasTensor());
   PrepareLeafNodesForPublicStates();
@@ -62,11 +62,12 @@ DepthLimitedCFR::DepthLimitedCFR(
 ) {
   auto trees = {MakeInfostateTree(*game, 0, max_depth_limit),
                 MakeInfostateTree(*game, 1, max_depth_limit)};
-  return new(this) DepthLimitedCFR(game, trees,
-                                   std::move(leaf_evaluator),
-                                   std::move(terminal_evaluator),
-                                   game->MakeObserver(kPublicStateObsType, {}),
-                                   MakeBanditVectors(trees));
+  // TODO: fix.
+  new(this) DepthLimitedCFR(game, trees,
+                            std::move(leaf_evaluator),
+                            std::move(terminal_evaluator),
+                            game->MakeObserver(kPublicStateObsType, {}),
+                            MakeBanditVectors(trees));
 }
 
 void DepthLimitedCFR::PrepareLeafNodesForPublicStates() {
@@ -164,12 +165,12 @@ TerminalPublicStateContext::TerminalPublicStateContext(
   SPIEL_CHECK_EQ(player1_map.size(), leaf_nodes[1].size());
 
   for (int i = 0; i < num_terminals; ++i) {
-    const InfostateNode const* a = leaf_nodes[0][i];
+    const InfostateNode* a = leaf_nodes[0][i];
     const int permutation_index = player1_map.at(a->TerminalHistory());
-    const InfostateNode const* b = leaf_nodes[1][permutation_index];
+    const InfostateNode* b = leaf_nodes[1][permutation_index];
     SPIEL_DCHECK_EQ(a->TerminalHistory(), b->TerminalHistory());
 
-    const InfostateNode const* leaf = leaf_nodes[0][i];
+    const InfostateNode* leaf = leaf_nodes[0][i];
     const double v = leaf->terminal_utility();
     const double chn = leaf->terminal_chance_reach_prob();
     utilities.push_back(v * chn);
@@ -379,8 +380,7 @@ CFREvaluator::CFREvaluator(std::shared_ptr<const Game> game, int depth_limit,
       leaf_evaluator(std::move(leaf_evaluator)),
       terminal_evaluator(std::move(terminal_evaluator)),
       public_observer(std::move(public_observer)),
-      infostate_observer(std::move(infostate_observer)),
-      reset_subgames_on_evaluation(reset_subgames_on_evaluation) {
+      infostate_observer(std::move(infostate_observer)) {
   SPIEL_CHECK_GT(depth_limit, 0);
 }
 
@@ -432,7 +432,7 @@ double DepthLimitedCFR::RootValue(Player pl) const {
 
 // -- Range table --------------------------------------------------------------
 
-int RangeTable::largest_range() const { return private_hands.size(); }
+size_t RangeTable::largest_range() const { return private_hands.size(); }
 
 size_t RangeTable::hand_index(const Observation& obs) {
   auto it = std::find(private_hands.begin(), private_hands.end(), obs);

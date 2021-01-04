@@ -111,7 +111,6 @@ void RegretMatchingPlus::ComputeStrategy(size_t current_time, double weight) {
   for (int i = 0; i < num_actions(); ++i) {
     cumulative_strategy_[i] += current_time * weight * current_strategy_[i];
   }
-  return current_strategy_;
 }
 
 void RegretMatchingPlus::ObserveRewards(absl::Span<const double> rewards) {
@@ -270,7 +269,6 @@ void PredictiveRegretMatchingPlus::ComputeStrategy(size_t current_time, double w
     cumulative_strategy_[i] = comb * weight * current_strategy_[i]
                             + (1. - comb) * cumulative_strategy_[i];
   }
-  return current_strategy_;
 }
 
 void PredictiveRegretMatchingPlus::ObserveRewards(absl::Span<const double> rewards) {

@@ -70,7 +70,7 @@ class EFCEState : public WrappedState {
   ActionsAndProbs ChanceOutcomes() const override;
   std::vector<Action> LegalActions() const override;
   std::string InformationStateString(Player player) const override;
-  std::string ToString() const;
+  std::string ToString() const override;
 
   bool HasDefected(Player player) const;
 

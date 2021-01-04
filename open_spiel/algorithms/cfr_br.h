@@ -40,7 +40,7 @@ class CFRBRSolver : public CFRSolverBase {
   void EvaluateAndUpdatePolicy() override;
 
  protected:
-  std::string SerializeThisType() const { return "CFRBRSolver"; }
+  std::string SerializeThisType() const override { return "CFRBRSolver"; }
 
  private:
   void InitializeBestResponseComputers();
