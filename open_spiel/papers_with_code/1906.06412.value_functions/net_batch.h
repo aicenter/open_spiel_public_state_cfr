@@ -104,6 +104,8 @@ struct BatchData {
   }
 };
 
+void DebugPrintBatchData(const BatchData& batch);
+
 }  // namespace papers_with_code
 }  // namespace open_spiel
 

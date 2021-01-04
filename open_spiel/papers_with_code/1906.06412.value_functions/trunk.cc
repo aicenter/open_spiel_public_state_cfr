@@ -24,46 +24,6 @@ namespace papers_with_code {
 
 using namespace algorithms;
 
-void PrintRangeTables(const std::vector<dlcfr::RangeTable>& tables) {
-  for (int pl = 0; pl < 2; ++pl) {
-    std::cout << "# List of private hands for pl " << pl << "\n";
-    const dlcfr::RangeTable& table = tables[pl];
-    for (int i = 0; i < table.private_hands.size(); ++i) {
-      std::cout << "#   private_hand[" << i << "]:\n#      "
-                << ObservationToString(table.private_hands[i], "\n#      ")
-                << "\n";
-    }
-
-    std::cout << "# List of bijections (tree -> net) for pl " << pl << "\n";
-    for (size_t i = 0; i < table.bijections.size(); ++i) {
-      std::cout << "#  Public state " << i << "\n";
-      const std::map<size_t, size_t>& tree_to_net =
-          table.bijections[i].tree_to_net();
-      for (auto&[key, val] : tree_to_net) {
-        std::cout << "#   " << key << " -> " << val << "\n";
-      }
-    }
-  }
-}
-
-void PrintBatchData(const BatchData& batch,
-                    const std::vector<dlcfr::LeafPublicState>& states) {
-  std::cout << "# Made BatchData with sizes:\n"
-            << "#   batch_size=" << batch.batch_size << "\n"
-            << "#   input_size=" << batch.input_size << "\n"
-            << "#   output_size=" << batch.output_size << "\n"
-            << "#   public_features_size=" << batch.public_features_size << "\n"
-            << "#   ranges_size=" << batch.ranges_size << "\n";
-  std::cout << "# Public features:\n";
-  for (int i = 0; i < states.size(); ++i) {
-    std::cout << "#   states[" << i << "].public_tensor\n#     "
-              << ObservationToString(states[i].public_tensor, "\n#     ")
-              << "\n";
-  }
-  std::cout << "# BatchData after feature copying:\n";
-  std::cout << "#   " << batch.data << "\n";
-}
-
 std::unique_ptr<Trunk> MakeTrunk(const std::string& game_name,
                                         int trunk_depth) {
   return std::make_unique<Trunk>(game_name, trunk_depth);

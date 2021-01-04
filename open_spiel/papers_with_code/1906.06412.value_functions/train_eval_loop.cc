@@ -54,8 +54,10 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
                    int cfr_oracle_iterations, int trunk_eval_iterations,
                    std::string use_bandits_for_cfr, int seed,
                    bool verbose_every_loop) {
-  PrintRangeTables(t->tables);
-  PrintBatchData(*t->batch, t->trunk_with_oracle->public_leaves());
+
+  DebugPrintRangeTables(t->tables);
+  DebugPrintBatchData(*t->batch);
+  DebugPrintPublicFeatures(t->trunk_with_oracle->public_leaves());
 
   t->oracle_evaluator->num_cfr_iterations = cfr_oracle_iterations;
   torch::manual_seed(seed);

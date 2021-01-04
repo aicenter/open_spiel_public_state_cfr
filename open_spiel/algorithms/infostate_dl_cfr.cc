@@ -344,6 +344,15 @@ bool LeafPublicState::IsTerminal() const {
   return leaf_nodes[0][0]->type() == kTerminalInfostateNode;
 }
 
+void DebugPrintPublicFeatures(const std::vector<LeafPublicState>& states) {
+  std::cout << "# Public features:\n";
+  for (int i = 0; i < states.size(); ++i) {
+    std::cout << "#   states[" << i << "].public_tensor\n#     "
+              << ObservationToString(states[i].public_tensor, "\n#     ")
+              << "\n";
+  }
+}
+
 bool CheckChildPublicStateConsistency(
     const CFRContext& cfr_public_state, const LeafPublicState& leaf_state) {
   auto trees = cfr_public_state.dlcfr->trees();
@@ -508,6 +517,29 @@ std::vector<RangeTable> CreateRangeTables(
     }
   }
   return tables;
+}
+
+void DebugPrintRangeTables(const std::vector<RangeTable>& tables) {
+  for (int pl = 0; pl < 2; ++pl) {
+    std::cout << "# List of private hands for player " << pl << "\n";
+    const RangeTable& table = tables[pl];
+    for (int i = 0; i < table.private_hands.size(); ++i) {
+      std::cout << "#   private_hand[" << i << "]:\n#      "
+                << ObservationToString(table.private_hands[i], "\n#      ")
+                << "\n";
+    }
+
+    std::cout << "# List of bijections (tree <-> net) for player "
+              << pl << "\n";
+    for (size_t i = 0; i < table.bijections.size(); ++i) {
+      std::cout << "#  Public state " << i << "\n";
+      const std::map<size_t, size_t>& tree_to_net =
+          table.bijections[i].tree_to_net();
+      for (auto&[key, val] : tree_to_net) {
+        std::cout << "#   " << key << " -> " << val << "\n";
+      }
+    }
+  }
 }
 
 }  // namespace dlcfr

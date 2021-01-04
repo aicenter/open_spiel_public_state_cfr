@@ -75,6 +75,8 @@ struct LeafPublicState final {
   bool IsConsistent() const;
 };
 
+void DebugPrintPublicFeatures(const std::vector<LeafPublicState>& states);
+
 // Derived classes specify members as they need for their specific
 // leaf evaluators.
 //
@@ -272,6 +274,8 @@ std::vector<RangeTable> CreateRangeTables(
     const Game& game,
     const std::shared_ptr<Observer>& hand_observer,
     const std::vector<dlcfr::LeafPublicState>& public_leaves);
+
+void DebugPrintRangeTables(const std::vector<dlcfr::RangeTable>& tables);
 
 }  // namespace dlcfr
 }  // namespace algorithms
