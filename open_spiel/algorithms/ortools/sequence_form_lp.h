@@ -25,6 +25,7 @@
 
 #include "open_spiel/policy.h"
 #include "open_spiel/algorithms/infostate_tree.h"
+#include "open_spiel/utils/data_structures.h"
 
 
 // An implementation of a sequence-form linear program for computing Nash
@@ -40,28 +41,6 @@
 namespace open_spiel {
 namespace algorithms {
 namespace ortools {
-
-
-template<class T>
-struct BijectiveContainer {
-  std::map<T, T> x2y;
-  std::map<T, T> y2x;
-
-  void put(std::pair<T, T> xy) {
-    const T& x = xy.first;
-    const T& y = xy.second;
-    SPIEL_CHECK_TRUE(x2y.find(x) == x2y.end());
-    SPIEL_CHECK_TRUE(y2x.find(y) == y2x.end());
-    x2y[x] = y;
-    y2x[y] = x;
-  }
-  // Direction is equivalent to player id.
-  const std::map<T, T>& association(int direction) const {
-    SPIEL_CHECK_TRUE(direction == 0 || direction == 1);
-    if (direction == 0) return x2y;
-    else return y2x;
-  }
-};
 
 BijectiveContainer<const InfostateNode*> ConnectTerminals(
     const InfostateTree& tree_a, const InfostateTree& tree_b);

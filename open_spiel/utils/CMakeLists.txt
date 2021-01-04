@@ -4,6 +4,7 @@ add_library (utils OBJECT
   combinatorics.cc
   data_logger.h
   data_logger.cc
+  data_structures.h
   file.h
   file.cc
   functional.h

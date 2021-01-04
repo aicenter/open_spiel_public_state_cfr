@@ -27,6 +27,7 @@
 #include "open_spiel/algorithms/infostate_tree.h"
 #include "open_spiel/spiel.h"
 #include "open_spiel/spiel_utils.h"
+#include "open_spiel/utils/data_structures.h"
 
 // Depth-limited CFR is conceptually similar to what `infostate_cfr.h` does.
 // Additionally it saves structure of public states in the leaves of the
@@ -229,29 +230,6 @@ struct CFREvaluator : public LeafEvaluator {
 };
 
 // -- Range table --------------------------------------------------------------
-
-
-template<class T>
-struct BijectiveContainer {
-  std::map<T, T> x2y;
-  std::map<T, T> y2x;
-
-  void put(std::pair<T, T> xy) {
-    const T& x = xy.first;
-    const T& y = xy.second;
-    SPIEL_CHECK_TRUE(x2y.find(x) == x2y.end());
-    SPIEL_CHECK_TRUE(y2x.find(y) == y2x.end());
-    x2y[x] = y;
-    y2x[y] = x;
-  }
-  const std::map<T, T>& tree_to_net() const { return x2y; }
-  const std::map<T, T>& net_to_tree() const { return y2x; }
-
-  size_t size() const {
-    SPIEL_CHECK_EQ(x2y.size(), y2x.size());
-    return x2y.size();
-  }
-};
 
 struct RangeTable {
   // Bijection between ranges coming from infostate tree (x)
