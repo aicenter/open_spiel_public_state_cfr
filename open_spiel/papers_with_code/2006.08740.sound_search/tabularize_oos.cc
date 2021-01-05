@@ -119,6 +119,7 @@ void InitializeRegrets(
     // p = Pass (equilvalent to fold/call), b = Bet
     // First action is Pass, second is Bet.
     // @formatter:off
+    // FIXME: this is probably flipped! pass vs bet
     t["0"].cumulative_regrets   = { mu * (a),          mu * (1 - a)};
     t["0pb"].cumulative_regrets = { mu * (0),          mu * (1)};
     t["1"].cumulative_regrets   = { mu * (0),          mu * (1)};
