@@ -42,6 +42,8 @@
 #include "open_spiel/abseil-cpp/absl/types/optional.h"
 #include "open_spiel/abseil-cpp/absl/types/span.h"
 
+#include "open_spiel/custom_utils.h"
+
 // Code that is not part of the API, but is widely useful in implementations.
 
 namespace open_spiel {
