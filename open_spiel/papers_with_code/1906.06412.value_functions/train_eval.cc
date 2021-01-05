@@ -37,9 +37,7 @@ double EvaluateNetwork(dlcfr::DepthLimitedCFR* trunk_with_net,
                        int trunk_iterations,
                        ortools::SequenceFormLpSpecification* whole_game) {
   trunk_with_net->Reset();
-  std::cout << " (trunk iters) " << std::flush;
   trunk_with_net->RunSimultaneousIterations(trunk_iterations);
-  std::cout << " (trunk expl) " << std::endl;
   return ortools::TrunkExploitability(
       whole_game, *trunk_with_net->AveragePolicy());
 }

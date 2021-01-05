@@ -35,12 +35,18 @@ void PlacementCopy(absl::Span<const From> from, absl::Span<To> to,
   }
 }
 
-void RandomizeTrunkStrategy(std::vector<algorithms::BanditVector>& bandits,
-                            std::mt19937& rnd_gen, double prob_pure_strat);
+void RandomizeStrategy(std::vector<algorithms::BanditVector>& bandits,
+                       std::mt19937& rnd_gen, double prob_pure_strat = 0.3);
 
 void GenerateData(const std::vector<algorithms::dlcfr::RangeTable>& tables,
                   algorithms::dlcfr::DepthLimitedCFR* trunk, BatchData* batch,
                   std::mt19937& rnd_gen, bool verbose = false);
+
+inline void GenerateData(Trunk* trunk, std::mt19937& rnd_gen,
+                         bool verbose = false) {
+  GenerateData(trunk->tables, trunk->trunk_with_oracle.get(),
+               trunk->batch.get(), rnd_gen, verbose);
+}
 
 }  // papers_with_code
 }  // open_spiel

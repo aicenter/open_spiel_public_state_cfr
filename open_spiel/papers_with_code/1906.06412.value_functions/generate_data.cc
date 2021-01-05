@@ -26,8 +26,8 @@ namespace papers_with_code {
 
 using namespace open_spiel::algorithms;
 
-void RandomizeTrunkStrategy(std::vector<BanditVector>& bandits,
-                            std::mt19937& rnd_gen, double prob_pure_strat) {
+void RandomizeStrategy(std::vector<BanditVector>& bandits,
+                       std::mt19937& rnd_gen, double prob_pure_strat) {
   for (int pl = 0; pl < 2; ++pl) {
     for (DecisionId id : bandits[pl].range()) {
       // Randomize current policy
@@ -62,8 +62,8 @@ void RandomizeTrunkStrategy(std::vector<BanditVector>& bandits,
 void GenerateData(const std::vector<dlcfr::RangeTable>& tables,
                   dlcfr::DepthLimitedCFR* trunk_with_oracle, BatchData* batch,
                   std::mt19937& rnd_gen, bool verbose) {
-  RandomizeTrunkStrategy(trunk_with_oracle->bandits(), rnd_gen,
-                         /*prob_pure_strat=*/0.3);
+  RandomizeStrategy(trunk_with_oracle->bandits(), rnd_gen,
+                    /*prob_pure_strat=*/0.3);
   // This call invokes public state evaluation under the hood.
   trunk_with_oracle->RunSimultaneousIterations(1);
   CopyRangesAndValues(trunk_with_oracle, tables, batch, verbose);
