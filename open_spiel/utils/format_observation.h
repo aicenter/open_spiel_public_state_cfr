@@ -28,8 +28,10 @@ namespace open_spiel {
 inline void _format_binary_value(std::ostream& os, const float& v) {
   if (v == 0) {
     os << "◯";
+    return;
   } else if (v == 1) {
     os << "◉";
+    return;
   }
   SpielFatalError("Values must all be 0 or 1");
 }
