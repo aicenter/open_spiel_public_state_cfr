@@ -144,6 +144,7 @@ class DepthLimitedCFR {
   void RunSimultaneousIterations(int iterations);
   void PrepareRootReachProbs();
   void EvaluateLeaves();
+  void UpdateReachProbs();
 
   void SetPlayerRanges(const std::array<std::vector<double>, 2>& ranges);
   double RootValue(Player pl = 0) const;

@@ -200,16 +200,18 @@ void TerminalEvaluator::EvaluatePublicState(
   }
 }
 
+void DepthLimitedCFR::UpdateReachProbs() {
+  PrepareRootReachProbs();
+  for (int pl = 0; pl < 2; ++pl) {
+    TopDown(*trees_[pl], bandits_[pl],
+            absl::MakeSpan(reach_probs_[pl]), num_iterations_);
+  }
+}
+
 void DepthLimitedCFR::RunSimultaneousIterations(int iterations) {
   for (int t = 0; t < iterations; ++t) {
     ++num_iterations_;
-
-    PrepareRootReachProbs();
-    for (int pl = 0; pl < 2; ++pl) {
-      TopDown(*trees_[pl], bandits_[pl],
-              absl::MakeSpan(reach_probs_[pl]), num_iterations_);
-    }
-
+    UpdateReachProbs();
     EvaluateLeaves();
     for (int pl = 0; pl < 2; ++pl) {
       BottomUp(*trees_[pl], bandits_[pl], absl::MakeSpan(cf_values_[pl]));
