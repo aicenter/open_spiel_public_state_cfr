@@ -120,10 +120,9 @@ void LearnFixedValuesTest(std::unique_ptr<Trunk> t) {
   const float_net fixed_range_input = 0.5;
   const float_net fixed_value_ouput = 1.0;
 
-  torch::Device device = FindDevice();
+  torch::Device device = torch::Device(torch::kCPU);
   PositionalValueNet model(t->batch->input_size, t->batch->output_size,
                            t->batch->input_size * 3);
-  model.to(device);
 
   // Make a single target -- all values are 1.0, all ranges are 0.5
   std::vector<dlcfr::LeafPublicState>& public_leaves =
@@ -173,10 +172,9 @@ void KuhnLearningTest(KuhnLearnCase learning_case) {
   std::mt19937 rnd_gen(kSeed);
 
   std::unique_ptr<Trunk> t = MakeTrunk("kuhn_poker", 3);
-  torch::Device device = FindDevice();
+  torch::Device device = torch::Device(torch::kCPU);
   PositionalValueNet model(t->batch->input_size, t->batch->output_size,
                            t->batch->input_size * 3);
-  model.to(device);
 
   std::vector<dlcfr::LeafPublicState>& public_leaves =
       t->trunk_with_oracle->public_leaves();
