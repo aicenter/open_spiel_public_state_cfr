@@ -118,8 +118,8 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
 
 int main(int argc, char** argv) {
   using namespace open_spiel::papers_with_code;
+  INIT_EXPERIMENT();
 
-  absl::ParseCommandLine(argc, argv);
   TrainEvalLoop(
       MakeTrunk(absl::GetFlag(FLAGS_game_name), absl::GetFlag(FLAGS_depth)),
       absl::GetFlag(FLAGS_train_batches),
