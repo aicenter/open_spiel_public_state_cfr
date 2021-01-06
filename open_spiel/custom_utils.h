@@ -24,9 +24,8 @@ inline void _InitiliazeExperimentRunner(std::string origin_file, int argc, char*
   absl::ParseCommandLine(argc, argv);
 
   std::string git_version = CommandOutput("git rev-parse HEAD");
-  std::string git_status = CommandOutput("git status");
-  bool is_clean =
-      absl::StrContains(git_status, "nothing to commit, working tree clean");
+  std::string git_status = CommandOutput("git status --porcelain");
+  bool is_clean = git_status == git_version;
 
   std::cout << "# Running " << origin_file << "\n";
   std::cout << "# Git version " << git_version << "\n";
