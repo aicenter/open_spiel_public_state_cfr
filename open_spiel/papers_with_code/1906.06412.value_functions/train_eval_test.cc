@@ -160,6 +160,7 @@ void LearnFixedValuesTest(std::unique_ptr<Trunk> t) {
 }
 
 enum KuhnLearnCase {
+  kLearnNashEqComputedTargets,
   kLearnNashEqDeterministicTargets,
   kLearnNashEqRandomizedTargets,
   kLearnExploitableStrategyRandomizedTargets,
@@ -175,6 +176,8 @@ void KuhnLearningTest(KuhnLearnCase learning_case) {
   torch::Device device = torch::Device(torch::kCPU);
   PositionalValueNet model(t->batch->input_size, t->batch->output_size,
                            t->batch->input_size * 3);
+  torch::optim::SGD optimizer(model.parameters(),
+                              torch::optim::SGDOptions(/*lr=*/0.4));
 
   std::vector<dlcfr::LeafPublicState>& public_leaves =
       t->trunk_with_oracle->public_leaves();
@@ -188,7 +191,7 @@ void KuhnLearningTest(KuhnLearnCase learning_case) {
   auto trunk_with_net = std::make_unique<dlcfr::DepthLimitedCFR>(
       t->game, t->trunk_trees, net_evaluator, t->terminal_evaluator,
       t->public_observer,
-      MakeBanditVectors(t->trunk_trees, "RegretMatchingPlus"));
+      MakeBanditVectors(t->trunk_trees, "PredictiveRegretMatchingPlus"));
 
   // 3. Create the LP spec for the whole game.
   ortools::SequenceFormLpSpecification whole_game(*t->game, "CLP");
@@ -196,15 +199,19 @@ void KuhnLearningTest(KuhnLearnCase learning_case) {
   double expl_before_training = EvaluateNetwork(trunk_with_net.get(), 100,
                                                 &whole_game);
   // Should get a high expl before training.
-  SPIEL_CHECK_GT(expl_before_training, 0.1);
+  SPIEL_CHECK_GT(expl_before_training, 0.05);
 
   // 4. Learn the fixed values.
-  for (int j = 0; j <= 64; ++j) {
+  const int num_iters = 64
+      * (learning_case == kLearnNashEqComputedTargets ? 100 : 1);
+  for (int j = 0; j <= num_iters; ++j) {
     // Generate random ranges.
     RandomizeStrategy(t->trunk_with_oracle->bandits(), rnd_gen);
     t->trunk_with_oracle->UpdateReachProbs();
 
-    if (learning_case == kLearnNashEqDeterministicTargets) {
+    if (learning_case == kLearnNashEqComputedTargets) {
+      t->trunk_with_oracle->RunSimultaneousIterations(1);
+    } else if (learning_case == kLearnNashEqDeterministicTargets) {
       // The player will learn to get high values for passing, and low values
       // for betting. This corresponds to Nash equilibrium with alpha = 0
       std::fill(pass_state.values[0].begin(), pass_state.values[0].end(), 1);
@@ -229,7 +236,13 @@ void KuhnLearningTest(KuhnLearnCase learning_case) {
     }
 
     CopyRangesAndValues(t.get());
-    LearnFixedValues(t->batch.get(), &model, &device, 1, 1);
+    TrainNetwork(&model, &device, &optimizer, t->batch.get());
+
+    if (j % 64 == 0) {
+      double expl_after_training = EvaluateNetwork(trunk_with_net.get(), 100,
+                                            &whole_game);
+      std::cout << j / 64 <<","<< expl_after_training << "\n";
+    }
   }
 
   double expl_after_training = EvaluateNetwork(trunk_with_net.get(), 100,
@@ -240,6 +253,9 @@ void KuhnLearningTest(KuhnLearnCase learning_case) {
     case kLearnNashEqDeterministicTargets:
     case kLearnNashEqRandomizedTargets:
       SPIEL_CHECK_LT(expl_after_training, 1e-4);
+      break;
+    case kLearnNashEqComputedTargets:
+      SPIEL_CHECK_LT(expl_after_training, 0.02);
       break;
     case kLearnExploitableStrategyDeterministicTargets:
     case kLearnExploitableStrategyRandomizedTargets:
@@ -260,6 +276,7 @@ int main(int argc, char** argv) {
   LearnFixedValuesTest(MakeTrunk(
       "goofspiel(players=2,num_cards=3,imp_info=True)", /*trunk_depth=*/1));
 
+  KuhnLearningTest(kLearnNashEqComputedTargets);
   KuhnLearningTest(kLearnNashEqDeterministicTargets);
   KuhnLearningTest(kLearnNashEqRandomizedTargets);
   KuhnLearningTest(kLearnExploitableStrategyDeterministicTargets);
