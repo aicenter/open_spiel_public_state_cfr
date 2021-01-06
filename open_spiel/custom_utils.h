@@ -41,7 +41,8 @@ inline void _InitiliazeExperimentRunner(std::string origin_file, int argc, char*
   }
 
   for (int i = 0; i < argc; ++i) {
-    std::cout << "# " << argv[i] << " \\ \n";
+    std::cout << "# " << argv[i];
+    if (i + 1 < argc) std::cout << " \\ \n";
   }
   std::cout << "\n" << std::endl;
 }
