@@ -18,6 +18,7 @@ ENV/
 .DS_Store
 
  # Build products
+build
 build/
 build*/
 cmake-build-*/
