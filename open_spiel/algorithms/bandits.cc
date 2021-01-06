@@ -315,7 +315,8 @@ std::vector<double> PredictiveRegretMatchingPlus::AverageStrategy() const {
 
 void PredictiveRegretMatchingPlus::Reset() {
   Bandit::Reset();
-  std::fill(cumulative_regrets_.begin(), cumulative_regrets_.end(), 0.);
+  // FIXME -- regret initialization.
+  std::fill(cumulative_regrets_.begin(), cumulative_regrets_.end(), 10.);
   std::fill(cumulative_strategy_.begin(), cumulative_strategy_.end(), 0.);
   std::fill(prediction_.begin(), prediction_.end(), 0.);
 }
