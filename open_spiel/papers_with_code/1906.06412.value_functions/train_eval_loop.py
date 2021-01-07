@@ -1,22 +1,29 @@
-import os
-import re
-from itertools import product, chain
-from pprint import pprint
-
+import grid_plot.sweep as sweep
 import matplotlib.pyplot as plt
 import pandas as pd
-from natsort import natsorted
 
 param_sweep = [
-  ("a_game_name", ".*(poker)"),
+  ("a_game_name", ".*kuhn_poker.*"),
+  # ("b_cfr_oracle_iters", ".*"),
   ("b_depth", ".*"),
+  # ("b_bandit", ".*"),
+  # ("c_ball", ".*"),
 ]
+
+display_perm = [
+  # ("a_game_name",),
+  ("a_game_name",),
+  # ("b_cfr_oracle_iters",),
+  ("b_depth",),
+  # ("b_bandit", "c_ball",),
+]
+
 display_perm = [
   ("a_game_name",),
   ("b_depth",),
 ]
 
-base_dir = "./train_test_loop"
+base_dir = "./experiments/train_test_loop_results"
 translation_map = {
   "goofspiel(players=2,num_cards=3,imp_info=True)": "GS 3 (rand)",
   "goofspiel(players=2,num_cards=3,imp_info=True,points_order=ascending)":
@@ -44,127 +51,18 @@ translation_map = {
   "d_subgame_cfr_iterations": "subgame iters"
 }
 
-def plot_item(ax, display_params, full_params):
+def plot_item(ax, file, display_params, full_params):
   try:
-    file = file_from_params(full_params)
     df = pd.read_csv(file, comment="#", skip_blank_lines=True)
     print(".", end="")
-    ax.semilogy(df.loop, df.avg_loss, label="loss")
-    ax.semilogy(df.loop, df.exploitability, label="expl")
+
+    ax.semilogy(df.loop, df.exploitability.rolling(window=20).mean(), label="expl (rolling mean)", c="r")
+    ax.semilogy(df.loop, df.exploitability, alpha=0.2, c="r")
+    ax.semilogy(df.loop, df.avg_loss.rolling(window=20).mean(), label="loss (rolling mean)", c="g")
+    ax.semilogy(df.loop, df.avg_loss, alpha=0.2, c="g")
   except Exception as e:
     print(e)
     pass
 
-def file_from_params(full_params):
-  full_dir = f"{base_dir}"
-  for (param_name, mask) in param_sweep:
-    full_dir += f"/{param_name}/{full_params[param_name]}"
-  return f"{full_dir}/stdout"
-
-
-def lbl(label_lookup):
-  return (translation_map[label_lookup]
-          if label_lookup in translation_map else label_lookup)
-
-def lbls(label_lookups, sep=", "):
-  if isinstance(label_lookups, dict):
-    # print(label_lookups)
-    return sep.join(f"{lbl(k)}={lbl(v)}" if lbl(v) == v else lbl(v)
-                    for k, v in label_lookups.items())
-  else:
-    return sep.join(lbl(lookup) for lookup in label_lookups)
-
-
-def glob_regex(pattern):
-  # print(pattern)
-  match_dir = re.compile(pattern)
-  ds = []
-  for dirpath, dirnames, filenames in os.walk(".", topdown=True):
-    if match_dir.search(dirpath):
-      ds.append(dirpath)
-    # print(dirpath)
-    if pattern.count("/") - dirpath.count("/") <= 0:
-      del dirnames[:]
-  return ds
-
-def kv_dict(ks, vs):
-  return {k: v for k,v in zip(ks, vs)}
-
-
-shape = {param: 1 for (param, card) in param_sweep}
-params = {param: set() for (param, card) in param_sweep}
-lookup = base_dir
-for i, (param, card) in enumerate(param_sweep):
-  lookup += f"/{param}/{card}"
-
-skip = len(base_dir)
-for file in glob_regex(f"{lookup}$"):
-  path_dirs = file[skip:].split("/")[1:]
-  for x in range(0, len(path_dirs), 2):
-    (param_idx, value_idx) = x, x+1
-    param, value = path_dirs[param_idx], path_dirs[value_idx]
-    print(param, value)
-    params[param].add(value)
-
-for param, value_set in params.items():
-  shape[param] = len(value_set)
-
-for param in params.keys():
-  params[param] = natsorted(list(params[param]))
-
-# else:
-#   raise Exception(f"No match for {lookup}")
-
-print("-" * 80)
-print("Data shape: ")
-pprint(shape)
-print("-" * 80)
-print("Param sweep: ")
-pprint(params)
-print("-" * 80)
-
-display_shape = [1] * 3
-display_gen = []
-display_lists = [[], [], []]
-assert 1 <= len(display_perm) <= 3
-for i, items in enumerate(display_perm):
-  for item in items:
-    display_shape[i] *= shape[item]
-    display_lists[i].append(params[item])
-  display_gen.append(lambda: product(*display_lists[i]))
-
-fig, axes = plt.subplots(nrows=display_shape[0], ncols=display_shape[1],
-                         sharex='col', sharey='row', squeeze=False,
-                         gridspec_kw=dict(wspace=0.1, hspace=0.1))
-
-for i, items in enumerate(product(*display_lists[0])):
-  plt.setp(axes[i][0], ylabel=lbls(kv_dict(display_perm[0], items), sep=",\n"))
-  axes[i][0].yaxis.label.set_size(7)
-
-for j, items in enumerate(product(*display_lists[1])):
-  plt.setp(axes[-1][j], xlabel=lbls(kv_dict(display_perm[1], items), sep=",\n"))
-
-
-for i, a in enumerate(product(*display_lists[0])):
-  for j, b in enumerate(product(*display_lists[1])):
-    # for k, c in enumerate(product(*display_lists[2])):
-      full_plot_params = dict()
-      for k, v in chain(zip(display_perm[0], a),
-                        zip(display_perm[1], b)):
-                        # zip(display_perm[2], c)):
-        full_plot_params[k] = v
-      # plot_params = {k: v for k,v in zip(display_perm[2], c)}
-      plot_item(axes[i][j], {}, full_plot_params)
-
-for i in range(display_shape[0]):
-  for j in range(display_shape[1]):
-    if i < display_shape[0] - 1:
-      plt.setp(axes[i][j].get_xticklabels(), visible=False)
-    if j > 0:
-      plt.setp(axes[i][j].get_yticklabels(), visible=False)
-
-axes[-1][-1].legend(loc="lower left")
-
-mng = plt.get_current_fig_manager()
-mng.window.showMaximized()
+sweep.display(base_dir, param_sweep, display_perm, translation_map, plot_item)
 plt.show()
