@@ -436,10 +436,10 @@ double DepthLimitedCFR::RootValue(Player pl) const {
 
 size_t RangeTable::largest_range() const { return private_hands.size(); }
 
-size_t RangeTable::hand_index(const Observation& obs) {
-  auto it = std::find(private_hands.begin(), private_hands.end(), obs);
+size_t RangeTable::hand_index(const Observation& hand) {
+  auto it = std::find(private_hands.begin(), private_hands.end(), hand);
   if (it == private_hands.end()) {
-    private_hands.push_back(obs);
+    private_hands.push_back(hand);
     return private_hands.size() - 1;
   } else {
     return std::distance(private_hands.begin(), it);
@@ -500,6 +500,8 @@ std::vector<RangeTable> CreateRangeTables(
   Observation hand(game, hand_observer);
   for (int state_idx = 0; state_idx < public_leaves.size(); ++state_idx) {
     const dlcfr::LeafPublicState& state = public_leaves[state_idx];
+    // Terminal states are not handled by non-terminal leaf evaluators,
+    // so we don't need to create range table for them.
     if (state.IsTerminal()) {
       continue;
     }
@@ -507,14 +509,18 @@ std::vector<RangeTable> CreateRangeTables(
     for (int pl = 0; pl < 2; ++pl) {
       SPIEL_DCHECK_TRUE(  // Holds within public state.
           AllInfoStatesHaveDistinctHands(game, hand_observer, pl, state));
-      for (int i = 0; i < state.leaf_nodes[pl].size(); ++i) {
-        const InfostateNode* node = state.leaf_nodes[pl][i];
+
+      for (int tree_idx = 0;
+           tree_idx < state.leaf_nodes[pl].size(); ++tree_idx) {
+        const InfostateNode* node = state.leaf_nodes[pl][tree_idx];
         const State& some_state = *node->corresponding_states().at(0);
         hand.SetFrom(some_state, pl);
+
         SPIEL_DCHECK_TRUE(  // Should hold for all states within an infostate.
             AllStatesHaveSameHands(hand, pl, node->corresponding_states()));
-        size_t j = tables[pl].hand_index(hand);
-        tables[pl].bijections[state_idx].put({i, j});
+
+        size_t net_idx = tables[pl].hand_index(hand);
+        tables[pl].bijections[state_idx].put({tree_idx, net_idx});
       }
     }
   }

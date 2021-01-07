@@ -138,6 +138,38 @@ void TestRecursiveDepthLimitedSolving(const std::string& game_name) {
   }
 }
 
+// Evaluator that does nothing.
+struct DummyEvaluator : public LeafEvaluator {
+  std::unique_ptr<PublicStateContext> CreateContext(
+      const LeafPublicState& state) const override { return nullptr;};
+  void ResetContext(PublicStateContext* context) const override {};
+  void EvaluatePublicState(LeafPublicState* public_state,
+                           PublicStateContext* context) const override {};
+};
+
+void TestCreateRangeTable() {
+  std::shared_ptr<const Game> game = LoadGame("kuhn_poker");
+  std::shared_ptr<Observer> hand_observer = game->MakeObserver(kHandObsType, {});
+  auto leaf_evaluator = std::make_shared<DummyEvaluator>();
+  DepthLimitedCFR dl_cfr(game, 3, leaf_evaluator, nullptr);
+
+  std::vector<RangeTable> tables = CreateRangeTables(*game, hand_observer,
+                                                     dl_cfr.public_leaves());
+  SPIEL_CHECK_EQ(tables.size(), game->NumPlayers());
+
+  for (const RangeTable& player_table : tables) {
+    SPIEL_CHECK_EQ(player_table.private_hands.size(), 3);
+    SPIEL_CHECK_EQ(player_table.bijections.size(),
+                   dl_cfr.public_leaves().size());
+
+    for (const BijectiveContainer<size_t>& state_bij : player_table.bijections) {
+      SPIEL_CHECK_EQ(state_bij.size(), player_table.private_hands.size());
+      for (const auto& xy : state_bij.x2y) SPIEL_CHECK_EQ(xy.first, xy.second);
+      for (const auto& yx : state_bij.y2x) SPIEL_CHECK_EQ(yx.first, yx.second);
+    }
+  }
+}
+
 }  // namespace
 }  // namespace dlcfr
 }  // namespace algorithms
@@ -156,4 +188,5 @@ int main(int argc, char** argv) {
     algorithms::TestTerminalEvaluatorHasSameIterations(game_name);
     algorithms::TestRecursiveDepthLimitedSolving(game_name);
   }
+  algorithms::TestCreateRangeTable();
 }
