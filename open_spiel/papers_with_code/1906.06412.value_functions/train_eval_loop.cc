@@ -69,9 +69,7 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
                            t->batch->output_size,
       /*hidden_size=*/t->batch->input_size * 3);
   model.to(device);
-  torch::optim::SGD optimizer(model.parameters(),
-                              torch::optim::SGDOptions(/*lr=*/0.01)
-                                  .momentum(0.5));
+  torch::optim::Adam optimizer(model.parameters());
 
   // 2. Create trunk net evaluator.
   auto net_evaluator = std::make_shared<NetEvaluator>(
