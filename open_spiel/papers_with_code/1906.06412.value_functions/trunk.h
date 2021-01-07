@@ -26,6 +26,7 @@ namespace papers_with_code {
 
 struct Trunk {
   std::shared_ptr<const Game> game;
+  int trunk_depth;
   std::shared_ptr<Observer> infostate_observer;
   std::shared_ptr<Observer> public_observer;
   std::shared_ptr<Observer> hand_observer;

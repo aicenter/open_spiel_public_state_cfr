@@ -29,9 +29,10 @@ std::unique_ptr<Trunk> MakeTrunk(const std::string& game_name,
   return std::make_unique<Trunk>(game_name, trunk_depth);
 }
 
-Trunk::Trunk(const std::string& game_name, int trunk_depth) {
+Trunk::Trunk(const std::string& game_name, int depth) {
   // 1. Prepare the game, observers and depth-limited (trunk) trees.
   game = LoadGame(game_name);
+  trunk_depth = depth;
   infostate_observer = game->MakeObserver(kInfoStateObsType, {});
   public_observer = game->MakeObserver(kPublicStateObsType, {});
   hand_observer = game->MakeObserver(kHandHistoryObsType, {});
