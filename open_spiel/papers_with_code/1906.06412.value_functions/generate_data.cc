@@ -27,9 +27,9 @@ namespace papers_with_code {
 using namespace open_spiel::algorithms;
 
 
-void RandomizeStrategy(std::vector<BanditVector>& bandits,
-                       std::mt19937& rnd_gen, double prob_pure_strat,
-                       double prob_fully_mixed) {
+void RandomizeStrategy(
+    std::vector<BanditVector>& bandits, std::mt19937& rnd_gen,
+    double prob_pure_strat, double prob_fully_mixed) {
   const bool fully_mixed_strategy =
       std::bernoulli_distribution(prob_fully_mixed)(rnd_gen);
   for (int pl = 0; pl < 2; ++pl) {
@@ -73,10 +73,13 @@ void RandomizeStrategy(std::vector<BanditVector>& bandits,
 void GenerateData(const std::vector<dlcfr::RangeTable>& tables,
                   dlcfr::DepthLimitedCFR* trunk_with_oracle, BatchData* batch,
                   std::mt19937& rnd_gen, bool verbose) {
-  RandomizeStrategy(trunk_with_oracle->bandits(), rnd_gen,
-      /*prob_pure_strat=*/0.3);
-  // This call invokes public state evaluation under the hood.
-  trunk_with_oracle->RunSimultaneousIterations(1);
+  // Randomize strategy in the trunk.
+  RandomizeStrategy(trunk_with_oracle->bandits(), rnd_gen);
+  // Compute the reach probs from the trunk.
+  trunk_with_oracle->UpdateReachProbs();
+  // Do not call bottom-up, just evaluate leaves.
+  trunk_with_oracle->EvaluateLeaves();
+  // Copy the leaves values to the batch.
   CopyRangesAndValues(trunk_with_oracle, tables, batch, verbose);
 
   if (verbose) {

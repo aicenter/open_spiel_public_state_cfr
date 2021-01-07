@@ -4,26 +4,22 @@ import pandas as pd
 
 param_sweep = [
   ("a_game_name", ".*kuhn_poker.*"),
-  # ("b_cfr_oracle_iters", ".*"),
   ("b_depth", ".*"),
+  # ("b_cfr_oracle_iters", ".*"),
+  ("c_git_version", ".*"),
   # ("b_bandit", ".*"),
   # ("c_ball", ".*"),
 ]
 
 display_perm = [
   # ("a_game_name",),
-  ("a_game_name",),
+  ("a_game_name", "b_depth"),
   # ("b_cfr_oracle_iters",),
-  ("b_depth",),
+  ("c_git_version",),
   # ("b_bandit", "c_ball",),
 ]
 
-display_perm = [
-  ("a_game_name",),
-  ("b_depth",),
-]
-
-base_dir = "./experiments/train_test_loop_results"
+base_dir = "./experiments/train_eval_loop"
 translation_map = {
   "goofspiel(players=2,num_cards=3,imp_info=True)": "GS 3 (rand)",
   "goofspiel(players=2,num_cards=3,imp_info=True,points_order=ascending)":
@@ -54,7 +50,7 @@ translation_map = {
 def plot_item(ax, file, display_params, full_params):
   try:
     df = pd.read_csv(file, comment="#", skip_blank_lines=True)
-    print(".", end="")
+    print(file)
 
     ax.semilogy(df.loop, df.exploitability.rolling(window=20).mean(), label="expl (rolling mean)", c="r")
     ax.semilogy(df.loop, df.exploitability, alpha=0.2, c="r")
