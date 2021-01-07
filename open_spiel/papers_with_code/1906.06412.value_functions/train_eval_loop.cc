@@ -26,6 +26,9 @@ ABSL_FLAG(int, train_batches, 32,
 ABSL_FLAG(int, num_loops, 5000, "Number of train-eval loops.");
 ABSL_FLAG(int, cfr_oracle_iterations, 100, "Number of oracle iterations.");
 ABSL_FLAG(int, trunk_eval_iterations, 100, "Number of trunk iterations.");
+ABSL_FLAG(int, num_layers, 3, "Number of hidden layers.");
+ABSL_FLAG(int, num_width, 3, "Multiplicative constant of the number "
+                             "of neurons per layer.");
 ABSL_FLAG(int, seed, 0, "Seed.");
 ABSL_FLAG(std::string, use_bandits_for_cfr, "PredictiveRegretMatchingPlus",
           "Which bandit should be used in the trunk.");
@@ -65,9 +68,10 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
 
   // 1. Create network and optimizer.
   torch::Device device = FindDevice();
-  PositionalValueNet model(t->batch->input_size,
-                           t->batch->output_size,
-      /*hidden_size=*/t->batch->input_size * 3);
+  PositionalValueNet model(
+      t->batch->input_size, t->batch->output_size,
+      t->batch->input_size * absl::GetFlag(FLAGS_num_width),
+      absl::GetFlag(FLAGS_num_layers));
   model.to(device);
   torch::optim::Adam optimizer(model.parameters());
 

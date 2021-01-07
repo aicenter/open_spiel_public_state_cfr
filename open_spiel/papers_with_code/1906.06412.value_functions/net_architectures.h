@@ -16,6 +16,7 @@
 #define OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_NEURAL_NETS_
 
 #include "torch/torch.h"
+#include "open_spiel/spiel.h"
 
 namespace open_spiel {
 namespace papers_with_code {
@@ -27,27 +28,24 @@ struct ValueNet : public torch::nn::Module {
 
 // A simple MLP neural network.
 struct PositionalValueNet final : public ValueNet {
-  torch::nn::Linear fc1;
-  torch::nn::Linear fc2;
-  torch::nn::Linear fc3;
-  torch::nn::Linear fc4;
+  std::vector<torch::nn::Linear> fc_layers;
   PositionalValueNet(size_t inputs_size, size_t outputs_size,
-                     size_t hidden_size) :
-      fc1(inputs_size, hidden_size),
-      fc2(hidden_size, hidden_size),
-      fc3(hidden_size, hidden_size),
-      fc4(hidden_size, outputs_size) {
-    register_module("fc1", fc1);
-    register_module("fc2", fc2);
-    register_module("fc3", fc3);
-    register_module("fc4", fc4);
+                     size_t hidden_size, size_t num_layers = 3) {
+    SPIEL_CHECK_GE(num_layers, 1);
+    for (int i = 0; i < num_layers; ++i) {
+      size_t layer_input = i == 0 ? inputs_size : hidden_size;
+      size_t layer_output = i == num_layers - 1 ? outputs_size : hidden_size;
+      fc_layers.emplace_back(layer_input, layer_output);
+      register_module(absl::StrCat("fc", i), fc_layers.back());
+    }
   }
 
   torch::Tensor forward(torch::Tensor x) {
-    x = torch::relu(fc1->forward(x));
-    x = torch::relu(fc2->forward(x));
-    x = torch::relu(fc3->forward(x));
-    return fc4->forward(x);
+    int num_relu_layers = fc_layers.size() - 1;
+    for (int i = 0; i < num_relu_layers; ++i) {
+      x = torch::relu(fc_layers[i]->forward(x));
+    }
+    return fc_layers.back()->forward(x);
   }
 };
 
