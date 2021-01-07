@@ -103,7 +103,7 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
     std::cout << std::endl;
 
     // Eval.
-    std::cout << "# Evaluating  " << std::flush;
+    std::cout << "# Evaluating  " << std::endl;
     const double exploitability = EvaluateNetwork(
         trunk_with_net.get(), trunk_eval_iterations, &whole_game);
     const double avg_loss = cumul_loss / train_batches;
