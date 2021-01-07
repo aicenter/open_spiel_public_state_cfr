@@ -299,8 +299,8 @@ void DepthLimitedCFR::Reset() {
   for (int i = 0; i < public_leaves_.size(); ++i) {
     LeafPublicState& state = public_leaves_[i];
     for (int pl = 0; pl < 2; ++pl) {
-      std::fill(state.ranges[pl].begin(), state.ranges[pl].begin(), 0.);
-      std::fill(state.values[pl].begin(), state.values[pl].begin(), 0.);
+      std::fill(state.ranges[pl].begin(), state.ranges[pl].end(), 0.);
+      std::fill(state.values[pl].begin(), state.values[pl].end(), 0.);
     }
     std::unique_ptr<PublicStateContext>& context = contexts_[i];
     if (!state.IsTerminal() && context && leaf_evaluator_) {

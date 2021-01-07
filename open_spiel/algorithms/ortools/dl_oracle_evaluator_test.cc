@@ -261,7 +261,7 @@ void TestConvergeWithCfrEvaluator(int trunk_depth) {
   leaf_evaluator->reset_subgames_on_evaluation = false;
   leaf_evaluator->bandit_name = "RegretMatchingPlus";
   leaf_evaluator->leaf_evaluator = leaf_evaluator;
-  leaf_evaluator->num_cfr_iterations = 100;
+  leaf_evaluator->num_cfr_iterations = 2;
 
   SequenceFormLpSpecification whole_game(*game);
   dlcfr::DepthLimitedCFR dl_cfr(game, trunk_depth,
@@ -269,7 +269,10 @@ void TestConvergeWithCfrEvaluator(int trunk_depth) {
   auto average_policy = dl_cfr.AveragePolicy();
   const double expl_before = TrunkExploitability(&whole_game, *average_policy);
 
-  dl_cfr.RunSimultaneousIterations(10000);
+  for (int i = 0; i < 20; ++i) {
+    dl_cfr.RunSimultaneousIterations(1);
+    std::cout << i << " " << TrunkExploitability(&whole_game, *average_policy) << "\n";
+  }
   const double expl_after = TrunkExploitability(&whole_game, *average_policy);
   SPIEL_CHECK_NE(expl_before, expl_after);
   SPIEL_CHECK_LT(expl_after, 5e-3);
@@ -297,7 +300,7 @@ int main(int argc, char** argv) {
 //    algorithms::TestOneSidedFixedStrategyExploitability(game_name);
 //    algorithms::TestValueOracle(game_name);
 //  }
-  for (int trunk_depth = 3; trunk_depth <= 5; ++trunk_depth) {
-    algorithms::TestConvergeWithCfrEvaluator(trunk_depth);
-  }
+//  for (int trunk_depth = 3; trunk_depth <= 5; ++trunk_depth) {
+    algorithms::TestConvergeWithCfrEvaluator(3);
+//  }
 }

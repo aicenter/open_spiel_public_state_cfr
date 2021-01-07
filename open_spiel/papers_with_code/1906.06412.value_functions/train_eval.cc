@@ -37,7 +37,19 @@ double EvaluateNetwork(dlcfr::DepthLimitedCFR* trunk_with_net,
                        int trunk_iterations,
                        ortools::SequenceFormLpSpecification* whole_game) {
   trunk_with_net->Reset();
-  trunk_with_net->RunSimultaneousIterations(trunk_iterations);
+//  std::cout << "# i = -1" << std::endl;
+//  std::cout << "# trunk_with_net->public_leaves()[0].ranges[0] " << trunk_with_net->public_leaves()[0].ranges[0] << std::endl;
+//  std::cout << "# trunk_with_net->public_leaves()[0].values[0] " << trunk_with_net->public_leaves()[0].values[0] << std::endl;
+//  std::cout << "# trunk_with_net->public_leaves()[1].ranges[0] " << trunk_with_net->public_leaves()[1].ranges[0] << std::endl;
+//  std::cout << "# trunk_with_net->public_leaves()[1].values[0] " << trunk_with_net->public_leaves()[1].values[0] << std::endl;
+  for (int i = 0; i < trunk_iterations; ++i) {
+    trunk_with_net->RunSimultaneousIterations(1);
+    std::cout << "# i = " << i << std::endl;
+    std::cout << "# trunk_with_net->public_leaves()[0].ranges[0] " << trunk_with_net->public_leaves()[0].ranges[0] << std::endl;
+    std::cout << "# trunk_with_net->public_leaves()[0].values[0] " << trunk_with_net->public_leaves()[0].values[0] << std::endl;
+    std::cout << "# trunk_with_net->public_leaves()[1].ranges[0] " << trunk_with_net->public_leaves()[1].ranges[0] << std::endl;
+    std::cout << "# trunk_with_net->public_leaves()[1].values[0] " << trunk_with_net->public_leaves()[1].values[0] << std::endl;
+  }
   return ortools::TrunkExploitability(
       whole_game, *trunk_with_net->AveragePolicy());
 }

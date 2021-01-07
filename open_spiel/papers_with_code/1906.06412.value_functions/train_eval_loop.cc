@@ -90,9 +90,7 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
     double cumul_loss = 0.;
     std::cout << "# Training  ";
     for (int i = 0; i < train_batches; ++i) {
-      GenerateData(t->tables, t->trunk_with_oracle.get(), t->batch.get(),
-                   rnd_gen,
-          /*verbose=*/(i == 0 && verbose_every_loop) || (i == 0 && loop == 0));
+      GenerateDataWithDLCfr(t.get(), rnd_gen, trunk_eval_iterations + 1);
       torch::Tensor loss = TrainNetwork(&model, &device,
                                         &optimizer, t->batch.get());
       cumul_loss += loss.item().to<double>();

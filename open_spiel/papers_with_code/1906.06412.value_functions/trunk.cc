@@ -89,20 +89,20 @@ void CopyRangesAndValues(dlcfr::DepthLimitedCFR* trunk,
   if (verbose) {
     std::cout << "\n# BatchData copying ranges and values:\n";
     for (size_t i = 0; i < leaves.size(); ++i) {
-      for (int pl = 0; pl < 2; ++pl) {
+      for (int pl = 0; pl < 1; ++pl) {
         std::cout << "#   leaves[" << i << "].ranges[" << pl << "]    = "
                   << leaves[i].ranges[pl] << "\n";
-        std::cout << "#   batch->ranges_at(" << i << ", " << pl << ") = "
-                  << batch->ranges_at(i, pl) << "\n";
+//        std::cout << "#   batch->ranges_at(" << i << ", " << pl << ") = "
+//                  << batch->ranges_at(i, pl) << "\n";
         std::cout << "#   leaves[" << i << "].values[" << pl << "]    = "
                   << leaves[i].values[pl] << "\n";
-        std::cout << "#   batch->values_at(" << i << ", " << pl << ") = "
-                  << batch->values_at(i, pl) << "\n";
+//        std::cout << "#   batch->values_at(" << i << ", " << pl << ") = "
+//                  << batch->values_at(i, pl) << "\n";
       }
     }
-    std::cout << "#\n";
-    std::cout << "#   batch->data    = " << batch->data << "\n";
-    std::cout << "#   batch->targets = " << batch->targets << "\n";
+//    std::cout << "#\n";
+//    std::cout << "#   batch->data    = " << batch->data << "\n";
+//    std::cout << "#   batch->targets = " << batch->targets << "\n";
   }
 }
 

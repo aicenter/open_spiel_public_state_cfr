@@ -56,6 +56,7 @@ def plot_item(ax, file, display_params, full_params):
     ax.semilogy(df.loop, df.exploitability, alpha=0.2, c="r")
     ax.semilogy(df.loop, df.avg_loss.rolling(window=20).mean(), label="loss (rolling mean)", c="g")
     ax.semilogy(df.loop, df.avg_loss, alpha=0.2, c="g")
+    ax.semilogy([df.loop.min(), df.loop.max()], [0.000884296,  0.000884296], label="DL-CFR after 20 iters")
   except Exception as e:
     print(e)
     pass

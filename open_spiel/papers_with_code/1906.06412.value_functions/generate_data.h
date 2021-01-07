@@ -49,6 +49,9 @@ inline void GenerateData(Trunk* trunk, std::mt19937& rnd_gen,
                trunk->batch.get(), rnd_gen, verbose);
 }
 
+void GenerateDataWithDLCfr(Trunk* trunk, std::mt19937& rnd_gen,
+                           int pick_max_iter = 2);
+
 }  // papers_with_code
 }  // open_spiel
 
