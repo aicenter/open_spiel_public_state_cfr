@@ -244,6 +244,37 @@ void TestOneSidedFixedStrategyExploitability(const std::string& game_name) {
   std::cout << "ok.\n";
 }
 
+
+void TestConvergeWithCfrEvaluator(int trunk_depth) {
+  std::shared_ptr<const Game> game = LoadGame("kuhn_poker");
+  std::shared_ptr<const dlcfr::LeafEvaluator> terminal_evaluator =
+      dlcfr::MakeTerminalEvaluator();
+  std::shared_ptr<Observer> public_observer =
+      game->MakeObserver(kPublicStateObsType, {});
+  std::shared_ptr<Observer> infostate_observer =
+      game->MakeObserver(kInfoStateObsType, {});
+
+  // CFR leaf evaluator.
+  auto leaf_evaluator = std::make_shared<dlcfr::CFREvaluator>(
+      game, /*depth_limit=*/100, /*leaf_evaluator=*/nullptr,
+      terminal_evaluator, public_observer, infostate_observer);
+  leaf_evaluator->reset_subgames_on_evaluation = false;
+  leaf_evaluator->bandit_name = "RegretMatchingPlus";
+  leaf_evaluator->leaf_evaluator = leaf_evaluator;
+  leaf_evaluator->num_cfr_iterations = 100;
+
+  SequenceFormLpSpecification whole_game(*game);
+  dlcfr::DepthLimitedCFR dl_cfr(game, trunk_depth,
+                                leaf_evaluator, terminal_evaluator);
+  auto average_policy = dl_cfr.AveragePolicy();
+  const double expl_before = TrunkExploitability(&whole_game, *average_policy);
+
+  dl_cfr.RunSimultaneousIterations(10000);
+  const double expl_after = TrunkExploitability(&whole_game, *average_policy);
+  SPIEL_CHECK_NE(expl_before, expl_after);
+  SPIEL_CHECK_LT(expl_after, 5e-3);
+}
+
 }  // namespace
 }  // namespace ortools
 }  // namespace algorithms
@@ -266,4 +297,7 @@ int main(int argc, char** argv) {
 //    algorithms::TestOneSidedFixedStrategyExploitability(game_name);
 //    algorithms::TestValueOracle(game_name);
 //  }
+  for (int trunk_depth = 3; trunk_depth <= 5; ++trunk_depth) {
+    algorithms::TestConvergeWithCfrEvaluator(trunk_depth);
+  }
 }
