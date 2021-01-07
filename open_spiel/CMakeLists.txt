@@ -54,7 +54,7 @@ if(${BUILD_TYPE} EQUAL "Release")
   # Optimized release build: turn off debug runtime checks (assert,
   # SPIEL_DCHECK_*) and turn on highest speed optimizations.
   # The difference in performance can be up to 10x higher.
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNDEBUG -O3")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNDEBUG -O3 -Werror")
 endif()
 
 if(APPLE)
@@ -66,7 +66,7 @@ if(APPLE)
   # has a virtual environment active
   set (CMAKE_FIND_FRAMEWORK LAST)
 else()
-  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pedantic -Wall -Werror -Wno-sign-compare -Wno-macro-redefined -Wno-tautological-type-limit-compare -Wno-unused-template -Wno-unused-value -Wno-potentially-evaluated-expression -Wno-gnu-zero-variadic-macro-arguments -Wno-c99-extensions -Wno-gcc-compat -Wno-gnu-case-range -Wno-extra-semi -Wno-unused-const-variable -Wno-unused-variable -Wno-unused-private-field"
+  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pedantic -Wall -Wno-sign-compare -Wno-macro-redefined -Wno-tautological-type-limit-compare -Wno-unused-template -Wno-unused-value -Wno-potentially-evaluated-expression -Wno-gnu-zero-variadic-macro-arguments -Wno-c99-extensions -Wno-gcc-compat -Wno-gnu-case-range -Wno-extra-semi -Wno-unused-const-variable -Wno-unused-variable -Wno-unused-private-field"
     )
   # -Wno-c99-extensions : A nice convenience used by most compilers.
   # -Wno-extra-semi : open_spiel/libtorch/libtorch/include/ATen/core/jit_type.h:1945:1: warning: extra ';' inside a struct
