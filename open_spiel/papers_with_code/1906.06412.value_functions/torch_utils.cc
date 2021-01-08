@@ -22,10 +22,10 @@ namespace papers_with_code {
 
 torch::Device FindDevice() {
   if (torch::cuda::is_available()) {
-    std::cerr << "# CUDA available! Training on GPU." << std::endl;
+    std::cout << "# CUDA available! Training on GPU." << std::endl;
     return torch::Device(torch::kCUDA);
   } else {
-    std::cerr << "# Training on CPU." << std::endl;
+    std::cout << "# Training on CPU." << std::endl;
     return torch::Device(torch::kCPU);
   }
 }
