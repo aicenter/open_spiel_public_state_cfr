@@ -91,7 +91,7 @@ std::unique_ptr<DepthLimitedCFR> MakeRecursiveDepthLimitedCFR(
   auto leaf_evaluator = std::make_shared<CFREvaluator>(
       game, subgame_depth_limit, /*leaf_evaluator=*/nullptr,
       terminal_evaluator, public_observer, infostate_observer);
-  leaf_evaluator->reset_subgames_on_evaluation = false;
+  leaf_evaluator->reset_subgames_on_evaluation = false;  // Needed for test !
   leaf_evaluator->bandit_name = "RegretMatching";
   leaf_evaluator->leaf_evaluator = leaf_evaluator;
   leaf_evaluator->num_cfr_iterations = 1;
