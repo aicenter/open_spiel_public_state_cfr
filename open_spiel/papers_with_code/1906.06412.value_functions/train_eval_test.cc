@@ -126,7 +126,7 @@ void LearnFixedValuesTest(std::unique_ptr<Trunk> t) {
 
   // Make a single target -- all values are 1.0, all ranges are 0.5
   std::vector<dlcfr::LeafPublicState>& public_leaves =
-      t->trunk_with_oracle->public_leaves();
+      t->fixable_trunk_with_oracle->public_leaves();
   FillRanges(public_leaves, fixed_range_input);
   CheckRanges(public_leaves, fixed_range_input);  // Test the test.
   FillValues(public_leaves, fixed_value_ouput);
@@ -148,8 +148,8 @@ void LearnFixedValuesTest(std::unique_ptr<Trunk> t) {
                              t->game, t->infostate_observer,
                              t->tables, t->batch.get());
 
-  for (int i = 0; i < t->trunk_with_oracle->public_leaves().size(); ++i) {
-    dlcfr::LeafPublicState* state = &t->trunk_with_oracle->public_leaves()[i];
+  for (int i = 0; i < t->fixable_trunk_with_oracle->public_leaves().size(); ++i) {
+    dlcfr::LeafPublicState* state = &t->fixable_trunk_with_oracle->public_leaves()[i];
     if (!state->IsTerminal()) net_evaluator.EvaluatePublicState(state, nullptr);
   }
 
@@ -180,7 +180,7 @@ void KuhnLearningTest(KuhnLearnCase learning_case) {
                               torch::optim::SGDOptions(/*lr=*/0.4));
 
   std::vector<dlcfr::LeafPublicState>& public_leaves =
-      t->trunk_with_oracle->public_leaves();
+      t->fixable_trunk_with_oracle->public_leaves();
   dlcfr::LeafPublicState& pass_state = public_leaves[0];
   dlcfr::LeafPublicState& bet_state = public_leaves[1];
 
@@ -206,11 +206,11 @@ void KuhnLearningTest(KuhnLearnCase learning_case) {
       * (learning_case == kLearnNashEqComputedTargets ? 100 : 1);
   for (int j = 0; j <= num_iters; ++j) {
     // Generate random ranges.
-    RandomizeStrategy(t->trunk_with_oracle->bandits(), rnd_gen);
-    t->trunk_with_oracle->UpdateReachProbs();
+    RandomizeStrategy(t->fixable_trunk_with_oracle->bandits(), rnd_gen);
+    t->fixable_trunk_with_oracle->UpdateReachProbs();
 
     if (learning_case == kLearnNashEqComputedTargets) {
-      t->trunk_with_oracle->RunSimultaneousIterations(1);
+      t->fixable_trunk_with_oracle->RunSimultaneousIterations(1);
     } else if (learning_case == kLearnNashEqDeterministicTargets) {
       // The player will learn to get high values for passing, and low values
       // for betting. This corresponds to Nash equilibrium with alpha = 0

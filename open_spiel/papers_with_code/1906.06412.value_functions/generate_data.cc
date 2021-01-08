@@ -71,16 +71,18 @@ void RandomizeStrategy(
 
 
 void GenerateData(const std::vector<dlcfr::RangeTable>& tables,
-                  dlcfr::DepthLimitedCFR* trunk_with_oracle, BatchData* batch,
+                  dlcfr::DepthLimitedCFR* fixable_trunk_with_oracle, BatchData* batch,
                   std::mt19937& rnd_gen, bool verbose) {
+  fixable_trunk_with_oracle->Reset();
+
   // Randomize strategy in the trunk.
-  RandomizeStrategy(trunk_with_oracle->bandits(), rnd_gen);
+  RandomizeStrategy(fixable_trunk_with_oracle->bandits(), rnd_gen);
   // Compute the reach probs from the trunk.
-  trunk_with_oracle->UpdateReachProbs();
+  fixable_trunk_with_oracle->UpdateReachProbs();
   // Do not call bottom-up, just evaluate leaves.
-  trunk_with_oracle->EvaluateLeaves();
+  fixable_trunk_with_oracle->EvaluateLeaves();
   // Copy the leaves values to the batch.
-  CopyRangesAndValues(trunk_with_oracle, tables, batch, verbose);
+  CopyRangesAndValues(fixable_trunk_with_oracle, tables, batch, verbose);
 
   if (verbose) {
     for (int i = 0; i < batch->batch_size; ++i) {

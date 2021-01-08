@@ -45,7 +45,7 @@ void GenerateData(const std::vector<algorithms::dlcfr::RangeTable>& tables,
 
 inline void GenerateData(Trunk* trunk, std::mt19937& rnd_gen,
                          bool verbose = false) {
-  GenerateData(trunk->tables, trunk->trunk_with_oracle.get(),
+  GenerateData(trunk->tables, trunk->fixable_trunk_with_oracle.get(),
                trunk->batch.get(), rnd_gen, verbose);
 }
 

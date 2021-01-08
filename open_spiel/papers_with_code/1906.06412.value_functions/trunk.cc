@@ -44,16 +44,16 @@ Trunk::Trunk(const std::string& game_name, int depth) {
   oracle_evaluator = std::make_shared<dlcfr::CFREvaluator>(
       game, /*full_subgame_depth=*/100, /*no_leaf_evaluator=*/nullptr,
       terminal_evaluator, public_observer, infostate_observer);
-  trunk_with_oracle = std::make_unique<dlcfr::DepthLimitedCFR>(
+  fixable_trunk_with_oracle = std::make_unique<dlcfr::DepthLimitedCFR>(
       game, trunk_trees, oracle_evaluator, terminal_evaluator,
       public_observer,
       MakeBanditVectors(trunk_trees, "FixableStrategy"));
 
   // 3. Make a Batch of data that encompasses all leaf public states.
   tables = CreateRangeTables(*game, hand_observer,
-                             trunk_with_oracle->public_leaves());
+                             fixable_trunk_with_oracle->public_leaves());
   const dlcfr::LeafPublicState& some_leaf =
-      trunk_with_oracle->public_leaves().at(0);
+      fixable_trunk_with_oracle->public_leaves().at(0);
   const size_t encoding_size = some_leaf.public_tensor.Tensor().size();
   std::array<size_t, 2> ranges_size = {
       tables[0].largest_range(),
@@ -62,7 +62,7 @@ Trunk::Trunk(const std::string& game_name, int depth) {
   const size_t range_size_sum = ranges_size[0] + ranges_size[1];
   const size_t input_size = encoding_size + range_size_sum;
   const size_t output_size = range_size_sum;
-  batch = std::make_unique<BatchData>(trunk_with_oracle->public_leaves(),
+  batch = std::make_unique<BatchData>(fixable_trunk_with_oracle->public_leaves(),
                                       input_size, output_size, encoding_size,
                                       ranges_size);
 }

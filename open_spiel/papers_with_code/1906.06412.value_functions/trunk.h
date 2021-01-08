@@ -33,7 +33,7 @@ struct Trunk {
   std::vector<std::shared_ptr<algorithms::InfostateTree>> trunk_trees;
   std::shared_ptr<const algorithms::dlcfr::LeafEvaluator> terminal_evaluator;
   std::shared_ptr<algorithms::dlcfr::CFREvaluator> oracle_evaluator;
-  std::unique_ptr<algorithms::dlcfr::DepthLimitedCFR> trunk_with_oracle;
+  std::unique_ptr<algorithms::dlcfr::DepthLimitedCFR> fixable_trunk_with_oracle;
   std::vector<algorithms::dlcfr::RangeTable> tables;
   std::unique_ptr<BatchData> batch;
 
@@ -48,7 +48,7 @@ void CopyRangesAndValues(
     BatchData* batch, bool verbose = false);
 
 inline void CopyRangesAndValues(Trunk* trunk, bool verbose = false) {
-  CopyRangesAndValues(trunk->trunk_with_oracle.get(), trunk->tables,
+  CopyRangesAndValues(trunk->fixable_trunk_with_oracle.get(), trunk->tables,
                       trunk->batch.get(), verbose);
 }
 
