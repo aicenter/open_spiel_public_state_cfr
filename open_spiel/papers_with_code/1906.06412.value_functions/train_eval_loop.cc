@@ -71,7 +71,8 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   PositionalValueNet model(
       t->batch->input_size, t->batch->output_size,
       t->batch->input_size * absl::GetFlag(FLAGS_num_width),
-      absl::GetFlag(FLAGS_num_layers));
+      absl::GetFlag(FLAGS_num_layers),
+      PositionalValueNet::ActivationFunction::kNone);
   model.to(device);
   torch::optim::Adam optimizer(model.parameters());
 
@@ -87,8 +88,8 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   // 3. Create the LP spec for the whole game.
   ortools::SequenceFormLpSpecification whole_game(*t->game, "CLP");
 
-  // Print all possible generated data.
-  for (int i = 0; i < trunk_eval_iterations; ++i) {
+  std::cout << "# Printing all possible generated data.\n";
+  for (int i = 1; i <= trunk_eval_iterations; ++i) {
     GenerateDataWithDLCfr(t.get(), rnd_gen, i);
     std::cout << "# " << i << ": \n# " << t->batch->data
               << "\n# " << t->batch->targets << "\n";
@@ -102,7 +103,7 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
     std::cout << "# Training  ";
     for (int i = 0; i < train_batches; ++i) {
       int which_iteration =
-          std::uniform_int_distribution<>(0, trunk_eval_iterations)(rnd_gen);
+          std::uniform_int_distribution<>(1, trunk_eval_iterations)(rnd_gen);
       GenerateDataWithDLCfr(t.get(), rnd_gen, which_iteration);
       torch::Tensor loss = TrainNetwork(&model, &device,
                                         &optimizer, t->batch.get());

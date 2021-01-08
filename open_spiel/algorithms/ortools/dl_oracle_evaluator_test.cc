@@ -258,7 +258,6 @@ void TestConvergeWithCfrEvaluator(int trunk_depth) {
   auto leaf_evaluator = std::make_shared<dlcfr::CFREvaluator>(
       game, /*depth_limit=*/100, /*leaf_evaluator=*/nullptr,
       terminal_evaluator, public_observer, infostate_observer);
-  leaf_evaluator->reset_subgames_on_evaluation = false;
   leaf_evaluator->bandit_name = "RegretMatchingPlus";
   leaf_evaluator->leaf_evaluator = leaf_evaluator;
   leaf_evaluator->num_cfr_iterations = 2;
@@ -269,7 +268,7 @@ void TestConvergeWithCfrEvaluator(int trunk_depth) {
   auto average_policy = dl_cfr.AveragePolicy();
   const double expl_before = TrunkExploitability(&whole_game, *average_policy);
 
-  for (int i = 0; i < 20; ++i) {
+  for (int i = 0; i < 100; ++i) {
     dl_cfr.RunSimultaneousIterations(1);
     std::cout << i << " " << TrunkExploitability(&whole_game, *average_policy) << "\n";
   }

@@ -95,7 +95,8 @@ void GenerateData(const std::vector<dlcfr::RangeTable>& tables,
 // The network should imitate DL-CFR at each iteration
 // when we use this generation method.
 void GenerateDataWithDLCfr(Trunk* trunk, std::mt19937& rnd_gen,
-                           int which_iteration) {
+                             int which_iteration) {
+  SPIEL_CHECK_GE(which_iteration, 1);
   auto leaf_evaluator = std::make_shared<dlcfr::CFREvaluator>(
       trunk->game, /*depth_limit=*/100, /*leaf_evaluator=*/nullptr,
       trunk->terminal_evaluator, trunk->public_observer,
@@ -108,12 +109,12 @@ void GenerateDataWithDLCfr(Trunk* trunk, std::mt19937& rnd_gen,
                                 leaf_evaluator, trunk->terminal_evaluator);
   auto average_policy = dl_cfr.AveragePolicy();
 
-  dl_cfr.RunSimultaneousIterations(which_iteration);
+  dl_cfr.RunSimultaneousIterations(which_iteration - 1);
 
   dl_cfr.UpdateReachProbs();
   dl_cfr.EvaluateLeaves();
   CopyRangesAndValues(&dl_cfr, trunk->tables, trunk->batch.get(),
-                      /*verbose=*/true);
+                      /*verbose=*/false);
 }
 
 }  // papers_with_code

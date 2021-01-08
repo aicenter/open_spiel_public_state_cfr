@@ -5,18 +5,12 @@ import pandas as pd
 param_sweep = [
   ("a_game_name", ".*kuhn_poker.*"),
   ("b_depth", ".*"),
-  # ("b_cfr_oracle_iters", ".*"),
-  ("c_git_version", ".*"),
-  # ("b_bandit", ".*"),
-  # ("c_ball", ".*"),
+  ("c_trunk_eval_iterations", ".*"),
 ]
 
 display_perm = [
-  # ("a_game_name",),
-  ("a_game_name", "b_depth"),
-  # ("b_cfr_oracle_iters",),
-  ("c_git_version",),
-  # ("b_bandit", "c_ball",),
+  ("a_game_name", "b_depth",),
+  ("c_trunk_eval_iterations",),
 ]
 
 base_dir = "./experiments/train_eval_loop"
@@ -44,19 +38,38 @@ translation_map = {
   "RegretMatchingPlus": "RM+",
   "b_depth": "trunk depth",
   "c_depth": "trunk depth",
+  "c_trunk_eval_iterations": "iters",
   "d_subgame_cfr_iterations": "subgame iters"
 }
+
 
 def plot_item(ax, file, display_params, full_params):
   try:
     df = pd.read_csv(file, comment="#", skip_blank_lines=True)
     print(file)
+    df.loc[df.exploitability == 0, "exploitability"] = 1e-13
 
-    ax.semilogy(df.loop, df.exploitability.rolling(window=20).mean(), label="expl (rolling mean)", c="r")
+    ax.semilogy(df.loop, df.exploitability.rolling(window=20).mean(),
+                label="expl (rolling mean)", c="r")
     ax.semilogy(df.loop, df.exploitability, alpha=0.2, c="r")
-    ax.semilogy(df.loop, df.avg_loss.rolling(window=20).mean(), label="loss (rolling mean)", c="g")
+    ax.semilogy(df.loop, df.avg_loss.rolling(window=20).mean(),
+                label="loss (rolling mean)", c="g")
     ax.semilogy(df.loop, df.avg_loss, alpha=0.2, c="g")
-    ax.semilogy([df.loop.min(), df.loop.max()], [0.000884296,  0.000884296], label="DL-CFR after 20 iters")
+    target_expls = {
+      3: [0.0694444, 0.0347222, 0.0277778, 0.0208333, 0.0305556, 0.0266204,
+          0.0228175, 0.0210069, 0.0187463, 0.0168717, 0.0154247, 0.0141393,
+          0.0143215, 0.0132985, 0.0125376, 0.011754, 0.0112125, 0.0105896,
+          0.0115995, 0.0110195, 0.0106958],
+      4: [0.347222, 0.229167, 0.164352, 0.138641, 0.0992965, 0.0783782,
+          0.074789, 0.0671453, 0.0573168, 0.0496838, 0.0469723, 0.04122,
+          0.0396299, 0.0392783, 0.0386818, 0.0376868, 0.0355828, 0.0325483,
+          0.02994, 0.0269017]}
+    depth = int(full_params["b_depth"])
+    iters = int(full_params["c_trunk_eval_iterations"])
+    v = target_expls[depth][iters - 1]
+    ax.semilogy([df.loop.min(), df.loop.max()], [v, v], label="DL-CFR target")
+
+    ax.set_ylim([1e-6, 1])
   except Exception as e:
     print(e)
     pass
