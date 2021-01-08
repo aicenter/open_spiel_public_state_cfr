@@ -145,6 +145,7 @@ class DepthLimitedCFR {
   void PrepareRootReachProbs();
   void EvaluateLeaves();
   void UpdateReachProbs();
+  void UpdateTrunk();
 
   void SetPlayerRanges(const std::array<std::vector<double>, 2>& ranges);
   double RootValue(Player pl = 0) const;
@@ -164,7 +165,7 @@ class DepthLimitedCFR {
   // Trunk evaluation.
   std::shared_ptr<Policy> AveragePolicy();
   std::shared_ptr<Policy> CurrentPolicy();
-
+  size_t num_iterations_ = 0;
  private:
   const std::shared_ptr<const Game> game_;
   std::vector<std::shared_ptr<InfostateTree>> trees_;
@@ -185,7 +186,7 @@ class DepthLimitedCFR {
 
   std::vector<BanditVector> bandits_;
 
-  size_t num_iterations_ = 0;
+
 
   void PrepareLeafNodesForPublicStates();
   void PrepareRangesAndValuesForPublicStates();

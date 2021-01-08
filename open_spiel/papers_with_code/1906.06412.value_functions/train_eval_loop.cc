@@ -72,7 +72,7 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
       t->batch->input_size, t->batch->output_size,
       t->batch->input_size * absl::GetFlag(FLAGS_num_width),
       absl::GetFlag(FLAGS_num_layers),
-      PositionalValueNet::ActivationFunction::kNone);
+      PositionalValueNet::ActivationFunction::kRelu);
   model.to(device);
   torch::optim::Adam optimizer(model.parameters());
 
@@ -91,7 +91,11 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   std::cout << "# Printing all possible generated data.\n";
   for (int i = 1; i <= trunk_eval_iterations; ++i) {
     GenerateDataWithDLCfr(t.get(), rnd_gen, i);
-    std::cout << "# " << i << ": \n# " << t->batch->data
+    double expl = ortools::TrunkExploitability(
+        &whole_game, *t->iterable_trunk_with_oracle->AveragePolicy());
+    std::cout << "# " << i << ": "
+              << "expl = " << expl
+              << "\n# " << t->batch->data
               << "\n# " << t->batch->targets << "\n";
   }
 
@@ -131,7 +135,8 @@ int main(int argc, char** argv) {
   INIT_EXPERIMENT();
 
   TrainEvalLoop(
-      MakeTrunk(absl::GetFlag(FLAGS_game_name), absl::GetFlag(FLAGS_depth)),
+      MakeTrunk(absl::GetFlag(FLAGS_game_name), absl::GetFlag(FLAGS_depth),
+                absl::GetFlag(FLAGS_use_bandits_for_cfr)),
       absl::GetFlag(FLAGS_train_batches),
       absl::GetFlag(FLAGS_num_loops),
       absl::GetFlag(FLAGS_cfr_oracle_iterations),

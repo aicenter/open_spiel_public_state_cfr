@@ -25,11 +25,11 @@ namespace papers_with_code {
 using namespace algorithms;
 
 std::unique_ptr<Trunk> MakeTrunk(const std::string& game_name,
-                                 int trunk_depth) {
-  return std::make_unique<Trunk>(game_name, trunk_depth);
+                                 int trunk_depth, std::string use_bandits_for_cfr) {
+  return std::make_unique<Trunk>(game_name, trunk_depth, use_bandits_for_cfr);
 }
 
-Trunk::Trunk(const std::string& game_name, int depth) {
+Trunk::Trunk(const std::string& game_name, int depth, std::string use_bandits_for_cfr) {
   // 1. Prepare the game, observers and depth-limited (trunk) trees.
   game = LoadGame(game_name);
   trunk_depth = depth;
@@ -44,10 +44,15 @@ Trunk::Trunk(const std::string& game_name, int depth) {
   oracle_evaluator = std::make_shared<dlcfr::CFREvaluator>(
       game, /*full_subgame_depth=*/100, /*no_leaf_evaluator=*/nullptr,
       terminal_evaluator, public_observer, infostate_observer);
+  oracle_evaluator->bandit_name = use_bandits_for_cfr;
   fixable_trunk_with_oracle = std::make_unique<dlcfr::DepthLimitedCFR>(
       game, trunk_trees, oracle_evaluator, terminal_evaluator,
       public_observer,
       MakeBanditVectors(trunk_trees, "FixableStrategy"));
+  iterable_trunk_with_oracle = std::make_unique<dlcfr::DepthLimitedCFR>(
+      game, trunk_trees, oracle_evaluator, terminal_evaluator,
+      public_observer,
+      MakeBanditVectors(trunk_trees, use_bandits_for_cfr));
 
   // 3. Make a Batch of data that encompasses all leaf public states.
   tables = CreateRangeTables(*game, hand_observer,

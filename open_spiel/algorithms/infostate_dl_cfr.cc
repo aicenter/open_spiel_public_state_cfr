@@ -208,14 +208,18 @@ void DepthLimitedCFR::UpdateReachProbs() {
   }
 }
 
+void DepthLimitedCFR::UpdateTrunk() {
+  for (int pl = 0; pl < 2; ++pl) {
+    BottomUp(*trees_[pl], bandits_[pl], absl::MakeSpan(cf_values_[pl]));
+  }
+}
+
 void DepthLimitedCFR::RunSimultaneousIterations(int iterations) {
   for (int t = 0; t < iterations; ++t) {
     ++num_iterations_;
     UpdateReachProbs();
     EvaluateLeaves();
-    for (int pl = 0; pl < 2; ++pl) {
-      BottomUp(*trees_[pl], bandits_[pl], absl::MakeSpan(cf_values_[pl]));
-    }
+    UpdateTrunk();
 //    SPIEL_DCHECK_FLOAT_NEAR(RootValue(/*pl=*/0), -RootValue(/*pl=*/1), 1e-6);
   }
 }

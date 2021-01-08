@@ -34,13 +34,16 @@ struct Trunk {
   std::shared_ptr<const algorithms::dlcfr::LeafEvaluator> terminal_evaluator;
   std::shared_ptr<algorithms::dlcfr::CFREvaluator> oracle_evaluator;
   std::unique_ptr<algorithms::dlcfr::DepthLimitedCFR> fixable_trunk_with_oracle;
+  std::unique_ptr<algorithms::dlcfr::DepthLimitedCFR> iterable_trunk_with_oracle;
   std::vector<algorithms::dlcfr::RangeTable> tables;
   std::unique_ptr<BatchData> batch;
 
-  Trunk(const std::string& game_name, int trunk_depth);
+  Trunk(const std::string& game_name, int trunk_depth,
+        std::string use_bandits_for_cfr = "RegretMatchingPlus");
 };
 
-std::unique_ptr<Trunk> MakeTrunk(const std::string& game_name, int trunk_depth);
+std::unique_ptr<Trunk> MakeTrunk(const std::string& game_name, int trunk_depth,
+    std::string use_bandits_for_cfr = "RegretMatchingPlus");
 
 void CopyRangesAndValues(
     algorithms::dlcfr::DepthLimitedCFR* trunk,
