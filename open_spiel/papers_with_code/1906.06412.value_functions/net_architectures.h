@@ -29,8 +29,17 @@ struct ValueNet : public torch::nn::Module {
 // A simple MLP neural network.
 struct PositionalValueNet final : public ValueNet {
   std::vector<torch::nn::Linear> fc_layers;
+
+  enum ActivationFunction {
+    kNone, kRelu, kLeakyRelu, kSigmoid
+  };
+
+  ActivationFunction activation_fn;
+
   PositionalValueNet(size_t inputs_size, size_t outputs_size,
-                     size_t hidden_size, size_t num_layers = 3) {
+                     size_t hidden_size, size_t num_layers = 3,
+                     ActivationFunction activation = kRelu)
+      : activation_fn(activation) {
     SPIEL_CHECK_GE(num_layers, 1);
     for (int i = 0; i < num_layers; ++i) {
       size_t layer_input = i == 0 ? inputs_size : hidden_size;
@@ -41,10 +50,24 @@ struct PositionalValueNet final : public ValueNet {
   }
 
   torch::Tensor forward(torch::Tensor x) {
-    int num_relu_layers = fc_layers.size() - 1;
-    for (int i = 0; i < num_relu_layers; ++i) {
-      x = torch::relu(fc_layers[i]->forward(x));
+    int num_layers_with_activation = fc_layers.size() - 1;
+    for (int i = 0; i < num_layers_with_activation; ++i) {
+      x = fc_layers[i]->forward(x);
+      switch (activation_fn) {
+        case kNone:
+          break;
+        case kRelu:
+          x = torch::relu(x);
+          break;
+        case kLeakyRelu:
+          x = torch::leaky_relu(x);
+          break;
+        case kSigmoid:
+          x = torch::sigmoid(x);
+          break;
+      }
     }
+    // Last layer has no activation function -- just linear output.
     return fc_layers.back()->forward(x);
   }
 };
