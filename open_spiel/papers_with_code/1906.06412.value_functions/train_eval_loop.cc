@@ -32,6 +32,7 @@ ABSL_FLAG(int, num_width, 3, "Multiplicative constant of the number "
 ABSL_FLAG(int, seed, 0, "Seed.");
 ABSL_FLAG(std::string, use_bandits_for_cfr, "PredictiveRegretMatchingPlus",
           "Which bandit should be used in the trunk.");
+ABSL_FLAG(std::string, data_generation, "random", "One of random,dl_cfr,mix");
 ABSL_FLAG(bool, verbose_every_loop, false,
           "Make verbose output at the start of every loop.");
 
@@ -88,15 +89,18 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   // 3. Create the LP spec for the whole game.
   ortools::SequenceFormLpSpecification whole_game(*t->game, "CLP");
 
-  std::cout << "# Printing all possible generated data.\n";
-  for (int i = 1; i <= trunk_eval_iterations; ++i) {
-    GenerateDataWithDLCfr(t.get(), rnd_gen, i);
-    double expl = ortools::TrunkExploitability(
-        &whole_game, *t->iterable_trunk_with_oracle->AveragePolicy());
-    std::cout << "# " << i << ": "
-              << "expl = " << expl
-              << "\n# " << t->batch->data
-              << "\n# " << t->batch->targets << "\n";
+  const std::string data_generation = absl::GetFlag(FLAGS_data_generation);
+  if (data_generation == "dl_cfr" || data_generation == "mix") {
+    std::cout << "# Printing all possible generated data.\n";
+    for (int i = 1; i <= trunk_eval_iterations; ++i) {
+      GenerateData(t.get(), rnd_gen, i);
+      double expl = ortools::TrunkExploitability(
+          &whole_game, *t->iterable_trunk_with_oracle->AveragePolicy());
+      std::cout << "# " << i << ": "
+                << "expl = " << expl
+                << "\n# " << t->batch->data
+                << "\n# " << t->batch->targets << "\n";
+    }
   }
 
   // 4. The train-eval loop.
@@ -106,9 +110,19 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
     double cumul_loss = 0.;
     std::cout << "# Training  ";
     for (int i = 0; i < train_batches; ++i) {
-      int which_iteration =
-          std::uniform_int_distribution<>(1, trunk_eval_iterations)(rnd_gen);
-      GenerateDataWithDLCfr(t.get(), rnd_gen, which_iteration);
+      int mix = std::uniform_int_distribution<>(0, 1)(rnd_gen);
+      bool generate_random =
+          data_generation == "random" || data_generation == "mix" && mix == 0;
+      bool generate_dlcfr =
+          data_generation == "dl_cfr" || data_generation == "mix" && mix == 1;
+      if (generate_random) {
+        GenerateData(t.get(), rnd_gen);
+      }
+      if (generate_dlcfr) {
+        int which_iteration =
+            std::uniform_int_distribution<>(1, trunk_eval_iterations)(rnd_gen);
+        GenerateDataWithDLCfr(t.get(), rnd_gen, which_iteration);
+      }
       torch::Tensor loss = TrainNetwork(&model, &device,
                                         &optimizer, t->batch.get());
       cumul_loss += loss.item().to<double>();
