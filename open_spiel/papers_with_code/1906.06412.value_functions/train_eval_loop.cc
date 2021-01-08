@@ -87,6 +87,13 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   // 3. Create the LP spec for the whole game.
   ortools::SequenceFormLpSpecification whole_game(*t->game, "CLP");
 
+  // Print all possible generated data.
+  for (int i = 0; i < trunk_eval_iterations; ++i) {
+    GenerateDataWithDLCfr(t.get(), rnd_gen, i);
+    std::cout << "# " << i << ": \n# " << t->batch->data
+              << "\n# " << t->batch->targets << "\n";
+  }
+
   // 4. The train-eval loop.
   std::cout << "loop,avg_loss,exploitability" << std::endl;
   for (int loop = 0; loop < num_loops; ++loop) {
@@ -94,7 +101,9 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
     double cumul_loss = 0.;
     std::cout << "# Training  ";
     for (int i = 0; i < train_batches; ++i) {
-      GenerateDataWithDLCfr(t.get(), rnd_gen, trunk_eval_iterations + 1);
+      int which_iteration =
+          std::uniform_int_distribution<>(0, trunk_eval_iterations)(rnd_gen);
+      GenerateDataWithDLCfr(t.get(), rnd_gen, which_iteration);
       torch::Tensor loss = TrainNetwork(&model, &device,
                                         &optimizer, t->batch.get());
       cumul_loss += loss.item().to<double>();

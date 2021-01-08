@@ -50,7 +50,7 @@ inline void GenerateData(Trunk* trunk, std::mt19937& rnd_gen,
 }
 
 void GenerateDataWithDLCfr(Trunk* trunk, std::mt19937& rnd_gen,
-                           int pick_max_iter = 2);
+                           int which_iteration);
 
 }  // papers_with_code
 }  // open_spiel

@@ -92,39 +92,14 @@ void GenerateData(const std::vector<dlcfr::RangeTable>& tables,
   }
 }
 
+// The network should imitate DL-CFR at each iteration
+// when we use this generation method.
 void GenerateDataWithDLCfr(Trunk* trunk, std::mt19937& rnd_gen,
-                           int pick_max_iter) {
-  // The network should imitate DL-CFR when we use this generation method.
-  // Running DL-CFR with this leaf evaluator yields following
-  // trunk exploitabilities:
-
-  //  0 0.0694444
-  //  1 0.0347222
-  //  2 0.0138889
-  //  3 0.00351338
-  //  4 0.00314063
-  //  5 0.00261719
-  //  6 0.00224331
-  //  7 0.00822699
-  //  8 0.00823886
-  //  9 0.00545127
-  //  10 0.00288314
-  //  11 0.00123926
-  //  12 0.00172119
-  //  13 0.0020411
-  //  14 0.00237835
-  //  15 0.00267345
-  //  16 0.00293383
-  //  17 0.00191372
-  //  18 0.00120782
-  //  19 0.00184289
-
-  // CFR leaf evaluator.
+                           int which_iteration) {
   auto leaf_evaluator = std::make_shared<dlcfr::CFREvaluator>(
       trunk->game, /*depth_limit=*/100, /*leaf_evaluator=*/nullptr,
       trunk->terminal_evaluator, trunk->public_observer,
       trunk->infostate_observer);
-  leaf_evaluator->reset_subgames_on_evaluation = false;
   leaf_evaluator->bandit_name = "RegretMatchingPlus";
   leaf_evaluator->leaf_evaluator = leaf_evaluator;
   leaf_evaluator->num_cfr_iterations = 2;
@@ -133,14 +108,12 @@ void GenerateDataWithDLCfr(Trunk* trunk, std::mt19937& rnd_gen,
                                 leaf_evaluator, trunk->terminal_evaluator);
   auto average_policy = dl_cfr.AveragePolicy();
 
-  int which_iteration =
-      std::uniform_int_distribution<>(1, pick_max_iter)(rnd_gen);
-  dl_cfr.RunSimultaneousIterations(which_iteration - 1);
+  dl_cfr.RunSimultaneousIterations(which_iteration);
 
   dl_cfr.UpdateReachProbs();
   dl_cfr.EvaluateLeaves();
   CopyRangesAndValues(&dl_cfr, trunk->tables, trunk->batch.get(),
-      /*verbose=*/false);
+                      /*verbose=*/true);
 }
 
 }  // papers_with_code
