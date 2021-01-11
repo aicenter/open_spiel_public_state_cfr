@@ -1,4 +1,6 @@
 add_library(paper_value_functions OBJECT
+  experience_replay.h
+  experience_replay.cc
   generate_data.h
   generate_data.cc
   net_architectures.h
