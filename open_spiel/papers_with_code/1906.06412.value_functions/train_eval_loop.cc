@@ -96,7 +96,7 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   const std::string data_generation = absl::GetFlag(FLAGS_data_generation);
   const bool generate_random = data_generation == "random";
   const bool generate_dlcfr = data_generation == "dl_cfr";
-  const auto eval_iters = std::vector<int>{5};
+  const auto eval_iters = std::vector<int>{1, 2, 5, 10, 20, 50, 100};
   if (generate_dlcfr) {
     PrecomputeExperienceReplayForDLCfr(t.get(), &experience_replay,
                                        &whole_game, eval_iters);
