@@ -18,7 +18,9 @@
 #include <map>
 
 #include "open_spiel/algorithms/infostate_dl_cfr.h"
+#include "open_spiel/algorithms/ortools/sequence_form_lp.h"
 
+#include "open_spiel/papers_with_code/1906.06412.value_functions/experience_replay.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_batch.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/trunk.h"
 
@@ -53,6 +55,11 @@ inline void GenerateDataRandomRanges(Trunk* trunk, std::mt19937& rnd_gen,
 
 void GenerateDataWithDLCfr(Trunk* trunk, std::mt19937& rnd_gen,
                            int which_iteration);
+
+void PrecomputeExperienceReplayForDLCfr(
+    Trunk* trunk, ExperienceReplay* replay,
+    algorithms::ortools::SequenceFormLpSpecification* whole_game,
+    const std::vector<int>& eval_iters, std::ostream& os = std::cout);
 
 }  // papers_with_code
 }  // open_spiel

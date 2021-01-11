@@ -65,6 +65,17 @@ struct BatchData {
     std::copy(tensor.begin(), tensor.end(),
               data.begin() + (batch_index * input_size));
   }
+
+  void CopyFrom(const BatchData& other) {
+    SPIEL_CHECK_EQ(batch_size, other.batch_size);
+    SPIEL_CHECK_EQ(input_size, other.input_size);
+    SPIEL_CHECK_EQ(output_size, other.output_size);
+    SPIEL_CHECK_EQ(public_features_size, other.public_features_size);
+    SPIEL_CHECK_EQ(ranges_size, other.ranges_size);
+    data = other.data;
+    targets = other.targets;
+  }
+
   // Zero-out ranges and values, keep the features.
   void Reset() {
     for (size_t batch_index = 0; batch_index < batch_size; ++batch_index) {

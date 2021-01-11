@@ -105,5 +105,40 @@ void GenerateDataWithDLCfr(Trunk* trunk, std::mt19937& rnd_gen,
                       trunk->batch.get(), /*verbose=*/false);
 }
 
+void PrecomputeExperienceReplayForDLCfr(
+    Trunk* trunk, ExperienceReplay* replay,
+    ortools::SequenceFormLpSpecification* whole_game,
+    const std::vector<int>& eval_iters, std::ostream& os) {
+  int trunk_eval_iterations = *std::max_element(eval_iters.begin(),
+                                                eval_iters.end());
+
+  auto should_evaluate = [&](int i){
+      for (auto j : eval_iters) {
+        if (i == j) return true;
+      }
+      return false;
+  };
+
+  os << "# Computing reference exploitabilities for given trunk iterations.\n";
+  trunk->iterable_trunk_with_oracle->Reset();
+  double expl;
+  for (int i = 1; i <= trunk_eval_iterations; ++i) {
+    ++trunk->iterable_trunk_with_oracle->num_iterations_;
+    trunk->iterable_trunk_with_oracle->UpdateReachProbs();
+    trunk->iterable_trunk_with_oracle->EvaluateLeaves();
+
+    if (should_evaluate(i)) {
+      expl = ortools::TrunkExploitability(
+          whole_game, *trunk->iterable_trunk_with_oracle->AveragePolicy());
+      os << "# " << i << ": " << "expl = " << expl << std::endl;
+    }
+    CopyRangesAndValues(trunk->iterable_trunk_with_oracle.get(), trunk->tables,
+                        trunk->batch.get(), /*verbose=*/false);
+    replay->buffer.push_back(*trunk->batch);
+
+    trunk->iterable_trunk_with_oracle->UpdateTrunk();
+  }
+}
+
 }  // papers_with_code
 }  // open_spiel

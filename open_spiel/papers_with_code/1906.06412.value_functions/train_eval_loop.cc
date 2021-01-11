@@ -41,6 +41,7 @@ ABSL_FLAG(bool, verbose_every_loop, false,
 #include "absl/random/random.h"
 #include "torch/torch.h"
 
+#include "open_spiel/papers_with_code/1906.06412.value_functions/experience_replay.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/train_eval.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/generate_data.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_dl_evaluator.h"
@@ -89,25 +90,19 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   // 3. Create the LP spec for the whole game.
   ortools::SequenceFormLpSpecification whole_game(*t->game, "CLP");
 
+  // 4. Make experience replay buffer.
+  ExperienceReplay experience_replay;
+
   const std::string data_generation = absl::GetFlag(FLAGS_data_generation);
   const bool generate_random = data_generation == "random";
   const bool generate_dlcfr = data_generation == "dl_cfr";
-  const auto eval_iters = std::vector<int>{1, 2, 5, 10, 20, 50, 100};
-
+  const auto eval_iters = std::vector<int>{5};
   if (generate_dlcfr) {
-    std::cout << "# Printing all possible generated data.\n";
-    for (int i : eval_iters) {
-      GenerateDataWithDLCfr(t.get(), rnd_gen, i);
-      double expl = ortools::TrunkExploitability(
-          &whole_game, *t->iterable_trunk_with_oracle->AveragePolicy());
-      std::cout << "# " << i << ": "
-                << "expl = " << expl
-                << "\n# " << t->batch->data
-                << "\n# " << t->batch->targets << "\n";
-    }
+    PrecomputeExperienceReplayForDLCfr(t.get(), &experience_replay,
+                                       &whole_game, eval_iters);
   }
 
-  // 4. The train-eval loop.
+  // 5. The train-eval loop.
   std::cout << "loop,avg_loss,";
   for (int i : eval_iters) {
     std::cout << "expl[" << i << "],";
@@ -123,9 +118,7 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
       if (generate_random) {
         GenerateDataRandomRanges(t.get(), rnd_gen);
       } else if (generate_dlcfr) {
-        int which_iteration =
-            std::uniform_int_distribution<>(1, trunk_eval_iterations)(rnd_gen);
-        GenerateDataWithDLCfr(t.get(), rnd_gen, which_iteration);
+        experience_replay.SelectRandomExperience(t->batch.get(), rnd_gen);
       }
 
       // Train using generated data.
