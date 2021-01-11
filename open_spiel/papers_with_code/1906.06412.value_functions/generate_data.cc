@@ -57,11 +57,7 @@ void RandomizeStrategy(
         policy[which_action] = 1.;
       } else {
         for (int i = 0; i < num_actions; ++i) {
-          if (std::bernoulli_distribution(prob_pure_strat)(rnd_gen)) {
-            policy[i] = std::uniform_real_distribution<>(0., 1.)(rnd_gen);
-          } else {
-            policy[i] = 0.;
-          }
+          policy[i] = std::uniform_real_distribution<>(0., 1.)(rnd_gen);
         }
         Normalize(absl::MakeSpan(policy));
       }

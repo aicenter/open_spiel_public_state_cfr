@@ -36,7 +36,7 @@ void PlacementCopy(absl::Span<const From> from, absl::Span<To> to,
 }
 
 void RandomizeStrategy(std::vector<algorithms::BanditVector>& bandits,
-                       std::mt19937& rnd_gen, double prob_pure_strat = 0.1,
+                       std::mt19937& rnd_gen, double prob_pure_strat = 0,
                        double prob_fully_mixed = 0.05);
 
 void GenerateDataRandomRanges(
