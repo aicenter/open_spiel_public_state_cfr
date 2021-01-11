@@ -41,11 +41,11 @@ double EvaluateNetwork(dlcfr::DepthLimitedCFR* trunk_with_net,
     ++trunk_with_net->num_iterations_;
     trunk_with_net->UpdateReachProbs();
     trunk_with_net->EvaluateLeaves();
-//    double expl = ortools::TrunkExploitability(
-//        whole_game, *trunk_with_net->AveragePolicy());
+    double expl = ortools::TrunkExploitability(
+        whole_game, *trunk_with_net->AveragePolicy());
 
     trunk_with_net->UpdateTrunk();
-//    std::cout << "# i = " << i << " expl=" << expl << std::endl;
+    std::cout << "# i = " << i << " expl=" << expl << std::endl;
   }
 
   ++trunk_with_net->num_iterations_;

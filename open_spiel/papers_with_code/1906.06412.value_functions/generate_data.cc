@@ -70,9 +70,9 @@ void RandomizeStrategy(
 }
 
 
-void GenerateData(const std::vector<dlcfr::RangeTable>& tables,
-                  dlcfr::DepthLimitedCFR* fixable_trunk_with_oracle, BatchData* batch,
-                  std::mt19937& rnd_gen, bool verbose) {
+void GenerateDataRandomRanges(const std::vector<dlcfr::RangeTable>& tables,
+                              dlcfr::DepthLimitedCFR* fixable_trunk_with_oracle, BatchData* batch,
+                              std::mt19937& rnd_gen, bool verbose) {
   fixable_trunk_with_oracle->Reset();
 
   // Randomize strategy in the trunk.

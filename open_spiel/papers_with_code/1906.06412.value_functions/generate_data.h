@@ -39,14 +39,16 @@ void RandomizeStrategy(std::vector<algorithms::BanditVector>& bandits,
                        std::mt19937& rnd_gen, double prob_pure_strat = 0.1,
                        double prob_fully_mixed = 0.05);
 
-void GenerateData(const std::vector<algorithms::dlcfr::RangeTable>& tables,
-                  algorithms::dlcfr::DepthLimitedCFR* trunk, BatchData* batch,
-                  std::mt19937& rnd_gen, bool verbose = false);
+void GenerateDataRandomRanges(
+    const std::vector<algorithms::dlcfr::RangeTable>& tables,
+    algorithms::dlcfr::DepthLimitedCFR* trunk, BatchData* batch,
+    std::mt19937& rnd_gen, bool verbose = false);
 
-inline void GenerateData(Trunk* trunk, std::mt19937& rnd_gen,
-                         bool verbose = false) {
-  GenerateData(trunk->tables, trunk->fixable_trunk_with_oracle.get(),
-               trunk->batch.get(), rnd_gen, verbose);
+inline void GenerateDataRandomRanges(Trunk* trunk, std::mt19937& rnd_gen,
+                                     bool verbose = false) {
+  GenerateDataRandomRanges(trunk->tables,
+                           trunk->fixable_trunk_with_oracle.get(),
+                           trunk->batch.get(), rnd_gen, verbose);
 }
 
 void GenerateDataWithDLCfr(Trunk* trunk, std::mt19937& rnd_gen,
