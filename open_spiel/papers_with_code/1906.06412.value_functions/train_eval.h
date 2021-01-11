@@ -33,8 +33,9 @@ torch::Tensor TrainNetwork(ValueNet* model, torch::Device* device,
                            BatchData* batch);
 
 double EvaluateNetwork(
-    algorithms::dlcfr::DepthLimitedCFR* trunk_with_net, int trunk_iterations,
-    algorithms::ortools::SequenceFormLpSpecification* whole_game);
+    algorithms::dlcfr::DepthLimitedCFR* trunk_with_net,
+    algorithms::ortools::SequenceFormLpSpecification* whole_game,
+    std::vector<int> evaluate_iters);
 
 }  //  papers_with_code
 }  //  open_spiel

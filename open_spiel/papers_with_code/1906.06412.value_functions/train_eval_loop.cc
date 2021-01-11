@@ -92,10 +92,11 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   const std::string data_generation = absl::GetFlag(FLAGS_data_generation);
   const bool generate_random = data_generation == "random";
   const bool generate_dlcfr = data_generation == "dl_cfr";
+  const auto eval_iters = std::vector<int>{1, 2, 5, 10, 20, 50, 100};
 
   if (generate_dlcfr) {
     std::cout << "# Printing all possible generated data.\n";
-    for (int i = 1; i <= trunk_eval_iterations; ++i) {
+    for (int i : eval_iters) {
       GenerateDataWithDLCfr(t.get(), rnd_gen, i);
       double expl = ortools::TrunkExploitability(
           &whole_game, *t->iterable_trunk_with_oracle->AveragePolicy());
@@ -107,7 +108,12 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   }
 
   // 4. The train-eval loop.
-  std::cout << "loop,avg_loss,exploitability" << std::endl;
+  std::cout << "loop,avg_loss,";
+  for (int i : eval_iters) {
+    std::cout << "expl[" << i << "],";
+  }
+  std::cout << std::endl;
+
   for (int loop = 0; loop < num_loops; ++loop) {
     // Train.
     double cumul_loss = 0.;
@@ -131,13 +137,10 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
     std::cout << std::endl;
 
     // Eval.
-    std::cout << "# Evaluating  " << std::endl;
-    const double exploitability = EvaluateNetwork(
-        trunk_with_net.get(), trunk_eval_iterations, &whole_game);
     const double avg_loss = cumul_loss / train_batches;
-
-    // Print.
-    std::cout << loop << ',' << avg_loss << ',' << exploitability << std::endl;
+    std::cout << loop << ',' << avg_loss << ',';
+    EvaluateNetwork(trunk_with_net.get(), &whole_game, eval_iters);
+    std::cout << std::endl;
   }
 }
 

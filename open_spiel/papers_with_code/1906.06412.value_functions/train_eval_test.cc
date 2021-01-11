@@ -196,8 +196,8 @@ void KuhnLearningTest(KuhnLearnCase learning_case) {
   // 3. Create the LP spec for the whole game.
   ortools::SequenceFormLpSpecification whole_game(*t->game, "CLP");
 
-  double expl_before_training = EvaluateNetwork(trunk_with_net.get(), 100,
-                                                &whole_game);
+  double expl_before_training =
+      EvaluateNetwork(trunk_with_net.get(), &whole_game, {100});
   // Should get a high expl before training.
   SPIEL_CHECK_GT(expl_before_training, 0.05);
 
@@ -239,14 +239,14 @@ void KuhnLearningTest(KuhnLearnCase learning_case) {
     TrainNetwork(&model, &device, &optimizer, t->batch.get());
 
     if (j % 64 == 0) {
-      double expl_after_training = EvaluateNetwork(trunk_with_net.get(), 100,
-                                            &whole_game);
-      std::cout << j / 64 <<","<< expl_after_training << "\n";
+      double expl_after_training =
+          EvaluateNetwork(trunk_with_net.get(), &whole_game, {100});
+      std::cout << j / 64 << "," << expl_after_training << "\n";
     }
   }
 
-  double expl_after_training = EvaluateNetwork(trunk_with_net.get(), 100,
-                                               &whole_game);
+  double expl_after_training =
+      EvaluateNetwork(trunk_with_net.get(), &whole_game, {100});
   SPIEL_CHECK_NE(expl_before_training, expl_after_training);
 
   switch (learning_case) {
