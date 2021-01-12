@@ -204,6 +204,20 @@ class RegretMatchingPlus final : public Bandit {
   void Reset() override;
 };
 
+// TODO(sustr): come up with a better name.
+class ConstrainedRMPlus final : public Bandit {
+  std::vector<double> cumulative_regrets_;
+  std::vector<double> cumulative_strategy_;
+ public:
+  ConstrainedRMPlus(int num_actions);
+  bool uses_average_strategy() const override { return true; }
+
+  void ComputeStrategy(size_t current_time, double weight = 1.) override;
+  void ObserveRewards(absl::Span<const double> rewards) override;
+  std::vector<double> AverageStrategy() const override;
+  void Reset() override;
+};
+
 // Faster Game Solving via Predictive Blackwell Approachability:
 // Connecting Regret Matching and Mirror Descent
 // Gabriele Farina, Christian Kroer, Tuomas Sandholm
