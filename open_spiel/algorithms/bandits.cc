@@ -185,9 +185,10 @@ void ConstrainedRMPlus::ObserveRewards(absl::Span<const double> rewards) {
   for (int i = 0; i < num_actions(); ++i) {
     expected_reward += rewards[i] * current_strategy_[i];
   }
+  const double regret_epsilon = 1e-6;
   for (int i = 0; i < num_actions(); ++i) {
     cumulative_regrets_[i] =
-        std::fmax(0, cumulative_regrets_[i] + rewards[i] - expected_reward);
+        std::fmax(regret_epsilon, cumulative_regrets_[i] + rewards[i] - expected_reward);
   }
 }
 
