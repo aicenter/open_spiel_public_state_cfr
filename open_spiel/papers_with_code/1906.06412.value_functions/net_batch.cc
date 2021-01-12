@@ -24,8 +24,6 @@ void DebugPrintBatchData(const BatchData& batch) {
             << "#   output_size=" << batch.output_size << "\n"
             << "#   public_features_size=" << batch.public_features_size << "\n"
             << "#   ranges_size=" << batch.ranges_size << "\n";
-  std::cout << "# BatchData.data:\n";
-  std::cout << "#   " << batch.data << "\n";
 }
 
 }  // namespace papers_with_code

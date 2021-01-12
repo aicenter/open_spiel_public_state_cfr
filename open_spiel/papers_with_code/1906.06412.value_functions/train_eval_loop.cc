@@ -60,8 +60,8 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
                    std::string use_bandits_for_cfr, int seed,
                    bool verbose_every_loop) {
 
+  DebugPrintBatchData(*t->batch);
 //  DebugPrintRangeTables(t->tables);
-//  DebugPrintBatchData(*t->batch);
 //  DebugPrintPublicFeatures(t->fixable_trunk_with_oracle->public_leaves());
 
   t->oracle_evaluator->num_cfr_iterations = cfr_oracle_iterations;
