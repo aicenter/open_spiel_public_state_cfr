@@ -4,8 +4,8 @@ add_library(paper_value_functions OBJECT
   generate_data.h
   generate_data.cc
   net_architectures.h
-  net_batch.h
-  net_batch.cc
+  net_data.h
+  net_data.cc
   net_dl_evaluator.cc
   net_dl_evaluator.h
   torch_utils.cc

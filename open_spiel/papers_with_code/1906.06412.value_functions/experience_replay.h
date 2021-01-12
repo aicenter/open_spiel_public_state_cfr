@@ -15,7 +15,7 @@
 #ifndef OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_EXPERIENCE_REPLAY_
 #define OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_EXPERIENCE_REPLAY_
 
-#include "open_spiel/papers_with_code/1906.06412.value_functions/net_batch.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/net_data.h"
 
 namespace open_spiel {
 namespace papers_with_code {

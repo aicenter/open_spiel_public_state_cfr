@@ -21,7 +21,7 @@
 #include "open_spiel/algorithms/ortools/sequence_form_lp.h"
 
 #include "open_spiel/papers_with_code/1906.06412.value_functions/experience_replay.h"
-#include "open_spiel/papers_with_code/1906.06412.value_functions/net_batch.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/net_data.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/trunk.h"
 
 namespace open_spiel {

@@ -18,7 +18,7 @@
 #include "open_spiel/algorithms/infostate_tree.h"
 #include "open_spiel/algorithms/infostate_dl_cfr.h"
 #include "open_spiel/algorithms/ortools/dl_oracle_evaluator.h"
-#include "open_spiel/papers_with_code/1906.06412.value_functions/net_batch.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/net_data.h"
 #include "open_spiel/spiel.h"
 
 namespace open_spiel {
