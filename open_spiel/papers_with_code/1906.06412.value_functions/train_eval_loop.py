@@ -4,19 +4,19 @@ import pandas as pd
 
 param_sweep = [
   ("a_game_name", ".*"),
-  ("b_depth", "(3|4)"),
-  ("c_trunk_eval_iterations", "[1-8]"),
-  ("d_data_generation", "dl_cfr"),
+  ("b_depth", "[13-8]"),
+  # ("c_trunk_eval_iterations", "[1-8]"),
+  ("c_data_generation", "random"),
 ]
 
 display_perm = [
 
   # ("c_trunk_eval_iterations",),
-  ("a_game_name", "b_depth", "d_data_generation",),
-  ("c_trunk_eval_iterations",),
+  ("a_game_name", "c_data_generation",),
+  ("b_depth",),
 ]
 
-base_dir = "./experiments/mix_data_generation"
+base_dir = "./experiments/eval_iters"
 translation_map = {
   "goofspiel(players=2,num_cards=3,imp_info=True)": "GS 3 (rand)",
   "goofspiel(players=2,num_cards=3,imp_info=True,points_order=ascending)":
@@ -45,36 +45,114 @@ translation_map = {
   "d_subgame_cfr_iterations": "subgame iters"
 }
 
+def file_from_params(full_params):
+  full_dir = f"{base_dir}"
+  for (param_name, mask) in param_sweep:
+    full_dir += f"/{param_name}/{full_params[param_name]}"
+  return f"{full_dir}/stdout"
 
 def plot_item(ax, file, display_params, full_params):
   try:
-    df = pd.read_csv(file, comment="#", skip_blank_lines=True)
+    file_random = file_from_params(full_params)
+    full_params2 = full_params
+    full_params2.update({"c_data_generation": "dl_cfr"})
+    file_dlcfr = file_from_params(full_params2)
+    df = pd.read_csv(file_random, comment="#", skip_blank_lines=True)
+    df2 = pd.read_csv(file_dlcfr, comment="#", skip_blank_lines=True)
     print(file)
-    df.loc[df.exploitability == 0, "exploitability"] = 1e-13
+    # df.loc[df.exploitability == 0, "exploitability"] = 1e-13
 
     # ax.semilogy(df.loop, df.exploitability.rolling(window=20).mean(),
     #             label="expl (rolling mean)", c="r")
-    ax.semilogy(df.loop, df.exploitability, alpha=0.9, c="r")
-    ax.semilogy(df.loop, df.avg_loss.rolling(window=20).mean(),
-                label="loss (rolling mean)", c="g")
-    ax.semilogy(df.loop, df.avg_loss, alpha=0.2, c="g")
+    expl_cols = [col for col in df.columns if col.startswith("expl")]
+
     target_expls = {
       "kuhn_poker": {
-        3: [0.0694444, 0.0138889, 0.0586623, 0.0579407, 0.037106, 0.0334998, 0.0166316, 0.0122922, 0.0136074, 0.00567496, 0.0049296, 0.00542391, 0.00439325, 0.00293351, 0.00415672, 0.00363367],
-        4: [0.347222, 0.222222, 0.130093, 0.0642981, 0.0512305, 0.0490274, 0.0538898, 0.0629207, 0.0565416, 0.0519562, 0.0404916, 0.031254, 0.0315923, 0.0281698, 0.0246861, 0.0182519]
+        3: [ 0.0694444,
+             0.0138889,
+             0.037106,
+             0.00567496,
+             0.00598514,
+             0.00520348,
+             0.00367275],
+        4: [0.347222,
+            0.222222,
+            0.0512305,
+            0.0519562,
+            0.0158763,
+            0.00953119,
+            0.0073928]
       },
       "leduc_poker": {
-         3: [0.0551441, 0.0253679, 0.0606634, 0.0614051, 0.0506499, 0.0408017, 0.0302935, 0.0203831, 0.0188982, 0.0147639, 0.0113608, 0.0117267, 0.0108591, 0.00972253, 0.00828659, 0.00812331, 0.00678446],
-         4: [0.237882, 0.0767588, 0.179079, 0.181522, 0.144847, 0.115943, 0.0939782, 0.0844154, 0.0791962, 0.0717062, 0.0633049, 0.0595763, 0.0553061, 0.0518049, 0.046881, 0.043043],
+        4: [0.237882,
+            0.0767588,
+            0.144847,
+            0.0717062,
+            0.0328893,
+            0.0159417,
+            0.00916333],
+        6: [ 0.90119,
+             0.507419,
+             0.227721,
+             0.111212,
+             0.070699,
+             0.0456274,
+             0.0316788],
+        8: [ 1.89087,
+             1.35069,
+             1.03251,
+             0.625757,
+             0.22752,
+             0.094673,
+             0.0607483,]
+      },
+      "goofspiel(players=2,num_cards=3,imp_info=True,points_order=ascending)": {
+        1: [0.444444,
+            0.148148,
+            0.0296296,
+            0.00808081,
+            0.0021164,
+            0.000348584,
+            8.80088e-05]
+      },
+      "goofspiel(players=2,num_cards=4,imp_info=True)": {
+        1: [0.320064,
+            0.278664,
+            0.0942615,
+            0.0587052,
+            0.0235283,
+            0.0107692,
+            0.00857602,],
+        2: [0.576389,
+            0.410799,
+            0.284437,
+            0.191588,
+            0.0614958,
+            0.0177474,
+            0.0217346]
       }
     }
+
     game = str(full_params["a_game_name"])
     depth = int(full_params["b_depth"])
-    iters = int(full_params["c_trunk_eval_iterations"])
-    v = target_expls[game][depth][iters - 1]
-    ax.semilogy([df.loop.min(), df.loop.max()], [v, v], label="DL-CFR target")
 
-    ax.set_ylim([1e-6, 1])
+    # for i, col in enumerate(expl_cols):
+    #   ax.semilogy(df.loop, df[col], alpha=i / len(expl_cols), c="r", label=col)
+    #   v = target_expls[game][depth][i]
+    #   ax.semilogy([df.loop.min(), df.loop.max()], [v, v], label=f"DL-CFR target {col}")
+
+    col = "expl[20]"
+    i = 4
+    ax.semilogy(df.loop, df[col], c="r", label=f"{col} random")
+    ax.semilogy(df2.loop, df2[col], c="g", label=f"{col} dlcfr")
+    v = target_expls[game][depth][i]
+    ax.semilogy([df.loop.min(), df.loop.max()], [v, v], label=f"DL-CFR target {col}")
+
+    # ax.semilogy(df.loop, df.avg_loss.rolling(window=20).mean(),
+    #             label="loss (rolling mean)", c="g")
+    # ax.semilogy(df.loop, df.avg_loss, alpha=0.2, c="g")
+
+    # ax.set_ylim([1e-6, 1])
   except Exception as e:
     print(e)
     pass
