@@ -66,6 +66,10 @@ Trunk::Trunk(const std::string& game_name, int depth, std::string use_bandits_fo
     dims.net_ranges_size[pl] = tables[pl].largest_range();
   }
   num_leaves = fixable_trunk_with_oracle->public_leaves().size();
+  num_non_terminal_leaves = 0;
+  for (auto& leaf: fixable_trunk_with_oracle->public_leaves()) {
+    if (!leaf.IsTerminal()) num_non_terminal_leaves++;
+  }
 }
 
 void AddExperiencesFromTrunk(std::vector<dlcfr::LeafPublicState>& public_leaves,

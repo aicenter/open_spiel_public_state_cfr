@@ -24,7 +24,7 @@ ABSL_FLAG(int, depth, 3, "Depth of the trunk.");
 ABSL_FLAG(int, train_batches, 32,
           "Number of training batches before the evalution is run.");
 ABSL_FLAG(int, batch_size, 32,
-          "Number of training batches before the evalution is run.");
+          "Batch size per train step. If <1, then full replay buffer is used.");
 ABSL_FLAG(int, num_loops, 5000, "Number of train-eval loops.");
 ABSL_FLAG(int, cfr_oracle_iterations, 100, "Number of oracle iterations.");
 ABSL_FLAG(int, trunk_eval_iterations, 100, "Number of trunk iterations.");
@@ -38,8 +38,6 @@ ABSL_FLAG(int, seed, 0, "Seed.");
 ABSL_FLAG(std::string, use_bandits_for_cfr, "PredictiveRegretMatchingPlus",
           "Which bandit should be used in the trunk.");
 ABSL_FLAG(std::string, data_generation, "random", "One of random,dl_cfr");
-ABSL_FLAG(bool, verbose_every_loop, false,
-          "Make verbose output at the start of every loop.");
 
 // -----------------------------------------------------------------------------
 
@@ -121,12 +119,16 @@ void FillExperienceReplay(ExpReplayInitPolicy init,
 
 void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
                    int cfr_oracle_iterations, int trunk_eval_iterations,
-                   std::string use_bandits_for_cfr, int seed,
-                   bool verbose_every_loop) {
+                   std::string use_bandits_for_cfr, int seed) {
 
-//  DebugPrintBatchData(*t->batch);
-//  DebugPrintRangeTables(t->tables);
-//  DebugPrintPublicFeatures(t->fixable_trunk_with_oracle->public_leaves());
+  std::cout << "# Number of public states: " << t->num_leaves << "\n";
+  std::cout << "# Number of non-terminal public states: "
+            << t->num_non_terminal_leaves << "\n";
+  std::cout << "# Public features: " << t->dims.public_features_size << "\n";
+  std::cout << "# Ranges size: " << t->dims.net_ranges_size << "\n";
+  std::cout << "# Net input size: " << t->dims.net_input_size() << "\n";
+  std::cout << "# Net output size: " << t->dims.net_output_size() << "\n";
+  SPIEL_CHECK_GT(t->num_non_terminal_leaves, 0);  // The trunk is too deep?
 
   t->oracle_evaluator->num_cfr_iterations = cfr_oracle_iterations;
   torch::manual_seed(seed);
@@ -143,7 +145,12 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   torch::optim::Adam optimizer(model.parameters());
 
   // 2. Create trunk net evaluator.
-  BatchData train_batch(absl::GetFlag(FLAGS_batch_size),
+  int experience_replay_buffer_size =
+      t->num_leaves * absl::GetFlag(FLAGS_num_trunks);
+  int batch_size = absl::GetFlag(FLAGS_batch_size) > 0
+                 ? absl::GetFlag(FLAGS_batch_size)
+                 : experience_replay_buffer_size;
+  BatchData train_batch(batch_size,
                         t->dims.net_input_size(), t->dims.net_output_size());
   BatchData eval_batch(1, t->dims.net_input_size(), t->dims.net_output_size());
 
@@ -155,15 +162,16 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
       MakeBanditVectors(t->trunk_trees, use_bandits_for_cfr));
 
   // 3. Create the LP spec for the whole game.
-  ortools::SequenceFormLpSpecification whole_game(*t->game, "CLP");
+  ortools::SequenceFormLpSpecification whole_game(*t->game, "GLOP");
 
   // 4. Make experience replay buffer.
-  int buffer_size = t->num_leaves * absl::GetFlag(FLAGS_num_trunks);
-  int num_floats = buffer_size * (t->dims.net_input_size() + t->dims.net_output_size());
+  int num_floats = experience_replay_buffer_size
+      * (t->dims.net_input_size() + t->dims.net_output_size());
   std::cout << "# Allocating experience replay buffer: "
-            << buffer_size << " sample points (" << num_floats << " floats)"
-            << std::endl;
-  ExperienceReplay experience_replay(buffer_size, t->dims.net_input_size(),
+            << experience_replay_buffer_size
+            << " sample points (" << num_floats << " floats)" << std::endl;
+  ExperienceReplay experience_replay(experience_replay_buffer_size,
+                                     t->dims.net_input_size(),
                                      t->dims.net_output_size());
 
   const auto eval_iters = std::vector<int>{1, 2, 5, 10, 20, 50,
@@ -224,6 +232,5 @@ int main(int argc, char** argv) {
       absl::GetFlag(FLAGS_cfr_oracle_iterations),
       absl::GetFlag(FLAGS_trunk_eval_iterations),
       absl::GetFlag(FLAGS_use_bandits_for_cfr),
-      absl::GetFlag(FLAGS_seed),
-      absl::GetFlag(FLAGS_verbose_every_loop));
+      absl::GetFlag(FLAGS_seed));
 }

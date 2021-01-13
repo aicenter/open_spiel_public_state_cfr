@@ -39,6 +39,7 @@ struct Trunk {
   std::vector<algorithms::dlcfr::RangeTable> tables;
   PositionalDataDims dims;
   int num_leaves;
+  int num_non_terminal_leaves;
 
   Trunk(const std::string& game_name, int trunk_depth,
         std::string use_bandits_for_cfr = "RegretMatchingPlus");

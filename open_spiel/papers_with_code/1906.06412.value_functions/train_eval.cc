@@ -26,10 +26,7 @@ torch::Tensor TrainNetwork(ValueNet* model, torch::Device* device,
   torch::Tensor target = batch->target.to(*device);
   optimizer->zero_grad();
   torch::Tensor output = model->forward(data);
-//  std::cout << "output" << output << std::endl;
-//  std::cout << "target" << target << std::endl;
   torch::Tensor loss = torch::mse_loss(output, target);
-//  std::cout << "loss" << loss << std::endl;
   SPIEL_CHECK_FALSE(std::isnan(loss.template item<float>()));
   loss.backward();
   optimizer->step();
