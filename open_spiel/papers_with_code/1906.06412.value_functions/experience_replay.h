@@ -20,9 +20,22 @@
 namespace open_spiel {
 namespace papers_with_code {
 
-struct ExperienceReplay {
-  std::vector<BatchData> buffer;
-  void SelectRandomExperience(BatchData* write_to, std::mt19937& rnd_gen);
+// Experience replay - a circular buffer.
+class ExperienceReplay : public BatchData {
+  size_t head_ = 0;
+  // Track how many times the whole buffer has been rewritten.
+  size_t overflow_cnt_ = 0;
+ public:
+  ExperienceReplay(int buffer_size, int input_size, int output_size)
+    : BatchData(buffer_size, input_size, output_size) {}
+  // Return a data point that can be written to.
+  PositionalData AddExperience(const PositionalDataDims& dims);
+
+  // Fill batch with randomly sampled data points.
+  void SampleBatch(BatchData* batch, std::mt19937& rnd_gen) const;
+ protected:
+  void AdvanceHead();
+
 };
 
 }  // papers_with_code

@@ -23,12 +23,17 @@ ABSL_FLAG(std::string, game_name, "kuhn_poker", "Game to run.");
 ABSL_FLAG(int, depth, 3, "Depth of the trunk.");
 ABSL_FLAG(int, train_batches, 32,
           "Number of training batches before the evalution is run.");
+ABSL_FLAG(int, batch_size, 32,
+          "Number of training batches before the evalution is run.");
 ABSL_FLAG(int, num_loops, 5000, "Number of train-eval loops.");
 ABSL_FLAG(int, cfr_oracle_iterations, 100, "Number of oracle iterations.");
 ABSL_FLAG(int, trunk_eval_iterations, 100, "Number of trunk iterations.");
+ABSL_FLAG(int, experience_replay_size, 100, "Number of points to store "
+                                             "in the replay buffer.");
 ABSL_FLAG(int, num_layers, 3, "Number of hidden layers.");
 ABSL_FLAG(int, num_width, 3, "Multiplicative constant of the number "
                              "of neurons per layer.");
+ABSL_FLAG(int, num_trunks, 100, "Size of experience replay in terms of trunks");
 ABSL_FLAG(int, seed, 0, "Seed.");
 ABSL_FLAG(std::string, use_bandits_for_cfr, "PredictiveRegretMatchingPlus",
           "Which bandit should be used in the trunk.");
@@ -54,13 +59,72 @@ namespace papers_with_code {
 
 using namespace algorithms;
 
+enum ExpReplayInitPolicy {
+  kGenerateDlcfrIterations,
+  kGenerateRandomRangesAndSubgameValues,
+};
+
+ExpReplayInitPolicy GetInitPolicy(const std::string& s) {
+  if (s == "dl_cfr") return kGenerateDlcfrIterations;
+  if (s == "random") return kGenerateRandomRangesAndSubgameValues;
+  SpielFatalError("Exhausted pattern match: data_generation");
+}
+
+void FillExperienceReplay(ExpReplayInitPolicy init,
+                          ExperienceReplay* experience_replay,
+                          Trunk* trunk,
+                          ortools::SequenceFormLpSpecification* whole_game,
+                          const std::vector<int>& eval_iters,
+                          std::mt19937& rnd_gen) {
+
+  std::cout << "# Filling experience replay buffer." << std::endl;
+
+  switch (init) {
+    case kGenerateDlcfrIterations: {
+      int trunk_eval_iterations = *std::max_element(eval_iters.begin(),
+                                                    eval_iters.end());
+
+      std::cout << "# Computing reference expls for given trunk iterations.\n";
+      GenerateDataDLCfrIterations(
+          trunk, experience_replay, trunk_eval_iterations,
+          /*monitor_fn*/[&](int trunk_iter) {
+              bool should_evaluate =
+                  std::find(eval_iters.begin(), eval_iters.end(), trunk_iter)
+                      != eval_iters.end();
+
+              if (should_evaluate) {
+                double expl = ortools::TrunkExploitability(
+                    whole_game,
+                    *trunk->iterable_trunk_with_oracle->AveragePolicy());
+                std::cout << "# " << trunk_iter << ": "
+                          << "expl = " << expl << std::endl;
+              }
+          }
+      );
+      break;
+    }
+
+    case kGenerateRandomRangesAndSubgameValues: {
+      std::cout << "# Generating random trunks to fill experience replay.\n# ";
+      for (int i = 0; i < absl::GetFlag(FLAGS_num_trunks); ++i) {
+        if (i % 10 == 0) std::cout << '.' << std::flush;
+        GenerateDataRandomRanges(trunk, experience_replay, rnd_gen);
+      }
+      std::cout << std::endl;
+      break;
+    }
+
+    default:
+      SpielFatalError("Exhausted pattern match: data_generation");
+  }
+}
 
 void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
                    int cfr_oracle_iterations, int trunk_eval_iterations,
                    std::string use_bandits_for_cfr, int seed,
                    bool verbose_every_loop) {
 
-  DebugPrintBatchData(*t->batch);
+//  DebugPrintBatchData(*t->batch);
 //  DebugPrintRangeTables(t->tables);
 //  DebugPrintPublicFeatures(t->fixable_trunk_with_oracle->public_leaves());
 
@@ -71,17 +135,20 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   // 1. Create network and optimizer.
   torch::Device device = FindDevice();
   PositionalValueNet model(
-      t->batch->input_size, t->batch->output_size,
-      t->batch->input_size * absl::GetFlag(FLAGS_num_width),
+      t->dims.net_input_size(), t->dims.net_output_size(),
+      t->dims.net_input_size() * absl::GetFlag(FLAGS_num_width),
       absl::GetFlag(FLAGS_num_layers),
       PositionalValueNet::ActivationFunction::kRelu);
   model.to(device);
   torch::optim::Adam optimizer(model.parameters());
 
   // 2. Create trunk net evaluator.
+  BatchData train_batch(absl::GetFlag(FLAGS_batch_size),
+                        t->dims.net_input_size(), t->dims.net_output_size());
+  BatchData eval_batch(1, t->dims.net_input_size(), t->dims.net_output_size());
+
   auto net_evaluator = std::make_shared<NetEvaluator>(
-      &model, &device, t->game, t->infostate_observer,
-      t->tables, t->batch.get());
+      &model, &device, t->tables, &eval_batch, t->dims);
   auto trunk_with_net = std::make_unique<dlcfr::DepthLimitedCFR>(
       t->game, t->trunk_trees, net_evaluator, t->terminal_evaluator,
       t->public_observer,
@@ -91,16 +158,20 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   ortools::SequenceFormLpSpecification whole_game(*t->game, "CLP");
 
   // 4. Make experience replay buffer.
-  ExperienceReplay experience_replay;
+  int buffer_size = t->num_leaves * absl::GetFlag(FLAGS_num_trunks);
+  int num_floats = buffer_size * (t->dims.net_input_size() + t->dims.net_output_size());
+  std::cout << "# Allocating experience replay buffer: "
+            << buffer_size << " sample points (" << num_floats << " floats)"
+            << std::endl;
+  ExperienceReplay experience_replay(buffer_size, t->dims.net_input_size(),
+                                     t->dims.net_output_size());
 
-  const std::string data_generation = absl::GetFlag(FLAGS_data_generation);
-  const bool generate_random = data_generation == "random";
-  const bool generate_dlcfr = data_generation == "dl_cfr";
-  const auto eval_iters = std::vector<int>{1, 2, 5, 10, 20, 50, 100};
-  if (generate_dlcfr) {
-    PrecomputeExperienceReplayForDLCfr(t.get(), &experience_replay,
-                                       &whole_game, eval_iters);
-  }
+  const auto eval_iters = std::vector<int>{1, 2, 5, 10, 20, 50,
+                                           100, 200, 500, 1000};
+  ExpReplayInitPolicy init_policy =
+      GetInitPolicy(absl::GetFlag(FLAGS_data_generation));
+  FillExperienceReplay(init_policy, &experience_replay, t.get(), &whole_game,
+                       eval_iters, rnd_gen);
 
   // 5. The train-eval loop.
   std::cout << "loop,avg_loss,";
@@ -114,16 +185,9 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
     double cumul_loss = 0.;
     std::cout << "# Training  ";
     for (int i = 0; i < train_batches; ++i) {
-      // Generate data.
-      if (generate_random) {
-        GenerateDataRandomRanges(t.get(), rnd_gen);
-      } else if (generate_dlcfr) {
-        experience_replay.SelectRandomExperience(t->batch.get(), rnd_gen);
-      }
-
       // Train using generated data.
-      torch::Tensor loss = TrainNetwork(&model, &device,
-                                        &optimizer, t->batch.get());
+      experience_replay.SampleBatch(&train_batch, rnd_gen);
+      torch::Tensor loss = TrainNetwork(&model, &device, &optimizer, &train_batch);
       cumul_loss += loss.item().to<double>();
       std::cout << '.' << std::flush;
     }

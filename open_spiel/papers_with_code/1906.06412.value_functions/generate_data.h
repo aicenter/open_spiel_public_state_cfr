@@ -27,39 +27,16 @@
 namespace open_spiel {
 namespace papers_with_code {
 
-// Copy non-contiguous vectors using a permutation map.
-// This also converts float <-> double as needed.
-template<typename From, typename To>
-void PlacementCopy(absl::Span<const From> from, absl::Span<To> to,
-                   const std::map<size_t, size_t>& from_to) {
-  for (const auto&[f, t] : from_to) {
-    to[t] = from[f];
-  }
-}
-
 void RandomizeStrategy(std::vector<algorithms::BanditVector>& bandits,
                        std::mt19937& rnd_gen, double prob_pure_strat = 0,
                        double prob_fully_mixed = 0.05);
 
-void GenerateDataRandomRanges(
-    const std::vector<algorithms::dlcfr::RangeTable>& tables,
-    algorithms::dlcfr::DepthLimitedCFR* trunk, BatchData* batch,
-    std::mt19937& rnd_gen, bool verbose = false);
+void GenerateDataRandomRanges(Trunk* trunk, ExperienceReplay* replay,
+                              std::mt19937& rnd_gen);
 
-inline void GenerateDataRandomRanges(Trunk* trunk, std::mt19937& rnd_gen,
-                                     bool verbose = false) {
-  GenerateDataRandomRanges(trunk->tables,
-                           trunk->fixable_trunk_with_oracle.get(),
-                           trunk->batch.get(), rnd_gen, verbose);
-}
-
-void GenerateDataWithDLCfr(Trunk* trunk, std::mt19937& rnd_gen,
-                           int which_iteration);
-
-void PrecomputeExperienceReplayForDLCfr(
-    Trunk* trunk, ExperienceReplay* replay,
-    algorithms::ortools::SequenceFormLpSpecification* whole_game,
-    const std::vector<int>& eval_iters, std::ostream& os = std::cout);
+void GenerateDataDLCfrIterations(
+    Trunk* trunk, ExperienceReplay* replay, int trunk_iters,
+    std::function<void(/*trunk_iter=*/int)> monitor_fn);
 
 }  // papers_with_code
 }  // open_spiel

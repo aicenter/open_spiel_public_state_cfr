@@ -23,26 +23,17 @@ void NetEvaluator::EvaluatePublicState(
   SPIEL_DCHECK_FALSE(context);  // Nets do not use any special context.
   SPIEL_DCHECK_FALSE(state->IsTerminal());
 
-  for (int pl = 0; pl < 2; ++pl) {
-    PlacementCopy<float_tree, float_net>(
-        /*tree=*/ state->ranges[pl],
-        /*net=*/  batch_->ranges_at(state->public_id, pl),
-                  tables_[pl].bijections[state->public_id].tree_to_net());
-  }
+  // TODO: evaluate all public states with a batch.
+  PositionalData point = batch_->point_at(0, dims_);
+  point.Reset();
+  CopyFeatures(state->public_tensor.Tensor(), point);
+  CopyRangesTreeToNet(*state, point, tables_);
 
-  torch::Tensor data = batch_->data_tensor_at(state->public_id).to(*device_);
-  torch::Tensor output = model_->forward(data);
+  torch::Tensor input = point.data.to(*device_);
+  torch::Tensor output = model_->forward(input);
 
-  auto raw_output = (float*) output.data_ptr();
-  for (int pl = 0; pl < 2; ++pl) {
-    const size_t player_offset = batch_->range_offset(pl);
-    absl::Span<const float_net> net_values(&raw_output[player_offset],
-                                           batch_->ranges_size[pl]);
-    PlacementCopy<float_net, float_tree>(
-        /*net= */ net_values,
-        /*tree=*/ absl::MakeSpan(state->values[pl]),
-                  tables_[pl].bijections[state->public_id].net_to_tree());
-  }
+  point.target.copy_(output);
+  CopyValuesNetToTree(point, *state, tables_);
 }
 
 }  // namespace papers_with_code

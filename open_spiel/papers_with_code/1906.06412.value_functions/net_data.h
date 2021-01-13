@@ -15,6 +15,8 @@
 #ifndef OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_NET_BATCH_
 #define OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_NET_BATCH_
 
+#include <iterator>
+
 #include "torch/torch.h"
 
 #include "open_spiel/algorithms/infostate_dl_cfr.h"
@@ -25,110 +27,57 @@ namespace papers_with_code {
 using float_net = float;    // Floats used in the neural network.
 using float_tree = double;  // Floats used in the cfr computation.
 
-struct BatchData {
-  using LeafPublicState = algorithms::dlcfr::LeafPublicState;
+// Our base class.
+// Data points are always a view to the underlying storage,
+// placed within a batch of data.
+struct DataPoint : torch::data::Example<>{
+  using torch::data::Example<>::Example;
+};
 
-  const size_t batch_size;
-  const size_t input_size;
-  const size_t output_size;
-  const size_t public_features_size;
-  const std::array<size_t, 2> ranges_size;
+// Dimensions for the current trunk.
+struct PositionalDataDims {
+  int public_features_size;
+  std::array<int, 2> net_ranges_size;
 
-  std::vector<float_net> data;
-  std::vector<float_net> targets;
-
-  BatchData(const std::vector<LeafPublicState>& states,
-            size_t input_size, size_t output_size,
-            size_t public_features_size, std::array<size_t, 2> ranges_size)
-      : batch_size(states.size()),
-        input_size(input_size), output_size(output_size),
-        public_features_size(public_features_size), ranges_size(ranges_size),
-      // Pre-allocate all vectors.
-        data(batch_size * input_size, 0.),
-        targets(batch_size * output_size, 0.) {
-
-    SPIEL_CHECK_GT(batch_size, 0);
-    SPIEL_CHECK_GT(input_size, 0);
-    SPIEL_CHECK_GT(output_size, 0);
-    SPIEL_CHECK_GT(public_features_size, 0);
-    SPIEL_CHECK_GT(ranges_size[0], 0);
-    SPIEL_CHECK_GT(ranges_size[1], 0);
-
-    for (size_t i = 0; i < states.size(); ++i) {
-      CopyFeatures(i, states[i]);
-    }
+  int net_input_size() const {
+    return public_features_size + net_ranges_size[0] +  net_ranges_size[1];
   }
-
-  // Copy public state features
-  void CopyFeatures(int batch_index, const LeafPublicState& state) {
-    const auto tensor = state.public_tensor.Tensor();
-    std::copy(tensor.begin(), tensor.end(),
-              data.begin() + (batch_index * input_size));
+  int net_output_size() const {
+    return net_ranges_size[0] +  net_ranges_size[1];
   }
-
-  void CopyFrom(const BatchData& other) {
-    SPIEL_CHECK_EQ(batch_size, other.batch_size);
-    SPIEL_CHECK_EQ(input_size, other.input_size);
-    SPIEL_CHECK_EQ(output_size, other.output_size);
-    SPIEL_CHECK_EQ(public_features_size, other.public_features_size);
-    SPIEL_CHECK_EQ(ranges_size, other.ranges_size);
-    data = other.data;
-    targets = other.targets;
+  // Encoding of the input / output -- offsets:
+  constexpr int public_features_offset() const { return 0; }
+  int ranges_offset(Player pl) const {
+    return public_features_size + (pl == 0 ? 0 : net_ranges_size[0]);
   }
-
-  // Zero-out ranges and values, keep the features.
-  void Reset() {
-    for (size_t batch_index = 0; batch_index < batch_size; ++batch_index) {
-      // Ranges are tricky: skip over the public features.
-      size_t begin_offset = batch_index * input_size + public_features_size;
-      size_t end_offset = (batch_index + 1) * input_size;
-      std::fill(data.begin() + begin_offset,
-                data.begin() + end_offset, 0.);
-    }
-    // Values are easy: put zeros everywhere.
-    std::fill(targets.begin(), targets.end(), 0.);
-  }
-
-  torch::Tensor data_tensor() {
-    return at::from_blob((void*) data.data(),
-                         {static_cast<long>(batch_size),
-                          static_cast<long>(input_size)}, at::kFloat);
-  }
-  torch::Tensor targets_tensor() {
-    return at::from_blob((void*) targets.data(),
-                         {static_cast<long>(batch_size),
-                          static_cast<long>(output_size)}, at::kFloat);
-  }
-  torch::Tensor data_tensor_at(int batch_index) {
-    return at::from_blob((void*) &data[batch_index * input_size],
-                         {static_cast<long>(input_size)}, at::kFloat);
-  }
-  absl::Span<float_net> data_at(int batch_index) {
-    return absl::MakeSpan(&data[batch_index * input_size], input_size);
-  }
-  absl::Span<float_net> targets_at(int batch_index) {
-    return absl::MakeSpan(&targets[batch_index * output_size], output_size);
-  }
-  absl::Span<float_net> ranges_at(int batch_index, Player pl) {
-    const size_t offset = range_offset(pl);
-    return absl::MakeSpan(
-        &data[batch_index * input_size + public_features_size + offset],
-        ranges_size[pl]);
-  }
-  absl::Span<float_net> values_at(int batch_index, Player pl) {
-    const size_t offset = values_offset(pl);
-    return absl::MakeSpan(&targets[batch_index * output_size + offset],
-                          ranges_size[pl]);
-  }
-  size_t range_offset(Player pl) const {
-    return pl == 1 ? ranges_size[0] : 0;
-  }
-  size_t values_offset(Player pl) const {
-    return pl == 1 ? ranges_size[0] : 0;
+  int values_offset(Player pl) const {
+    return (pl == 0 ? 0 : net_ranges_size[0]);
   }
 };
 
-void DebugPrintBatchData(const BatchData& batch);
+struct PositionalData final : DataPoint {
+  // Views over the data point for easier manipulation.
+  absl::Span<float_net> public_features;
+  std::array<absl::Span<float_net>, 2> net_ranges;
+  std::array<absl::Span<float_net>, 2> net_values;
+
+  PositionalData(torch::Tensor data, torch::Tensor target,
+                 const PositionalDataDims& dims);
+  void Reset();  // Zeros-out inputs and outputs.
+};
+
+struct BatchData {
+  torch::Tensor data;
+  torch::Tensor target;
+
+  BatchData(int batch_size, int input_size, int output_size);
+  void Reset();
+  int size() const;
+
+  // Views for individual data points.
+  PositionalData point_at(int index, const PositionalDataDims& dims);
+};
+
 
 }  // namespace papers_with_code
 }  // namespace open_spiel

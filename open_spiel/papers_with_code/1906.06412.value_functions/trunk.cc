@@ -59,55 +59,86 @@ Trunk::Trunk(const std::string& game_name, int depth, std::string use_bandits_fo
                              fixable_trunk_with_oracle->public_leaves());
   const dlcfr::LeafPublicState& some_leaf =
       fixable_trunk_with_oracle->public_leaves().at(0);
-  const size_t encoding_size = some_leaf.public_tensor.Tensor().size();
-  std::array<size_t, 2> ranges_size = {
-      tables[0].largest_range(),
-      tables[1].largest_range()
-  };
-  const size_t range_size_sum = ranges_size[0] + ranges_size[1];
-  const size_t input_size = encoding_size + range_size_sum;
-  const size_t output_size = range_size_sum;
-  batch = std::make_unique<BatchData>(fixable_trunk_with_oracle->public_leaves(),
-                                      input_size, output_size, encoding_size,
-                                      ranges_size);
+
+
+  dims.public_features_size = some_leaf.public_tensor.Tensor().size();
+  for (int pl = 0; pl < 2; ++pl) {
+    dims.net_ranges_size[pl] = tables[pl].largest_range();
+  }
+  num_leaves = fixable_trunk_with_oracle->public_leaves().size();
 }
 
-// Copy generated train data into a network batch.
-void CopyRangesAndValues(dlcfr::DepthLimitedCFR* trunk,
-                         const std::vector<dlcfr::RangeTable>& tables,
-                         BatchData* batch, bool verbose) {
-  const std::vector<dlcfr::LeafPublicState>& leaves = trunk->public_leaves();
-  SPIEL_DCHECK_EQ(batch->batch_size, leaves.size());
-  for (size_t i = 0; i < leaves.size(); ++i) {
-    for (int pl = 0; pl < 2; ++pl) {
-      PlacementCopy<float_tree, float_net>(
-          /*tree=*/ leaves[i].ranges[pl],
-          /*net=*/  batch->ranges_at(i, pl),
-                    tables[pl].bijections[i].tree_to_net());
-      PlacementCopy<float_tree, float_net>(
-          /*tree=*/ leaves[i].values[pl],
-          /*net=*/  batch->values_at(i, pl),
-                    tables[pl].bijections[i].tree_to_net());
-    }
+void AddExperiencesFromTrunk(std::vector<dlcfr::LeafPublicState>& public_leaves,
+                             const std::vector<dlcfr::RangeTable>& tables,
+                             PositionalDataDims dims,
+                             ExperienceReplay* replay) {
+  for (const dlcfr::LeafPublicState& leaf : public_leaves) {
+    PositionalData data_point = replay->AddExperience(dims);
+    data_point.Reset();
+    CopyFeatures(leaf.public_tensor.Tensor(), data_point);
+    CopyDataTreeToNet(leaf, data_point, tables);
   }
+}
 
-  if (verbose) {
-    std::cout << "\n# BatchData copying ranges and values:\n";
-    for (size_t i = 0; i < leaves.size(); ++i) {
-      for (int pl = 0; pl < 1; ++pl) {
-        std::cout << "#   leaves[" << i << "].ranges[" << pl << "]    = "
-                  << leaves[i].ranges[pl] << "\n";
-//        std::cout << "#   batch->ranges_at(" << i << ", " << pl << ") = "
-//                  << batch->ranges_at(i, pl) << "\n";
-        std::cout << "#   leaves[" << i << "].values[" << pl << "]    = "
-                  << leaves[i].values[pl] << "\n";
-//        std::cout << "#   batch->values_at(" << i << ", " << pl << ") = "
-//                  << batch->values_at(i, pl) << "\n";
-      }
-    }
-//    std::cout << "#\n";
-//    std::cout << "#   batch->data    = " << batch->data << "\n";
-//    std::cout << "#   batch->targets = " << batch->targets << "\n";
+void CopyFeatures(absl::Span<const float> features, PositionalData data_point) {
+  std::copy(features.begin(), features.end(),
+            data_point.public_features.begin());
+}
+
+void CopyDataTreeToNet(const dlcfr::LeafPublicState& leaf,
+                       PositionalData data_point,
+                       const std::vector<dlcfr::RangeTable>& tables) {
+  CopyRangesTreeToNet(leaf, data_point, tables);
+  CopyValuesTreeToNet(leaf, data_point, tables);
+}
+
+// Copy non-contiguous vectors using a permutation map.
+// This also converts float <-> double as needed.
+template<typename From, typename To>
+void PlacementCopy(const std::vector<From>& from, absl::Span<To> to,
+                   const std::map<size_t, size_t>& from_to) {
+  for (const auto&[f, t] : from_to) {
+    to[t] = from[f];
+  }
+}
+template<typename From, typename To>
+void PlacementCopy(absl::Span<From> from, std::vector<To>& to,
+                   const std::map<size_t, size_t>& from_to) {
+  for (const auto&[f, t] : from_to) {
+    to[t] = from[f];
+  }
+}
+
+void CopyRangesTreeToNet(const dlcfr::LeafPublicState& leaf,
+                         PositionalData data_point,
+                         const std::vector<dlcfr::RangeTable>& tables) {
+  for (int pl = 0; pl < 2; ++pl) {
+    PlacementCopy<float_tree, float_net>(
+        /*tree=*/ leaf.ranges[pl],
+        /*net=*/  data_point.net_ranges[pl],
+                  tables[pl].bijections[leaf.public_id].tree_to_net());
+  }
+}
+
+void CopyValuesTreeToNet(const dlcfr::LeafPublicState& leaf,
+                         PositionalData data_point,
+                         const std::vector<dlcfr::RangeTable>& tables) {
+  for (int pl = 0; pl < 2; ++pl) {
+    PlacementCopy<float_tree, float_net>(
+        /*tree=*/ leaf.values[pl],
+        /*net=*/  data_point.net_values[pl],
+                  tables[pl].bijections[leaf.public_id].tree_to_net());
+  }
+}
+
+void CopyValuesNetToTree(PositionalData data_point,
+                         dlcfr::LeafPublicState& leaf,
+                         const std::vector<dlcfr::RangeTable>& tables) {
+  for (int pl = 0; pl < 2; ++pl) {
+    PlacementCopy<float_net, float_tree>(
+        /*net=*/  data_point.net_values[pl],
+        /*tree=*/ leaf.values[pl],
+                  tables[pl].bijections[leaf.public_id].net_to_tree());
   }
 }
 

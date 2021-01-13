@@ -66,75 +66,44 @@ void RandomizeStrategy(
 }
 
 
-void GenerateDataRandomRanges(const std::vector<dlcfr::RangeTable>& tables,
-                              dlcfr::DepthLimitedCFR* fixable_trunk_with_oracle, BatchData* batch,
-                              std::mt19937& rnd_gen, bool verbose) {
-  fixable_trunk_with_oracle->Reset();
+void GenerateDataRandomRanges(Trunk* trunk, ExperienceReplay* replay,
+                              std::mt19937& rnd_gen) {
+  trunk->fixable_trunk_with_oracle->Reset();
 
   // Randomize strategy in the trunk.
-  RandomizeStrategy(fixable_trunk_with_oracle->bandits(), rnd_gen);
+  RandomizeStrategy(trunk->fixable_trunk_with_oracle->bandits(), rnd_gen);
   // Compute the reach probs from the trunk.
-  fixable_trunk_with_oracle->UpdateReachProbs();
+  trunk->fixable_trunk_with_oracle->UpdateReachProbs();
   // Do not call bottom-up, just evaluate leaves.
-  fixable_trunk_with_oracle->EvaluateLeaves();
-  // Copy the leaves values to the batch.
-  CopyRangesAndValues(fixable_trunk_with_oracle, tables, batch, verbose);
+  trunk->fixable_trunk_with_oracle->EvaluateLeaves();
+  // Copy the leaves values to the experience replay.
+  AddExperiencesFromTrunk(trunk->fixable_trunk_with_oracle->public_leaves(),
+                          trunk->tables, trunk->dims, replay);
 
-  if (verbose) {
-    for (int i = 0; i < batch->batch_size; ++i) {
-      std::cout << "# Public state " << i << std::endl;
-      std::cout << "#   Inputs:  " << batch->data_at(i) << std::endl;
-      std::cout << "#   Outputs: " << batch->targets_at(i) << std::endl;
-    }
-    std::cout << "\n# ";
-  }
+//  if (verbose) {
+//    for (int i = 0; i < batch->batch_size; ++i) {
+//      std::cout << "# Public state " << i << std::endl;
+//      std::cout << "#   Inputs:  " << batch->data_at(i) << std::endl;
+//      std::cout << "#   Outputs: " << batch->targets_at(i) << std::endl;
+//    }
+//    std::cout << "\n# ";
+//  }
 }
 
 // The network should imitate DL-CFR at each iteration
 // when we use this generation method.
-void GenerateDataWithDLCfr(Trunk* trunk, std::mt19937& rnd_gen,
-                           int which_iteration) {
-  SPIEL_CHECK_GE(which_iteration, 1);
+void GenerateDataDLCfrIterations(
+    Trunk* trunk, ExperienceReplay* replay, int trunk_iters,
+    std::function<void(/*trunk_iter=*/int)> monitor_fn) {
   trunk->iterable_trunk_with_oracle->Reset();
-  trunk->iterable_trunk_with_oracle->RunSimultaneousIterations(which_iteration - 1);
-
-  trunk->iterable_trunk_with_oracle->num_iterations_++;
-  trunk->iterable_trunk_with_oracle->UpdateReachProbs();
-  trunk->iterable_trunk_with_oracle->EvaluateLeaves();
-  CopyRangesAndValues(trunk->iterable_trunk_with_oracle.get(), trunk->tables,
-                      trunk->batch.get(), /*verbose=*/false);
-}
-
-void PrecomputeExperienceReplayForDLCfr(
-    Trunk* trunk, ExperienceReplay* replay,
-    ortools::SequenceFormLpSpecification* whole_game,
-    const std::vector<int>& eval_iters, std::ostream& os) {
-  int trunk_eval_iterations = *std::max_element(eval_iters.begin(),
-                                                eval_iters.end());
-
-  auto should_evaluate = [&](int i){
-      for (auto j : eval_iters) {
-        if (i == j) return true;
-      }
-      return false;
-  };
-
-  os << "# Computing reference exploitabilities for given trunk iterations.\n";
-  trunk->iterable_trunk_with_oracle->Reset();
-  double expl;
-  for (int i = 1; i <= trunk_eval_iterations; ++i) {
+  for (int iter = 1; iter <= trunk_iters; ++iter) {
     ++trunk->iterable_trunk_with_oracle->num_iterations_;
     trunk->iterable_trunk_with_oracle->UpdateReachProbs();
     trunk->iterable_trunk_with_oracle->EvaluateLeaves();
 
-    if (should_evaluate(i)) {
-      expl = ortools::TrunkExploitability(
-          whole_game, *trunk->iterable_trunk_with_oracle->AveragePolicy());
-      os << "# " << i << ": " << "expl = " << expl << std::endl;
-    }
-    CopyRangesAndValues(trunk->iterable_trunk_with_oracle.get(), trunk->tables,
-                        trunk->batch.get(), /*verbose=*/false);
-    replay->buffer.push_back(*trunk->batch);
+    AddExperiencesFromTrunk(trunk->iterable_trunk_with_oracle->public_leaves(),
+                            trunk->tables, trunk->dims, replay);
+    monitor_fn(iter);
 
     trunk->iterable_trunk_with_oracle->UpdateTrunk();
   }

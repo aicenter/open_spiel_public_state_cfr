@@ -18,12 +18,35 @@
 namespace open_spiel {
 namespace papers_with_code {
 
-void ExperienceReplay::SelectRandomExperience(BatchData* write_to,
-                                              std::mt19937& rnd_gen) {
-  SPIEL_CHECK_FALSE(buffer.empty());
-  const int num_batches = buffer.size();
-  int index = std::uniform_int_distribution<>(0, num_batches - 1)(rnd_gen);
-  write_to->CopyFrom(buffer[index]);
+PositionalData ExperienceReplay::AddExperience(const PositionalDataDims& dims) {
+  PositionalData point = point_at(head_, dims);
+  AdvanceHead();
+  return point;
+}
+
+void ExperienceReplay::AdvanceHead() {
+  ++head_;
+  if (head_ >= size()) {
+    head_ = 0;
+    ++overflow_cnt_;
+  }
+}
+
+void ExperienceReplay::SampleBatch(BatchData* batch,
+                                   std::mt19937& rnd_gen) const {
+  // Do not sample non-filled experiences.
+  const int n = overflow_cnt_ == 0 ? head_ : size();
+  const int k = batch->size();
+  SPIEL_CHECK_GE(n, k);
+
+  std::vector<int> perm(n);
+  std::iota(perm.begin(), perm.end(), 0);
+  std::shuffle(perm.begin(), perm.end(), rnd_gen);
+
+  for (int i = 0; i < k; ++i) {
+    batch->data[i].copy_(data[perm[i]]);
+    batch->target[i].copy_(target[perm[i]]);
+  }
 }
 
 }  // papers_with_code

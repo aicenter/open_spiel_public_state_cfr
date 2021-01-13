@@ -19,6 +19,7 @@
 #include "open_spiel/algorithms/infostate_dl_cfr.h"
 #include "open_spiel/algorithms/ortools/dl_oracle_evaluator.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_data.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/experience_replay.h"
 #include "open_spiel/spiel.h"
 
 namespace open_spiel {
@@ -36,7 +37,8 @@ struct Trunk {
   std::unique_ptr<algorithms::dlcfr::DepthLimitedCFR> fixable_trunk_with_oracle;
   std::unique_ptr<algorithms::dlcfr::DepthLimitedCFR> iterable_trunk_with_oracle;
   std::vector<algorithms::dlcfr::RangeTable> tables;
-  std::unique_ptr<BatchData> batch;
+  PositionalDataDims dims;
+  int num_leaves;
 
   Trunk(const std::string& game_name, int trunk_depth,
         std::string use_bandits_for_cfr = "RegretMatchingPlus");
@@ -45,15 +47,31 @@ struct Trunk {
 std::unique_ptr<Trunk> MakeTrunk(const std::string& game_name, int trunk_depth,
     std::string use_bandits_for_cfr = "RegretMatchingPlus");
 
-void CopyRangesAndValues(
-    algorithms::dlcfr::DepthLimitedCFR* trunk,
+void AddExperiencesFromTrunk(
+    std::vector<algorithms::dlcfr::LeafPublicState>& public_leaves,
     const std::vector<algorithms::dlcfr::RangeTable>& tables,
-    BatchData* batch, bool verbose = false);
+    PositionalDataDims dims,
+    ExperienceReplay* replay);
 
-inline void CopyRangesAndValues(Trunk* trunk, bool verbose = false) {
-  CopyRangesAndValues(trunk->fixable_trunk_with_oracle.get(), trunk->tables,
-                      trunk->batch.get(), verbose);
-}
+void CopyFeatures(absl::Span<const float> features, PositionalData data_point);
+
+void CopyDataTreeToNet(const algorithms::dlcfr::LeafPublicState& leaf,
+                       PositionalData data_point,
+                       const std::vector<algorithms::dlcfr::RangeTable>& tables);
+
+void CopyRangesTreeToNet(const algorithms::dlcfr::LeafPublicState& leaf,
+                         PositionalData data_point,
+                         const std::vector<algorithms::dlcfr::RangeTable>& tables);
+
+void CopyValuesTreeToNet(const algorithms::dlcfr::LeafPublicState& leaf,
+                         PositionalData data_point,
+                         const std::vector<algorithms::dlcfr::RangeTable>& tables);
+
+void CopyValuesNetToTree(PositionalData data_point,
+                         algorithms::dlcfr::LeafPublicState& leaf,
+                         const std::vector<algorithms::dlcfr::RangeTable>& tables);
+
+
 
 }  // namespace papers_with_code
 }  // namespace open_spiel

@@ -4,7 +4,7 @@ import pandas as pd
 
 param_sweep = [
   ("a_game_name", ".*"),
-  ("b_depth", "[13-8]"),
+  ("b_depth", "[123-8]"),
   # ("c_trunk_eval_iterations", "[1-8]"),
   ("c_data_generation", "random"),
 ]
@@ -130,6 +130,22 @@ def plot_item(ax, file, display_params, full_params):
             0.0614958,
             0.0177474,
             0.0217346]
+      },
+      "goofspiel(players=2,num_cards=4,imp_info=True,points_order=ascending)": {
+        1: [0.416667,
+            0.138889,
+            0.0373442,
+            0.0264351,
+            0.0202786,
+            0.0141592,
+            0.0104897],
+        2: [0.638889,
+            0.353324,
+            0.18645,
+            0.136918,
+            0.0279113,
+            0.0138864,
+            0.0102248]
       }
     }
 

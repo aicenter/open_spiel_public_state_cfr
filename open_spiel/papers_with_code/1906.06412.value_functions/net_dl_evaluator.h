@@ -27,20 +27,16 @@ namespace papers_with_code {
 class NetEvaluator final : public algorithms::dlcfr::LeafEvaluator {
   ValueNet* model_;
   torch::Device* device_;
-  std::shared_ptr<const Game> game_;
-  std::shared_ptr<Observer> infostate_observer_;
   const std::vector<algorithms::dlcfr::RangeTable>& tables_;
   BatchData* batch_;
+  PositionalDataDims dims_;
 
  public:
   NetEvaluator(ValueNet* model, torch::Device* device,
-               std::shared_ptr<const Game> game,
-               std::shared_ptr<Observer> infostate_observer,
                const std::vector<algorithms::dlcfr::RangeTable>& tables,
-               BatchData* batch)
-      : model_(model), device_(device), game_(std::move(game)),
-        infostate_observer_(std::move(infostate_observer)),
-        tables_(tables), batch_(batch) {}
+               BatchData* batch, const PositionalDataDims& dims)
+      : model_(model), device_(device), tables_(tables), batch_(batch),
+        dims_(dims) {}
 
   void EvaluatePublicState(
       algorithms::dlcfr::LeafPublicState* state,
