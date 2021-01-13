@@ -85,21 +85,20 @@ void FillExperienceReplay(ExpReplayInitPolicy init,
 
       std::cout << "# Computing reference expls for given trunk iterations.\n";
       GenerateDataDLCfrIterations(
-          trunk, experience_replay, trunk_eval_iterations,
-          /*monitor_fn*/[&](int trunk_iter) {
-              bool should_evaluate =
-                  std::find(eval_iters.begin(), eval_iters.end(), trunk_iter)
-                      != eval_iters.end();
+        trunk, experience_replay, trunk_eval_iterations,
+        /*monitor_fn*/[&](int trunk_iter) {
+          bool should_evaluate =
+              std::find(eval_iters.begin(), eval_iters.end(), trunk_iter)
+                  != eval_iters.end();
 
-              if (should_evaluate) {
-                double expl = ortools::TrunkExploitability(
-                    whole_game,
-                    *trunk->iterable_trunk_with_oracle->AveragePolicy());
-                std::cout << "# " << trunk_iter << ": "
-                          << "expl = " << expl << std::endl;
-              }
+          if (should_evaluate) {
+            double expl = ortools::TrunkExploitability(
+                whole_game,
+                *trunk->iterable_trunk_with_oracle->AveragePolicy());
+            std::cout << "# " << trunk_iter << ": "
+                      << "expl = " << expl << std::endl;
           }
-      );
+        });
       break;
     }
 
