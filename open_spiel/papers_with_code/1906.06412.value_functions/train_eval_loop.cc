@@ -140,6 +140,20 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   std::cout << "# Net output size: " << t->dims.net_output_size() << "\n";
   SPIEL_CHECK_GT(t->num_non_terminal_leaves, 0);  // The trunk is too deep?
 
+  const ExpReplayInitPolicy init_policy =
+      GetInitPolicy(absl::GetFlag(FLAGS_data_generation));
+  const std::vector<int> eval_iters =
+      ItersFromString(absl::GetFlag(FLAGS_trunk_eval_iterations));
+  const int num_trunks = init_policy == kGenerateDlcfrIterations
+      ? eval_iters.back()
+      : absl::GetFlag(FLAGS_num_trunks);
+  const int experience_replay_buffer_size =
+      t->num_non_terminal_leaves * num_trunks;
+  const int batch_size = absl::GetFlag(FLAGS_batch_size) > 0
+                   ? absl::GetFlag(FLAGS_batch_size)
+                   : experience_replay_buffer_size;
+  SPIEL_CHECK_GE(experience_replay_buffer_size, batch_size);  // Too big batch?
+
   t->oracle_evaluator->num_cfr_iterations = cfr_oracle_iterations;
   torch::manual_seed(seed);
   std::mt19937 rnd_gen(seed);
@@ -155,11 +169,6 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   torch::optim::Adam optimizer(model.parameters());
 
   // 2. Create trunk net evaluator.
-  int experience_replay_buffer_size =
-      t->num_leaves * absl::GetFlag(FLAGS_num_trunks);
-  int batch_size = absl::GetFlag(FLAGS_batch_size) > 0
-                 ? absl::GetFlag(FLAGS_batch_size)
-                 : experience_replay_buffer_size;
   BatchData train_batch(batch_size,
                         t->dims.net_input_size(), t->dims.net_output_size());
   BatchData eval_batch(1, t->dims.net_input_size(), t->dims.net_output_size());
@@ -175,19 +184,14 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   ortools::SequenceFormLpSpecification whole_game(*t->game, "GLOP");
 
   // 4. Make experience replay buffer.
-  int num_floats = experience_replay_buffer_size
-      * (t->dims.net_input_size() + t->dims.net_output_size());
   std::cout << "# Allocating experience replay buffer: "
+            << experience_replay_buffer_size << " sample points ("
             << experience_replay_buffer_size
-            << " sample points (" << num_floats << " floats)" << std::endl;
+               * (t->dims.net_input_size() + t->dims.net_output_size())
+            << " floats)" << std::endl;
   ExperienceReplay experience_replay(experience_replay_buffer_size,
                                      t->dims.net_input_size(),
                                      t->dims.net_output_size());
-
-  const std::vector<int> eval_iters =
-      ItersFromString(absl::GetFlag(FLAGS_trunk_eval_iterations));
-  ExpReplayInitPolicy init_policy =
-      GetInitPolicy(absl::GetFlag(FLAGS_data_generation));
   FillExperienceReplay(init_policy, &experience_replay, t.get(), &whole_game,
                        eval_iters, rnd_gen);
 
