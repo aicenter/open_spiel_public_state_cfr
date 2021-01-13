@@ -27,7 +27,8 @@ ABSL_FLAG(int, batch_size, 32,
           "Batch size per train step. If <1, then full replay buffer is used.");
 ABSL_FLAG(int, num_loops, 5000, "Number of train-eval loops.");
 ABSL_FLAG(int, cfr_oracle_iterations, 100, "Number of oracle iterations.");
-ABSL_FLAG(int, trunk_eval_iterations, 100, "Number of trunk iterations.");
+ABSL_FLAG(std::string, trunk_eval_iterations, "1,2,5,10,20,50,100,200,500,1000",
+          "List of trunk eval iterations.");
 ABSL_FLAG(int, experience_replay_size, 100, "Number of points to store "
                                              "in the replay buffer.");
 ABSL_FLAG(int, num_layers, 3, "Number of hidden layers.");
@@ -117,9 +118,18 @@ void FillExperienceReplay(ExpReplayInitPolicy init,
   }
 }
 
+std::vector<int> ItersFromString(const std::string& s) {
+  std::vector<std::string> xs = absl::StrSplit(s, ',');
+  std::vector<int> out;
+  for (auto& x : xs) {
+    out.push_back(std::stoi(x));
+  }
+  return out;
+}
+
 void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
-                   int cfr_oracle_iterations, int trunk_eval_iterations,
-                   std::string use_bandits_for_cfr, int seed) {
+                   int cfr_oracle_iterations, std::string use_bandits_for_cfr,
+                   int seed) {
 
   std::cout << "# Number of public states: " << t->num_leaves << "\n";
   std::cout << "# Number of non-terminal public states: "
@@ -174,8 +184,8 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
                                      t->dims.net_input_size(),
                                      t->dims.net_output_size());
 
-  const auto eval_iters = std::vector<int>{1, 2, 5, 10, 20, 50,
-                                           100, 200, 500, 1000};
+  const std::vector<int> eval_iters =
+      ItersFromString(absl::GetFlag(FLAGS_trunk_eval_iterations));
   ExpReplayInitPolicy init_policy =
       GetInitPolicy(absl::GetFlag(FLAGS_data_generation));
   FillExperienceReplay(init_policy, &experience_replay, t.get(), &whole_game,
@@ -230,7 +240,6 @@ int main(int argc, char** argv) {
       absl::GetFlag(FLAGS_train_batches),
       absl::GetFlag(FLAGS_num_loops),
       absl::GetFlag(FLAGS_cfr_oracle_iterations),
-      absl::GetFlag(FLAGS_trunk_eval_iterations),
       absl::GetFlag(FLAGS_use_bandits_for_cfr),
       absl::GetFlag(FLAGS_seed));
 }
