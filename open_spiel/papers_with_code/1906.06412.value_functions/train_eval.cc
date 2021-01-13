@@ -36,7 +36,7 @@ torch::Tensor TrainNetwork(ValueNet* model, torch::Device* device,
 std::vector<double> EvaluateNetwork(
     dlcfr::DepthLimitedCFR* trunk_with_net,
     ortools::SequenceFormLpSpecification* whole_game,
-    std::vector<int> evaluate_iters) {
+    const std::vector<int>& evaluate_iters) {
 
   auto should_evaluate = [&](int i){
     for (auto j : evaluate_iters) {
@@ -58,8 +58,8 @@ std::vector<double> EvaluateNetwork(
     trunk_with_net->EvaluateLeaves();
 
     if (should_evaluate(i)) {
-      expls.push_back(ortools::TrunkExploitability(whole_game,
-                                          *trunk_with_net->AveragePolicy()));
+      expls.push_back(ortools::TrunkExploitability(
+          whole_game, *trunk_with_net->AveragePolicy()));
       std::cout << '.' << std::flush;
     }
 
