@@ -180,7 +180,7 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
       MakeBanditVectors(t->trunk_trees, use_bandits_for_cfr));
 
   // 3. Create the LP spec for the whole game.
-  ortools::SequenceFormLpSpecification whole_game(*t->game, "GLOP");
+  ortools::SequenceFormLpSpecification whole_game(*t->game, "CLP");
 
   // 4. Make experience replay buffer.
   std::cout << "# Allocating experience replay buffer: "
