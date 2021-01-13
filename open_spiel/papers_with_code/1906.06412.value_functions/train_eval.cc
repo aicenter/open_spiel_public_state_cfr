@@ -36,9 +36,10 @@ torch::Tensor TrainNetwork(ValueNet* model, torch::Device* device,
   return loss;
 }
 
-double EvaluateNetwork(dlcfr::DepthLimitedCFR* trunk_with_net,
-                       ortools::SequenceFormLpSpecification* whole_game,
-                       std::vector<int> evaluate_iters) {
+std::vector<double> EvaluateNetwork(
+    dlcfr::DepthLimitedCFR* trunk_with_net,
+    ortools::SequenceFormLpSpecification* whole_game,
+    std::vector<int> evaluate_iters) {
 
   auto should_evaluate = [&](int i){
     for (auto j : evaluate_iters) {
@@ -47,25 +48,28 @@ double EvaluateNetwork(dlcfr::DepthLimitedCFR* trunk_with_net,
     return false;
   };
 
+  std::vector<double> expls;
+  expls.reserve(evaluate_iters.size());
+
   trunk_with_net->Reset();
   int trunk_iters = *std::max_element(evaluate_iters.begin(),
                                       evaluate_iters.end());
-  double expl;
+
   for (int i = 1; i <= trunk_iters; ++i) {
     ++trunk_with_net->num_iterations_;
     trunk_with_net->UpdateReachProbs();
     trunk_with_net->EvaluateLeaves();
 
     if (should_evaluate(i)) {
-      expl = ortools::TrunkExploitability(whole_game,
-                                          *trunk_with_net->AveragePolicy());
-      std::cout << expl << ',';
+      expls.push_back(ortools::TrunkExploitability(whole_game,
+                                          *trunk_with_net->AveragePolicy()));
+      std::cout << '.' << std::flush;
     }
 
     trunk_with_net->UpdateTrunk();
   }
 
-  return expl;
+  return expls;
 }
 
 }  // namespace papers_with_code

@@ -195,8 +195,16 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
 
     // Eval.
     const double avg_loss = cumul_loss / train_batches;
+    std::cout << "# Evaluating  " << std::flush;
+    std::vector<double> evals =
+        EvaluateNetwork(trunk_with_net.get(), &whole_game, eval_iters);
+    std::cout << std::endl;
+
+
     std::cout << loop << ',' << avg_loss << ',';
-    EvaluateNetwork(trunk_with_net.get(), &whole_game, eval_iters);
+    for (float eval : evals) {
+      std::cout << eval << ',';
+    }
     std::cout << std::endl;
   }
 }

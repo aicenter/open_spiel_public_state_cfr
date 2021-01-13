@@ -32,7 +32,7 @@ torch::Tensor TrainNetwork(ValueNet* model, torch::Device* device,
                            torch::optim::Optimizer* optimizer,
                            BatchData* batch);
 
-double EvaluateNetwork(
+std::vector<double> EvaluateNetwork(
     algorithms::dlcfr::DepthLimitedCFR* trunk_with_net,
     algorithms::ortools::SequenceFormLpSpecification* whole_game,
     std::vector<int> evaluate_iters);
