@@ -25,6 +25,11 @@ PositionalData::PositionalData(torch::Tensor data, torch::Tensor target,
   DataPoint(data, target) {
   SPIEL_CHECK_EQ(data.size(0), dims.net_input_size());
   SPIEL_CHECK_EQ(target.size(0), dims.net_output_size());
+  // Make sure the data point is just a view!
+  SPIEL_CHECK_TRUE(data.is_view());
+  SPIEL_CHECK_TRUE(target.is_view());
+  SPIEL_CHECK_TRUE(data.is_contiguous());
+  SPIEL_CHECK_TRUE(target.is_contiguous());
 
   float_net* data_ptr = data.data_ptr<float_net>();
   float_net* target_ptr = target.data_ptr<float_net>();
