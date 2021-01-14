@@ -21,7 +21,8 @@ void NetEvaluator::EvaluatePublicState(
     algorithms::dlcfr::LeafPublicState* state,
     algorithms::dlcfr::PublicStateContext* context) const {
   SPIEL_DCHECK_FALSE(context);  // Nets do not use any special context.
-  SPIEL_DCHECK_FALSE(state->IsTerminal());
+  SPIEL_DCHECK_FALSE(state->IsTerminal());  // Only non-terminal leafs.
+  torch::NoGradGuard no_grad_guard;  // We run only inference.
 
   // TODO: evaluate all public states with a batch.
   PositionalData point = batch_->point_at(0, dims_);
