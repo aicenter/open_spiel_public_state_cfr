@@ -1,16 +1,17 @@
 #!/bin/bash
 
-RESULTS_DIR=experiments/eval_iters
-BINARY="/home/michal/Code/open_spiel/open_spiel/cmake-build-release/papers_with_code/1906.06412.value_functions/train_eval_loop"
+RESULTS_DIR=experiments/eval_iters_refactor
+BINARY="/home/sustr/Code/open_spiel/build/papers_with_code/1906.06412.value_functions/train_eval_loop"
 GAMES=(
   "kuhn_poker"
   "leduc_poker"
   "goofspiel(players=2,num_cards=3,imp_info=True,points_order=ascending)"
-  "goofspiel(players=2,num_cards=4,imp_info=True)"
+  "goofspiel(players=2,num_cards=4,imp_info=True,points_order=ascending)"
 )
-DEPTHS="1 2 3 4 5 6"
+DEPTHS="3 4"
 DATA_GENERATION="random dl_cfr"
-ARGS="--cfr_oracle_iterations=100 --num_loops=200  --use_bandits_for_cfr=\"RegretMatchingPlus\""
+ARGS="--cfr_oracle_iterations=100 --num_loops=200  --use_bandits_for_cfr=\"RegretMatchingPlus\" --trunk_eval_iterations=\"1,2,5,10,20,50,100\" --train_batches=32 --batch_size=128"
+
 let "NPROC=`nproc --all` - 1"
 
 parallel -j $NPROC -v -v --shuf --header --dry-run : --results "$RESULTS_DIR" \
