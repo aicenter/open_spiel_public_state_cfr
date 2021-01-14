@@ -28,9 +28,9 @@
 namespace open_spiel {
 namespace papers_with_code {
 
-torch::Tensor TrainNetwork(ValueNet* model, torch::Device* device,
-                           torch::optim::Optimizer* optimizer,
-                           BatchData* batch);
+double TrainNetwork(ValueNet* model, torch::Device* device,
+                    torch::optim::Optimizer* optimizer,
+                    BatchData* batch);
 
 std::vector<double> EvaluateNetwork(
     algorithms::dlcfr::DepthLimitedCFR* trunk_with_net,

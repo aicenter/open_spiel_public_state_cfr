@@ -25,11 +25,6 @@ PositionalData::PositionalData(torch::Tensor data, torch::Tensor target,
   DataPoint(data, target) {
   SPIEL_CHECK_EQ(data.size(0), dims.net_input_size());
   SPIEL_CHECK_EQ(target.size(0), dims.net_output_size());
-  // Make sure the data point is just a view!
-  SPIEL_CHECK_TRUE(data.is_view());
-  SPIEL_CHECK_TRUE(target.is_view());
-  SPIEL_CHECK_TRUE(data.is_contiguous());
-  SPIEL_CHECK_TRUE(target.is_contiguous());
 
   float_net* data_ptr = data.data_ptr<float_net>();
   float_net* target_ptr = target.data_ptr<float_net>();
@@ -42,11 +37,34 @@ PositionalData::PositionalData(torch::Tensor data, torch::Tensor target,
     net_values[pl] = absl::MakeSpan(&target_ptr[dims.values_offset(pl)],
                                     dims.net_ranges_size[pl]);
   }
+
+  // Make sure the data point is just a view!
+  SPIEL_CHECK_TRUE(is_valid_view());
 }
 
 void PositionalData::Reset() {
   data.zero_();
   target.zero_();
+}
+
+bool PositionalData::is_valid_view() const {
+  float_net* data_ptr = data.data_ptr<float_net>();
+  float_net* target_ptr = target.data_ptr<float_net>();
+
+  return data.is_view()
+      && target.is_view()
+      && data.is_contiguous()
+      && target.is_contiguous()
+      // Dims check
+      && public_features.size() + net_ranges[0].size() + net_ranges[1].size()
+         == data.sizes()[0]
+      && net_values[0].size() + net_values[1].size() == target.sizes()[0]
+      // Pointers check
+      && data_ptr == public_features.data()
+      && &data_ptr[public_features.size()] == net_ranges[0].data()
+      && &data_ptr[public_features.size() + net_ranges[0].size()] == net_ranges[1].data()
+      && target_ptr == net_values[0].data()
+      && &target_ptr[net_values[0].size()] == net_values[1].data();
 }
 
 BatchData::BatchData(int batch_size, int input_size, int output_size)

@@ -19,7 +19,7 @@ namespace papers_with_code {
 
 using namespace algorithms;
 
-torch::Tensor TrainNetwork(ValueNet* model, torch::Device* device,
+double TrainNetwork(ValueNet* model, torch::Device* device,
                            torch::optim::Optimizer* optimizer,
                            BatchData* batch) {
   torch::Tensor data = batch->data.to(*device);
@@ -30,7 +30,7 @@ torch::Tensor TrainNetwork(ValueNet* model, torch::Device* device,
   SPIEL_CHECK_FALSE(std::isnan(loss.template item<float>()));
   loss.backward();
   optimizer->step();
-  return loss;
+  return loss.item().to<double>();
 }
 
 std::vector<double> EvaluateNetwork(

@@ -79,6 +79,7 @@ void AddExperiencesFromTrunk(std::vector<dlcfr::LeafPublicState>& public_leaves,
   for (const dlcfr::LeafPublicState& leaf : public_leaves) {
     if (leaf.IsTerminal()) continue;  // Add experiences only for non-terminals.
     PositionalData data_point = replay->AddExperience(dims);
+    SPIEL_DCHECK_TRUE(data_point.is_valid_view());
     data_point.Reset();
     CopyFeatures(leaf.public_tensor.Tensor(), data_point);
     CopyDataTreeToNet(leaf, data_point, tables);

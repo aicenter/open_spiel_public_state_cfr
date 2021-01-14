@@ -210,18 +210,7 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
     for (int i = 0; i < train_batches; ++i) {
       // Train using generated data.
       experience_replay.SampleBatch(&train_batch, rnd_gen);
-//      torch::Tensor loss = TrainNetwork(&model, &device,
-//                                        &optimizer, &train_batch);
-
-      torch::Tensor data = train_batch.data.to(device);
-      torch::Tensor target = train_batch.target.to(device);
-      optimizer.zero_grad();
-      output = model.forward(data);
-      loss = torch::mse_loss(output, target);
-      SPIEL_CHECK_FALSE(std::isnan(loss.template item<float>()));
-      loss.backward();
-      optimizer.step();
-      cumul_loss += loss.item().to<double>();
+      cumul_loss += TrainNetwork(&model, &device, &optimizer, &train_batch);
       std::cout << '.' << std::flush;
     }
     std::cout << std::endl;

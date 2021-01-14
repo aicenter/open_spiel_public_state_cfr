@@ -26,13 +26,14 @@ void NetEvaluator::EvaluatePublicState(
 
   // TODO: evaluate all public states with a batch.
   PositionalData point = batch_->point_at(0, dims_);
+  SPIEL_DCHECK_TRUE(point.is_valid_view());
   point.Reset();
   CopyFeatures(state->public_tensor.Tensor(), point);
   CopyRangesTreeToNet(*state, point, tables_);
 
   torch::Tensor input = point.data.to(*device_);
   torch::Tensor output = model_->forward(input);
-
+  SPIEL_DCHECK_EQ(output.sizes(), point.target.sizes());
   point.target.copy_(output);
   CopyValuesNetToTree(point, *state, tables_);
 }

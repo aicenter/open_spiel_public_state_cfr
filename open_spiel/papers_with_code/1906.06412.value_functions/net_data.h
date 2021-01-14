@@ -64,6 +64,10 @@ struct PositionalData final : DataPoint {
   PositionalData(torch::Tensor data, torch::Tensor target,
                  const PositionalDataDims& dims);
   void Reset();  // Zeros-out inputs and outputs.
+
+  // Check if the data point is still a valid view:
+  // no tensor pointers or spans are broken.
+  bool is_valid_view() const;
 };
 
 struct BatchData {
