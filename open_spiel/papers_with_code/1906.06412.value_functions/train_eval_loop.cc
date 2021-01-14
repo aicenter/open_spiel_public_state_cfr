@@ -202,26 +202,37 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   std::cout << std::endl;
 
   for (int loop = 0; loop < num_loops; ++loop) {
-    // Train.
-    double cumul_loss = 0.;
+    model.train();  // Train mode.
     std::cout << "# Training  ";
+
+    double cumul_loss = 0.;
+    torch::Tensor output, loss;
     for (int i = 0; i < train_batches; ++i) {
       // Train using generated data.
       experience_replay.SampleBatch(&train_batch, rnd_gen);
-      torch::Tensor loss = TrainNetwork(&model, &device, &optimizer, &train_batch);
+//      torch::Tensor loss = TrainNetwork(&model, &device,
+//                                        &optimizer, &train_batch);
+
+      torch::Tensor data = train_batch.data.to(device);
+      torch::Tensor target = train_batch.target.to(device);
+      optimizer.zero_grad();
+      output = model.forward(data);
+      loss = torch::mse_loss(output, target);
+      SPIEL_CHECK_FALSE(std::isnan(loss.template item<float>()));
+      loss.backward();
+      optimizer.step();
       cumul_loss += loss.item().to<double>();
       std::cout << '.' << std::flush;
     }
     std::cout << std::endl;
 
-    // Eval.
-    const double avg_loss = cumul_loss / train_batches;
+    model.eval();  // Eval mode.
     std::cout << "# Evaluating  " << std::flush;
-    std::vector<double> evals =
-        EvaluateNetwork(trunk_with_net.get(), &whole_game, eval_iters);
+    std::vector<double> evals = EvaluateNetwork(trunk_with_net.get(),
+                                                &whole_game, eval_iters);
     std::cout << std::endl;
 
-
+    const double avg_loss = cumul_loss / train_batches;
     std::cout << loop << ',' << avg_loss << ',';
     for (float eval : evals) {
       std::cout << eval << ',';

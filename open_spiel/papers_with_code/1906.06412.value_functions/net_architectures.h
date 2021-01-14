@@ -49,9 +49,11 @@ struct PositionalValueNet final : public ValueNet {
     }
   }
 
-  torch::Tensor forward(torch::Tensor x) {
+  torch::Tensor forward(torch::Tensor input) {
     int num_layers_with_activation = fc_layers.size() - 1;
-    for (int i = 0; i < num_layers_with_activation; ++i) {
+    torch::Tensor x = torch::relu(fc_layers[0]->forward(input));
+
+    for (int i = 1; i < num_layers_with_activation; ++i) {
       x = fc_layers[i]->forward(x);
       switch (activation_fn) {
         case kNone:
@@ -71,6 +73,8 @@ struct PositionalValueNet final : public ValueNet {
     return fc_layers.back()->forward(x);
   }
 };
+
+//TORCH_MODULE_IMPL(PositionalValueNet, PositionalValueNetImpl);
 
 }  // namespace papers_with_code
 }  // namespace open_spiel
