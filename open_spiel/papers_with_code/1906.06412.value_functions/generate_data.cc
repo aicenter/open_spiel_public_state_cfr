@@ -59,9 +59,9 @@ void AssignMixedStrategy(absl::Span<double> policy, std::mt19937& rnd_gen,
   }
 }
 
-void RandomizeStrategy(
-    std::vector<BanditVector>& bandits, std::mt19937& rnd_gen,
-    double prob_pure_strat, double prob_fully_mixed) {
+void RandomizeStrategy(std::vector<BanditVector>& bandits,
+                       double prob_pure_strat, double prob_fully_mixed,
+                       std::mt19937& rnd_gen) {
   for (int pl = 0; pl < 2; ++pl) {
     for (DecisionId id : bandits[pl].range()) {
       // Randomize current policy
@@ -85,11 +85,13 @@ void RandomizeStrategy(
 
 
 void GenerateDataRandomRanges(Trunk* trunk, ExperienceReplay* replay,
+                              double prob_pure_strat, double prob_fully_mixed,
                               std::mt19937& rnd_gen) {
   trunk->fixable_trunk_with_oracle->Reset();
 
   // Randomize strategy in the trunk.
-  RandomizeStrategy(trunk->fixable_trunk_with_oracle->bandits(), rnd_gen);
+  RandomizeStrategy(trunk->fixable_trunk_with_oracle->bandits(),
+                    prob_pure_strat, prob_fully_mixed, rnd_gen);
   // Compute the reach probs from the trunk.
   trunk->fixable_trunk_with_oracle->UpdateReachProbs();
   // Do not call bottom-up, just evaluate leaves.

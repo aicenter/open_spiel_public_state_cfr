@@ -37,6 +37,8 @@ ABSL_FLAG(int, seed, 0, "Seed.");
 ABSL_FLAG(std::string, use_bandits_for_cfr, "PredictiveRegretMatchingPlus",
           "Which bandit should be used in the trunk.");
 ABSL_FLAG(std::string, data_generation, "random", "One of random,dl_cfr");
+ABSL_FLAG(double, prob_pure_strat, 0.1, "Params for random generation.");
+ABSL_FLAG(double, prob_fully_mixed, 0.05, "Params for random generation.");
 
 // -----------------------------------------------------------------------------
 
@@ -104,7 +106,10 @@ void FillExperienceReplay(ExpReplayInitPolicy init,
       std::cout << "# Generating random trunks to fill experience replay.\n# ";
       for (int i = 0; i < absl::GetFlag(FLAGS_num_trunks); ++i) {
         if (i % 10 == 0) std::cout << '.' << std::flush;
-        GenerateDataRandomRanges(trunk, experience_replay, rnd_gen);
+        GenerateDataRandomRanges(trunk, experience_replay,
+                                 absl::GetFlag(FLAGS_prob_pure_strat),
+                                 absl::GetFlag(FLAGS_prob_fully_mixed),
+                                 rnd_gen);
       }
       std::cout << std::endl;
       break;
