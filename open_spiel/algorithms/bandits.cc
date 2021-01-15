@@ -149,6 +149,74 @@ void RegretMatchingPlus::Reset() {
   std::fill(cumulative_strategy_.begin(), cumulative_strategy_.end(), 0.);
 }
 
+// -- RegretMatchingPlus -------------------------------------------------------
+
+RMPlusWithEps::RMPlusWithEps(int num_actions)
+    : Bandit(num_actions),
+      cumulative_regrets_(num_actions, 0.),
+      cumulative_strategy_(num_actions, 0.) {}
+
+void RMPlusWithEps::ComputeStrategy(size_t current_time, double weight) {
+  double positive_regrets_sum = 0.;
+  for (double regret : cumulative_regrets_) {
+    positive_regrets_sum += regret > 0. ? regret : 0.;
+  }
+
+  if (positive_regrets_sum) {
+    const double epsilon_combination = 0.001;
+    for (int i = 0; i < num_actions(); ++i) {
+      const double regret = cumulative_regrets_[i];
+      current_strategy_[i] =
+          ((regret > 0. ? regret : 0.) / positive_regrets_sum) * (1 - epsilon_combination)
+          + (1. / num_actions()) * epsilon_combination;
+    }
+  } else {
+    for (int i = 0; i < num_actions(); ++i) {
+      current_strategy_[i] = 1. / num_actions();
+    }
+  }
+
+  for (int i = 0; i < num_actions(); ++i) {
+    cumulative_strategy_[i] += current_time * weight * current_strategy_[i];
+  }
+}
+
+void RMPlusWithEps::ObserveRewards(absl::Span<const double> rewards) {
+  SPIEL_DCHECK_EQ(rewards.size(), num_actions());
+  double expected_reward = 0.;
+  for (int i = 0; i < num_actions(); ++i) {
+    expected_reward += rewards[i] * current_strategy_[i];
+  }
+  for (int i = 0; i < num_actions(); ++i) {
+    cumulative_regrets_[i] =
+        std::fmax(0, cumulative_regrets_[i] + rewards[i] - expected_reward);
+  }
+}
+
+std::vector<double> RMPlusWithEps::AverageStrategy() const {
+  std::vector<double> strategy;
+  strategy.reserve(num_actions());
+  double normalization = 0.;
+  for (double action : cumulative_strategy_) normalization += action;
+
+  if (normalization) {
+    for (int i = 0; i < num_actions(); ++i) {
+      strategy.push_back(cumulative_strategy_[i] / normalization);
+    }
+  } else {
+    for (int i = 0; i < num_actions(); ++i) {
+      strategy.push_back(1. / num_actions());
+    }
+  }
+  return strategy;
+}
+
+void RMPlusWithEps::Reset() {
+  Bandit::Reset();
+  std::fill(cumulative_regrets_.begin(), cumulative_regrets_.end(), 0.);
+  std::fill(cumulative_strategy_.begin(), cumulative_strategy_.end(), 0.);
+}
+
 // -- ConstrainedRMPlus -------------------------------------------------------
 
 ConstrainedRMPlus::ConstrainedRMPlus(int num_actions)
@@ -413,6 +481,9 @@ std::unique_ptr<bandits::Bandit> MakeBandit(
   }
   if (bandit_name == "RegretMatchingPlus") {
     return std::make_unique<bandits::RegretMatchingPlus>(num_actions);
+  }
+  if (bandit_name == "RMPlusWithEps") {
+    return std::make_unique<bandits::RMPlusWithEps>(num_actions);
   }
   if (bandit_name == "ConstrainedRMPlus") {
     return std::make_unique<bandits::ConstrainedRMPlus>(num_actions);
