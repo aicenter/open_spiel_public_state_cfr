@@ -29,8 +29,6 @@ ABSL_FLAG(int, num_loops, 5000, "Number of train-eval loops.");
 ABSL_FLAG(int, cfr_oracle_iterations, 100, "Number of oracle iterations.");
 ABSL_FLAG(std::string, trunk_eval_iterations, "1,2,5,10,20,50,100,200,500,1000",
           "List of trunk eval iterations.");
-ABSL_FLAG(int, experience_replay_size, 100, "Number of points to store "
-                                             "in the replay buffer.");
 ABSL_FLAG(int, num_layers, 3, "Number of hidden layers.");
 ABSL_FLAG(int, num_width, 3, "Multiplicative constant of the number "
                              "of neurons per layer.");

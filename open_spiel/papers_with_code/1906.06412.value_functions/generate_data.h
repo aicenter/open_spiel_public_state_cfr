@@ -28,7 +28,8 @@ namespace open_spiel {
 namespace papers_with_code {
 
 void RandomizeStrategy(std::vector<algorithms::BanditVector>& bandits,
-                       std::mt19937& rnd_gen, double prob_pure_strat = 0,
+                       std::mt19937& rnd_gen,
+                       double prob_pure_strat = 0.0,
                        double prob_fully_mixed = 0.05);
 
 void GenerateDataRandomRanges(Trunk* trunk, ExperienceReplay* replay,
