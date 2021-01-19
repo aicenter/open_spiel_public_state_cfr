@@ -1,4 +1,5 @@
 import torch
+import sys
 
 # A test to learn a linear mapping from R^m -> R^m:
 # Unlike a usual linear regression, we ask to predict each of the output values
@@ -31,8 +32,8 @@ import torch
 torch.manual_seed(42)
 
 # dim_b = 2            # Test batch size.
-dim_b = 1000         # Batch size.
-dim_m = 4
+dim_b = 5000         # Batch size.
+dim_m = 20
 dim_q = dim_m * 2    # Positioned value and a binary mask.
 dim_c = dim_m        # Size of the contextual embedding.
 min_seq_len = dim_m  # Minimal subset size of queries.
@@ -68,7 +69,7 @@ def make_particle_data(num_points=dim_b, min_seq_len=dim_m, f=linear, permute=Tr
   x = torch.rand((num_points, dim_m))
   y = f(x)                           ; assert y.shape == (num_points, dim_m)
 
-  seq_lens = torch.randint(low=min_seq_len, high=dim_m + 1, size=(dim_b,))
+  seq_lens = torch.randint(low=min_seq_len, high=min_seq_len + 1, size=(dim_b,))
   # We will use only seq_lens, but we align to full sequence for xs.
   xs = make_query(x)                 ; assert xs.shape == (num_points, dim_m, dim_q)
   ys = y.unsqueeze(dim=2)            ; assert ys.shape == (num_points, dim_m, 1)
@@ -119,7 +120,7 @@ def linear_model_experiment():
       with torch.no_grad():
         Y_test_pred = model.forward(X_test)
         test_loss = loss_fn(Y_test, Y_test_pred)
-        print(i, train_loss.item(), test_loss.item())
+        print(f"{i},{train_loss.item()},{test_loss.item()}")
 
 
 class PieceWiseLinearModel(torch.nn.Module):
@@ -155,10 +156,8 @@ def pw_linear_model_experiment():
       with torch.no_grad():
         Y_test_pred = model.forward(X_test)
         test_loss = loss_fn(Y_test, Y_test_pred)
-        print(i, train_loss.item(), test_loss.item())
+        print(f"{i},{train_loss.item()},{test_loss.item()}")
     i += 1
-
-
 
 
 class ContextualModel(torch.nn.Module):
@@ -271,19 +270,20 @@ class ParticleModel(torch.nn.Module):
     return self.regression(batches)
 
 
-def particle_model_experiment():
+def particle_model_experiment(num_particles):
   model = ParticleModel()
   optimizer = torch.optim.Adam(model.parameters(), lr=0.05)
   lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(
       optimizer=optimizer, gamma=0.95)
   loss_fn = torch.nn.MSELoss()
 
-  X_train, Y_train, X_train_seq_lens = make_particle_data()
-  X_test, Y_test, X_test_seq_lens = make_particle_data()
+  X_train, Y_train, X_train_seq_lens = make_particle_data(
+      num_points=dim_b, min_seq_len=num_particles)
+  X_test, Y_test, X_test_seq_lens = make_particle_data(
+      num_points=dim_b, min_seq_len=num_particles)
 
   try:
-    i = 0
-    while (True):
+    for i in range(10000):
       optimizer.zero_grad()
       Y_train_pred = model.forward(X_train, X_train_seq_lens)
       Y_train_subset = subset_of_targets(Y_train, X_train_seq_lens)
@@ -298,14 +298,19 @@ def particle_model_experiment():
           Y_test_pred = model.forward(X_test, X_test_seq_lens)
           Y_test_subset = subset_of_targets(Y_test, X_test_seq_lens)
           test_loss = loss_fn(Y_test_subset, Y_test_pred)
-          print(i, train_loss.item(), test_loss.item())
-      i += 1
+          print(f"{i},{train_loss.item()},{test_loss.item()}")
   except KeyboardInterrupt:
     print("Interrupted particle_model_experiment!")
 
 
 if __name__ == '__main__':
+  import argparse
+  parser = argparse.ArgumentParser()
+  parser.add_argument("--num_particles", type=int)
+  args = parser.parse_args()
+
+  print("steps,train_loss,test_loss")
+  particle_model_experiment(args.num_particles)
   # linear_model_experiment()
   # contextual_model_experiment()
-  particle_model_experiment()
   # pw_linear_model_experiment()
