@@ -20,11 +20,16 @@ namespace papers_with_code {
 const torch::TensorOptions kDataPointOptions = torch::TensorOptions()
     .dtype<float_net>();
 
+void DataPoint::Reset() {
+  data.zero_();
+  target.zero_();
+}
+
 PositionalData::PositionalData(torch::Tensor data, torch::Tensor target,
                                const PositionalDataDims& dims) :
   DataPoint(data, target) {
-  SPIEL_CHECK_EQ(data.size(0), dims.net_input_size());
-  SPIEL_CHECK_EQ(target.size(0), dims.net_output_size());
+  SPIEL_CHECK_EQ(data.size(0), dims.point_input_size());
+  SPIEL_CHECK_EQ(target.size(0), dims.point_output_size());
 
   float_net* data_ptr = data.data_ptr<float_net>();
   float_net* target_ptr = target.data_ptr<float_net>();
@@ -40,11 +45,6 @@ PositionalData::PositionalData(torch::Tensor data, torch::Tensor target,
 
   // Make sure the data point is just a view!
   SPIEL_CHECK_TRUE(is_valid_view());
-}
-
-void PositionalData::Reset() {
-  data.zero_();
-  target.zero_();
 }
 
 bool PositionalData::is_valid_view() const {
@@ -67,6 +67,53 @@ bool PositionalData::is_valid_view() const {
       && &target_ptr[net_values[0].size()] == net_values[1].data();
 }
 
+
+ParticleData::ParticleData(torch::Tensor data, torch::Tensor target,
+                           const ParticleDataDims& particle_dims) :
+    DataPoint(data, target), dims(particle_dims) {
+  // Make sure the data point is just a view!
+  SPIEL_CHECK_TRUE(is_valid_view());
+}
+
+bool ParticleData::is_valid_view() const {
+  return data.is_view()
+      && target.is_view()
+      && data.is_contiguous()
+      && target.is_contiguous()
+      && data.dim() == 1
+      && target.dim() == 1
+      && data.size(0) == dims.point_input_size()
+      && target.size(0) == dims.point_output_size();
+}
+
+float_net& ParticleData::num_particles() {
+  return data_ptr()[dims.num_particles_offset()];
+}
+
+absl::Span<float_net> ParticleData::particle_public_features(int particle) {
+  return absl::MakeSpan(
+      &particle_data_ptr(particle)[dims.public_features_offset()],
+      dims.public_features_size);
+}
+
+absl::Span<float_net> ParticleData::particle_hand_features(int particle) {
+  return absl::MakeSpan(
+      &particle_data_ptr(particle)[dims.hand_features_offset()],
+      dims.hand_features_size);
+}
+
+absl::Span<float_net> ParticleData::particle_player_features(int particle) {
+  return absl::MakeSpan(&particle_data_ptr(particle)[dims.player_offset()], 2);
+}
+
+float& ParticleData::particle_range(int particle) {
+  return particle_data_ptr(particle)[dims.range_offset()];
+}
+
+float& ParticleData::particle_value(int particle) {
+  return target_ptr()[particle];
+}
+
 BatchData::BatchData(int batch_size, int input_size, int output_size)
     : // Pre-allocate all tensors.
       data(torch::empty({batch_size, input_size}, kDataPointOptions)),
@@ -78,6 +125,10 @@ BatchData::BatchData(int batch_size, int input_size, int output_size)
 
 PositionalData BatchData::point_at(int index, const PositionalDataDims& dims) {
   return PositionalData(data[index], target[index], dims);
+}
+
+ParticleData BatchData::point_at(int index, const ParticleDataDims& dims) {
+  return ParticleData(data[index], target[index], dims);
 }
 
 void BatchData::Reset() {

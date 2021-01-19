@@ -138,8 +138,8 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
             << t->num_non_terminal_leaves << "\n";
   std::cout << "# Public features: " << t->dims.public_features_size << "\n";
   std::cout << "# Ranges size: " << t->dims.net_ranges_size << "\n";
-  std::cout << "# Net input size: " << t->dims.net_input_size() << "\n";
-  std::cout << "# Net output size: " << t->dims.net_output_size() << "\n";
+  std::cout << "# Net input size: " << t->dims.point_input_size() << "\n";
+  std::cout << "# Net output size: " << t->dims.point_output_size() << "\n";
   SPIEL_CHECK_GT(t->num_non_terminal_leaves, 0);  // The trunk is too deep?
 
   const ExpReplayInitPolicy init_policy =
@@ -163,8 +163,8 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   // 1. Create network and optimizer.
   torch::Device device = FindDevice();
   PositionalValueNet model(
-      t->dims.net_input_size(), t->dims.net_output_size(),
-      t->dims.net_input_size() * absl::GetFlag(FLAGS_num_width),
+      t->dims.point_input_size(), t->dims.point_output_size(),
+      t->dims.point_input_size() * absl::GetFlag(FLAGS_num_width),
       absl::GetFlag(FLAGS_num_layers),
       PositionalValueNet::ActivationFunction::kRelu);
   model.to(device);
@@ -172,8 +172,9 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
 
   // 2. Create trunk net evaluator.
   BatchData train_batch(batch_size,
-                        t->dims.net_input_size(), t->dims.net_output_size());
-  BatchData eval_batch(1, t->dims.net_input_size(), t->dims.net_output_size());
+                        t->dims.point_input_size(), t->dims.point_output_size());
+  BatchData eval_batch(1, t->dims.point_input_size(),
+                       t->dims.point_output_size());
 
   auto net_evaluator = std::make_shared<NetEvaluator>(
       &model, &device, t->tables, &eval_batch, t->dims);
@@ -189,11 +190,11 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   std::cout << "# Allocating experience replay buffer: "
             << experience_replay_buffer_size << " sample points ("
             << experience_replay_buffer_size
-               * (t->dims.net_input_size() + t->dims.net_output_size())
+               * (t->dims.point_input_size() + t->dims.point_output_size())
             << " floats)" << std::endl;
   ExperienceReplay experience_replay(experience_replay_buffer_size,
-                                     t->dims.net_input_size(),
-                                     t->dims.net_output_size());
+                                     t->dims.point_input_size(),
+                                     t->dims.point_output_size());
   FillExperienceReplay(init_policy, &experience_replay, t.get(), &whole_game,
                        eval_iters, rnd_gen);
 
