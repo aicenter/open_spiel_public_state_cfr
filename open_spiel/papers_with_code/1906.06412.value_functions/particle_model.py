@@ -122,6 +122,45 @@ def linear_model_experiment():
         print(i, train_loss.item(), test_loss.item())
 
 
+class PieceWiseLinearModel(torch.nn.Module):
+  def __init__(self):
+    super(PieceWiseLinearModel, self).__init__()
+    self.fc_1 = torch.nn.Linear(dim_m, dim_m * 3)
+    self.fc_2 = torch.nn.Linear(3 * dim_m, dim_m * 3)
+    self.fc_3 = torch.nn.Linear(3 * dim_m, dim_m)
+
+  def forward(self, x):
+    x = torch.relu(self.fc_1.forward(x))
+    x = torch.relu(self.fc_2.forward(x))
+    return self.fc_3.forward(x)
+
+
+
+def pw_linear_model_experiment():
+  model = PieceWiseLinearModel()
+  optimizer = torch.optim.Adam(model.parameters(), lr=0.1)
+  loss_fn = torch.nn.MSELoss()
+
+  X_train, Y_train = make_data(dim_b, piece_wise_linear)
+  X_test, Y_test = make_data(dim_b, piece_wise_linear)
+
+  i = 0
+  while(True):
+    optimizer.zero_grad()
+    Y_train_pred = model.forward(X_train)
+    train_loss = loss_fn(Y_train, Y_train_pred)
+    train_loss.backward()
+    optimizer.step()
+    if i % 100 == 0:
+      with torch.no_grad():
+        Y_test_pred = model.forward(X_test)
+        test_loss = loss_fn(Y_test, Y_test_pred)
+        print(i, train_loss.item(), test_loss.item())
+    i += 1
+
+
+
+
 class ContextualModel(torch.nn.Module):
   def __init__(self):
     super(ContextualModel, self).__init__()
@@ -186,10 +225,12 @@ def contextual_model_experiment():
   except KeyboardInterrupt:
     print("Interrupted contextual_model_experiment!")
 
+
 class ParticleModel(torch.nn.Module):
   def __init__(self):
     super(ParticleModel, self).__init__()
     self.fc_context_regression = torch.nn.Linear(dim_c, dim_m, bias=False)
+    self.fc_query = torch.nn.Linear(dim_q, dim_m, bias=False)
     self.fc_kernel = torch.nn.Linear(dim_q, dim_c, bias=False)
     self.register_parameter("proj", torch.nn.Parameter(torch.randn(dim_c, dim_q)))
 
@@ -208,10 +249,8 @@ class ParticleModel(torch.nn.Module):
     contexts = xs[:, :dim_c]                           ; assert contexts.shape == (dim_b, dim_c)
     queries = xs[:, dim_c:]                            ; assert queries.shape  == (dim_b, dim_q)
     cs = self.fc_context_regression(contexts)          ; assert cs.shape       == (dim_b, dim_m)
-    cs = cs.unsqueeze(dim=1)                           ; assert cs.shape       == (dim_b, 1, dim_c)
-    qs = queries.unsqueeze(dim=2)                      ; assert qs.shape       == (dim_b, dim_q, 1)
-    proj = self.proj.expand(dim_b, *self.proj.shape)   ; assert proj.shape     == (dim_b, dim_c, dim_q)
-    ys = cs.bmm(proj).bmm(qs).squeeze(dim=2)           ; assert ys.shape       == (dim_b, 1)
+    qs = self.fc_query(queries)                        ; assert qs.shape       == (dim_b, dim_m)
+    ys = (cs * qs).sum(dim=1).unsqueeze(dim=1)         ; assert ys.shape       == (dim_b, 1)
     return ys
 
   def forward(self, xss, seq_lengths):
@@ -267,5 +306,6 @@ def particle_model_experiment():
 
 if __name__ == '__main__':
   # linear_model_experiment()
-  contextual_model_experiment()
-  # particle_model_experiment()
+  # contextual_model_experiment()
+  particle_model_experiment()
+  # pw_linear_model_experiment()
