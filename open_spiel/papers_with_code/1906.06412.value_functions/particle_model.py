@@ -39,13 +39,22 @@ min_seq_len = dim_m  # Minimal subset size of queries.
 
 # Make some random instance which we want to fit.
 A = torch.rand((dim_m, dim_m))
+As = torch.rand((10, dim_m, dim_m))
 
-
-def make_data(num_points=dim_b):
-  xs = torch.rand((num_points, dim_m))
+def linear(xs):
   ys = A @ xs.T
   # Put batch dim always to the front!
-  ys = ys.T                            ; assert ys.shape == (num_points, dim_m)
+  return ys.T
+
+def piece_wise_linear(xs):
+  ys = torch.empty(dim_b, dim_m, As.shape[0])
+  for i, A in enumerate(As.split(1, dim=0)):
+    ys[:, :, i] = (A @ xs.T).T.squeeze(dim=2)
+  return ys.max(dim=2).values
+
+def make_data(num_points=dim_b, f=linear):
+  xs = torch.rand((num_points, dim_m))
+  ys = f(xs)                       ; assert ys.shape == (num_points, dim_m)
   return xs, ys
 
 
@@ -55,11 +64,9 @@ def make_query(x):
   return torch.cat((diags, eyes), dim=2)
 
 
-def make_particle_data(num_points=dim_b, min_seq_len=dim_m):
+def make_particle_data(num_points=dim_b, min_seq_len=dim_m, f=linear, permute=True):
   x = torch.rand((num_points, dim_m))
-  y = A @ x.T
-  # Put batch dim always to the front!
-  y = y.T                            ; assert y.shape == (num_points, dim_m)
+  y = f(x)                           ; assert y.shape == (num_points, dim_m)
 
   seq_lens = torch.randint(low=min_seq_len, high=dim_m + 1, size=(dim_b,))
   # We will use only seq_lens, but we align to full sequence for xs.
@@ -68,10 +75,11 @@ def make_particle_data(num_points=dim_b, min_seq_len=dim_m):
 
   # Perform equivariant (pairwise xs and ys) permutation,
   # so we take a random subset according to seq lengths.
-  for i in range(num_points):
-    p = torch.randperm(dim_m)
-    xs[i, :, :] = xs[i, p, :]
-    ys[i, :, :] = ys[i, p, :]
+  if permute:
+    for i in range(num_points):
+      p = torch.randperm(dim_m)
+      xs[i, :, :] = xs[i, p, :]
+      ys[i, :, :] = ys[i, p, :]
 
   return xs, ys, seq_lens
 
@@ -107,12 +115,76 @@ def linear_model_experiment():
     train_loss = loss_fn(Y_train, Y_train_pred)
     train_loss.backward()
     optimizer.step()
-    if i % 10 == 0:
+    if i % 100 == 0:
       with torch.no_grad():
         Y_test_pred = model.forward(X_test)
         test_loss = loss_fn(Y_test, Y_test_pred)
         print(i, train_loss.item(), test_loss.item())
 
+
+class ContextualModel(torch.nn.Module):
+  def __init__(self):
+    super(ContextualModel, self).__init__()
+    self.fc_context_regression = torch.nn.Linear(dim_c, dim_m, bias=False)
+    self.fc_kernel = torch.nn.Linear(dim_q, dim_c, bias=False)
+
+  def kernel(self, qs):
+    assert qs.shape[1:] == (dim_q, )
+    ks = self.fc_kernel.forward(qs)                    ; assert ks.shape[1:]   == (dim_c, )
+    return ks
+
+  def pool(self, xs):
+    assert xs.shape[1:] == (dim_c, )
+    context = torch.sum(xs, dim=0)                     ; assert context.shape  == (dim_c, )
+    return context
+
+  def regression(self, contexts):
+    dim_b = contexts.shape[0]                          ; assert contexts.shape == (dim_b, dim_c)
+    ys = self.fc_context_regression(contexts)          ; assert ys.shape       == (dim_b, dim_m)
+    return ys
+
+  def forward(self, xss, seq_lengths):
+    # xss.shape = [b, m, q]
+    #   where sequence length is upper bounded to be `m`, but only a subset
+    #   `seq_lengths[b]` is valid for given a point `b` in the batch.
+    dim_b = xss.shape[0]                                   ; assert xss.shape               == (dim_b, dim_m, dim_q)
+
+    contexts = []
+    for b, aligned_xs in enumerate(xss.split(1, dim=0)):
+      dim_s = seq_lengths[b]
+      xs = aligned_xs[:, :dim_s, :].squeeze(dim=0)          ; assert xs.shape                == (dim_s, dim_q)
+      context = self.pool(self.kernel(xs)).unsqueeze(dim=0) ; assert context.shape           == (1, dim_c)
+      contexts.append(context)
+    batches = torch.cat(contexts, dim=0)                    ; assert batches.shape           == (dim_b, dim_c)
+    return self.regression(batches)
+
+
+
+def contextual_model_experiment():
+  model = ContextualModel()
+  optimizer = torch.optim.Adam(model.parameters(), lr=0.05)
+  loss_fn = torch.nn.MSELoss()
+
+  X_train, Y_train, X_train_seq_lens = make_particle_data(permute=False)
+  X_test, Y_test, X_test_seq_lens = make_particle_data(permute=False)
+
+  try:
+    i = 0
+    while (True):
+      optimizer.zero_grad()
+      Y_train_pred = model.forward(X_train, X_train_seq_lens)
+      train_loss = loss_fn(Y_train.squeeze(dim=2), Y_train_pred)
+      train_loss.backward()
+      optimizer.step()
+
+      if i % 10 == 0:
+        with torch.no_grad():
+          Y_test_pred = model.forward(X_test, X_test_seq_lens)
+          test_loss = loss_fn(Y_test.squeeze(dim=2), Y_test_pred)
+          print(i, train_loss.item(), test_loss.item())
+      i += 1
+  except KeyboardInterrupt:
+    print("Interrupted contextual_model_experiment!")
 
 class ParticleModel(torch.nn.Module):
   def __init__(self):
@@ -163,6 +235,8 @@ class ParticleModel(torch.nn.Module):
 def particle_model_experiment():
   model = ParticleModel()
   optimizer = torch.optim.Adam(model.parameters(), lr=0.05)
+  lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(
+      optimizer=optimizer, gamma=0.95)
   loss_fn = torch.nn.MSELoss()
 
   X_train, Y_train, X_train_seq_lens = make_particle_data()
@@ -177,6 +251,8 @@ def particle_model_experiment():
       train_loss = loss_fn(Y_train_subset, Y_train_pred)
       train_loss.backward()
       optimizer.step()
+      if i % 100 == 0:
+        lr_scheduler.step()
 
       if i % 10 == 0:
         with torch.no_grad():
@@ -190,5 +266,6 @@ def particle_model_experiment():
 
 
 if __name__ == '__main__':
-  linear_model_experiment()
-  particle_model_experiment()
+  # linear_model_experiment()
+  contextual_model_experiment()
+  # particle_model_experiment()
