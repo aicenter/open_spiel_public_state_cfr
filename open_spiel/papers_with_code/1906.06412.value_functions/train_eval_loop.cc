@@ -166,7 +166,7 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
       t->dims.point_input_size(), t->dims.point_output_size(),
       t->dims.point_input_size() * absl::GetFlag(FLAGS_num_width),
       absl::GetFlag(FLAGS_num_layers),
-      PositionalValueNet::ActivationFunction::kRelu);
+      ActivationFunction::kRelu);
   model.to(device);
   torch::optim::Adam optimizer(model.parameters());
 
