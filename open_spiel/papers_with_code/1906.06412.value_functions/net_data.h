@@ -122,7 +122,7 @@ struct BatchData {
   int size() const;
 
   // Views for individual data points.
-  ParticleData point_at(int index, const ParticleDims& dims);
+  ParticleData point_at(const ParticleDims& dims, int index);
 };
 
 

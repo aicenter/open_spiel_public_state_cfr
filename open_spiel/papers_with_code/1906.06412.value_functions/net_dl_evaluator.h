@@ -18,29 +18,39 @@
 #include "torch/torch.h"
 
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_architectures.h"
-#include "open_spiel/papers_with_code/1906.06412.value_functions/generate_data.h"
 #include "open_spiel/spiel.h"
 
 namespace open_spiel {
 namespace papers_with_code {
 
-class NetEvaluator final : public algorithms::dlcfr::LeafEvaluator {
+using PublicStateContext = algorithms::dlcfr::PublicStateContext;
+using LeafPublicState = algorithms::dlcfr::LeafPublicState;
+using LeafEvaluator = algorithms::dlcfr::LeafEvaluator;
+using RangeTable = algorithms::dlcfr::RangeTable;
+
+class NetEvaluator final : public LeafEvaluator {
   ValueNet* model_;
   torch::Device* device_;
-  const std::vector<algorithms::dlcfr::RangeTable>& tables_;
+  const std::vector<RangeTable>& tables_;
   BatchData* batch_;
-  PositionalDataDims dims_;
+  ParticleDims* const dims_;
+  std::shared_ptr<const Game> game_;
+  std::shared_ptr<Observer> hand_observer_;
 
  public:
   NetEvaluator(ValueNet* model, torch::Device* device,
-               const std::vector<algorithms::dlcfr::RangeTable>& tables,
-               BatchData* batch, const PositionalDataDims& dims)
+               const std::vector<RangeTable>& tables,
+               BatchData* batch, ParticleDims* const dims,
+               std::shared_ptr<const Game> game,
+               std::shared_ptr<Observer> hand_observer)
       : model_(model), device_(device), tables_(tables), batch_(batch),
-        dims_(dims) {}
+        dims_(dims), game_(game), hand_observer_(hand_observer) {}
 
-  void EvaluatePublicState(
-      algorithms::dlcfr::LeafPublicState* state,
-      algorithms::dlcfr::PublicStateContext* context) const override;
+  std::unique_ptr<PublicStateContext> CreateContext(
+      const LeafPublicState& leaf_state) const override;
+
+  void EvaluatePublicState(LeafPublicState* state,
+                           PublicStateContext* context) const override;
 };
 
 }  // namespace papers_with_code

@@ -14,7 +14,6 @@
 
 
 #include "open_spiel/papers_with_code/1906.06412.value_functions/trunk.h"
-#include "open_spiel/papers_with_code/1906.06412.value_functions/generate_data.h"
 
 #include "open_spiel/utils/format_observation.h"
 
@@ -72,79 +71,49 @@ Trunk::Trunk(const std::string& game_name, int depth, std::string use_bandits_fo
   }
 }
 
-void AddExperiencesFromTrunk(std::vector<dlcfr::LeafPublicState>& public_leaves,
-                             const std::vector<dlcfr::RangeTable>& tables,
-                             PositionalDataDims dims,
-                             ExperienceReplay* replay) {
-  for (const dlcfr::LeafPublicState& leaf : public_leaves) {
+void AddExperiencesFromTrunk(
+    const std::vector<algorithms::dlcfr::LeafPublicState>& public_leaves,
+    const std::vector<std::unique_ptr<HandContext>>& hand_contexts,
+    const ParticleDims& dims, ExperienceReplay* replay) {
+  for (int i = 0; i < public_leaves.size(); ++i) {
+    const dlcfr::LeafPublicState& leaf = public_leaves[i];
     if (leaf.IsTerminal()) continue;  // Add experiences only for non-terminals.
-    PositionalData data_point = replay->AddExperience(dims);
+    ParticleData data_point = replay->AddExperience(dims);
     SPIEL_DCHECK_TRUE(data_point.is_valid_view());
-    data_point.Reset();
-    CopyFeatures(leaf.public_tensor.Tensor(), data_point);
-    CopyDataTreeToNet(leaf, data_point, tables);
+    WriteParticles(leaf, *hand_contexts[i], &data_point);
   }
 }
 
-void CopyFeatures(absl::Span<const float> features, PositionalData data_point) {
-  std::copy(features.begin(), features.end(),
-            data_point.public_features.begin());
-}
-
-void CopyDataTreeToNet(const dlcfr::LeafPublicState& leaf,
-                       PositionalData data_point,
-                       const std::vector<dlcfr::RangeTable>& tables) {
-  CopyRangesTreeToNet(leaf, data_point, tables);
-  CopyValuesTreeToNet(leaf, data_point, tables);
-}
-
-// Copy non-contiguous vectors using a permutation map.
-// This also converts float <-> double as needed.
-template<typename From, typename To>
-void PlacementCopy(const std::vector<From>& from, absl::Span<To> to,
-                   const std::map<size_t, size_t>& from_to) {
-  for (const auto&[f, t] : from_to) {
-    to[t] = from[f];
-  }
-}
-template<typename From, typename To>
-void PlacementCopy(absl::Span<From> from, std::vector<To>& to,
-                   const std::map<size_t, size_t>& from_to) {
-  for (const auto&[f, t] : from_to) {
-    to[t] = from[f];
-  }
-}
-
-void CopyRangesTreeToNet(const dlcfr::LeafPublicState& leaf,
-                         PositionalData data_point,
-                         const std::vector<dlcfr::RangeTable>& tables) {
+void WriteParticles(const algorithms::dlcfr::LeafPublicState& state,
+                    const HandContext& hand_context, ParticleData* point) {
+  point->Reset();
+  int particle = 0;
   for (int pl = 0; pl < 2; ++pl) {
-    PlacementCopy<float_tree, float_net>(
-        /*tree=*/ leaf.ranges[pl],
-        /*net=*/  data_point.net_ranges[pl],
-                  tables[pl].bijections[leaf.public_id].tree_to_net());
+    for (int j = 0; j < state.leaf_nodes[pl].size(); j++) {
+      Copy(state.public_tensor.Tensor(),
+           point->public_features(particle));
+      Copy(hand_context.hand_features[pl][j].Tensor(),
+           point->hand_features(particle));
+      point->player_features(particle)[pl] = 1.;
+      point->range(particle) = state.ranges[pl][j];
+      point->value(particle) = state.values[pl][j];
+      particle++;
+    }
   }
+  point->num_particles() = particle;
 }
 
-void CopyValuesTreeToNet(const dlcfr::LeafPublicState& leaf,
-                         PositionalData data_point,
-                         const std::vector<dlcfr::RangeTable>& tables) {
+HandContext::HandContext(const algorithms::dlcfr::LeafPublicState& leaf_state,
+                         Observation& hand_observation) {
   for (int pl = 0; pl < 2; ++pl) {
-    PlacementCopy<float_tree, float_net>(
-        /*tree=*/ leaf.values[pl],
-        /*net=*/  data_point.net_values[pl],
-                  tables[pl].bijections[leaf.public_id].tree_to_net());
-  }
-}
+    hand_features[pl].reserve(leaf_state.leaf_nodes[pl].size());
 
-void CopyValuesNetToTree(PositionalData data_point,
-                         dlcfr::LeafPublicState& leaf,
-                         const std::vector<dlcfr::RangeTable>& tables) {
-  for (int pl = 0; pl < 2; ++pl) {
-    PlacementCopy<float_net, float_tree>(
-        /*net=*/  data_point.net_values[pl],
-        /*tree=*/ leaf.values[pl],
-                  tables[pl].bijections[leaf.public_id].net_to_tree());
+    for (const InfostateNode* leaf_node : leaf_state.leaf_nodes[pl]) {
+      SPIEL_CHECK_FALSE(leaf_node->corresponding_states().empty());
+      const auto& some_state = leaf_node->corresponding_states()[0];
+      hand_observation.SetFrom(*some_state, pl);
+      hand_features[pl].push_back(hand_observation);
+    }
   }
 }
 

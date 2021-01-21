@@ -19,11 +19,19 @@
 #include "open_spiel/algorithms/infostate_dl_cfr.h"
 #include "open_spiel/algorithms/ortools/dl_oracle_evaluator.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_data.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/net_dl_evaluator.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/experience_replay.h"
 #include "open_spiel/spiel.h"
 
 namespace open_spiel {
 namespace papers_with_code {
+
+// Public state context that stores hand observations for each infostate node.
+struct HandContext : public PublicStateContext {
+  std::array<std::vector<Observation>, 2> hand_features;
+  HandContext(const algorithms::dlcfr::LeafPublicState& leaf_state,
+              Observation& hand_observation);
+};
 
 struct Trunk {
   std::shared_ptr<const Game> game;
@@ -37,7 +45,8 @@ struct Trunk {
   std::unique_ptr<algorithms::dlcfr::DepthLimitedCFR> fixable_trunk_with_oracle;
   std::unique_ptr<algorithms::dlcfr::DepthLimitedCFR> iterable_trunk_with_oracle;
   std::vector<algorithms::dlcfr::RangeTable> tables;
-  std::unique_ptr<BasicDims> dims;
+  std::unique_ptr<ParticleDims> dims;
+  std::vector<std::unique_ptr<HandContext>> hand_contexts;
   int num_leaves;
   int num_non_terminal_leaves;
 
@@ -49,29 +58,18 @@ std::unique_ptr<Trunk> MakeTrunk(const std::string& game_name, int trunk_depth,
     std::string use_bandits_for_cfr = "RegretMatchingPlus");
 
 void AddExperiencesFromTrunk(
-    std::vector<algorithms::dlcfr::LeafPublicState>& public_leaves,
-    const std::vector<algorithms::dlcfr::RangeTable>& tables,
-    PositionalDataDims dims,
+    const std::vector<algorithms::dlcfr::LeafPublicState>& public_leaves,
+    const std::vector<std::unique_ptr<HandContext>>& hand_contexts,
+    const ParticleDims& dims,
     ExperienceReplay* replay);
 
-void CopyFeatures(absl::Span<const float> features, PositionalData data_point);
+void WriteParticles(const algorithms::dlcfr::LeafPublicState& state,
+                    const HandContext& hand_context, ParticleData* point);
 
-void CopyDataTreeToNet(const algorithms::dlcfr::LeafPublicState& leaf,
-                       PositionalData data_point,
-                       const std::vector<algorithms::dlcfr::RangeTable>& tables);
-
-void CopyRangesTreeToNet(const algorithms::dlcfr::LeafPublicState& leaf,
-                         PositionalData data_point,
-                         const std::vector<algorithms::dlcfr::RangeTable>& tables);
-
-void CopyValuesTreeToNet(const algorithms::dlcfr::LeafPublicState& leaf,
-                         PositionalData data_point,
-                         const std::vector<algorithms::dlcfr::RangeTable>& tables);
-
-void CopyValuesNetToTree(PositionalData data_point,
-                         algorithms::dlcfr::LeafPublicState& leaf,
-                         const std::vector<algorithms::dlcfr::RangeTable>& tables);
-
+void inline Copy(absl::Span<const float> source, absl::Span<float> target) {
+  SPIEL_CHECK_LE(source.size(), target.size());
+  std::copy(source.begin(), source.end(), target.begin());
+}
 
 
 }  // namespace papers_with_code

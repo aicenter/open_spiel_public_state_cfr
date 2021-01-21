@@ -13,29 +13,42 @@
 // limitations under the License.
 
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_dl_evaluator.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/trunk.h"
 
 namespace open_spiel {
 namespace papers_with_code {
 
+using namespace open_spiel::algorithms;
+
+std::unique_ptr<PublicStateContext> NetEvaluator::CreateContext(
+    const LeafPublicState& leaf_state) const {
+  if (leaf_state.IsTerminal()) {
+    return nullptr;
+  }
+
+  Observation hand_observation(*game_, hand_observer_);
+  return std::make_unique<HandContext>(leaf_state, hand_observation);
+}
+
+// TODO: evaluate all public states with a batch.
 void NetEvaluator::EvaluatePublicState(
     algorithms::dlcfr::LeafPublicState* state,
     algorithms::dlcfr::PublicStateContext* context) const {
-  SPIEL_DCHECK_FALSE(context);  // Nets do not use any special context.
   SPIEL_DCHECK_FALSE(state->IsTerminal());  // Only non-terminal leafs.
+  SPIEL_DCHECK_TRUE(context);
   torch::NoGradGuard no_grad_guard;  // We run only inference.
+  auto* hand_context = open_spiel::down_cast<HandContext*>(context);
 
-  // TODO: evaluate all public states with a batch.
-  PositionalData point = batch_->point_at(0, dims_);
+  ParticleData point = batch_->point_at(*dims_, 0);
   SPIEL_DCHECK_TRUE(point.is_valid_view());
-  point.Reset();
-  CopyFeatures(state->public_tensor.Tensor(), point);
-  CopyRangesTreeToNet(*state, point, tables_);
+  WriteParticles(*state, *hand_context, &point);
 
   torch::Tensor input = point.data.to(*device_);
   torch::Tensor output = model_->forward(input);
   SPIEL_DCHECK_EQ(output.sizes(), point.target.sizes());
   point.target.copy_(output);
-  CopyValuesNetToTree(point, *state, tables_);
+  // TODO
+//  CopyValuesNetToTree(point, *state, tables_);
 }
 
 }  // namespace papers_with_code

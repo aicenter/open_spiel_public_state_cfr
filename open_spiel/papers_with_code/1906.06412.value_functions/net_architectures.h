@@ -56,7 +56,7 @@ enum ActivationFunction {
 };
 
 inline void MakeLayers(std::vector<torch::nn::Linear>& layers, int num_layers,
-                int inputs_size, int hidden_size, int outputs_size) {
+                       int inputs_size, int hidden_size, int outputs_size) {
   for (int i = 0; i < num_layers; ++i) {
     size_t layer_input = i == 0 ? inputs_size : hidden_size;
     size_t layer_output = i == num_layers - 1 ? outputs_size : hidden_size;
@@ -108,15 +108,15 @@ struct PositionalValueNet final : public ValueNet {
 
 
 struct ParticleValueNet final : public ValueNet {
-  ParticleDataDims dims;
+  ParticleDims* dims;
   ActivationFunction activation_fn;
   std::vector<torch::nn::Linear> fc_context;
   std::vector<torch::nn::Linear> fc_kernel;
 
-  int context_size() { return dims.max_particles * 2; }
-  int positional_output() { return dims.max_particles * 2; }
+  int context_size() { return dims->max_particles * 2; }
+  int positional_output() { return dims->max_particles * 2; }
 
-  ParticleValueNet(ParticleDataDims particle_dims,
+  ParticleValueNet(ParticleDims* particle_dims,
                    ActivationFunction activation = kRelu)
       : dims(particle_dims), activation_fn(activation) {
     int dim_context = context_size();
@@ -124,19 +124,21 @@ struct ParticleValueNet final : public ValueNet {
     int num_layers_context = 3;
 
     MakeLayers(fc_kernel, num_layers_kernel,
-               dims.particle_size(), dims.particle_size() * 3, dim_context);
-    for (int i = 0; i < num_layers_kernel; ++i) {
-      register_module(absl::StrCat("fc_kernel_", i), fc_kernel[i]);
-    }
-
+               dims->particle_size(), dims->particle_size() * 3, dim_context);
     MakeLayers(fc_context, num_layers_context,
-               dim_context, dim_context * 3, dims.max_particles);
-    for (int i = 0; i < num_layers_kernel; ++i) {
-      register_module(absl::StrCat("fc_context_", i), fc_context[i]);
+               dim_context, dim_context * 3, dims->max_particles);
+    RegisterLayers(fc_kernel, "fc_kernel_");
+    RegisterLayers(fc_context, "fc_context_");
+  }
+
+  void RegisterLayers(const std::vector<torch::nn::Linear>& layers,
+                      const std::string& layer_name) {
+    for (int i = 0; i < layers.size(); ++i) {
+      register_module(absl::StrCat(layer_name, i), layers[i]);
     }
   }
 
-  torch::Tensor kernel(torch::Tensor xs) {                                      CHECK_SHAPE(xs, {_, dims.particle_size()});
+  torch::Tensor kernel(torch::Tensor xs) {                                      CHECK_SHAPE(xs, {_, dims->particle_size()});
     for (int i = 0; i < fc_kernel.size() - 1; ++i) {
       xs = fc_kernel[i]->forward(xs);
       xs = Activation(activation_fn, xs);
@@ -160,18 +162,18 @@ struct ParticleValueNet final : public ValueNet {
   }
 
   torch::Tensor forward(torch::Tensor xss) {
-    CHECK_SHAPE(xss, {_, dims.point_input_size()});
+    CHECK_SHAPE(xss, {_, dims->point_input_size()});
 
     std::vector<torch::Tensor> contexts;
-    for (torch::Tensor xs : xss.split(/*split_size=*/1, /*dim=*/0)) {           CHECK_SHAPE(xs, {dims.point_input_size()});
+    for (torch::Tensor xs : xss.split(/*split_size=*/1, /*dim=*/0)) {           CHECK_SHAPE(xs, {dims->point_input_size()});
       // Convert to int -- for our small numbers this is ok.
       int num_particles = xs[0].item<float_net>();
 
       torch::Tensor particles = xs
           .slice(/*dim=*/0,
                  /*start*/1,  // Skip the num_particles item.
-                 /*end=*/dims.particle_size() * num_particles + 1, /*step=*/1)
-          .reshape({num_particles, dims.particle_size()});                      CHECK_SHAPE(particles, {num_particles, dims.particle_size()});
+                 /*end=*/dims->particle_size() * num_particles + 1, /*step=*/1)
+          .reshape({num_particles, dims->particle_size()});                     CHECK_SHAPE(particles, {num_particles, dims->particle_size()});
       torch::Tensor context = pool(kernel(particles));                          CHECK_SHAPE(context, {context_size()});
       contexts.push_back(context);
     }
