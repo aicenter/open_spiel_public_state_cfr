@@ -18,8 +18,8 @@
 namespace open_spiel {
 namespace papers_with_code {
 
-ParticleData ExperienceReplay::AddExperience(const ParticleDims& dims) {
-  ParticleData point = point_at(dims, head_);
+ParticlesInContext ExperienceReplay::AddExperience(const ParticleDims& dims) {
+  ParticlesInContext point = point_at(dims, head_);
   AdvanceHead();
   return point;
 }

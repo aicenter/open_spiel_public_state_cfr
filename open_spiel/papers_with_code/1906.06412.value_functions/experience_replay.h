@@ -29,7 +29,7 @@ class ExperienceReplay : public BatchData {
   ExperienceReplay(int buffer_size, int input_size, int output_size)
     : BatchData(buffer_size, input_size, output_size) {}
   // Return a data point that can be written to.
-  ParticleData AddExperience(const ParticleDims& dims);
+  ParticlesInContext AddExperience(const ParticleDims& dims);
 
   // Fill batch with randomly sampled data points.
   void SampleBatch(BatchData* batch, std::mt19937& rnd_gen) const;

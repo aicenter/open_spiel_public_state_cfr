@@ -78,14 +78,14 @@ void AddExperiencesFromTrunk(
   for (int i = 0; i < public_leaves.size(); ++i) {
     const dlcfr::LeafPublicState& leaf = public_leaves[i];
     if (leaf.IsTerminal()) continue;  // Add experiences only for non-terminals.
-    ParticleData data_point = replay->AddExperience(dims);
+    ParticlesInContext data_point = replay->AddExperience(dims);
     SPIEL_DCHECK_TRUE(data_point.is_valid_view());
     WriteParticles(leaf, *hand_contexts[i], &data_point);
   }
 }
 
 void WriteParticles(const algorithms::dlcfr::LeafPublicState& state,
-                    const HandContext& hand_context, ParticleData* point) {
+                    const HandContext& hand_context, ParticlesInContext* point) {
   point->Reset();
   int particle = 0;
   for (int pl = 0; pl < 2; ++pl) {

@@ -34,45 +34,45 @@ bool DataPoint::is_valid_view() const {
       && target.dim() == 1;
 }
 
-ParticleData::ParticleData(const ParticleDims& particle_dims,
-                           torch::Tensor data, torch::Tensor target)
+ParticlesInContext::ParticlesInContext(const ParticleDims& particle_dims,
+                                       torch::Tensor data, torch::Tensor target)
     : DataPoint(data, target), dims(particle_dims) {
   // Make sure the data point is just a view!
   SPIEL_DCHECK_TRUE(is_valid_view());
 }
 
-float_net& ParticleData::num_particles() {
+float_net& ParticlesInContext::num_particles() {
   return data_ptr()[num_particles_offset()];
 }
 
-absl::Span<float_net> ParticleData::public_features(int particle) {
+absl::Span<float_net> ParticlesInContext::public_features(int particle) {
   SPIEL_DCHECK_LT(particle, dims.max_particles);
   return absl::MakeSpan(
       &particle_data_ptr(particle)[public_features_offset()],
       dims.public_features_size);
 }
 
-absl::Span<float_net> ParticleData::hand_features(int particle) {
+absl::Span<float_net> ParticlesInContext::hand_features(int particle) {
   SPIEL_DCHECK_LT(particle, dims.max_particles);
   return absl::MakeSpan(
       &particle_data_ptr(particle)[hand_features_offset()],
       dims.hand_features_size);
 }
 
-absl::Span<float_net> ParticleData::player_features(int particle) {
+absl::Span<float_net> ParticlesInContext::player_features(int particle) {
   SPIEL_DCHECK_LT(particle, dims.max_particles);
   return absl::MakeSpan(
       &particle_data_ptr(particle)[player_offset()],
       dims.player_features_size);
 }
 
-float& ParticleData::range(int particle) {
+float& ParticlesInContext::range(int particle) {
   SPIEL_DCHECK_LT(particle, dims.max_particles);
   SPIEL_DCHECK_EQ(dims.range_size, 1);
   return particle_data_ptr(particle)[range_offset()];
 }
 
-float& ParticleData::value(int particle) {
+float& ParticlesInContext::value(int particle) {
   SPIEL_DCHECK_LT(particle, dims.max_particles);
   return target_ptr()[particle];
 }
@@ -86,8 +86,8 @@ BatchData::BatchData(int batch_size, int input_size, int output_size)
   SPIEL_CHECK_GT(output_size, 0);
 }
 
-ParticleData BatchData::point_at(const ParticleDims& dims, int index) {
-  return ParticleData(dims, data[index], target[index]);
+ParticlesInContext BatchData::point_at(const ParticleDims& dims, int index) {
+  return ParticlesInContext(dims, data[index], target[index]);
 }
 
 void BatchData::Reset() {

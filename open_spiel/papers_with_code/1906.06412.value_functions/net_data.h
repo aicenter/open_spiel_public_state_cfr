@@ -69,10 +69,11 @@ struct ParticleDims final : public BasicDims {
   }
 };
 
-struct ParticleData final : DataPoint {
+// Particles for one public state, collected into a single data point.
+struct ParticlesInContext final : DataPoint {
   const ParticleDims& dims;
-  ParticleData(const ParticleDims& dims,
-               torch::Tensor data, torch::Tensor target);
+  ParticlesInContext(const ParticleDims& dims,
+                     torch::Tensor data, torch::Tensor target);
 
   // Particle accessors.
   float_net& num_particles();
@@ -122,7 +123,7 @@ struct BatchData {
   int size() const;
 
   // Views for individual data points.
-  ParticleData point_at(const ParticleDims& dims, int index);
+  ParticlesInContext point_at(const ParticleDims& dims, int index);
 };
 
 
