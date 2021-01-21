@@ -37,7 +37,7 @@ struct Trunk {
   std::unique_ptr<algorithms::dlcfr::DepthLimitedCFR> fixable_trunk_with_oracle;
   std::unique_ptr<algorithms::dlcfr::DepthLimitedCFR> iterable_trunk_with_oracle;
   std::vector<algorithms::dlcfr::RangeTable> tables;
-  PositionalDataDims dims;
+  std::unique_ptr<BasicDims> dims;
   int num_leaves;
   int num_non_terminal_leaves;
 

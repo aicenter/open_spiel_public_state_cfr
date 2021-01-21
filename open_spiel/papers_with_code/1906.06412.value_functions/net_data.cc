@@ -25,92 +25,50 @@ void DataPoint::Reset() {
   target.zero_();
 }
 
-PositionalData::PositionalData(torch::Tensor data, torch::Tensor target,
-                               const PositionalDataDims& dims) :
-  DataPoint(data, target) {
-  SPIEL_CHECK_EQ(data.size(0), dims.point_input_size());
-  SPIEL_CHECK_EQ(target.size(0), dims.point_output_size());
-
-  float_net* data_ptr = data.data_ptr<float_net>();
-  float_net* target_ptr = target.data_ptr<float_net>();
-
-  public_features = absl::MakeSpan(&data_ptr[dims.public_features_offset()],
-                                   dims.public_features_size);
-  for (int pl = 0; pl < 2; ++pl) {
-    net_ranges[pl] = absl::MakeSpan(&data_ptr[dims.ranges_offset(pl)],
-                                    dims.net_ranges_size[pl]);
-    net_values[pl] = absl::MakeSpan(&target_ptr[dims.values_offset(pl)],
-                                    dims.net_ranges_size[pl]);
-  }
-
-  // Make sure the data point is just a view!
-  SPIEL_CHECK_TRUE(is_valid_view());
-}
-
-bool PositionalData::is_valid_view() const {
-  float_net* data_ptr = data.data_ptr<float_net>();
-  float_net* target_ptr = target.data_ptr<float_net>();
-
-  return data.is_view()
-      && target.is_view()
-      && data.is_contiguous()
-      && target.is_contiguous()
-      // Dims check
-      && public_features.size() + net_ranges[0].size() + net_ranges[1].size()
-         == data.sizes()[0]
-      && net_values[0].size() + net_values[1].size() == target.sizes()[0]
-      // Pointers check
-      && data_ptr == public_features.data()
-      && &data_ptr[public_features.size()] == net_ranges[0].data()
-      && &data_ptr[public_features.size() + net_ranges[0].size()] == net_ranges[1].data()
-      && target_ptr == net_values[0].data()
-      && &target_ptr[net_values[0].size()] == net_values[1].data();
-}
-
-
-ParticleData::ParticleData(torch::Tensor data, torch::Tensor target,
-                           const ParticleDataDims& particle_dims) :
-    DataPoint(data, target), dims(particle_dims) {
-  // Make sure the data point is just a view!
-  SPIEL_CHECK_TRUE(is_valid_view());
-}
-
-bool ParticleData::is_valid_view() const {
+bool DataPoint::is_valid_view() const {
   return data.is_view()
       && target.is_view()
       && data.is_contiguous()
       && target.is_contiguous()
       && data.dim() == 1
-      && target.dim() == 1
-      && data.size(0) == dims.point_input_size()
-      && target.size(0) == dims.point_output_size();
+      && target.dim() == 1;
+}
+
+ParticleData::ParticleData(const ParticleDims& particle_dims,
+                           torch::Tensor data, torch::Tensor target)
+    : DataPoint(data, target), dims(particle_dims) {
+  // Make sure the data point is just a view!
+  SPIEL_DCHECK_TRUE(is_valid_view());
 }
 
 float_net& ParticleData::num_particles() {
-  return data_ptr()[dims.num_particles_offset()];
+  return data_ptr()[num_particles_offset()];
 }
 
-absl::Span<float_net> ParticleData::particle_public_features(int particle) {
+absl::Span<float_net> ParticleData::public_features(int particle) {
   return absl::MakeSpan(
-      &particle_data_ptr(particle)[dims.public_features_offset()],
+      &particle_data_ptr(particle)[public_features_offset()],
       dims.public_features_size);
 }
 
-absl::Span<float_net> ParticleData::particle_hand_features(int particle) {
+absl::Span<float_net> ParticleData::hand_features(int particle) {
   return absl::MakeSpan(
-      &particle_data_ptr(particle)[dims.hand_features_offset()],
+      &particle_data_ptr(particle)[hand_features_offset()],
       dims.hand_features_size);
 }
 
-absl::Span<float_net> ParticleData::particle_player_features(int particle) {
-  return absl::MakeSpan(&particle_data_ptr(particle)[dims.player_offset()], 2);
+absl::Span<float_net> ParticleData::player_features(int particle) {
+  return absl::MakeSpan(
+      &particle_data_ptr(particle)[player_offset()],
+      dims.player_features_size);
 }
 
-float& ParticleData::particle_range(int particle) {
-  return particle_data_ptr(particle)[dims.range_offset()];
+float& ParticleData::range(int particle) {
+  SPIEL_DCHECK_EQ(dims.range_size, 1);
+  return particle_data_ptr(particle)[range_offset()];
 }
 
-float& ParticleData::particle_value(int particle) {
+float& ParticleData::value(int particle) {
   return target_ptr()[particle];
 }
 

@@ -27,94 +27,90 @@ namespace papers_with_code {
 using float_net = float;    // Floats used in the neural network.
 using float_tree = double;  // Floats used in the cfr computation.
 
-// Our base class.
-// Data points are always a view to the underlying storage,
-// placed within a batch of data.
+// Our base class. Data points are always a view
+// to the underlying storage, placed within a batch of data.
 struct DataPoint : torch::data::Example<>{
   using torch::data::Example<>::Example;
-  void Reset();  // Zeros-out inputs and outputs.
-};
-
-// Dimensions for the current trunk.
-struct PositionalDataDims {
-  int public_features_size;
-  std::array<int, 2> net_ranges_size;
-
-  int point_input_size() const {
-    return public_features_size + net_ranges_size[0] +  net_ranges_size[1];
-  }
-  int point_output_size() const {
-    return net_ranges_size[0] +  net_ranges_size[1];
-  }
-  // Encoding of the input / output -- offsets:
-  constexpr int public_features_offset() const { return 0; }
-  int ranges_offset(Player pl) const {
-    return public_features_size + (pl == 0 ? 0 : net_ranges_size[0]);
-  }
-  int values_offset(Player pl) const {
-    return (pl == 0 ? 0 : net_ranges_size[0]);
-  }
-};
-
-struct PositionalData final : DataPoint {
-  // Views over the data point for easier manipulation.
-  absl::Span<float_net> public_features;
-  std::array<absl::Span<float_net>, 2> net_ranges;
-  std::array<absl::Span<float_net>, 2> net_values;
-
-  PositionalData(torch::Tensor data, torch::Tensor target,
-                 const PositionalDataDims& dims);
+  // Zeros-out inputs and outputs.
+  void Reset();
   // Check if the data point is still a valid view:
-  // no tensor pointers or spans are broken.
+  // no tensor pointers are broken.
   bool is_valid_view() const;
 };
 
-struct ParticleDataDims {
+// Dimensions for the current trunk, as they depend
+// on the game and depth being currently solved.
+struct BasicDims {
   int public_features_size;
   int hand_features_size;
-  int max_particles;
+  std::array<int, 2> net_ranges_size;
+  const int player_features_size = 2;
 
-  int point_input_size() const {
-    return 1  // Number of particles in the given point
-         + max_particles * particle_size();
+  // I/O sizes so we know how to construct batch data.
+  virtual int point_input_size() const = 0;
+  virtual int point_output_size() const = 0;
+};
+
+struct ParticleDims final : public BasicDims {
+  int max_particles = 1000;
+  const int range_size = 1;
+
+  int point_input_size() const override {
+    return 1  // Store the number of particles in the given point.
+         + max_particles * particle_size();  // Particle contents.
   }
+  int point_output_size() const override { return max_particles; }
+
   int particle_size() const {
     return public_features_size
          + hand_features_size
-         + 2  // Player index features.
-         + 1; // Range.
+         + player_features_size
+         + range_size;
   }
-  int point_output_size() const { return max_particles; }
-
-  constexpr int num_particles_offset() const { return 0; }
-  constexpr int public_features_offset() const { return 1; }
-  int hand_features_offset() const { return public_features_size; }
-  int player_offset() const { return public_features_size + hand_features_size; }
-  int range_offset() const { return public_features_size + hand_features_size + 2; }
 };
 
 struct ParticleData final : DataPoint {
-  // Views over the data point for easier manipulation.
-  ParticleDataDims dims;
-  ParticleData(torch::Tensor data, torch::Tensor target,
-               const ParticleDataDims& dims);
+  const ParticleDims& dims;
+  ParticleData(const ParticleDims& dims,
+               torch::Tensor data, torch::Tensor target);
 
+  // Particle accessors.
   float_net& num_particles();
-  absl::Span<float_net> particle_public_features(int particle);
-  absl::Span<float_net> particle_hand_features(int particle);
-  absl::Span<float_net> particle_player_features(int particle);
-  float& particle_range(int particle);
-  float& particle_value(int particle);
+  absl::Span<float_net> public_features(int particle);
+  absl::Span<float_net> hand_features(int particle);
+  absl::Span<float_net> player_features(int particle);
+  float& range(int particle);
+  float& value(int particle);
 
+ private:
   float_net* data_ptr() { return data.data_ptr<float_net>(); }
-  float_net* particle_data_ptr(int particle) {
-    return 1 + &data.data_ptr<float_net>()[particle * dims.particle_size()];
-  }
   float_net* target_ptr() { return target.data_ptr<float_net>(); }
+  // Contents of the individual particle.
+  float_net* particle_data_ptr(int particle) {
+    return &data_ptr()[
+      particle_storage_offset() + particle * dims.particle_size()
+    ];
+  }
+  // Offsets for number of particles and the storage.
+  int num_particles_offset() const { return 0; }
+  int particle_storage_offset() const { return 1; }
 
-  // Check if the data point is still a valid view:
-  // no tensor pointers or spans are broken.
-  bool is_valid_view() const;
+  // Offsets within the particle.
+  int public_features_offset() const {
+    return 0;
+  }
+  int hand_features_offset() const {
+    return dims.public_features_size;
+  }
+  int player_offset() const {
+    return dims.public_features_size
+         + dims.hand_features_size;
+  }
+  int range_offset() const {
+    return dims.public_features_size
+         + dims.hand_features_size
+         + dims.player_features_size;
+  }
 };
 
 struct BatchData {
@@ -126,8 +122,7 @@ struct BatchData {
   int size() const;
 
   // Views for individual data points.
-  PositionalData point_at(int index, const PositionalDataDims& dims);
-  ParticleData point_at(int index, const ParticleDataDims& dims);
+  ParticleData point_at(int index, const ParticleDims& dims);
 };
 
 
