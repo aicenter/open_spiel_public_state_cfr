@@ -36,6 +36,8 @@ struct DataPoint : torch::data::Example<>{
   // Check if the data point is still a valid view:
   // no tensor pointers are broken.
   bool is_valid_view() const;
+  float_net* data_ptr() { return data.data_ptr<float_net>(); }
+  float_net* target_ptr() { return target.data_ptr<float_net>(); }
 };
 
 // Dimensions for the current trunk, as they depend
@@ -69,33 +71,18 @@ struct ParticleDims final : public BasicDims {
   }
 };
 
-// Particles for one public state, collected into a single data point.
-struct ParticlesInContext final : DataPoint {
+// A single particle.
+struct ParticleData final : DataPoint {
   const ParticleDims& dims;
-  ParticlesInContext(const ParticleDims& dims,
-                     torch::Tensor data, torch::Tensor target);
-
-  // Particle accessors.
-  float_net& num_particles();
-  absl::Span<float_net> public_features(int particle);
-  absl::Span<float_net> hand_features(int particle);
-  absl::Span<float_net> player_features(int particle);
-  float& range(int particle);
-  float& value(int particle);
-
+  ParticleData(const ParticleDims& particle_dims,
+               torch::Tensor data, torch::Tensor target);
+  // Individual accessors.
+  absl::Span<float_net> public_features();
+  absl::Span<float_net> hand_features();
+  absl::Span<float_net> player_features();
+  float& range();
+  float& value();
  private:
-  float_net* data_ptr() { return data.data_ptr<float_net>(); }
-  float_net* target_ptr() { return target.data_ptr<float_net>(); }
-  // Contents of the individual particle.
-  float_net* particle_data_ptr(int particle) {
-    return &data_ptr()[
-      particle_storage_offset() + particle * dims.particle_size()
-    ];
-  }
-  // Offsets for number of particles and the storage.
-  int num_particles_offset() const { return 0; }
-  int particle_storage_offset() const { return 1; }
-
   // Offsets within the particle.
   int public_features_offset() const {
     return 0;
@@ -114,6 +101,17 @@ struct ParticlesInContext final : DataPoint {
   }
 };
 
+// Particles for one public state, collected into a single data point.
+struct ParticlesInContext final : DataPoint {
+  ParticlesInContext(torch::Tensor data, torch::Tensor target);
+  float_net& num_particles();
+  ParticleData particle_at(const ParticleDims& dims, int particle_index);
+ private:
+  // Offsets for number of particles and the storage.
+  int num_particles_offset() const { return 0; }
+  int particle_storage_offset() const { return 1; }
+};
+
 struct BatchData {
   torch::Tensor data;
   torch::Tensor target;
@@ -123,7 +121,7 @@ struct BatchData {
   int size() const;
 
   // Views for individual data points.
-  ParticlesInContext point_at(const ParticleDims& dims, int index);
+  ParticlesInContext point_at(int index);
 };
 
 

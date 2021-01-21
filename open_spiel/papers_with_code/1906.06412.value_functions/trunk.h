@@ -64,7 +64,8 @@ void AddExperiencesFromTrunk(
     ExperienceReplay* replay);
 
 void WriteParticles(const algorithms::dlcfr::LeafPublicState& state,
-                    const HandContext& hand_context, ParticlesInContext* point);
+                    const HandContext& hand_context, const ParticleDims& dims,
+                    ParticlesInContext* point);
 
 void inline Copy(absl::Span<const float> source, absl::Span<float> target) {
   SPIEL_CHECK_LE(source.size(), target.size());

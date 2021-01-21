@@ -34,47 +34,56 @@ bool DataPoint::is_valid_view() const {
       && target.dim() == 1;
 }
 
-ParticlesInContext::ParticlesInContext(const ParticleDims& particle_dims,
-                                       torch::Tensor data, torch::Tensor target)
-    : DataPoint(data, target), dims(particle_dims) {
-  // Make sure the data point is just a view!
-  SPIEL_DCHECK_TRUE(is_valid_view());
+ParticleData ParticlesInContext::particle_at(const ParticleDims& dims,
+                                             int particle_index) {
+  SPIEL_CHECK_LT(particle_index, dims.max_particles);
+  const int offset = particle_storage_offset();
+  return ParticleData(
+      dims,
+      data.slice(
+          /*dim=*/0,
+          /*start=*/offset + dims.particle_size() * particle_index,
+          /*end=*/offset + dims.particle_size() * (particle_index + 1),
+          /*step=*/1),
+      target[particle_index]);
 }
+
+
+absl::Span<float_net> ParticleData::public_features() {
+  return absl::MakeSpan(&data_ptr()[public_features_offset()],
+                        dims.public_features_size);
+}
+absl::Span<float_net> ParticleData::hand_features() {
+  return absl::MakeSpan(&data_ptr()[hand_features_offset()],
+                        dims.hand_features_size);
+}
+absl::Span<float_net> ParticleData::player_features() {
+  return absl::MakeSpan(&data_ptr()[player_offset()],
+                        dims.player_features_size);
+}
+float& ParticleData::range() {
+  SPIEL_DCHECK_EQ(dims.range_size, 1);
+  return data_ptr()[range_offset()];
+}
+float& ParticleData::value() {
+  return target_ptr()[0];
+}
+
+ParticleData::ParticleData(const ParticleDims& particle_dims,
+                           torch::Tensor data,
+                           torch::Tensor target)
+    : DataPoint(data, target), dims(particle_dims) {
+  SPIEL_DCHECK_TRUE(is_valid_view());
+  SPIEL_DCHECK_EQ(data.size(0), dims.particle_size());
+  SPIEL_DCHECK_EQ(target.size(0), 1);
+}
+
+ParticlesInContext::ParticlesInContext(torch::Tensor data, torch::Tensor target)
+// Make sure the data point is just a view!
+    : DataPoint(data, target) { SPIEL_DCHECK_TRUE(is_valid_view()); }
 
 float_net& ParticlesInContext::num_particles() {
   return data_ptr()[num_particles_offset()];
-}
-
-absl::Span<float_net> ParticlesInContext::public_features(int particle) {
-  SPIEL_DCHECK_LT(particle, dims.max_particles);
-  return absl::MakeSpan(
-      &particle_data_ptr(particle)[public_features_offset()],
-      dims.public_features_size);
-}
-
-absl::Span<float_net> ParticlesInContext::hand_features(int particle) {
-  SPIEL_DCHECK_LT(particle, dims.max_particles);
-  return absl::MakeSpan(
-      &particle_data_ptr(particle)[hand_features_offset()],
-      dims.hand_features_size);
-}
-
-absl::Span<float_net> ParticlesInContext::player_features(int particle) {
-  SPIEL_DCHECK_LT(particle, dims.max_particles);
-  return absl::MakeSpan(
-      &particle_data_ptr(particle)[player_offset()],
-      dims.player_features_size);
-}
-
-float& ParticlesInContext::range(int particle) {
-  SPIEL_DCHECK_LT(particle, dims.max_particles);
-  SPIEL_DCHECK_EQ(dims.range_size, 1);
-  return particle_data_ptr(particle)[range_offset()];
-}
-
-float& ParticlesInContext::value(int particle) {
-  SPIEL_DCHECK_LT(particle, dims.max_particles);
-  return target_ptr()[particle];
 }
 
 BatchData::BatchData(int batch_size, int input_size, int output_size)
@@ -86,8 +95,8 @@ BatchData::BatchData(int batch_size, int input_size, int output_size)
   SPIEL_CHECK_GT(output_size, 0);
 }
 
-ParticlesInContext BatchData::point_at(const ParticleDims& dims, int index) {
-  return ParticlesInContext(dims, data[index], target[index]);
+ParticlesInContext BatchData::point_at(int index) {
+  return ParticlesInContext(data[index], target[index]);
 }
 
 void BatchData::Reset() {

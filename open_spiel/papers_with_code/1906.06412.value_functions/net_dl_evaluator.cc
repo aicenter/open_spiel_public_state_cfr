@@ -39,9 +39,9 @@ void NetEvaluator::EvaluatePublicState(
   torch::NoGradGuard no_grad_guard;  // We run only inference.
   auto* hand_context = open_spiel::down_cast<HandContext*>(context);
 
-  ParticlesInContext point = batch_->point_at(*dims_, 0);
+  ParticlesInContext point = batch_->point_at(0);
   SPIEL_DCHECK_TRUE(point.is_valid_view());
-  WriteParticles(*state, *hand_context, &point);
+  WriteParticles(*state, *hand_context, *dims_, &point);
 
   torch::Tensor input = point.data.to(*device_);
   torch::Tensor output = model_->forward(input);

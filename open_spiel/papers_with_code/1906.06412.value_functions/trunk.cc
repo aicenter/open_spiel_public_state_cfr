@@ -80,27 +80,28 @@ void AddExperiencesFromTrunk(
     if (leaf.IsTerminal()) continue;  // Add experiences only for non-terminals.
     ParticlesInContext data_point = replay->AddExperience(dims);
     SPIEL_DCHECK_TRUE(data_point.is_valid_view());
-    WriteParticles(leaf, *hand_contexts[i], &data_point);
+    WriteParticles(leaf, *hand_contexts[i], dims, &data_point);
   }
 }
 
 void WriteParticles(const algorithms::dlcfr::LeafPublicState& state,
-                    const HandContext& hand_context, ParticlesInContext* point) {
+                    const HandContext& hand_context, const ParticleDims& dims,
+                    ParticlesInContext* point) {
   point->Reset();
-  int particle = 0;
+  int particle_index = 0;
   for (int pl = 0; pl < 2; ++pl) {
     for (int j = 0; j < state.leaf_nodes[pl].size(); j++) {
-      Copy(state.public_tensor.Tensor(),
-           point->public_features(particle));
-      Copy(hand_context.hand_features[pl][j].Tensor(),
-           point->hand_features(particle));
-      point->player_features(particle)[pl] = 1.;
-      point->range(particle) = state.ranges[pl][j];
-      point->value(particle) = state.values[pl][j];
-      particle++;
+      ParticleData particle = point->particle_at(dims, particle_index);
+
+      Copy(state.public_tensor.Tensor(), particle.public_features());
+      Copy(hand_context.hand_features[pl][j].Tensor(), particle.hand_features());
+      particle.player_features()[pl] = 1.;
+      particle.range() = state.ranges[pl][j];
+      particle.value() = state.values[pl][j];
+      particle_index++;
     }
   }
-  point->num_particles() = particle;
+  point->num_particles() = particle_index;
 }
 
 HandContext::HandContext(const algorithms::dlcfr::LeafPublicState& leaf_state,
