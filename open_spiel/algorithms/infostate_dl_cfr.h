@@ -231,31 +231,6 @@ struct CFREvaluator : public LeafEvaluator {
                            PublicStateContext* context) const override;
 };
 
-// -- Range table --------------------------------------------------------------
-
-struct RangeTable {
-  // Bijection between ranges coming from infostate tree (x)
-  // and the input position (y), called also hand, for each public state.
-  // This is used for encoding NN inputs (resp. outputs).
-  // Forward:  tree  -> input positions
-  // Backward: output positions -> tree
-  std::vector<BijectiveContainer<size_t>> bijections;
-
-  // List all possible private observations ("hands") for each player.
-  // Their vector indices represent the input position for each public state.
-  std::vector<Observation> private_hands;
-
-  RangeTable(int num_public_states) : bijections(num_public_states) {}
-  size_t largest_range() const;
-  size_t hand_index(const Observation& obs);
-};
-
-std::vector<RangeTable> CreateRangeTables(
-    const Game& game,
-    const std::shared_ptr<Observer>& hand_observer,
-    const std::vector<dlcfr::LeafPublicState>& public_leaves);
-
-void DebugPrintRangeTables(const std::vector<dlcfr::RangeTable>& tables);
 
 }  // namespace dlcfr
 }  // namespace algorithms

@@ -17,6 +17,7 @@
 
 #include "torch/torch.h"
 
+#include "open_spiel/papers_with_code/1906.06412.value_functions/range_table.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_architectures.h"
 #include "open_spiel/spiel.h"
 
@@ -26,7 +27,6 @@ namespace papers_with_code {
 using PublicStateContext = algorithms::dlcfr::PublicStateContext;
 using LeafPublicState = algorithms::dlcfr::LeafPublicState;
 using LeafEvaluator = algorithms::dlcfr::LeafEvaluator;
-using RangeTable = algorithms::dlcfr::RangeTable;
 
 class NetEvaluator final : public LeafEvaluator {
   ValueNet* model_;
