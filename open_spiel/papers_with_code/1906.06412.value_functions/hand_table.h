@@ -15,23 +15,27 @@
 #ifndef OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_HAND_TABLE_
 #define OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_HAND_TABLE_
 
+#include "open_spiel/algorithms/infostate_tree.h"
 #include "open_spiel/algorithms/infostate_dl_cfr.h"
 
 namespace open_spiel {
 namespace papers_with_code {
 
-struct HandTable {
-  // Bijection between ranges coming from infostate tree (x)
-  // and the input position (y), called also hand, for each public state.
-  // This is used for encoding NN inputs (resp. outputs).
-  // Forward:  tree  -> input positions
-  // Backward: output positions -> tree
-  std::vector<BijectiveContainer<size_t>> bijections;
-  // TODO: use DecisionIds and PublicStateIds for identification,
-  //  now we have untyped ints all over the place!
+// Bijection between ranges coming from infostate tree (x)
+// and the input position (y), called also hand, for each public state.
+// This is used for encoding NN inputs (resp. outputs).
+struct HandMapping : BijectiveContainer<size_t> {
+  const std::map<size_t, size_t>& tree_to_net() const { return x2y; }
+  const std::map<size_t, size_t>& net_to_tree() const { return y2x; }
+};
 
-  // List all possible private observations ("hands") for each player.
-  // Their vector indices represent the input position for each public state.
+// Store all possible private hands within a trunk for one player.
+struct HandTable {
+  // Hand mapping per public state.
+  std::vector<HandMapping> bijections;
+
+  // List all possible private observations ("hands") for the player.
+  // Their vector indices represent their network's input position.
   std::vector<Observation> private_hands;
 
   HandTable(int num_public_states) : bijections(num_public_states) {}
