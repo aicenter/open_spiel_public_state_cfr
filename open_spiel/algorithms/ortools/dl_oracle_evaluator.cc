@@ -408,7 +408,8 @@ std::unique_ptr<dlcfr::PublicStateContext> OracleEvaluator::CreateContext(
 void RecursivelyRefineSpecFixStrategyWithPolicy(
     const InfostateNode* player_node,
     const Policy& fixed_policy,
-    SequenceFormLpSpecification* specification) {
+    SequenceFormLpSpecification* specification,
+    double strategy_epsilon) {
   if (player_node->type() == kDecisionInfostateNode) {
     ActionsAndProbs local_policy =
         fixed_policy.GetStatePolicy(player_node->infostate_string());
@@ -418,13 +419,15 @@ void RecursivelyRefineSpecFixStrategyWithPolicy(
       std::unordered_map<const InfostateNode*, NodeSpecification>& node_spec =
           specification->node_spec();
 
-      for (int i = 0; i < player_node->num_children(); ++i) {
+      const int num_actions = player_node->num_children();
+      for (int i = 0; i < num_actions; ++i) {
         const InfostateNode* player_child = player_node->child_at(i);
         SPIEL_DCHECK_EQ(player_node->legal_actions()[i], local_policy[i].first);
         SPIEL_DCHECK_TRUE(node_spec[player_node].var_reach_prob);
         SPIEL_DCHECK_TRUE(node_spec[player_child].var_reach_prob);
 
-        const double prob = local_policy[i].second;
+        const double prob = (1. - strategy_epsilon) * local_policy[i].second
+                          + strategy_epsilon / num_actions;
         // Creates a constraint: prob * r(parent) = r(child)
         opres::MPConstraint* ct = specification->solver()->MakeRowConstraint(0., 0.);
         ct->SetCoefficient(node_spec[player_node].var_reach_prob, prob);
@@ -435,28 +438,31 @@ void RecursivelyRefineSpecFixStrategyWithPolicy(
 
   for (const InfostateNode* player_child : player_node->child_iterator()) {
     RecursivelyRefineSpecFixStrategyWithPolicy(
-        player_child, fixed_policy, specification);
+        player_child, fixed_policy, specification, strategy_epsilon);
   }
 }
 
 double ComputeRootValueWhileFixingStrategy(
     SequenceFormLpSpecification* specification, const Policy& fixed_policy,
-    Player fixed_player) {
+    Player fixed_player, double strategy_epsilon) {
   specification->SpecifyLinearProgram(fixed_player);
   RecursivelyRefineSpecFixStrategyWithPolicy(
-      specification->trees()[fixed_player]->mutable_root(), fixed_policy, specification);
+      specification->trees()[fixed_player]->mutable_root(),
+      fixed_policy, specification, strategy_epsilon);
   return specification->Solve();
 }
 
 double TrunkExploitability(SequenceFormLpSpecification* spec,
-                           const Policy& trunk_policy) {
-  return (- ComputeRootValueWhileFixingStrategy(spec, trunk_policy, 0)
-          - ComputeRootValueWhileFixingStrategy(spec, trunk_policy, 1)) / 2.;
+                           const Policy& trunk_policy,
+                           double strategy_epsilon) {
+  return (- ComputeRootValueWhileFixingStrategy(spec, trunk_policy, 0, strategy_epsilon)
+          - ComputeRootValueWhileFixingStrategy(spec, trunk_policy, 1, strategy_epsilon)) / 2.;
 }
 
 double TrunkPlayerExploitability(
     SequenceFormLpSpecification* spec, const Policy& trunk_policy,
-    Player p, absl::optional<double> maybe_game_value) {
+    Player p, absl::optional<double> maybe_game_value,
+    double strategy_epsilon) {
   double game_value;
   if (maybe_game_value.has_value()) {
     game_value = maybe_game_value.value();
@@ -467,7 +473,7 @@ double TrunkPlayerExploitability(
   // Switch sign appropriately - game value is defined for player 0!
   const double root_value = game_value * (1 - 2*p);
   const double fixed_value =
-      ComputeRootValueWhileFixingStrategy(spec, trunk_policy, p);
+      ComputeRootValueWhileFixingStrategy(spec, trunk_policy, p, strategy_epsilon);
   return root_value - fixed_value;
 }
 
