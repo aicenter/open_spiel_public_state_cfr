@@ -14,7 +14,7 @@
 // limitations under the License.
 
 
-#include "open_spiel/papers_with_code/1906.06412.value_functions/range_table.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/hand_table.h"
 
 #include "open_spiel/utils/format_observation.h"
 
@@ -23,11 +23,10 @@ namespace papers_with_code {
 
 using namespace open_spiel::algorithms;
 
-// -- Range table --------------------------------------------------------------
 
-size_t RangeTable::largest_range() const { return private_hands.size(); }
+size_t HandTable::num_hands() const { return private_hands.size(); }
 
-size_t RangeTable::hand_index(const Observation& hand) {
+size_t HandTable::hand_index(const Observation& hand) {
   auto it = std::find(private_hands.begin(), private_hands.end(), hand);
   if (it == private_hands.end()) {
     private_hands.push_back(hand);
@@ -84,15 +83,15 @@ bool AllStatesHaveSameHands(const Observation& expected_hand, Player player,
   return true;
 }
 
-std::vector<RangeTable> CreateRangeTables(
+std::vector<HandTable> CreateHandTables(
     const Game& game, const std::shared_ptr<Observer>& hand_observer,
     const std::vector<dlcfr::LeafPublicState>& public_leaves) {
-  std::vector<RangeTable> tables{public_leaves.size(), public_leaves.size()};
+  std::vector<HandTable> tables{public_leaves.size(), public_leaves.size()};
   Observation hand(game, hand_observer);
   for (int state_idx = 0; state_idx < public_leaves.size(); ++state_idx) {
     const dlcfr::LeafPublicState& state = public_leaves[state_idx];
     // Terminal states are not handled by non-terminal leaf evaluators,
-    // so we don't need to create range table for them.
+    // so we don't need to create hand table for them.
     if (state.IsTerminal()) {
       continue;
     }
@@ -118,10 +117,11 @@ std::vector<RangeTable> CreateRangeTables(
   return tables;
 }
 
-void DebugPrintRangeTables(const std::vector<RangeTable>& tables) {
+void DebugPrintHandTables(const std::vector<HandTable>& tables) {
+  SPIEL_CHECK_EQ(tables.size(), 2);
   for (int pl = 0; pl < 2; ++pl) {
     std::cout << "# List of private hands for player " << pl << "\n";
-    const RangeTable& table = tables[pl];
+    const HandTable& table = tables[pl];
     for (int i = 0; i < table.private_hands.size(); ++i) {
       std::cout << "#   private_hand[" << i << "]:\n#      "
                 << ObservationToString(table.private_hands[i], "\n#      ")

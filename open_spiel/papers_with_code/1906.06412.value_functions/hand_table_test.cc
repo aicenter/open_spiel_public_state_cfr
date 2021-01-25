@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "open_spiel/papers_with_code/1906.06412.value_functions/range_table.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/hand_table.h"
 #include "open_spiel/algorithms/infostate_dl_cfr.h"
 
 
@@ -31,17 +31,17 @@ struct DummyEvaluator : public algorithms::dlcfr::LeafEvaluator {
       algorithms::dlcfr::PublicStateContext* context) const override {};
 };
 
-void TestCreateRangeTable() {
+void TestCreateHandTable() {
   std::shared_ptr<const Game> game = LoadGame("kuhn_poker");
   std::shared_ptr<Observer> hand_observer = game->MakeObserver(kHandObsType, {});
   auto leaf_evaluator = std::make_shared<DummyEvaluator>();
   algorithms::dlcfr::DepthLimitedCFR dl_cfr(game, 3, leaf_evaluator, nullptr);
 
-  std::vector<RangeTable> tables = CreateRangeTables(*game, hand_observer,
-                                                     dl_cfr.public_leaves());
+  std::vector<HandTable> tables = CreateHandTables(*game, hand_observer,
+                                                   dl_cfr.public_leaves());
   SPIEL_CHECK_EQ(tables.size(), game->NumPlayers());
 
-  for (const RangeTable& player_table : tables) {
+  for (const HandTable& player_table : tables) {
     SPIEL_CHECK_EQ(player_table.private_hands.size(), 3);
     SPIEL_CHECK_EQ(player_table.bijections.size(),
                    dl_cfr.public_leaves().size());
@@ -59,6 +59,6 @@ void TestCreateRangeTable() {
 }  // namespace open_spiel
 
 int main(int argc, char** argv) {
-  open_spiel::papers_with_code::TestCreateRangeTable();
+  open_spiel::papers_with_code::TestCreateHandTable();
 }
 

@@ -54,15 +54,15 @@ Trunk::Trunk(const std::string& game_name, int depth, std::string use_bandits_fo
       MakeBanditVectors(trunk_trees, use_bandits_for_cfr));
 
   // 3. Make a Batch of data that encompasses all leaf public states.
-  tables = CreateRangeTables(*game, hand_observer,
-                             fixable_trunk_with_oracle->public_leaves());
+  tables = CreateHandTables(*game, hand_observer,
+                            fixable_trunk_with_oracle->public_leaves());
   const dlcfr::LeafPublicState& some_leaf =
       fixable_trunk_with_oracle->public_leaves().at(0);
 
   dims = std::make_unique<ParticleDims>();
   dims->public_features_size = some_leaf.public_tensor.Tensor().size();
   for (int pl = 0; pl < 2; ++pl) {
-    dims->net_ranges_size[pl] = tables[pl].largest_range();
+    dims->net_ranges_size[pl] = tables[pl].num_hands();
   }
   num_leaves = fixable_trunk_with_oracle->public_leaves().size();
   num_non_terminal_leaves = 0;

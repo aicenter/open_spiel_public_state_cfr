@@ -8,8 +8,8 @@ add_library(paper_value_functions OBJECT
   net_data.cc
   net_dl_evaluator.cc
   net_dl_evaluator.h
-  range_table.h
-  range_table.cc
+  hand_table.h
+  hand_table.cc
   torch_utils.cc
   torch_utils.h
   train_eval.h
@@ -29,8 +29,8 @@ macro(add_paper_executable NAME SOURCES)
 endmacro()
 
 add_paper_executable(train_eval_loop train_eval_loop.cc)
-add_paper_executable(value_functions_train_eval_test train_eval_test.cc)
-add_paper_executable(range_table_test range_table_test.cc)
+add_paper_executable(train_eval_test train_eval_test.cc)
+add_paper_executable(range_table_test hand_table_test.cc)
 
 add_paper_executable(value_fn_convergence value_fn_convergence.cc)
 target_link_libraries(value_fn_convergence

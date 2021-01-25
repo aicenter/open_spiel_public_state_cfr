@@ -19,7 +19,7 @@
 #include "open_spiel/algorithms/infostate_dl_cfr.h"
 #include "open_spiel/algorithms/ortools/dl_oracle_evaluator.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_data.h"
-#include "open_spiel/papers_with_code/1906.06412.value_functions/range_table.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/hand_table.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_dl_evaluator.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/experience_replay.h"
 #include "open_spiel/spiel.h"
@@ -45,7 +45,7 @@ struct Trunk {
   std::shared_ptr<algorithms::dlcfr::CFREvaluator> oracle_evaluator;
   std::unique_ptr<algorithms::dlcfr::DepthLimitedCFR> fixable_trunk_with_oracle;
   std::unique_ptr<algorithms::dlcfr::DepthLimitedCFR> iterable_trunk_with_oracle;
-  std::vector<RangeTable> tables;
+  std::vector<HandTable> tables;
   std::unique_ptr<ParticleDims> dims;
   std::vector<std::unique_ptr<HandContext>> hand_contexts;
   int num_leaves;

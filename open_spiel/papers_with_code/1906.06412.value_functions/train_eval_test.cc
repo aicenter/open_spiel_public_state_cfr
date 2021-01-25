@@ -31,7 +31,7 @@ using namespace algorithms;
 constexpr size_t kSeed = 0;
 
 
-void PrepareTestData(const std::vector<dlcfr::RangeTable>& tables,
+void PrepareTestData(const std::vector<HandTable>& tables,
                      dlcfr::DepthLimitedCFR* trunk, BatchData* batch,
                      std::mt19937& rnd_gen) {
   RandomizeStrategy(trunk->bandits(), rnd_gen, /*prob_pure_strat=*/0.9);

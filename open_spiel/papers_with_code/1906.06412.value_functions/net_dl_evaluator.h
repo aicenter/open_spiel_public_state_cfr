@@ -17,7 +17,7 @@
 
 #include "torch/torch.h"
 
-#include "open_spiel/papers_with_code/1906.06412.value_functions/range_table.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/hand_table.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_architectures.h"
 #include "open_spiel/spiel.h"
 
@@ -31,7 +31,7 @@ using LeafEvaluator = algorithms::dlcfr::LeafEvaluator;
 class NetEvaluator final : public LeafEvaluator {
   ValueNet* model_;
   torch::Device* device_;
-  const std::vector<RangeTable>& tables_;
+  const std::vector<HandTable>& tables_;
   BatchData* batch_;
   ParticleDims* const dims_;
   std::shared_ptr<const Game> game_;
@@ -39,7 +39,7 @@ class NetEvaluator final : public LeafEvaluator {
 
  public:
   NetEvaluator(ValueNet* model, torch::Device* device,
-               const std::vector<RangeTable>& tables,
+               const std::vector<HandTable>& tables,
                BatchData* batch, ParticleDims* const dims,
                std::shared_ptr<const Game> game,
                std::shared_ptr<Observer> hand_observer)
