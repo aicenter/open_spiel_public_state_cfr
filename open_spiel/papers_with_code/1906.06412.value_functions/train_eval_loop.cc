@@ -174,8 +174,7 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
                        t->dims->point_output_size());
 
   auto net_evaluator = std::make_shared<NetEvaluator>(
-      &model, &device, t->tables, &eval_batch, t->dims.get(),
-      t->game, t->hand_observer);
+      &model, &device, t->tables, &eval_batch, t->dims.get());
   auto trunk_with_net = std::make_unique<dlcfr::DepthLimitedCFR>(
       t->game, t->trunk_trees, net_evaluator, t->terminal_evaluator,
       t->public_observer,

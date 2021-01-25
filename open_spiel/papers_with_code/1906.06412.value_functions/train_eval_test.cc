@@ -186,8 +186,7 @@ void KuhnLearningTest(KuhnLearnCase learning_case) {
 
   // 2. Create trunk net evaluator.
   auto net_evaluator = std::make_shared<NetEvaluator>(
-      &model, &device, t->game, t->infostate_observer,
-      t->tables, t->batch.get());
+      &model, &device, t->tables, t->batch.get());
   auto trunk_with_net = std::make_unique<dlcfr::DepthLimitedCFR>(
       t->game, t->trunk_trees, net_evaluator, t->terminal_evaluator,
       t->public_observer,

@@ -27,13 +27,6 @@
 namespace open_spiel {
 namespace papers_with_code {
 
-// Public state context that stores hand observations for each infostate node.
-struct HandContext : public PublicStateContext {
-  std::array<std::vector<Observation>, 2> hand_features;
-  HandContext(const algorithms::dlcfr::LeafPublicState& leaf_state,
-              Observation& hand_observation);
-};
-
 struct Trunk {
   std::shared_ptr<const Game> game;
   int trunk_depth;
@@ -47,7 +40,6 @@ struct Trunk {
   std::unique_ptr<algorithms::dlcfr::DepthLimitedCFR> iterable_trunk_with_oracle;
   std::vector<HandTable> tables;
   std::unique_ptr<ParticleDims> dims;
-  std::vector<std::unique_ptr<HandContext>> hand_contexts;
   int num_leaves;
   int num_non_terminal_leaves;
 
@@ -60,13 +52,12 @@ std::unique_ptr<Trunk> MakeTrunk(const std::string& game_name, int trunk_depth,
 
 void AddExperiencesFromTrunk(
     const std::vector<algorithms::dlcfr::LeafPublicState>& public_leaves,
-    const std::vector<std::unique_ptr<HandContext>>& hand_contexts,
-    const ParticleDims& dims,
+    const std::vector<HandTable>& hand_tables, const ParticleDims& dims,
     ExperienceReplay* replay);
 
 void WriteParticles(const algorithms::dlcfr::LeafPublicState& state,
-                    const HandContext& hand_context, const ParticleDims& dims,
-                    ParticlesInContext* point);
+                    const std::vector<HandTable>& hand_tables,
+                    const ParticleDims& dims, ParticlesInContext* point);
 
 void inline Copy(absl::Span<const float> source, absl::Span<float> target) {
   SPIEL_CHECK_LE(source.size(), target.size());

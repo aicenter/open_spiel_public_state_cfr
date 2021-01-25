@@ -27,6 +27,8 @@ struct HandTable {
   // Forward:  tree  -> input positions
   // Backward: output positions -> tree
   std::vector<BijectiveContainer<size_t>> bijections;
+  // TODO: use DecisionIds and PublicStateIds for identification,
+  //  now we have untyped ints all over the place!
 
   // List all possible private observations ("hands") for each player.
   // Their vector indices represent the input position for each public state.
@@ -35,6 +37,7 @@ struct HandTable {
   HandTable(int num_public_states) : bijections(num_public_states) {}
   size_t num_hands() const;
   size_t hand_index(const Observation& obs);
+  const Observation& hand_observation_at(int public_id, int infostate_id) const;
 };
 
 std::vector<HandTable> CreateHandTables(

@@ -31,23 +31,16 @@ using LeafEvaluator = algorithms::dlcfr::LeafEvaluator;
 class NetEvaluator final : public LeafEvaluator {
   ValueNet* model_;
   torch::Device* device_;
-  const std::vector<HandTable>& tables_;
+  const std::vector<HandTable>& hand_tables_;
   BatchData* batch_;
   ParticleDims* const dims_;
-  std::shared_ptr<const Game> game_;
-  std::shared_ptr<Observer> hand_observer_;
 
  public:
   NetEvaluator(ValueNet* model, torch::Device* device,
                const std::vector<HandTable>& tables,
-               BatchData* batch, ParticleDims* const dims,
-               std::shared_ptr<const Game> game,
-               std::shared_ptr<Observer> hand_observer)
-      : model_(model), device_(device), tables_(tables), batch_(batch),
-        dims_(dims), game_(game), hand_observer_(hand_observer) {}
-
-  std::unique_ptr<PublicStateContext> CreateContext(
-      const LeafPublicState& leaf_state) const override;
+               BatchData* batch, ParticleDims* const dims)
+      : model_(model), device_(device), hand_tables_(tables), batch_(batch),
+        dims_(dims) {}
 
   void EvaluatePublicState(LeafPublicState* state,
                            PublicStateContext* context) const override;

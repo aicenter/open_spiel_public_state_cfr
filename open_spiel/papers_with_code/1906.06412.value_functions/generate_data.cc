@@ -99,7 +99,7 @@ void GenerateDataRandomRanges(Trunk* trunk, ExperienceReplay* replay,
   // Copy the leaves values to the experience replay.
   AddExperiencesFromTrunk(
       trunk->fixable_trunk_with_oracle->public_leaves(),
-      trunk->hand_contexts, *trunk->dims, replay);
+      trunk->tables, *trunk->dims, replay);
 
 //  if (verbose) {
 //    for (int i = 0; i < batch->batch_size; ++i) {
@@ -123,7 +123,7 @@ void GenerateDataDLCfrIterations(
     trunk->iterable_trunk_with_oracle->EvaluateLeaves();
 
     AddExperiencesFromTrunk(trunk->iterable_trunk_with_oracle->public_leaves(),
-                            trunk->hand_contexts, *trunk->dims, replay);
+                            trunk->tables, *trunk->dims, replay);
     monitor_fn(iter);
 
     trunk->iterable_trunk_with_oracle->UpdateTrunk();

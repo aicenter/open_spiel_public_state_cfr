@@ -36,6 +36,12 @@ size_t HandTable::hand_index(const Observation& hand) {
   }
 }
 
+const Observation& HandTable::hand_observation_at(int public_id,
+                                                  int infostate_id) const {
+  int hand_index = bijections.at(public_id).tree_to_net().at(infostate_id);
+  return private_hands.at(hand_index);
+}
+
 bool AllInfoStatesHaveDistinctHands(
     const Game& game, const std::shared_ptr<Observer>& hand_observer,
     Player pl, const dlcfr::LeafPublicState& state) {

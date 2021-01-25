@@ -73,19 +73,20 @@ Trunk::Trunk(const std::string& game_name, int depth, std::string use_bandits_fo
 
 void AddExperiencesFromTrunk(
     const std::vector<algorithms::dlcfr::LeafPublicState>& public_leaves,
-    const std::vector<std::unique_ptr<HandContext>>& hand_contexts,
+    const std::vector<HandTable>& hand_tables,
     const ParticleDims& dims, ExperienceReplay* replay) {
   for (int i = 0; i < public_leaves.size(); ++i) {
     const dlcfr::LeafPublicState& leaf = public_leaves[i];
     if (leaf.IsTerminal()) continue;  // Add experiences only for non-terminals.
     ParticlesInContext data_point = replay->AddExperience(dims);
     SPIEL_DCHECK_TRUE(data_point.is_valid_view());
-    WriteParticles(leaf, *hand_contexts[i], dims, &data_point);
+    WriteParticles(leaf, hand_tables, dims, &data_point);
   }
 }
 
 void WriteParticles(const algorithms::dlcfr::LeafPublicState& state,
-                    const HandContext& hand_context, const ParticleDims& dims,
+                    const std::vector<HandTable>& hand_tables,
+                    const ParticleDims& dims,
                     ParticlesInContext* point) {
   point->Reset();
   int particle_index = 0;
@@ -94,7 +95,8 @@ void WriteParticles(const algorithms::dlcfr::LeafPublicState& state,
       ParticleData particle = point->particle_at(dims, particle_index);
 
       Copy(state.public_tensor.Tensor(), particle.public_features());
-      Copy(hand_context.hand_features[pl][j].Tensor(), particle.hand_features());
+      Copy(hand_tables[pl].hand_observation_at(state.public_id, j).Tensor(),
+           particle.hand_features());
       particle.player_features()[pl] = 1.;
       particle.range() = state.ranges[pl][j];
       particle.value() = state.values[pl][j];
@@ -102,20 +104,6 @@ void WriteParticles(const algorithms::dlcfr::LeafPublicState& state,
     }
   }
   point->num_particles() = particle_index;
-}
-
-HandContext::HandContext(const algorithms::dlcfr::LeafPublicState& leaf_state,
-                         Observation& hand_observation) {
-  for (int pl = 0; pl < 2; ++pl) {
-    hand_features[pl].reserve(leaf_state.leaf_nodes[pl].size());
-
-    for (const InfostateNode* leaf_node : leaf_state.leaf_nodes[pl]) {
-      SPIEL_CHECK_FALSE(leaf_node->corresponding_states().empty());
-      const auto& some_state = leaf_node->corresponding_states()[0];
-      hand_observation.SetFrom(*some_state, pl);
-      hand_features[pl].push_back(hand_observation);
-    }
-  }
 }
 
 }  // namespace papers_with_code

@@ -20,16 +20,6 @@ namespace papers_with_code {
 
 using namespace open_spiel::algorithms;
 
-std::unique_ptr<PublicStateContext> NetEvaluator::CreateContext(
-    const LeafPublicState& leaf_state) const {
-  if (leaf_state.IsTerminal()) {
-    return nullptr;
-  }
-
-  Observation hand_observation(*game_, hand_observer_);
-  return std::make_unique<HandContext>(leaf_state, hand_observation);
-}
-
 // TODO: evaluate all public states with a batch.
 void NetEvaluator::EvaluatePublicState(
     algorithms::dlcfr::LeafPublicState* state,
@@ -37,11 +27,10 @@ void NetEvaluator::EvaluatePublicState(
   SPIEL_DCHECK_FALSE(state->IsTerminal());  // Only non-terminal leafs.
   SPIEL_DCHECK_TRUE(context);
   torch::NoGradGuard no_grad_guard;  // We run only inference.
-  auto* hand_context = open_spiel::down_cast<HandContext*>(context);
 
   ParticlesInContext point = batch_->point_at(0);
   SPIEL_DCHECK_TRUE(point.is_valid_view());
-  WriteParticles(*state, *hand_context, *dims_, &point);
+  WriteParticles(*state, hand_tables_, *dims_, &point);
 
   torch::Tensor input = point.data.to(*device_);
   torch::Tensor output = model_->forward(input);
