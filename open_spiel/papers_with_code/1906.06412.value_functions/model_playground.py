@@ -32,9 +32,9 @@ import sys
 torch.manual_seed(42)
 
 # dim_b = 2            # Test batch size.
-dim_b = 5000         # Batch size.
-dim_m = 20
-dim_q = dim_m * 2    # Positioned value and a binary mask.
+dim_b = 1000         # Batch size.
+dim_m = 10
+dim_q = dim_m + 1    # Positioned value and a binary mask.
 dim_c = dim_m        # Size of the contextual embedding.
 min_seq_len = dim_m  # Minimal subset size of queries.
 
@@ -59,11 +59,17 @@ def make_data(num_points=dim_b, f=linear):
   return xs, ys
 
 
-def make_query(x):
-  diags = torch.diag_embed(x)
-  eyes = torch.eye(dim_m).expand_as(diags)
-  return torch.cat((diags, eyes), dim=2)
+# def make_query(x):
+#   diags = torch.diag_embed(x)
+#   eyes = torch.eye(dim_m).expand_as(diags)
+#   return torch.cat((diags, eyes), dim=2)
 
+
+def make_query(x):
+  dim_b, dim_m = x.shape
+  eyes = torch.eye(dim_m).expand(dim_b, -1, -1)
+  xs = x.unsqueeze(dim=2)
+  return torch.cat((xs, eyes), dim=2)
 
 def make_particle_data(num_points=dim_b, min_seq_len=dim_m, f=linear, permute=True):
   x = torch.rand((num_points, dim_m))
@@ -164,12 +170,12 @@ class ContextualModel(torch.nn.Module):
   def __init__(self):
     super(ContextualModel, self).__init__()
     self.fc_context_regression = torch.nn.Linear(dim_c, dim_m, bias=False)
-    self.fc_kernel = torch.nn.Linear(dim_q, dim_c, bias=False)
+    self.fc_kernel = torch.nn.Linear(dim_q - 1, dim_c, bias=False)
 
   def kernel(self, qs):
     assert qs.shape[1:] == (dim_q, )
-    ks = self.fc_kernel.forward(qs)                    ; assert ks.shape[1:]   == (dim_c, )
-    return ks
+    ks = self.fc_kernel.forward(qs[:, 1:])             ; assert ks.shape[1:]   == (dim_c, )
+    return ks * qs[:, 0]
 
   def pool(self, xs):
     assert xs.shape[1:] == (dim_c, )
@@ -310,7 +316,7 @@ if __name__ == '__main__':
   args = parser.parse_args()
 
   print("steps,train_loss,test_loss")
-  particle_model_experiment(args.num_particles)
+  # particle_model_experiment(args.num_particles)
   # linear_model_experiment()
-  # contextual_model_experiment()
+  contextual_model_experiment()
   # pw_linear_model_experiment()
