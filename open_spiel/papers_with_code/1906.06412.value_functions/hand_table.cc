@@ -36,6 +36,10 @@ size_t HandTable::hand_index(const Observation& hand) {
   }
 }
 
+size_t HandTable::hand_tensor_size() const {
+  return private_hands.back().Tensor().size();
+}
+
 const Observation& HandTable::hand_observation_at(int public_id,
                                                   int infostate_id) const {
   int hand_index = bijections.at(public_id).tree_to_net().at(infostate_id);

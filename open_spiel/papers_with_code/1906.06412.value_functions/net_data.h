@@ -29,8 +29,13 @@ using float_tree = double;  // Floats used in the cfr computation.
 
 // Our base class. Data points are always a view
 // to the underlying storage, placed within a batch of data.
-struct DataPoint : torch::data::Example<>{
-  using torch::data::Example<>::Example;
+struct DataPoint : torch::data::Example<> {
+  DataPoint(torch::Tensor data, torch::Tensor target)
+      : torch::data::Example<>(data, target) {
+    // Make sure the data point is just a view!
+    SPIEL_DCHECK_TRUE(is_valid_view());
+  }
+
   // Zeros-out inputs and outputs.
   void Reset();
   // Check if the data point is still a valid view:
@@ -47,6 +52,7 @@ struct BasicDims {
   int hand_features_size;
   std::array<int, 2> net_ranges_size;
   const int player_features_size = 2;
+  bool write_hand_features_positionally = false;
 
   // I/O sizes so we know how to construct batch data.
   virtual int point_input_size() const = 0;
@@ -72,6 +78,14 @@ struct ParticleDims final : public BasicDims {
 };
 
 // A single particle.
+//
+// The data is arranged as:
+// - public_features
+// - hand_features
+// - player_features
+// - range
+//
+// The target is a single float: value.
 struct ParticleData final : DataPoint {
   const ParticleDims& dims;
   ParticleData(const ParticleDims& particle_dims,

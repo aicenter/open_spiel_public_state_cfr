@@ -34,7 +34,7 @@ ABSL_FLAG(int, num_width, 3, "Multiplicative constant of the number "
                              "of neurons per layer.");
 ABSL_FLAG(int, num_trunks, 100, "Size of experience replay in terms of trunks");
 ABSL_FLAG(int, seed, 0, "Seed.");
-ABSL_FLAG(std::string, use_bandits_for_cfr, "PredictiveRegretMatchingPlus",
+ABSL_FLAG(std::string, use_bandits_for_cfr, "RegretMatchingPlus",
           "Which bandit should be used in the trunk.");
 ABSL_FLAG(std::string, data_generation, "random", "One of random,dl_cfr");
 ABSL_FLAG(double, prob_pure_strat, 0.1, "Params for random generation.");
@@ -137,9 +137,11 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   std::cout << "# Number of non-terminal public states: "
             << t->num_non_terminal_leaves << "\n";
   std::cout << "# Public features: " << t->dims->public_features_size << "\n";
+  std::cout << "# Hand features: " << t->dims->hand_features_size << "\n";
   std::cout << "# Ranges size: " << t->dims->net_ranges_size << "\n";
-  std::cout << "# Net input size: " << t->dims->point_input_size() << "\n";
-  std::cout << "# Net output size: " << t->dims->point_output_size() << "\n";
+  std::cout << "# Point input size: " << t->dims->point_input_size() << "\n";
+  std::cout << "# Point output size: " << t->dims->point_output_size() << "\n";
+  std::cout << "# Max particles: " << t->dims->max_particles << "\n";
   SPIEL_CHECK_GT(t->num_non_terminal_leaves, 0);  // The trunk is too deep?
 
   const ExpReplayInitPolicy init_policy =

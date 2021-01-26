@@ -21,8 +21,10 @@
 namespace open_spiel {
 namespace papers_with_code {
 
-// Bijection between ranges coming from infostate tree (x)
-// and the input position (y), called also hand, for each public state.
+// A bijection within the scope of a public state. This is a mapping between
+// LeafPublicState::ranges coming from the tree (x) and the input position
+// of the neural network (y) which is assigned according to player's private
+// hands across all public states of the trunk.
 // This is used for encoding NN inputs (resp. outputs).
 struct HandMapping : BijectiveContainer<size_t> {
   const std::map<size_t, size_t>& tree_to_net() const { return x2y; }
@@ -35,12 +37,13 @@ struct HandTable {
   std::vector<HandMapping> bijections;
 
   // List all possible private observations ("hands") for the player.
-  // Their vector indices represent their network's input position.
+  // Their position in the vector is the same as their network's input position.
   std::vector<Observation> private_hands;
 
   HandTable(int num_public_states) : bijections(num_public_states) {}
   size_t num_hands() const;
   size_t hand_index(const Observation& obs);
+  size_t hand_tensor_size() const;
   const Observation& hand_observation_at(int public_id, int infostate_id) const;
 };
 

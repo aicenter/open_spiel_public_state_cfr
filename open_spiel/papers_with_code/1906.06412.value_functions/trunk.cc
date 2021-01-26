@@ -63,7 +63,16 @@ Trunk::Trunk(const std::string& game_name, int depth, std::string use_bandits_fo
   dims->public_features_size = some_leaf.public_tensor.Tensor().size();
   for (int pl = 0; pl < 2; ++pl) {
     dims->net_ranges_size[pl] = tables[pl].num_hands();
+    if (!dims->write_hand_features_positionally) {
+      dims->hand_features_size = tables[pl].hand_tensor_size();
+    }
   }
+  if (dims->write_hand_features_positionally) {
+    // Max per table, because we already encode player id as a feature.
+    dims->hand_features_size = std::max(tables[0].num_hands(),
+                                        tables[1].num_hands());
+  }
+  dims->max_particles = tables[0].num_hands() + tables[1].num_hands();
   num_leaves = fixable_trunk_with_oracle->public_leaves().size();
   num_non_terminal_leaves = 0;
   for (auto& leaf: fixable_trunk_with_oracle->public_leaves()) {
@@ -79,24 +88,38 @@ void AddExperiencesFromTrunk(
     const dlcfr::LeafPublicState& leaf = public_leaves[i];
     if (leaf.IsTerminal()) continue;  // Add experiences only for non-terminals.
     ParticlesInContext data_point = replay->AddExperience(dims);
-    SPIEL_DCHECK_TRUE(data_point.is_valid_view());
     WriteParticles(leaf, hand_tables, dims, &data_point);
   }
 }
 
+// Rewrite all private hands into one-hot encoded positional hands.
+// The size of the encoding should be supplied and should be equal
+// to the maximum of the number of the private hands over the players.
+void WritePositionalHand(const HandMapping& map, int infostate_id,
+                         absl::Span<float_net> write_to) {
+  int net_id = map.tree_to_net().at(infostate_id);
+  std::fill(write_to.begin(), write_to.end(), 0.);
+  write_to[net_id] = 1.;
+}
+
 void WriteParticles(const algorithms::dlcfr::LeafPublicState& state,
                     const std::vector<HandTable>& hand_tables,
-                    const ParticleDims& dims,
-                    ParticlesInContext* point) {
+                    const ParticleDims& dims, ParticlesInContext* point) {
   point->Reset();
   int particle_index = 0;
   for (int pl = 0; pl < 2; ++pl) {
     for (int j = 0; j < state.leaf_nodes[pl].size(); j++) {
       ParticleData particle = point->particle_at(dims, particle_index);
-
       Copy(state.public_tensor.Tensor(), particle.public_features());
-      Copy(hand_tables[pl].hand_observation_at(state.public_id, j).Tensor(),
-           particle.hand_features());
+      // Hand features.
+      if(dims.write_hand_features_positionally) {
+        WritePositionalHand(hand_tables[pl].bijections[state.public_id], j,
+                            particle.hand_features());
+      } else {
+        const Observation& hand_observation =
+            hand_tables[pl].hand_observation_at(state.public_id, j);
+        Copy(hand_observation.Tensor(), particle.hand_features());
+      }
       particle.player_features()[pl] = 1.;
       particle.range() = state.ranges[pl][j];
       particle.value() = state.values[pl][j];
@@ -104,6 +127,21 @@ void WriteParticles(const algorithms::dlcfr::LeafPublicState& state,
     }
   }
   point->num_particles() = particle_index;
+}
+
+void CopyValuesNetToTree(ParticlesInContext data_point,
+                         algorithms::dlcfr::LeafPublicState& state,
+                         const std::vector<HandTable>& hand_tables,
+                         const ParticleDims& dims) {
+  int particle_index = 0;
+  for (int pl = 0; pl < 2; ++pl) {
+    for (int j = 0; j < state.leaf_nodes[pl].size(); j++) {
+      ParticleData particle = data_point.particle_at(dims, particle_index);
+      state.values[pl][j] = particle.value();
+      particle_index++;
+    }
+  }
+  SPIEL_CHECK_EQ(data_point.num_particles(), particle_index);
 }
 
 }  // namespace papers_with_code

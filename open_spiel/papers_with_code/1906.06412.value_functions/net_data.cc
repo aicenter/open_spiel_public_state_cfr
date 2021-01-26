@@ -45,7 +45,11 @@ ParticleData ParticlesInContext::particle_at(const ParticleDims& dims,
           /*start=*/offset + dims.particle_size() * particle_index,
           /*end=*/offset + dims.particle_size() * (particle_index + 1),
           /*step=*/1),
-      target[particle_index]);
+      // Technically, this is just one float, but let's pass a slice,
+      // so that it is a proper view with # of dimensions = 1
+      // (and not 0 for scalar). This makes it easy to reuse the code.
+      target.slice(/*dim=*/0, /*start=*/particle_index,
+                   /*end=*/particle_index + 1, /*step=*/1));
 }
 
 
@@ -70,17 +74,14 @@ float& ParticleData::value() {
 }
 
 ParticleData::ParticleData(const ParticleDims& particle_dims,
-                           torch::Tensor data,
-                           torch::Tensor target)
+                           torch::Tensor data, torch::Tensor target)
     : DataPoint(data, target), dims(particle_dims) {
-  SPIEL_DCHECK_TRUE(is_valid_view());
   SPIEL_DCHECK_EQ(data.size(0), dims.particle_size());
   SPIEL_DCHECK_EQ(target.size(0), 1);
 }
 
 ParticlesInContext::ParticlesInContext(torch::Tensor data, torch::Tensor target)
-// Make sure the data point is just a view!
-    : DataPoint(data, target) { SPIEL_DCHECK_TRUE(is_valid_view()); }
+    : DataPoint(data, target) {}
 
 float_net& ParticlesInContext::num_particles() {
   return data_ptr()[num_particles_offset()];

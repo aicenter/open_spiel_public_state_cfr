@@ -64,6 +64,11 @@ void inline Copy(absl::Span<const float> source, absl::Span<float> target) {
   std::copy(source.begin(), source.end(), target.begin());
 }
 
+void CopyValuesNetToTree(ParticlesInContext data_point,
+                         algorithms::dlcfr::LeafPublicState& state,
+                         const std::vector<HandTable>& hand_tables,
+                         const ParticleDims& dims);
+
 
 }  // namespace papers_with_code
 }  // namespace open_spiel

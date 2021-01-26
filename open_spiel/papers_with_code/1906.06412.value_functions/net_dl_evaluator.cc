@@ -25,19 +25,20 @@ void NetEvaluator::EvaluatePublicState(
     algorithms::dlcfr::LeafPublicState* state,
     algorithms::dlcfr::PublicStateContext* context) const {
   SPIEL_DCHECK_FALSE(state->IsTerminal());  // Only non-terminal leafs.
-  SPIEL_DCHECK_TRUE(context);
+  SPIEL_DCHECK_FALSE(context);
   torch::NoGradGuard no_grad_guard;  // We run only inference.
 
   ParticlesInContext point = batch_->point_at(0);
-  SPIEL_DCHECK_TRUE(point.is_valid_view());
   WriteParticles(*state, hand_tables_, *dims_, &point);
 
-  torch::Tensor input = point.data.to(*device_);
-  torch::Tensor output = model_->forward(input);
+  // Input must be batched.
+  torch::Tensor input = point.data.to(*device_).unsqueeze(/*dim=*/0);
+  // The output must be "unbatched".
+  torch::Tensor output = model_->forward(input).squeeze(/*dim=*/0);
   SPIEL_DCHECK_EQ(output.sizes(), point.target.sizes());
+  SPIEL_DCHECK_EQ(output.size(/*dim=*/0), dims_->point_output_size());
   point.target.copy_(output);
-  // TODO
-//  CopyValuesNetToTree(point, *state, tables_);
+  CopyValuesNetToTree(point, *state, hand_tables_, *dims_);
 }
 
 }  // namespace papers_with_code
