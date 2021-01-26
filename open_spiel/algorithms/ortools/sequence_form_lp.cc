@@ -182,7 +182,9 @@ double SequenceFormLpSpecification::Solve() {
 //    solver_->ExportModelAsLpFormat(false, &out);
 //    std::cout << out << "\n";
 //  }
-  SPIEL_CHECK_EQ(status, opres::MPSolver::ResultStatus::OPTIMAL);
+  if (status != opres::MPSolver::ResultStatus::OPTIMAL) {
+    return nan("");
+  }
   return -solver_->Objective().Value();
 }
 
