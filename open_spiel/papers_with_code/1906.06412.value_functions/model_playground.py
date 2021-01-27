@@ -33,7 +33,7 @@ torch.manual_seed(42)
 
 # dim_b = 2            # Test batch size.
 dim_b = 1000         # Batch size.
-dim_m = 10
+dim_m = 4
 dim_q = dim_m + 1    # Positioned value and a binary mask.
 dim_c = dim_m        # Size of the contextual embedding.
 min_seq_len = dim_m  # Minimal subset size of queries.
@@ -236,13 +236,20 @@ class ParticleModel(torch.nn.Module):
     super(ParticleModel, self).__init__()
     self.fc_context_regression = torch.nn.Linear(dim_c, dim_m, bias=False)
     self.fc_query = torch.nn.Linear(dim_q, dim_m, bias=False)
-    self.fc_kernel = torch.nn.Linear(dim_q, dim_c, bias=False)
+    self.fc_kernel = torch.nn.Linear(dim_q - 1, dim_c, bias=False)
     self.register_parameter("proj", torch.nn.Parameter(torch.randn(dim_c, dim_q)))
 
   def kernel(self, qs):
     assert qs.shape[1:] == (dim_q, )
-    ks = self.fc_kernel.forward(qs)                    ; assert ks.shape[1:]   == (dim_c, )
+    ks = self.fc_kernel.forward(qs[:, 1:])             ; assert ks.shape[1:]   == (dim_c, )
     return ks
+
+  def kernel_and_scale(self, qs):
+    assert qs.shape[1:] == (dim_q, )
+    magnitudes = qs[:, 0].unsqueeze(dim=1)             ; assert magnitudes.shape[1:] == (1, )
+    ks = self.fc_kernel.forward(qs[:, 1:])             ; assert ks.shape[1:]   == (dim_c, )
+    ys = ks * magnitudes
+    return ys
 
   def pool(self, xs):
     assert xs.shape[1:] == (dim_c, )
@@ -254,7 +261,7 @@ class ParticleModel(torch.nn.Module):
     contexts = xs[:, :dim_c]                           ; assert contexts.shape == (dim_b, dim_c)
     queries = xs[:, dim_c:]                            ; assert queries.shape  == (dim_b, dim_q)
     cs = self.fc_context_regression(contexts)          ; assert cs.shape       == (dim_b, dim_m)
-    qs = self.fc_query(queries)                        ; assert qs.shape       == (dim_b, dim_m)
+    qs = self.kernel(queries)                          ; assert qs.shape       == (dim_b, dim_m)
     ys = (cs * qs).sum(dim=1).unsqueeze(dim=1)         ; assert ys.shape       == (dim_b, 1)
     return ys
 
@@ -268,7 +275,7 @@ class ParticleModel(torch.nn.Module):
     for b, aligned_xs in enumerate(xss.split(1, dim=0)):
       dim_s = seq_lengths[b]
       xs = aligned_xs[:, :dim_s, :].squeeze(dim=0)         ; assert xs.shape                == (dim_s, dim_q)
-      context = self.pool(self.kernel(xs))                 ; assert context.shape           == (dim_c, )
+      context = self.pool(self.kernel_and_scale(xs))                 ; assert context.shape           == (dim_c, )
       contexts = context.expand(dim_s, -1)                 ; assert contexts.shape          == (dim_s, dim_c)
       context_and_query = torch.cat((contexts, xs), dim=1) ; assert context_and_query.shape == (dim_s, dim_c + dim_q)
       contexts_with_queries.append(context_and_query)
@@ -284,9 +291,13 @@ def particle_model_experiment(num_particles):
   loss_fn = torch.nn.MSELoss()
 
   X_train, Y_train, X_train_seq_lens = make_particle_data(
-      num_points=dim_b, min_seq_len=num_particles)
+      num_points=dim_b, min_seq_len=num_particles, permute=True)
   X_test, Y_test, X_test_seq_lens = make_particle_data(
-      num_points=dim_b, min_seq_len=num_particles)
+      num_points=dim_b, min_seq_len=num_particles, permute=True)
+
+  if dim_b == 2:
+    print(X_train)
+    print(Y_train)
 
   try:
     for i in range(10000):
@@ -316,7 +327,7 @@ if __name__ == '__main__':
   args = parser.parse_args()
 
   print("steps,train_loss,test_loss")
-  # particle_model_experiment(args.num_particles)
+  particle_model_experiment(dim_m)
   # linear_model_experiment()
-  contextual_model_experiment()
+  # contextual_model_experiment()
   # pw_linear_model_experiment()
