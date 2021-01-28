@@ -40,8 +40,7 @@ inline void CHECK_SHAPE(const torch::Tensor& tensor,
                         std::initializer_list<int64_t> shape) {}
 #endif
 
-// Load all of the Slice, Ellipsis, etc.
-using namespace torch::indexing;
+using namespace torch::indexing;  // Load all of the Slice, Ellipsis, etc.
 
 void ValueNet::MakeLayers(std::vector<torch::nn::Linear>& layers, int num_layers,
                      int inputs_size, int hidden_size, int outputs_size) {
@@ -82,79 +81,115 @@ torch::Tensor PositionalValueNet::forward(torch::Tensor x) {
 
 // -- ParticleValueNet ---------------------------------------------------------
 
-ParticleValueNet::ParticleValueNet(ParticleDims* particle_dims,
+ParticleValueNet::ParticleValueNet(ParticleDims* particle_dims, int batch_size,
                                    ActivationFunction activation)
-    : dims(particle_dims), activation_fn(activation) {
+    : dims(particle_dims), activation_fn(activation),
+      max_batch_size(batch_size) {
   int dim_context = context_size();
   int num_layers_kernel = 4;
   int num_layers_context = 3;
 
-  MakeLayers(fc_kernel, num_layers_kernel,
+  MakeLayers(fc_basis, num_layers_kernel,
              dims->particle_size() - 1, dims->particle_size(), dim_context);
   MakeLayers(fc_context, num_layers_context,
-             dim_context, dim_context * 3, dims->max_particles);
-  RegisterLayers(fc_kernel, "fc_kernel_");
+             dim_context, dim_context * 3, regression_size());
+  RegisterLayers(fc_basis, "fc_basis_");
   RegisterLayers(fc_context, "fc_context_");
+
+//  forward_out = torch::zeros({max_batch_size, dims->max_particles});
 }
 
-torch::Tensor ParticleValueNet::kernel(torch::Tensor xs) {                      CHECK_SHAPE(xs, {_, dims->particle_size()});
-  torch::Tensor coords = xs.index({  // Skip the range input.
-      Slice(), Slice(0, dims->particle_size() - 1)});                           CHECK_SHAPE(coords, {_, dims->particle_size() - 1});
-  torch::Tensor ranges = xs.index({  // Skip all features.
-      Slice(), Slice(dims->particle_size() - 1, dims->particle_size())});       CHECK_SHAPE(ranges, {_, 1});
-
-  for (int i = 0; i < fc_kernel.size() - 1; ++i) {
-    coords = fc_kernel[i]->forward(coords);
-    coords = Activation(activation_fn, coords);
+torch::Tensor ParticleValueNet::change_of_basis(torch::Tensor fs) {             CHECK_SHAPE(fs, {_, dims->features_size()});
+  for (int i = 0; i < fc_basis.size() - 1; ++i) {
+    fs = fc_basis[i]->forward(fs);
+    fs = Activation(activation_fn, fs);
   }
-  coords = fc_kernel.back()->forward(coords);                                   CHECK_SHAPE(coords, {_, context_size()});
-  torch::Tensor ks = coords.mul(ranges);                                        CHECK_SHAPE(ks, {_, context_size()});
-  return ks;
+  torch::Tensor bs = fc_basis.back()->forward(fs);                             CHECK_SHAPE(bs, {_, context_size()});
+  return bs;
 }
 
-torch::Tensor ParticleValueNet::pool(torch::Tensor xs) {                        CHECK_SHAPE(xs, {_, context_size()});
-  torch::Tensor context = torch::sum(xs, {0});                                  CHECK_SHAPE(context, {context_size()});
+torch::Tensor ParticleValueNet::base_coordinates(torch::Tensor bs,
+                                                 torch::Tensor scales) {
+  CHECK_SHAPE(bs, {_, context_size()});
+  CHECK_SHAPE(scales, {_, 1});
+  torch::Tensor cs = bs.mul(scales);                                            CHECK_SHAPE(cs, {_, context_size()});
+  return cs;
+}
+
+torch::Tensor ParticleValueNet::pool(torch::Tensor cs) {                        CHECK_SHAPE(cs, {_, context_size()});
+  torch::Tensor context = torch::sum(cs, {0});                                  CHECK_SHAPE(context, {context_size()});
   return context;
 }
 
-torch::Tensor ParticleValueNet::regression(torch::Tensor xs) {
+torch::Tensor ParticleValueNet::regression(torch::Tensor xs) {                  CHECK_SHAPE(xs, {1, context_size()});
   for (int i = 0; i < fc_context.size() - 1; ++i) {
     xs = fc_context[i]->forward(xs);
     xs = Activation(activation_fn, xs);
   }
-  xs = fc_context.back()->forward(xs);                                          CHECK_SHAPE(xs, {_, positional_output()});
+  xs = fc_context.back()->forward(xs);                                          CHECK_SHAPE(xs, {1, regression_size()});
   return xs;
 }
 
 torch::Tensor ParticleValueNet::forward(torch::Tensor xss) {
   int batch_size = xss.size(0);
+  SPIEL_CHECK_LE(batch_size, max_batch_size);
   CHECK_SHAPE(xss, {batch_size, dims->point_input_size()});
 
-  std::vector<torch::Tensor> contexts;
-  contexts.reserve(batch_size);
-  for (torch::Tensor xs : xss.split(/*split_size=*/1, /*dim=*/0)) {             CHECK_SHAPE(xs, {1, dims->point_input_size()});
-    xs = xs.squeeze(/*dim=*/0);                                                 CHECK_SHAPE(xs, {dims->point_input_size()});
+//  forward_out.retain_grad();
+//  forward_out.zero_();  // Reset the output tensor.
+
+  std::vector<torch::Tensor> out;
+  out.reserve(batch_size);
+
+  for (int i = 0; i < batch_size; ++i) {
+    torch::Tensor xs = xss[i];                                                  CHECK_SHAPE(xs, {dims->point_input_size()});
     // Convert fp32 to int -- for our small numbers < 1e7 this is ok.
     int num_particles = xs[0].item<float_net>();                                SPIEL_CHECK_GT(num_particles, 0);
-    SPIEL_CHECK_LT(num_particles, 1e7);
+                                                                                SPIEL_CHECK_LT(num_particles, 1e7);
     // Take only an ordered subset of particles, as specified by the amount.
-    if (limit_particle_count > 0) {
+    if (is_training() && limit_particle_count > 0) {
       num_particles = std::min(num_particles, limit_particle_count);
     }
 
     const int num_particles_offset = 1;
     torch::Tensor particles = xs
         // Skip the num_particles item.
-        .index({ Slice(1, num_particles_offset + num_particles * dims->particle_size()) })
+        .index({ Slice(1, num_particles_offset
+                          + num_particles * dims->particle_size()) })
         // Rearrange into particles.
         .reshape({num_particles, dims->particle_size()});                       CHECK_SHAPE(particles, {num_particles, dims->particle_size()});
-    torch::Tensor context = pool(kernel(particles)).unsqueeze(/*dim=*/0);       CHECK_SHAPE(context, {1, context_size()});
-    contexts.push_back(context);
-  }
 
-  torch::Tensor batches = torch::cat(contexts, /*dim=*/0);                      CHECK_SHAPE(batches, {batch_size, context_size()});
-  torch::Tensor ys = regression(batches);                                       CHECK_SHAPE(ys, {batch_size, positional_output()});
-  return ys;
+    torch::Tensor fs = particles  // Skip the range input (as the last value).
+        .index({Slice(), Slice(0, dims->features_size())});                     CHECK_SHAPE(fs, {num_particles, dims->features_size()});
+    torch::Tensor ranges = particles  // Skip all features.
+        .index({Slice(), Slice(dims->features_size(), dims->particle_size())}); CHECK_SHAPE(ranges, {num_particles, 1});
+
+    torch::Tensor bs = change_of_basis(fs);                                     CHECK_SHAPE(bs, {num_particles, context_size()});
+    torch::Tensor cs = base_coordinates(bs, ranges);                            CHECK_SHAPE(cs, {num_particles, context_size()});
+    torch::Tensor context = pool(cs).unsqueeze(/*dim=*/0);                      CHECK_SHAPE(context, {1, context_size()});
+    torch::Tensor ys = regression(context).expand({num_particles, -1});         CHECK_SHAPE(ys, {num_particles, regression_size()});
+    torch::Tensor proj = (ys * bs).sum(/*dim=*/1).unsqueeze(0);                 CHECK_SHAPE(proj, {1, num_particles});
+    out.push_back(proj);
+//    forward_out.index_put_({i, Slice(0, num_particles)}, proj);
+  }
+  return torch::cat(out, /*dim=*/1);
+//  // Return slice of the same size as the input batch.
+//  return forward_out.index({Slice(0, batch_size), Slice()});
+}
+
+torch::Tensor ParticleValueNet::PrepareTarget(BatchData* batch) {
+  torch::Tensor particles_data = batch->data.index({Slice(), 0});
+
+  std::vector<torch::Tensor> target_slices;
+  target_slices.reserve(batch->size());
+  for (int i = 0; i < batch->size(); ++i) {
+    int num_particles = particles_data[i].item<int>();
+    if (limit_particle_count > 0) {
+      num_particles = std::min(num_particles, limit_particle_count);
+    }
+    target_slices.push_back(batch->target.index({i, Slice(0, num_particles)}));
+  }
+  return torch::cat(target_slices).unsqueeze(/*dim=*/0);
 }
 
 }  // namespace papers_with_code

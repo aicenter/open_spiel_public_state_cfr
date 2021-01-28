@@ -69,11 +69,13 @@ struct ParticleDims final : public BasicDims {
   }
   int point_output_size() const override { return max_particles; }
 
-  int particle_size() const {
+  int features_size() const {
     return public_features_size
          + hand_features_size
-         + player_features_size
-         + range_size;
+         + player_features_size;
+  }
+  int particle_size() const {
+    return features_size() + range_size;
   }
 };
 

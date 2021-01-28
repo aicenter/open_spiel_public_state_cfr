@@ -18,12 +18,14 @@ namespace open_spiel {
 namespace papers_with_code {
 
 using namespace algorithms;
+using namespace torch::indexing;  // Load all of the Slice, Ellipsis, etc.
 
-double TrainNetwork(ValueNet* model, torch::Device* device,
+double TrainNetwork(ParticleValueNet* model, torch::Device* device,
                            torch::optim::Optimizer* optimizer,
                            BatchData* batch) {
+  SPIEL_DCHECK_TRUE(model->is_training());
   torch::Tensor data = batch->data.to(*device);
-  torch::Tensor target = batch->target.to(*device);
+  torch::Tensor target = model->PrepareTarget(batch).to(*device);
   optimizer->zero_grad();
   torch::Tensor output = model->forward(data);
   torch::Tensor loss = torch::mse_loss(output, target);

@@ -5,19 +5,16 @@ import pandas as pd
 import os
 
 param_sweep = [
-  ("net_model", "positional_batched"),
-  ("game_name", "leduc.*"),
-  ("depth", ".*"),
   ("data_generation", ".*"),
-  ("prob_pure_strat", "0.1"),
+  ("limit_particle_count", ".*"),
 ]
 
 display_perm = [
-  ("net_model", "prob_pure_strat", "data_generation",),
-  ("game_name", "depth", ),
+  ("data_generation",),
+  ("limit_particle_count", ),
 ]
 
-base_dir = "./experiments/model_cmp"
+base_dir = "./experiments/limit_particles_kuhn"
 translation_map = {
   "goofspiel(players=2,num_cards=3,imp_info=True)": "GS 3 (rand)",
   "goofspiel(players=2,num_cards=3,imp_info=True,points_order=ascending)":
@@ -187,25 +184,19 @@ colors = plt.rcParams['axes.prop_cycle'].by_key()['color'][1:]
 
 def plot_item(ax, file, display_params, full_params):
   try:
-    game = str(full_params["game_name"])
-    depth = int(full_params["depth"])
+    game = "kuhn_poker" # str(full_params["game_name"])
+    depth = 3  # int(full_params["depth"])
     col = "expl[100]"
     v = target_expls[game][depth][6]
     ax.semilogy([0, 1000], [v, v], label=f"DL-CFR target")
 
-    for i, net_model in enumerate(["positional_batched", "particle_batched"]):
-      full_params.update({"net_model": net_model})
-      file = file_from_params(full_params)
-      if not os.path.exists(file):
-        continue
-      print(file)
-      df = pd.read_csv(file, comment="#", skip_blank_lines=True)
-      ax.semilogy(df.loop, df[col], c=colors[i], label=f"{col} {net_model}",
-                  alpha=1)
-      # ax.semilogy(df.loop, df[col].rolling(10).mean(), c=colors[i], label=f"{col} {net_model}")
-      # ax.semilogy(df.loop, df.avg_loss, c=colors[i], alpha=0.8)
+    print(file)
+    df = pd.read_csv(file, comment="#", skip_blank_lines=True)
+    ax.semilogy(df.loop, df[col], label=f"{col}", alpha=1)
+    # ax.semilogy(df.loop, df[col].rolling(10).mean(), c=colors[i], label=f"{col} {net_model}")
+    ax.semilogy(df.loop, df.avg_loss, label="mse loss", alpha=1)
 
-      # ax.set_ylim([1e-6, 1])
+    ax.set_ylim([1e-5, 1])
   except Exception as e:
     print(e)
     pass

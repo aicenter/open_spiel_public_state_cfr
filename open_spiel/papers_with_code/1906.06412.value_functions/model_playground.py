@@ -34,7 +34,8 @@ torch.manual_seed(42)
 # dim_b = 2            # Test batch size.
 dim_b = 1000         # Batch size.
 dim_m = 4
-dim_q = dim_m + 1    # Positioned value and a binary mask.
+dim_f = dim_m        # Features, i.e. binary mask.
+dim_q = dim_f + 1    # Positioned value and a binary mask.
 dim_c = dim_m        # Size of the contextual embedding.
 min_seq_len = dim_m  # Minimal subset size of queries.
 
@@ -235,61 +236,62 @@ class ParticleModel(torch.nn.Module):
   def __init__(self):
     super(ParticleModel, self).__init__()
     self.fc_context_regression = torch.nn.Linear(dim_c, dim_m, bias=False)
-    self.fc_kernel = torch.nn.Linear(dim_q - 1, dim_c, bias=False)
+    self.fc_change_of_basis = torch.nn.Linear(dim_f, dim_c, bias=False)
     self.fc_query1 = torch.nn.Linear(2*dim_m, 2*dim_m, bias=True)
     self.fc_query2 = torch.nn.Linear(2*dim_m, 2*dim_m, bias=True)
     self.fc_query_last = torch.nn.Linear(2*dim_m, 1, bias=True)
     self.register_parameter("proj", torch.nn.Parameter(torch.randn(dim_c, dim_q)))
 
-  def kernel(self, qs):
-    assert qs.shape[1:] == (dim_q, )
-    ks = self.fc_kernel.forward(qs[:, 1:])             ; assert ks.shape[1:]   == (dim_c, )
-    return ks
+  def change_of_basis(self, fs):
+    assert fs.shape[1:] == (dim_f,)
+    bs = self.fc_change_of_basis.forward(fs)                                    ; assert bs.shape[1:] == (dim_c,)
+    return bs
 
-  def kernel_and_scale(self, qs):
-    assert qs.shape[1:] == (dim_q, )
-    magnitudes = qs[:, 0].unsqueeze(dim=1)             ; assert magnitudes.shape[1:] == (1, )
-    ks = self.fc_kernel.forward(qs[:, 1:])             ; assert ks.shape[1:]   == (dim_c, )
-    ys = ks * magnitudes
-    return ys
+  def base_coordinates(self, bs, scales):
+    assert bs.shape[1:] == (dim_c,)
+    assert scales.shape[1:] == (1, )
+    cs = bs * scales
+    assert cs.shape[1:] == (dim_c, )
+    return cs
 
   def pool(self, xs):
     assert xs.shape[1:] == (dim_c, )
-    context = torch.sum(xs, dim=0)                     ; assert context.shape  == (dim_c, )
+    context = torch.sum(xs, dim=0)                                              ; assert context.shape  == (dim_c, )
     return context
 
-  def regression(self, xs):
-    dim_b = xs.shape[0]                                ; assert xs.shape       == (dim_b, dim_c + dim_q)
-    contexts = xs[:, :dim_c]                           ; assert contexts.shape == (dim_b, dim_c)
-    queries = xs[:, dim_c:]                            ; assert queries.shape  == (dim_b, dim_q)
-    cs = self.fc_context_regression(contexts)          ; assert cs.shape       == (dim_b, dim_m)
-    ks = self.kernel(queries)                          ; assert ks.shape       == (dim_b, dim_m)
-    # Use projection:
-    ys = (cs * ks).sum(dim=1).unsqueeze(dim=1)         ; assert ys.shape       == (dim_b, 1)
-    # # Use concat:
-    # cs_and_qs = torch.cat((cs, ks), dim=1)             ; assert cs_and_qs.shape == (dim_b, 2*dim_m)
-    # ys = torch.relu(self.fc_query1(cs_and_qs))         ; assert ys.shape       == (dim_b, 2*dim_m)
-    # # Optionally second layer
-    # ys = torch.relu(self.fc_query2(ys))                ; assert ys.shape       == (dim_b, 2*dim_m)
-    # ys = self.fc_query_last(ys)                        ; assert ys.shape       == (dim_b, 1)
+  def regression(self, context):
+    assert context.shape == (dim_c, )
+    ys = self.fc_context_regression(context)                                    ; assert ys.shape       == (dim_m, )
     return ys
 
   def forward(self, xss, seq_lengths):
     # xss.shape = [b, m, q]
     #   where sequence length is upper bounded to be `m`, but only a subset
     #   `seq_lengths[b]` is valid for given a point `b` in the batch.
-    dim_b = xss.shape[0]                                   ; assert xss.shape               == (dim_b, dim_m, dim_q)
+    dim_b = xss.shape[0]                                                        ; assert xss.shape               == (dim_b, dim_m, dim_q)
 
-    contexts_with_queries = []
+    yss = []
     for b, aligned_xs in enumerate(xss.split(1, dim=0)):
       dim_s = seq_lengths[b]
-      xs = aligned_xs[:, :dim_s, :].squeeze(dim=0)         ; assert xs.shape                == (dim_s, dim_q)
-      context = self.pool(self.kernel_and_scale(xs))                 ; assert context.shape           == (dim_c, )
-      contexts = context.expand(dim_s, -1)                 ; assert contexts.shape          == (dim_s, dim_c)
-      context_and_query = torch.cat((contexts, xs), dim=1) ; assert context_and_query.shape == (dim_s, dim_c + dim_q)
-      contexts_with_queries.append(context_and_query)
-    batches = torch.cat(contexts_with_queries, dim=0)      ; assert batches.shape           == (seq_lengths.sum(), dim_c + dim_q)
-    return self.regression(batches)
+      xs = aligned_xs[:, :dim_s, :].squeeze(dim=0)                              ; assert xs.shape                == (dim_s, dim_q)
+      scales = xs[:, 0].unsqueeze(dim=1)                                        ; assert scales.shape            == (dim_s, 1)
+      fs = xs[:, 1:]                                                            ; assert fs.shape                == (dim_s, dim_f)
+      bs = self.change_of_basis(fs)                                             ; assert bs.shape                == (dim_s, dim_c)
+      cs = self.base_coordinates(bs, scales)                                    ; assert cs.shape                == (dim_s, dim_c)
+      context = self.pool(cs)                                                   ; assert context.shape           == (dim_c, )
+      ys = self.regression(context).expand(dim_s, -1)                           ; assert ys.shape                == (dim_s, dim_m)
+      # Use projection of ys to bases bs:
+      projs = (ys * bs).sum(dim=1).unsqueeze(dim=1)                             ; assert projs.shape             == (dim_s, 1)
+      # # Use concat:
+      # cs_and_qs = torch.cat((cs, ks), dim=1)                                      ; assert cs_and_qs.shape == (dim_b, 2*dim_m)
+      # ys = torch.relu(self.fc_query1(cs_and_qs))                                  ; assert ys.shape       == (dim_b, 2*dim_m)
+      # # Optionally second layer
+      # ys = torch.relu(self.fc_query2(ys))                                         ; assert ys.shape       == (dim_b, 2*dim_m)
+      # ys = self.fc_query_last(ys)                                                 ; assert ys.shape       == (dim_b, 1)
+      yss.append(projs)
+
+    out = torch.cat(yss, dim=0)                                                 ; assert out.shape               == (seq_lengths.sum(), 1)
+    return out
 
 
 def particle_model_experiment(num_particles):
@@ -309,7 +311,7 @@ def particle_model_experiment(num_particles):
     print(Y_train)
 
   try:
-    for i in range(10000):
+    for i in range(100):
       optimizer.zero_grad()
       Y_train_pred = model.forward(X_train, X_train_seq_lens)
       Y_train_subset = subset_of_targets(Y_train, X_train_seq_lens)

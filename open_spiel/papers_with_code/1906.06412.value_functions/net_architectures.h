@@ -64,19 +64,24 @@ struct ParticleValueNet final : public ValueNet {
   ParticleDims* dims;
   ActivationFunction activation_fn;
   std::vector<torch::nn::Linear> fc_context;
-  std::vector<torch::nn::Linear> fc_kernel;
+  std::vector<torch::nn::Linear> fc_basis;
   int limit_particle_count = -1;
+  const int max_batch_size;
+  torch::Tensor forward_out;
 
-  ParticleValueNet(ParticleDims* particle_dims,
+  ParticleValueNet(ParticleDims* particle_dims, int max_batch_size,
                    ActivationFunction activation = kRelu);
 
-  torch::Tensor kernel(torch::Tensor xs);
+  torch::Tensor change_of_basis(torch::Tensor fs);
+  torch::Tensor base_coordinates(torch::Tensor bs, torch::Tensor scales);
   torch::Tensor pool(torch::Tensor xs);
   torch::Tensor regression(torch::Tensor xs);
   torch::Tensor forward(torch::Tensor xss);
 
+  torch::Tensor PrepareTarget(BatchData* batch);
+
   int context_size() { return dims->max_particles; }
-  int positional_output() { return dims->max_particles; }
+  int regression_size() { return dims->max_particles; }
 };
 
 #undef _

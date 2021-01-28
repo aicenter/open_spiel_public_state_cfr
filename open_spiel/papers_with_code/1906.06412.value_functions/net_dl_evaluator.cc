@@ -19,6 +19,7 @@ namespace open_spiel {
 namespace papers_with_code {
 
 using namespace open_spiel::algorithms;
+using namespace torch::indexing;  // Load all of the Slice, Ellipsis, etc.
 
 // TODO: evaluate all public states with a batch.
 void NetEvaluator::EvaluatePublicState(
@@ -26,10 +27,10 @@ void NetEvaluator::EvaluatePublicState(
     algorithms::dlcfr::PublicStateContext* context) const {
   SPIEL_DCHECK_FALSE(state->IsTerminal());  // Only non-terminal leafs.
   SPIEL_DCHECK_FALSE(context);
+  SPIEL_DCHECK_FALSE(model_->is_training());
   torch::NoGradGuard no_grad_guard;  // We run only inference.
 
   ParticlesInContext point = batch_->point_at(0);
-
   // !! Do not shuffle, so that we can get back the values in an ordered way !!
   WriteParticles(*state, hand_tables_, *dims_, &point,
                  nullptr, /*shuffle_input=*/false, /*shuffle_output=*/false);
@@ -38,9 +39,9 @@ void NetEvaluator::EvaluatePublicState(
   torch::Tensor input = point.data.to(*device_).unsqueeze(/*dim=*/0);
   // The output must be "unbatched".
   torch::Tensor output = model_->forward(input).squeeze(/*dim=*/0);
-  SPIEL_DCHECK_EQ(output.sizes(), point.target.sizes());
-  SPIEL_DCHECK_EQ(output.size(/*dim=*/0), dims_->point_output_size());
-  point.target.copy_(output);
+  SPIEL_DCHECK_EQ(output.sizes().size(), 1);
+  SPIEL_DCHECK_EQ(output.size(/*dim=*/0), point.num_particles());
+  point.target.index_put_({Slice(0, point.num_particles())}, output);
 
   // !! This does not work with shuffling !!
   CopyValuesNetToTree(point, *state, hand_tables_, *dims_);

@@ -28,7 +28,7 @@
 namespace open_spiel {
 namespace papers_with_code {
 
-double TrainNetwork(ValueNet* model, torch::Device* device,
+double TrainNetwork(ParticleValueNet* model, torch::Device* device,
                     torch::optim::Optimizer* optimizer,
                     BatchData* batch);
 
