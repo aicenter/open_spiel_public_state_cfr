@@ -137,6 +137,11 @@ torch::Tensor ParticleValueNet::forward(torch::Tensor xss) {
     // Convert fp32 to int -- for our small numbers < 1e7 this is ok.
     int num_particles = xs[0].item<float_net>();                                SPIEL_CHECK_GT(num_particles, 0);
     SPIEL_CHECK_LT(num_particles, 1e7);
+    // Take only an ordered subset of particles, as specified by the amount.
+    if (limit_particle_count > 0) {
+      num_particles = std::min(num_particles, limit_particle_count);
+    }
+
     const int num_particles_offset = 1;
     torch::Tensor particles = xs
         // Skip the num_particles item.

@@ -65,6 +65,7 @@ struct ParticleValueNet final : public ValueNet {
   ActivationFunction activation_fn;
   std::vector<torch::nn::Linear> fc_context;
   std::vector<torch::nn::Linear> fc_kernel;
+  int limit_particle_count = -1;
 
   ParticleValueNet(ParticleDims* particle_dims,
                    ActivationFunction activation = kRelu);

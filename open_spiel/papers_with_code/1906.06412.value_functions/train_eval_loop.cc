@@ -43,6 +43,8 @@ ABSL_FLAG(bool, shuffle_input, false,
           "Should experience replay particle data input be shuffled?");
 ABSL_FLAG(bool, shuffle_output, false,
           "Should experience replay particle data output be shuffled?");
+ABSL_FLAG(int, limit_particle_count, -1,
+          "How many particles should be used at most? -1 for all.");
 
 // -----------------------------------------------------------------------------
 
@@ -173,10 +175,12 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   // 1. Create network and optimizer.
   torch::Device device = FindDevice();
   ParticleValueNet model(t->dims.get(), ActivationFunction::kRelu);
+  model.limit_particle_count = absl::GetFlag(FLAGS_limit_particle_count);
   model.to(device);
   torch::optim::Adam optimizer(model.parameters());
 
   // 2. Create trunk net evaluator.
+  std::cout << "# Batch size: " << batch_size << "\n";
   BatchData train_batch(batch_size,
                         t->dims->point_input_size(),
                         t->dims->point_output_size());
