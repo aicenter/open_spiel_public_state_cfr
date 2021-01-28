@@ -5,8 +5,8 @@ import pandas as pd
 import os
 
 param_sweep = [
-  ("net_model", "particle_value_net"),
-  ("game_name", "kuhn.*"),
+  ("net_model", "positional_batched"),
+  ("game_name", "leduc.*"),
   ("depth", ".*"),
   ("data_generation", ".*"),
   ("prob_pure_strat", "0.1"),
@@ -189,18 +189,19 @@ def plot_item(ax, file, display_params, full_params):
   try:
     game = str(full_params["game_name"])
     depth = int(full_params["depth"])
-    col = "expl[20]"
-    v = target_expls[game][depth][4]
-    ax.semilogy([0, 300], [v, v], label=f"DL-CFR target")
+    col = "expl[100]"
+    v = target_expls[game][depth][6]
+    ax.semilogy([0, 1000], [v, v], label=f"DL-CFR target")
 
-    for i, net_model in enumerate(["particle_value_net", "positional_value_net"]):
+    for i, net_model in enumerate(["positional_batched", "particle_batched"]):
       full_params.update({"net_model": net_model})
       file = file_from_params(full_params)
       if not os.path.exists(file):
         continue
       print(file)
       df = pd.read_csv(file, comment="#", skip_blank_lines=True)
-      ax.semilogy(df.loop, df[col], c=colors[i]) #, alpha=0.2)
+      ax.semilogy(df.loop, df[col], c=colors[i], label=f"{col} {net_model}",
+                  alpha=1)
       # ax.semilogy(df.loop, df[col].rolling(10).mean(), c=colors[i], label=f"{col} {net_model}")
       # ax.semilogy(df.loop, df.avg_loss, c=colors[i], alpha=0.8)
 
