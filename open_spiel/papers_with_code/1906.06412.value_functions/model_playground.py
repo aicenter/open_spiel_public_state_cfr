@@ -235,8 +235,10 @@ class ParticleModel(torch.nn.Module):
   def __init__(self):
     super(ParticleModel, self).__init__()
     self.fc_context_regression = torch.nn.Linear(dim_c, dim_m, bias=False)
-    self.fc_query = torch.nn.Linear(dim_q, dim_m, bias=False)
     self.fc_kernel = torch.nn.Linear(dim_q - 1, dim_c, bias=False)
+    self.fc_query1 = torch.nn.Linear(2*dim_m, 2*dim_m, bias=True)
+    self.fc_query2 = torch.nn.Linear(2*dim_m, 2*dim_m, bias=True)
+    self.fc_query_last = torch.nn.Linear(2*dim_m, 1, bias=True)
     self.register_parameter("proj", torch.nn.Parameter(torch.randn(dim_c, dim_q)))
 
   def kernel(self, qs):
@@ -261,8 +263,15 @@ class ParticleModel(torch.nn.Module):
     contexts = xs[:, :dim_c]                           ; assert contexts.shape == (dim_b, dim_c)
     queries = xs[:, dim_c:]                            ; assert queries.shape  == (dim_b, dim_q)
     cs = self.fc_context_regression(contexts)          ; assert cs.shape       == (dim_b, dim_m)
-    qs = self.kernel(queries)                          ; assert qs.shape       == (dim_b, dim_m)
-    ys = (cs * qs).sum(dim=1).unsqueeze(dim=1)         ; assert ys.shape       == (dim_b, 1)
+    ks = self.kernel(queries)                          ; assert ks.shape       == (dim_b, dim_m)
+    # Use projection:
+    ys = (cs * ks).sum(dim=1).unsqueeze(dim=1)         ; assert ys.shape       == (dim_b, 1)
+    # # Use concat:
+    # cs_and_qs = torch.cat((cs, ks), dim=1)             ; assert cs_and_qs.shape == (dim_b, 2*dim_m)
+    # ys = torch.relu(self.fc_query1(cs_and_qs))         ; assert ys.shape       == (dim_b, 2*dim_m)
+    # # Optionally second layer
+    # ys = torch.relu(self.fc_query2(ys))                ; assert ys.shape       == (dim_b, 2*dim_m)
+    # ys = self.fc_query_last(ys)                        ; assert ys.shape       == (dim_b, 1)
     return ys
 
   def forward(self, xss, seq_lengths):
