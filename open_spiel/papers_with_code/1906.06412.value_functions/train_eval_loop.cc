@@ -152,9 +152,8 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   const int experience_replay_buffer_size =
       t->num_non_terminal_leaves * num_trunks;
   const int batch_size = absl::GetFlag(FLAGS_batch_size) > 0
-                   ? absl::GetFlag(FLAGS_batch_size)
-                   : experience_replay_buffer_size;
-  SPIEL_CHECK_GE(experience_replay_buffer_size, batch_size);  // Too big batch?
+      ? std::min(absl::GetFlag(FLAGS_batch_size), experience_replay_buffer_size)
+      : experience_replay_buffer_size;
 
   t->oracle_evaluator->num_cfr_iterations = cfr_oracle_iterations;
   torch::manual_seed(seed);
