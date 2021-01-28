@@ -4,7 +4,7 @@ import pandas as pd
 
 param_sweep = [
   ("target", ".*"),
-  ("model", ".*"),
+  ("model", "(particle_concat_1layer|particle_concat_2layer|particle_dotprod_nopos)"),
 ]
 
 display_perm = [

@@ -5,8 +5,8 @@ import pandas as pd
 import os
 
 param_sweep = [
-  ("net_model", "full_ct_nonpos_in_pos_out"),
-  ("game_name", "goofspiel.*"),
+  ("net_model", "particle_value_net"),
+  ("game_name", "kuhn.*"),
   ("depth", ".*"),
   ("data_generation", ".*"),
   ("prob_pure_strat", "0.1"),
@@ -193,15 +193,16 @@ def plot_item(ax, file, display_params, full_params):
     v = target_expls[game][depth][4]
     ax.semilogy([0, 300], [v, v], label=f"DL-CFR target")
 
-    for i, net_model in enumerate(["positional", "full_ct_nonpos_in_pos_out"]):
+    for i, net_model in enumerate(["particle_value_net", "positional_value_net"]):
       full_params.update({"net_model": net_model})
       file = file_from_params(full_params)
       if not os.path.exists(file):
         continue
       print(file)
       df = pd.read_csv(file, comment="#", skip_blank_lines=True)
-      ax.semilogy(df.loop, df[col], c=colors[i], label=f"{col} {net_model}")
-      ax.semilogy(df.loop, df.avg_loss, c=colors[i], alpha=0.8)
+      ax.semilogy(df.loop, df[col], c=colors[i]) #, alpha=0.2)
+      # ax.semilogy(df.loop, df[col].rolling(10).mean(), c=colors[i], label=f"{col} {net_model}")
+      # ax.semilogy(df.loop, df.avg_loss, c=colors[i], alpha=0.8)
 
       # ax.set_ylim([1e-6, 1])
   except Exception as e:
