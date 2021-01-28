@@ -39,6 +39,10 @@ ABSL_FLAG(std::string, use_bandits_for_cfr, "RegretMatchingPlus",
 ABSL_FLAG(std::string, data_generation, "random", "One of random,dl_cfr");
 ABSL_FLAG(double, prob_pure_strat, 0.1, "Params for random generation.");
 ABSL_FLAG(double, prob_fully_mixed, 0.05, "Params for random generation.");
+ABSL_FLAG(bool, shuffle_input, false,
+          "Should experience replay particle data input be shuffled?");
+ABSL_FLAG(bool, shuffle_output, false,
+          "Should experience replay particle data output be shuffled?");
 
 // -----------------------------------------------------------------------------
 
@@ -98,7 +102,10 @@ void FillExperienceReplay(ExpReplayInitPolicy init,
             std::cout << "# " << trunk_iter << ": "
                       << "expl = " << expl << std::endl;
           }
-        });
+        },
+        rnd_gen,
+        absl::GetFlag(FLAGS_shuffle_input),
+        absl::GetFlag(FLAGS_shuffle_output));
       break;
     }
 
@@ -109,7 +116,9 @@ void FillExperienceReplay(ExpReplayInitPolicy init,
         GenerateDataRandomRanges(trunk, experience_replay,
                                  absl::GetFlag(FLAGS_prob_pure_strat),
                                  absl::GetFlag(FLAGS_prob_fully_mixed),
-                                 rnd_gen);
+                                 rnd_gen,
+                                 absl::GetFlag(FLAGS_shuffle_input),
+                                 absl::GetFlag(FLAGS_shuffle_output));
       }
       std::cout << std::endl;
       break;
@@ -210,7 +219,7 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
     double cumul_loss = 0.;
     torch::Tensor output, loss;
     for (int i = 0; i < train_batches; ++i) {
-      // Train using generated data.
+      // Train using generated data. This data may be shuffled.
       experience_replay.SampleBatch(&train_batch, rnd_gen);
       cumul_loss += TrainNetwork(&model, &device, &optimizer, &train_batch);
       std::cout << '.' << std::flush;

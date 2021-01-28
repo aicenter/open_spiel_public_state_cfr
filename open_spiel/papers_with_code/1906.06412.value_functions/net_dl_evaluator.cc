@@ -29,7 +29,10 @@ void NetEvaluator::EvaluatePublicState(
   torch::NoGradGuard no_grad_guard;  // We run only inference.
 
   ParticlesInContext point = batch_->point_at(0);
-  WriteParticles(*state, hand_tables_, *dims_, &point);
+
+  // !! Do not shuffle, so that we can get back the values in an ordered way !!
+  WriteParticles(*state, hand_tables_, *dims_, &point,
+                 nullptr, /*shuffle_input=*/false, /*shuffle_output=*/false);
 
   // Input must be batched.
   torch::Tensor input = point.data.to(*device_).unsqueeze(/*dim=*/0);
@@ -38,6 +41,8 @@ void NetEvaluator::EvaluatePublicState(
   SPIEL_DCHECK_EQ(output.sizes(), point.target.sizes());
   SPIEL_DCHECK_EQ(output.size(/*dim=*/0), dims_->point_output_size());
   point.target.copy_(output);
+
+  // !! This does not work with shuffling !!
   CopyValuesNetToTree(point, *state, hand_tables_, *dims_);
 }
 

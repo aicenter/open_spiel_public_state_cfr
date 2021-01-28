@@ -83,12 +83,14 @@ Trunk::Trunk(const std::string& game_name, int depth, std::string use_bandits_fo
 void AddExperiencesFromTrunk(
     const std::vector<algorithms::dlcfr::LeafPublicState>& public_leaves,
     const std::vector<HandTable>& hand_tables,
-    const ParticleDims& dims, ExperienceReplay* replay) {
+    const ParticleDims& dims, ExperienceReplay* replay,
+    std::mt19937& rnd_gen, bool shuffle_input, bool shuffle_output) {
   for (int i = 0; i < public_leaves.size(); ++i) {
     const dlcfr::LeafPublicState& leaf = public_leaves[i];
     if (leaf.IsTerminal()) continue;  // Add experiences only for non-terminals.
     ParticlesInContext data_point = replay->AddExperience(dims);
-    WriteParticles(leaf, hand_tables, dims, &data_point);
+    WriteParticles(leaf, hand_tables, dims, &data_point,
+                   &rnd_gen, shuffle_input, shuffle_output);
   }
 }
 
@@ -104,12 +106,26 @@ void WritePositionalHand(const HandMapping& map, int infostate_id,
 
 void WriteParticles(const algorithms::dlcfr::LeafPublicState& state,
                     const std::vector<HandTable>& hand_tables,
-                    const ParticleDims& dims, ParticlesInContext* point) {
+                    const ParticleDims& dims, ParticlesInContext* point,
+                    std::mt19937* rnd_gen, bool shuffle_input, bool shuffle_output) {
   point->Reset();
-  int particle_index = 0;
+
+  // Make a random permutation if something should be shuffled.
+  int num_particles = state.leaf_nodes[0].size() + state.leaf_nodes[1].size();
+  std::vector<int> particle_placement(num_particles);
+  if (shuffle_input || shuffle_output) {
+    SPIEL_CHECK_TRUE(rnd_gen);
+    std::iota(particle_placement.begin(), particle_placement.end(), 0);
+    std::shuffle(particle_placement.begin(), particle_placement.end(),
+                 *rnd_gen);
+  }
+
+  // Write inputs
+  int i = 0;
   for (int pl = 0; pl < 2; ++pl) {
     for (int j = 0; j < state.leaf_nodes[pl].size(); j++) {
-      ParticleData particle = point->particle_at(dims, particle_index);
+      ParticleData particle = point->particle_at(
+          dims, shuffle_input ? particle_placement[i] : i);
       Copy(state.public_tensor.Tensor(), particle.public_features());
       // Hand features.
       if(dims.write_hand_features_positionally) {
@@ -122,11 +138,24 @@ void WriteParticles(const algorithms::dlcfr::LeafPublicState& state,
       }
       particle.player_features()[pl] = 1.;
       particle.range() = state.ranges[pl][j];
-      particle.value() = state.values[pl][j];
-      particle_index++;
+      i++;
     }
   }
-  point->num_particles() = particle_index;
+  SPIEL_CHECK_EQ(i, num_particles);
+
+  // Write outputs
+  i = 0;
+  for (int pl = 0; pl < 2; ++pl) {
+    for (int j = 0; j < state.leaf_nodes[pl].size(); j++) {
+      ParticleData particle = point->particle_at(
+          dims, shuffle_output ? particle_placement[i] : i);
+      particle.value() = state.values[pl][j];
+      i++;
+    }
+  }
+
+  SPIEL_CHECK_EQ(i, num_particles);
+  point->num_particles() = num_particles;
 }
 
 void CopyValuesNetToTree(ParticlesInContext data_point,

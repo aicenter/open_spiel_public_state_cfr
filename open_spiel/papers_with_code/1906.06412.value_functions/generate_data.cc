@@ -84,9 +84,10 @@ void RandomizeStrategy(std::vector<BanditVector>& bandits,
 }
 
 
-void GenerateDataRandomRanges(Trunk* trunk, ExperienceReplay* replay,
-                              double prob_pure_strat, double prob_fully_mixed,
-                              std::mt19937& rnd_gen) {
+void GenerateDataRandomRanges(
+    Trunk* trunk, ExperienceReplay* replay,
+    double prob_pure_strat, double prob_fully_mixed,
+    std::mt19937& rnd_gen, bool shuffle_input, bool shuffle_output) {
   trunk->fixable_trunk_with_oracle->Reset();
 
   // Randomize strategy in the trunk.
@@ -99,7 +100,8 @@ void GenerateDataRandomRanges(Trunk* trunk, ExperienceReplay* replay,
   // Copy the leaves values to the experience replay.
   AddExperiencesFromTrunk(
       trunk->fixable_trunk_with_oracle->public_leaves(),
-      trunk->tables, *trunk->dims, replay);
+      trunk->tables, *trunk->dims, replay,
+      rnd_gen, shuffle_input, shuffle_output);
 
 //  if (verbose) {
 //    for (int i = 0; i < batch->batch_size; ++i) {
@@ -115,7 +117,8 @@ void GenerateDataRandomRanges(Trunk* trunk, ExperienceReplay* replay,
 // when we use this generation method.
 void GenerateDataDLCfrIterations(
     Trunk* trunk, ExperienceReplay* replay, int trunk_iters,
-    std::function<void(/*trunk_iter=*/int)> monitor_fn) {
+    std::function<void(/*trunk_iter=*/int)> monitor_fn,
+    std::mt19937& rnd_gen, bool shuffle_input, bool shuffle_output) {
   trunk->iterable_trunk_with_oracle->Reset();
   for (int iter = 1; iter <= trunk_iters; ++iter) {
     ++trunk->iterable_trunk_with_oracle->num_iterations_;
@@ -123,7 +126,8 @@ void GenerateDataDLCfrIterations(
     trunk->iterable_trunk_with_oracle->EvaluateLeaves();
 
     AddExperiencesFromTrunk(trunk->iterable_trunk_with_oracle->public_leaves(),
-                            trunk->tables, *trunk->dims, replay);
+                            trunk->tables, *trunk->dims, replay,
+                            rnd_gen, shuffle_input, shuffle_output);
     monitor_fn(iter);
 
     trunk->iterable_trunk_with_oracle->UpdateTrunk();

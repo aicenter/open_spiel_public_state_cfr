@@ -53,11 +53,14 @@ std::unique_ptr<Trunk> MakeTrunk(const std::string& game_name, int trunk_depth,
 void AddExperiencesFromTrunk(
     const std::vector<algorithms::dlcfr::LeafPublicState>& public_leaves,
     const std::vector<HandTable>& hand_tables, const ParticleDims& dims,
-    ExperienceReplay* replay);
+    ExperienceReplay* replay,
+    std::mt19937& rnd_gen, bool shuffle_input, bool shuffle_output);
 
-void WriteParticles(const algorithms::dlcfr::LeafPublicState& state,
-                    const std::vector<HandTable>& hand_tables,
-                    const ParticleDims& dims, ParticlesInContext* point);
+void WriteParticles(
+    const algorithms::dlcfr::LeafPublicState& state,
+    const std::vector<HandTable>& hand_tables,
+    const ParticleDims& dims, ParticlesInContext* point,
+    std::mt19937* rnd_gen, bool shuffle_input, bool shuffle_output);
 
 void inline Copy(absl::Span<const float> source, absl::Span<float> target) {
   SPIEL_CHECK_LE(source.size(), target.size());
