@@ -45,6 +45,8 @@ ABSL_FLAG(bool, shuffle_output, false,
           "Should experience replay particle data output be shuffled?");
 ABSL_FLAG(int, limit_particle_count, -1,
           "How many particles should be used at most? -1 for all.");
+ABSL_FLAG(bool, apply_mask, false,
+          "Should equilibrium support mask be applied at evaluation?");
 
 // -----------------------------------------------------------------------------
 
@@ -55,6 +57,7 @@ ABSL_FLAG(int, limit_particle_count, -1,
 #include "open_spiel/papers_with_code/1906.06412.value_functions/train_eval.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/generate_data.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_dl_evaluator.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/sparse_trunk.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/torch_utils.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/trunk.h"
 
@@ -172,14 +175,24 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   torch::manual_seed(seed);
   std::mt19937 rnd_gen(seed);
 
-  // 1. Create network and optimizer.
+  // 1. Create the LP spec for the whole game.
+  ortools::SequenceFormLpSpecification whole_game(*t->game, "CLP");
+  std::unique_ptr<SparseTrunk> sparse_trunk;
+  if (absl::GetFlag(FLAGS_apply_mask)) {
+    // Find a valid sparse trunk, so that we can use it for evaluation.
+    sparse_trunk = FindSparseTrunk(&whole_game,
+                                   t->fixable_trunk_with_oracle.get());
+    sparse_trunk->PrintMasks();
+  }
+
+  // 2. Create network and optimizer.
   torch::Device device = FindDevice();
   ParticleValueNet model(t->dims.get(), batch_size, ActivationFunction::kRelu);
   model.limit_particle_count = absl::GetFlag(FLAGS_limit_particle_count);
   model.to(device);
   torch::optim::Adam optimizer(model.parameters());
 
-  // 2. Create trunk net evaluator.
+  // 3. Create trunk net evaluator.
   std::cout << "# Batch size: " << batch_size << "\n";
   BatchData train_batch(batch_size,
                         t->dims->point_input_size(),
@@ -188,16 +201,12 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
                        t->dims->point_output_size());
 
   auto net_evaluator = std::make_shared<NetEvaluator>(
-      &model, &device, t->tables, &eval_batch, t->dims.get());
+      &model, &device, t->tables, &eval_batch, t->dims.get(),
+      std::move(sparse_trunk));
   auto trunk_with_net = std::make_unique<dlcfr::DepthLimitedCFR>(
       t->game, t->trunk_trees, net_evaluator, t->terminal_evaluator,
       t->public_observer,
       MakeBanditVectors(t->trunk_trees, use_bandits_for_cfr));
-
-  // 3. Create the LP spec for the whole game.
-  ortools::SequenceFormLpSpecification whole_game(*t->game, "CLP");
-  // Find a valid sparse trunk, so that we can use it for evaluation.
-  net_evaluator->sparse_trunk = FindSparseTrunk(whole_game, t->trunk_trees);
 
   // 4. Make experience replay buffer.
   std::cout << "# Allocating experience replay buffer: "
@@ -237,6 +246,16 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
     std::vector<double> evals = EvaluateNetwork(trunk_with_net.get(),
                                                 &whole_game, eval_iters);
     std::cout << std::endl;
+
+    // Print resulting strategies.
+    auto& bandits = trunk_with_net->bandits();
+    for (int pl = 0; pl < 2; ++pl) {
+      std::cout << "# Trunk eq strategies -- player " << pl << std::endl;
+      for(DecisionId id : bandits[pl].range()) {
+        std::cout << "# " << trunk_with_net->trees()[pl]->decision_infostate(id)->ToString()
+                  << " " << bandits[pl][id]->AverageStrategy() << std::endl;
+      }
+    }
 
     const double avg_loss = cumul_loss / train_batches;
     std::cout << loop << ',' << avg_loss << ',';

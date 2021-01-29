@@ -89,7 +89,7 @@ void AddExperiencesFromTrunk(
     const dlcfr::LeafPublicState& leaf = public_leaves[i];
     if (leaf.IsTerminal()) continue;  // Add experiences only for non-terminals.
     ParticlesInContext data_point = replay->AddExperience(dims);
-    WriteParticles(leaf, hand_tables, dims, &data_point,
+    WriteParticles(leaf, hand_tables, dims, &data_point, /*mask=*/{},
                    &rnd_gen, shuffle_input, shuffle_output);
   }
 }
@@ -107,11 +107,26 @@ void WritePositionalHand(const HandMapping& map, int infostate_id,
 void WriteParticles(const algorithms::dlcfr::LeafPublicState& state,
                     const std::vector<HandTable>& hand_tables,
                     const ParticleDims& dims, ParticlesInContext* point,
+                    std::optional<std::array<std::vector<bool>, 2>> reachable_mask,
                     std::mt19937* rnd_gen, bool shuffle_input, bool shuffle_output) {
   point->Reset();
 
+  // Find out how many particles we will write.
+  int num_particles = 0;
+
+  if (reachable_mask.has_value()) {
+    for (int pl = 0; pl < 2; ++pl) {
+      // Mask must be over the same ranges!
+      SPIEL_DCHECK_EQ((*reachable_mask)[pl].size(), state.ranges[pl].size());
+      for (int i = 0; i < (*reachable_mask)[pl].size(); ++i) {
+        if((*reachable_mask)[pl][i]) num_particles++;
+      }
+    }
+  } else {
+    num_particles = state.leaf_nodes[0].size() + state.leaf_nodes[1].size();
+  }
+
   // Make a random permutation if something should be shuffled.
-  int num_particles = state.leaf_nodes[0].size() + state.leaf_nodes[1].size();
   std::vector<int> particle_placement(num_particles);
   if (shuffle_input || shuffle_output) {
     SPIEL_CHECK_TRUE(rnd_gen);
@@ -124,6 +139,9 @@ void WriteParticles(const algorithms::dlcfr::LeafPublicState& state,
   int i = 0;
   for (int pl = 0; pl < 2; ++pl) {
     for (int j = 0; j < state.leaf_nodes[pl].size(); j++) {
+      // Skip this infostate!
+      if(reachable_mask.has_value() && !(*reachable_mask)[pl][j]) continue;
+
       ParticleData particle = point->particle_at(
           dims, shuffle_input ? particle_placement[i] : i);
       Copy(state.public_tensor.Tensor(), particle.public_features());
@@ -147,6 +165,9 @@ void WriteParticles(const algorithms::dlcfr::LeafPublicState& state,
   i = 0;
   for (int pl = 0; pl < 2; ++pl) {
     for (int j = 0; j < state.leaf_nodes[pl].size(); j++) {
+      // Skip this infostate!
+      if(reachable_mask.has_value() && !(*reachable_mask)[pl][j]) continue;
+
       ParticleData particle = point->particle_at(
           dims, shuffle_output ? particle_placement[i] : i);
       particle.value() = state.values[pl][j];
@@ -158,14 +179,30 @@ void WriteParticles(const algorithms::dlcfr::LeafPublicState& state,
   point->num_particles() = num_particles;
 }
 
+// This should be a value larger than any cf. value in the game.
+const float_tree kSparseTrunkDoNotFollowValue = -1000;
+
 void CopyValuesNetToTree(ParticlesInContext data_point,
                          algorithms::dlcfr::LeafPublicState& state,
                          const std::vector<HandTable>& hand_tables,
-                         const ParticleDims& dims) {
+                         const ParticleDims& dims,
+                         std::optional<std::array<std::vector<bool>, 2>> reachable_mask) {
   int particle_index = 0;
   for (int pl = 0; pl < 2; ++pl) {
+    if (reachable_mask.has_value())  // Mask must be over the same ranges!
+        SPIEL_DCHECK_EQ((*reachable_mask)[pl].size(), state.ranges[pl].size());
+
     for (int j = 0; j < state.leaf_nodes[pl].size(); j++) {
+      if(reachable_mask.has_value() && !(*reachable_mask)[pl][j]) {
+        // Write a big negative value for this infostate.
+        // This should be a value larger than any utility in the game.
+        state.values[pl][j] = kSparseTrunkDoNotFollowValue;
+        continue;  // Skip copying in this infostate!
+      }
+
       ParticleData particle = data_point.particle_at(dims, particle_index);
+      // Check no prediction was lower!
+      SPIEL_DCHECK_LT(kSparseTrunkDoNotFollowValue, particle.value());
       state.values[pl][j] = particle.value();
       particle_index++;
     }

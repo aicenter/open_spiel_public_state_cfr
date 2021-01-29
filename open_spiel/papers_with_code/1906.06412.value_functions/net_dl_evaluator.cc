@@ -30,10 +30,15 @@ void NetEvaluator::EvaluatePublicState(
   SPIEL_DCHECK_FALSE(model_->is_training());
   torch::NoGradGuard no_grad_guard;  // We run only inference.
 
+  // Optionally apply support mask.
+  std::optional<std::array<std::vector<bool>, 2>> mask = {};
+  if (sparse_trunk_) mask = sparse_trunk_->StateMask(*state);
+
   ParticlesInContext point = batch_->point_at(0);
   // !! Do not shuffle, so that we can get back the values in an ordered way !!
   WriteParticles(*state, hand_tables_, *dims_, &point,
-                 nullptr, /*shuffle_input=*/false, /*shuffle_output=*/false);
+                 mask, /*rnd_gen=*/nullptr,
+                 /*shuffle_input=*/false, /*shuffle_output=*/false);
 
   // Input must be batched.
   torch::Tensor input = point.data.to(*device_).unsqueeze(/*dim=*/0);
@@ -44,7 +49,7 @@ void NetEvaluator::EvaluatePublicState(
   point.target.index_put_({Slice(0, point.num_particles())}, output);
 
   // !! This does not work with shuffling !!
-  CopyValuesNetToTree(point, *state, hand_tables_, *dims_);
+  CopyValuesNetToTree(point, *state, hand_tables_, *dims_, mask);
 }
 
 }  // namespace papers_with_code

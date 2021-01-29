@@ -33,6 +33,7 @@ std::unique_ptr<SparseTrunk> FindSparseTrunk(
     whole_game->Solve();
     TabularPolicy policy = whole_game->OptimalPolicy(pl);
 
+    std::cout << "# Trunk eq strategies -- player " << pl << std::endl;
     for (DecisionId id : bandits[pl].range()) {
       bandits::Bandit* bandit = bandits[pl][id].get();
       auto* fixable_bandit =
@@ -45,19 +46,23 @@ std::unique_ptr<SparseTrunk> FindSparseTrunk(
       const InfostateNode* node =
           fixable_trunk->trees()[pl]->decision_infostate(id);
       const std::string& infostate_str = node->infostate_string();
+
       ActionsAndProbs state_policy = policy.GetStatePolicy(infostate_str);
       SPIEL_DCHECK_EQ(node->num_children(), bandit_policy.size());
       SPIEL_DCHECK_EQ(state_policy.size(), bandit_policy.size());
       for (int i = 0; i < bandit_policy.size(); ++i) {
         bandit_policy[i] = state_policy[i].second;
       }
+
+      std::cout << "# " << node->ToString() << " " << bandit_policy << std::endl;
     }
   }
 
   // Compute the ranges from the trunk.
   fixable_trunk->UpdateReachProbs();
+  fixable_trunk->EvaluateLeaves();
 
-  // Copy them.
+  // Copy the ranges.
   auto sparse_trunk = std::make_unique<SparseTrunk>();
   sparse_trunk->eq_ranges.reserve(fixable_trunk->public_leaves().size());
   for (const LeafPublicState& state : fixable_trunk->public_leaves()) {
@@ -66,6 +71,49 @@ std::unique_ptr<SparseTrunk> FindSparseTrunk(
   return sparse_trunk;
 }
 
+std::array<std::vector<bool>, 2> SparseTrunk::StateMask(
+    const LeafPublicState& state) {
+
+  const std::array<std::vector<double>, 2>& ranges =
+      eq_ranges.at(state.public_id);
+
+  std::array<std::vector<bool>, 2> mask = {
+      std::vector<bool>(ranges[0].size()),
+      std::vector<bool>(ranges[1].size())
+  };
+
+  for (int pl = 0; pl < 2; ++pl) {
+    for (int i = 0; i < ranges[pl].size(); ++i) {
+      mask[pl][i] = IsReachable(ranges[pl][i]);
+    }
+  }
+  return mask;
+}
+
+void SparseTrunk::PrintMasks() const {
+  std::cout << "# Equilibrium support mask:" << std::endl;
+  int max_support = 0;
+  for (const auto& state_ranges : eq_ranges) {
+    std::cout << "# ";
+    int num_reachable = 0;
+    for (int pl = 0; pl < 2; ++pl) {
+      for (int i = 0; i < state_ranges[pl].size(); ++i) {
+        bool reachable = IsReachable(state_ranges[pl][i]);
+        if (reachable) {
+          num_reachable++;
+          std::cout << "◉";
+        } else {
+          std::cout << "◯";
+        }
+
+      }
+      std::cout << ' ';
+    }
+    std::cout << " in support: " << num_reachable << std::endl;
+    max_support = std::max(max_support, num_reachable);
+  }
+  std::cout << "# Max support size: " << max_support << std::endl;
+}
 }  // papers_with_code
 }  // open_spiel
 

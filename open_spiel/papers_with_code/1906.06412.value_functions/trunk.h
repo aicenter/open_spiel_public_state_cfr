@@ -60,6 +60,7 @@ void WriteParticles(
     const algorithms::dlcfr::LeafPublicState& state,
     const std::vector<HandTable>& hand_tables,
     const ParticleDims& dims, ParticlesInContext* point,
+    std::optional<std::array<std::vector<bool>, 2>> mask,
     std::mt19937* rnd_gen, bool shuffle_input, bool shuffle_output);
 
 void inline Copy(absl::Span<const float> source, absl::Span<float> target) {
@@ -70,7 +71,8 @@ void inline Copy(absl::Span<const float> source, absl::Span<float> target) {
 void CopyValuesNetToTree(ParticlesInContext data_point,
                          algorithms::dlcfr::LeafPublicState& state,
                          const std::vector<HandTable>& hand_tables,
-                         const ParticleDims& dims);
+                         const ParticleDims& dims,
+                         std::optional<std::array<std::vector<bool>, 2>> mask);
 
 
 }  // namespace papers_with_code

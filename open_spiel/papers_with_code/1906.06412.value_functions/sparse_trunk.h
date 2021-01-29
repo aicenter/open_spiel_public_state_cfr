@@ -28,9 +28,14 @@ struct SparseTrunk {
   std::vector<std::array<std::vector<double>, 2>> eq_ranges;
 
   bool IsReachable(const algorithms::dlcfr::LeafPublicState& state,
-                   Player p, int infostate_index) {
-    return eq_ranges.at(state.public_id).at(p).at(infostate_index) > 0.;
+                   Player p, int infostate_index) const {
+    return IsReachable(eq_ranges.at(state.public_id).at(p).at(infostate_index));
   }
+  bool IsReachable(double prob) const { return prob > 0.; }
+
+  std::array<std::vector<bool>, 2> StateMask(
+      const algorithms::dlcfr::LeafPublicState& state);
+  void PrintMasks() const;
 };
 
 std::unique_ptr<SparseTrunk> FindSparseTrunk(
