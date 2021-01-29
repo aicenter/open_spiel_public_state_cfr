@@ -65,7 +65,7 @@ sweep.run_sweep(backend,
                     batch_size=64,
                     prob_pure_strat=0.1,
                     shuffle_input="true",
-                    shuffle_output="false"
+                    shuffle_output="true"
                 ),
                 comb_params=[
                   "game_name",
