@@ -196,6 +196,8 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
 
   // 3. Create the LP spec for the whole game.
   ortools::SequenceFormLpSpecification whole_game(*t->game, "CLP");
+  // Find a valid sparse trunk, so that we can use it for evaluation.
+  net_evaluator->sparse_trunk = FindSparseTrunk(whole_game, t->trunk_trees);
 
   // 4. Make experience replay buffer.
   std::cout << "# Allocating experience replay buffer: "
