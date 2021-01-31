@@ -35,7 +35,7 @@ double TrainNetwork(ParticleValueNet* model, torch::Device* device,
 std::vector<double> EvaluateNetwork(
     algorithms::dlcfr::DepthLimitedCFR* trunk_with_net,
     algorithms::ortools::SequenceFormLpSpecification* whole_game,
-    const std::vector<int>& evaluate_iters);
+    const std::vector<int>& evaluate_iters, bool eval_only_root = false);
 
 }  //  papers_with_code
 }  //  open_spiel

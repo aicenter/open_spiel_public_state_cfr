@@ -47,6 +47,9 @@ ABSL_FLAG(int, limit_particle_count, -1,
           "How many particles should be used at most? -1 for all.");
 ABSL_FLAG(bool, apply_mask, false,
           "Should equilibrium support mask be applied at evaluation?");
+ABSL_FLAG(bool, eval_only_root, false,
+          "Should evaluation be done only in the root? "
+          "Only some games supported! See FilterPolicy.");
 
 // -----------------------------------------------------------------------------
 
@@ -143,6 +146,18 @@ std::vector<int> ItersFromString(const std::string& s) {
   return out;
 }
 
+void PrintTrunkStrategies(dlcfr::DepthLimitedCFR* trunk_with_net) {
+  auto& bandits = trunk_with_net->bandits();
+  auto& trees = trunk_with_net->trees();
+  for (int pl = 0; pl < 2; ++pl) {
+    std::cout << "# Trunk eq strategies -- player " << pl << std::endl;
+    for(DecisionId id : bandits[pl].range()) {
+      std::cout << "# " << trees[pl]->decision_infostate(id)->ToString()
+                << " " << bandits[pl][id]->AverageStrategy() << std::endl;
+    }
+  }
+}
+
 void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
                    int cfr_oracle_iterations, std::string use_bandits_for_cfr,
                    int seed) {
@@ -170,6 +185,7 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   const int batch_size = absl::GetFlag(FLAGS_batch_size) > 0
       ? std::min(absl::GetFlag(FLAGS_batch_size), experience_replay_buffer_size)
       : experience_replay_buffer_size;
+  const bool eval_only_root = absl::GetFlag(FLAGS_eval_only_root);
 
   t->oracle_evaluator->num_cfr_iterations = cfr_oracle_iterations;
   torch::manual_seed(seed);
@@ -243,19 +259,10 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
 
     model.eval();  // Eval mode.
     std::cout << "# Evaluating  " << std::flush;
-    std::vector<double> evals = EvaluateNetwork(trunk_with_net.get(),
-                                                &whole_game, eval_iters);
+    std::vector<double> evals = EvaluateNetwork(
+        trunk_with_net.get(), &whole_game, eval_iters, eval_only_root);
     std::cout << std::endl;
-
-    // Print resulting strategies.
-    auto& bandits = trunk_with_net->bandits();
-    for (int pl = 0; pl < 2; ++pl) {
-      std::cout << "# Trunk eq strategies -- player " << pl << std::endl;
-      for(DecisionId id : bandits[pl].range()) {
-        std::cout << "# " << trunk_with_net->trees()[pl]->decision_infostate(id)->ToString()
-                  << " " << bandits[pl][id]->AverageStrategy() << std::endl;
-      }
-    }
+//    PrintTrunkStrategies(trunk_with_net.get());
 
     const double avg_loss = cumul_loss / train_batches;
     std::cout << loop << ',' << avg_loss << ',';
