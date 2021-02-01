@@ -258,8 +258,6 @@ void TestConvergeWithCfrEvaluator(int trunk_depth) {
   auto leaf_evaluator = std::make_shared<dlcfr::CFREvaluator>(
       game, /*depth_limit=*/100, /*leaf_evaluator=*/nullptr,
       terminal_evaluator, public_observer, infostate_observer);
-  leaf_evaluator->bandit_name = "RegretMatchingPlus";
-  leaf_evaluator->leaf_evaluator = leaf_evaluator;
   leaf_evaluator->num_cfr_iterations = 2;
 
   SequenceFormLpSpecification whole_game(*game);
