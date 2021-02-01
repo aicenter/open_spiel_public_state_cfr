@@ -123,6 +123,7 @@ class TerminalEvaluator final : public LeafEvaluator {
 };
 
 std::shared_ptr<LeafEvaluator> MakeTerminalEvaluator();
+std::shared_ptr<LeafEvaluator> MakeDummyEvaluator();
 
 // -- DL CFR -------------------------------------------------------------------
 
@@ -196,6 +197,21 @@ class DepthLimitedCFR {
   // Internal checks.
   bool DoStatesProduceEqualPublicObservations(
       const InfostateNode& node, absl::Span<float> expected_observation);
+};
+
+// -- Dummy evaluator ----------------------------------------------------------
+
+// Evaluator that does nothing.
+struct DummyEvaluator : public algorithms::dlcfr::LeafEvaluator {
+  std::unique_ptr<algorithms::dlcfr::PublicStateContext> CreateContext(
+      const algorithms::dlcfr::LeafPublicState& state) const override {
+    return nullptr;
+  };
+  void ResetContext(
+      algorithms::dlcfr::PublicStateContext* context) const override {};
+  void EvaluatePublicState(
+      algorithms::dlcfr::LeafPublicState* public_state,
+      algorithms::dlcfr::PublicStateContext* context) const override {};
 };
 
 

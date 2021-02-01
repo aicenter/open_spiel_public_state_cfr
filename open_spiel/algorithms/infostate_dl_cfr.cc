@@ -149,6 +149,10 @@ std::shared_ptr<LeafEvaluator> MakeTerminalEvaluator() {
   return std::make_shared<TerminalEvaluator>();
 }
 
+std::shared_ptr<LeafEvaluator> MakeDummyEvaluator() {
+  return std::make_shared<DummyEvaluator>();
+}
+
 TerminalPublicStateContext::TerminalPublicStateContext(
     const LeafPublicState& state) {
   auto& leaf_nodes = state.leaf_nodes;

@@ -20,21 +20,11 @@ namespace open_spiel {
 namespace papers_with_code {
 namespace {
 
-// Evaluator that does nothing.
-struct DummyEvaluator : public algorithms::dlcfr::LeafEvaluator {
-  std::unique_ptr<algorithms::dlcfr::PublicStateContext> CreateContext(
-      const algorithms::dlcfr::LeafPublicState& state) const override { return nullptr; };
-  void ResetContext(
-      algorithms::dlcfr::PublicStateContext* context) const override {};
-  void EvaluatePublicState(
-      algorithms::dlcfr::LeafPublicState* public_state,
-      algorithms::dlcfr::PublicStateContext* context) const override {};
-};
 
 void TestCreateHandTable() {
   std::shared_ptr<const Game> game = LoadGame("kuhn_poker");
   std::shared_ptr<Observer> hand_observer = game->MakeObserver(kHandObsType, {});
-  auto leaf_evaluator = std::make_shared<DummyEvaluator>();
+  auto leaf_evaluator = algorithms::dlcfr::MakeDummyEvaluator();
   algorithms::dlcfr::DepthLimitedCFR dl_cfr(game, 3, leaf_evaluator, nullptr);
 
   std::vector<HandTable> tables = CreateHandTables(*game, hand_observer,
