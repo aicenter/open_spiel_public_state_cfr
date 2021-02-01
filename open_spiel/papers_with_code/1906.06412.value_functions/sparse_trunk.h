@@ -42,6 +42,9 @@ std::unique_ptr<SparseTrunk> FindSparseTrunk(
     algorithms::ortools::SequenceFormLpSpecification* whole_game,
     algorithms::dlcfr::DepthLimitedCFR* fixable_trunk);
 
+// This should be a value larger than any cf. value in the game.
+const double kSparseTrunkDoNotFollowValue = -1000.;
+
 }  // papers_with_code
 }  // open_spiel
 
