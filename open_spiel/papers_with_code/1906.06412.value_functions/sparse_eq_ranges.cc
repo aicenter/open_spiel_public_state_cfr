@@ -13,7 +13,7 @@
 // limitations under the License.
 
 
-#include "open_spiel/papers_with_code/1906.06412.value_functions/sparse_trunk.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/sparse_eq_ranges.h"
 
 namespace open_spiel {
 namespace papers_with_code {
@@ -22,7 +22,7 @@ using namespace algorithms;
 using namespace algorithms::dlcfr;
 using namespace algorithms::ortools;
 
-std::unique_ptr<SparseTrunk> FindSparseTrunk(
+std::unique_ptr<SparseEqRanges> FindSparseEqRanges(
     SequenceFormLpSpecification* whole_game, DepthLimitedCFR* fixable_trunk) {
 
   std::vector<BanditVector>& bandits = fixable_trunk->bandits();
@@ -63,15 +63,15 @@ std::unique_ptr<SparseTrunk> FindSparseTrunk(
   fixable_trunk->EvaluateLeaves();
 
   // Copy the ranges.
-  auto sparse_trunk = std::make_unique<SparseTrunk>();
-  sparse_trunk->eq_ranges.reserve(fixable_trunk->public_leaves().size());
+  auto sparse_eq_ranges = std::make_unique<SparseEqRanges>();
+  sparse_eq_ranges->eq_ranges.reserve(fixable_trunk->public_leaves().size());
   for (const LeafPublicState& state : fixable_trunk->public_leaves()) {
-    sparse_trunk->eq_ranges.push_back(state.ranges);
+    sparse_eq_ranges->eq_ranges.push_back(state.ranges);
   }
-  return sparse_trunk;
+  return sparse_eq_ranges;
 }
 
-std::array<std::vector<bool>, 2> SparseTrunk::StateMask(
+std::array<std::vector<bool>, 2> SparseEqRanges::StateMask(
     const LeafPublicState& state) {
 
   const std::array<std::vector<double>, 2>& ranges =
@@ -90,7 +90,7 @@ std::array<std::vector<bool>, 2> SparseTrunk::StateMask(
   return mask;
 }
 
-void SparseTrunk::PrintMasks() const {
+void SparseEqRanges::PrintMasks() const {
   std::cout << "# Equilibrium support mask:" << std::endl;
   int max_support = 0;
   for (const auto& state_ranges : eq_ranges) {

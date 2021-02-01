@@ -14,7 +14,7 @@
 
 
 #include "open_spiel/algorithms/ortools/sequence_form_lp.h"
-#include "open_spiel/papers_with_code/1906.06412.value_functions/sparse_trunk.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/sparse_eq_ranges.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/trunk.h"
 
 namespace open_spiel {
@@ -24,7 +24,7 @@ namespace {
 using namespace algorithms;
 
 class MaskedEvaluator : public dlcfr::CFREvaluator {
-  std::unique_ptr<SparseTrunk> sparse_trunk_;
+  std::unique_ptr<SparseEqRanges> sparse_eq_ranges_;
 
  public:
   MaskedEvaluator(std::shared_ptr<const Game> game, int depth_limit,
@@ -32,11 +32,11 @@ class MaskedEvaluator : public dlcfr::CFREvaluator {
                   std::shared_ptr<const LeafEvaluator> terminal_evaluator,
                   std::shared_ptr<Observer> public_observer,
                   std::shared_ptr<Observer> infostate_observer,
-                  std::unique_ptr<SparseTrunk> sparse_trunk)
+                  std::unique_ptr<SparseEqRanges> sparse_eq_ranges)
       : dlcfr::CFREvaluator(game, depth_limit, leaf_evaluator,
                             terminal_evaluator, public_observer,
                             infostate_observer),
-        sparse_trunk_(std::move(sparse_trunk)) {}
+        sparse_eq_ranges_(std::move(sparse_eq_ranges)) {}
 
   void EvaluatePublicState(LeafPublicState* public_state,
                            PublicStateContext* context) const override {
@@ -44,7 +44,7 @@ class MaskedEvaluator : public dlcfr::CFREvaluator {
     CFREvaluator::EvaluatePublicState(public_state, context);
 
     // Mask the output values.
-    std::array<std::vector<bool>, 2> mask = sparse_trunk_->StateMask(*public_state);
+    std::array<std::vector<bool>, 2> mask = sparse_eq_ranges_->StateMask(*public_state);
     for (int pl = 0; pl < 2; ++pl) {
       SPIEL_DCHECK_EQ((*reachable_mask)[pl].size(), state.ranges[pl].size());
 
@@ -67,14 +67,14 @@ void TestDlCFRConvergenceWithSparseTrunk() {
       "RegretMatching");
 
   ortools::SequenceFormLpSpecification whole_game(*trunk->game, "CLP");
-  std::unique_ptr<SparseTrunk> sparse_trunk = FindSparseTrunk(
+  std::unique_ptr<SparseEqRanges> sparse_eq_ranges = FindSparseEqRanges(
       &whole_game, trunk->fixable_trunk_with_oracle.get());
-  sparse_trunk->PrintMasks();
+  sparse_eq_ranges->PrintMasks();
 
   auto masked_evaluator = std::make_shared<const MaskedEvaluator>(
       trunk->game, /*full_subgame_depth=*/100, /*no_leaf_evaluator=*/nullptr,
       trunk->terminal_evaluator, trunk->public_observer,
-      trunk->infostate_observer, std::move(sparse_trunk));
+      trunk->infostate_observer, std::move(sparse_eq_ranges));
 
   dlcfr::DepthLimitedCFR masked_dlcfr(
       trunk->game, trunk->trunk_trees, masked_evaluator,

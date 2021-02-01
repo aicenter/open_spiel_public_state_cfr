@@ -60,7 +60,7 @@ ABSL_FLAG(bool, eval_only_root, false,
 #include "open_spiel/papers_with_code/1906.06412.value_functions/train_eval.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/generate_data.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_dl_evaluator.h"
-#include "open_spiel/papers_with_code/1906.06412.value_functions/sparse_trunk.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/sparse_eq_ranges.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/torch_utils.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/trunk.h"
 
@@ -181,12 +181,12 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
 
   // 1. Create the LP spec for the whole game.
   ortools::SequenceFormLpSpecification whole_game(*t->game, "CLP");
-  std::unique_ptr<SparseTrunk> sparse_trunk;
+  std::unique_ptr<SparseEqRanges> sparse_eq_ranges;
   if (absl::GetFlag(FLAGS_apply_mask)) {
     // Find a valid sparse trunk, so that we can use it for evaluation.
-    sparse_trunk = FindSparseTrunk(&whole_game,
-                                   t->fixable_trunk_with_oracle.get());
-    sparse_trunk->PrintMasks();
+    sparse_eq_ranges = FindSparseEqRanges(&whole_game,
+                                      t->fixable_trunk_with_oracle.get());
+    sparse_eq_ranges->PrintMasks();
   }
 
   // 2. Create network and optimizer.
@@ -206,7 +206,7 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
 
   auto net_evaluator = std::make_shared<NetEvaluator>(
       &model, &device, t->tables, &eval_batch, t->dims.get(),
-      std::move(sparse_trunk));
+      std::move(sparse_eq_ranges));
   auto trunk_with_net = std::make_unique<dlcfr::DepthLimitedCFR>(
       t->game, t->trunk_trees, net_evaluator, t->terminal_evaluator,
       t->public_observer,

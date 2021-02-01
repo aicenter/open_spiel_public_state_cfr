@@ -11,8 +11,8 @@ add_library(paper_value_functions OBJECT
   net_dl_evaluator.h
   hand_table.h
   hand_table.cc
-  sparse_trunk.cc
-  sparse_trunk.h
+  sparse_eq_ranges.cc
+  sparse_eq_ranges.h
   torch_utils.cc
   torch_utils.h
   train_eval.h
@@ -34,7 +34,7 @@ endmacro()
 add_paper_executable(train_eval_loop train_eval_loop.cc)
 add_paper_executable(train_eval_test train_eval_test.cc)
 add_paper_executable(range_table_test hand_table_test.cc)
-add_paper_executable(sparse_trunk_test sparse_trunk_test.cc)
+add_paper_executable(sparse_eq_ranges_test sparse_eq_ranges_test.cc)
 
 add_paper_executable(value_fn_convergence value_fn_convergence.cc)
 target_link_libraries(value_fn_convergence

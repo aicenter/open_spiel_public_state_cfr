@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_SPARSE_TRUNK_
-#define OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_SPARSE_TRUNK_
+#ifndef OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_SPARSE_EQ_RANGES_
+#define OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_SPARSE_EQ_RANGES_
 
 #include "open_spiel/algorithms/infostate_tree.h"
 #include "open_spiel/algorithms/infostate_dl_cfr.h"
@@ -22,7 +22,7 @@
 namespace open_spiel {
 namespace papers_with_code {
 
-struct SparseTrunk {
+struct SparseEqRanges {
   // Equilibrium ranges for each leaf public state, each player
   // and each infostate of the trunk.
   std::vector<std::array<std::vector<double>, 2>> eq_ranges;
@@ -38,7 +38,7 @@ struct SparseTrunk {
   void PrintMasks() const;
 };
 
-std::unique_ptr<SparseTrunk> FindSparseTrunk(
+std::unique_ptr<SparseEqRanges> FindSparseEqRanges(
     algorithms::ortools::SequenceFormLpSpecification* whole_game,
     algorithms::dlcfr::DepthLimitedCFR* fixable_trunk);
 
@@ -50,4 +50,4 @@ const double kSparseTrunkDoNotFollowValue = -1000.;
 
 
 
-#endif  // OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_SPARSE_TRUNK_
+#endif  // OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_SPARSE_EQ_RANGES_

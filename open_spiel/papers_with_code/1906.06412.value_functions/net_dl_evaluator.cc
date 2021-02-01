@@ -32,7 +32,7 @@ void NetEvaluator::EvaluatePublicState(
 
   // Optionally apply support mask.
   std::optional<std::array<std::vector<bool>, 2>> mask = {};
-  if (sparse_trunk_) mask = sparse_trunk_->StateMask(*state);
+  if (sparse_eq_ranges_) mask = sparse_eq_ranges_->StateMask(*state);
 
   ParticlesInContext point = batch_->point_at(0);
   // !! Do not shuffle, so that we can get back the values in an ordered way !!

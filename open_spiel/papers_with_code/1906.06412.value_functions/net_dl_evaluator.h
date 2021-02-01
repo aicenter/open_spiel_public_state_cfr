@@ -19,7 +19,7 @@
 
 #include "open_spiel/papers_with_code/1906.06412.value_functions/hand_table.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_architectures.h"
-#include "open_spiel/papers_with_code/1906.06412.value_functions/sparse_trunk.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/sparse_eq_ranges.h"
 #include "open_spiel/spiel.h"
 
 namespace open_spiel {
@@ -35,14 +35,14 @@ class NetEvaluator final : public LeafEvaluator {
   const std::vector<HandTable>& hand_tables_;
   BatchData* batch_;
   ParticleDims* const dims_;
-  std::unique_ptr<SparseTrunk> sparse_trunk_;
+  std::unique_ptr<SparseEqRanges> sparse_eq_ranges_;
  public:
   NetEvaluator(ValueNet* model, torch::Device* device,
                const std::vector<HandTable>& tables,
                BatchData* batch, ParticleDims* const dims,
-               std::unique_ptr<SparseTrunk> sparse_trunk)
+               std::unique_ptr<SparseEqRanges> sparse_eq_ranges)
       : model_(model), device_(device), hand_tables_(tables), batch_(batch),
-        dims_(dims), sparse_trunk_(std::move(sparse_trunk)) {}
+        dims_(dims), sparse_eq_ranges_(std::move(sparse_eq_ranges)) {}
 
   void EvaluatePublicState(LeafPublicState* state,
                            PublicStateContext* context) const override;
