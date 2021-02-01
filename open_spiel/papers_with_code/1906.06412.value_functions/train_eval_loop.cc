@@ -146,18 +146,6 @@ std::vector<int> ItersFromString(const std::string& s) {
   return out;
 }
 
-void PrintTrunkStrategies(dlcfr::DepthLimitedCFR* trunk_with_net) {
-  auto& bandits = trunk_with_net->bandits();
-  auto& trees = trunk_with_net->trees();
-  for (int pl = 0; pl < 2; ++pl) {
-    std::cout << "# Trunk eq strategies -- player " << pl << std::endl;
-    for(DecisionId id : bandits[pl].range()) {
-      std::cout << "# " << trees[pl]->decision_infostate(id)->ToString()
-                << " " << bandits[pl][id]->AverageStrategy() << std::endl;
-    }
-  }
-}
-
 void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
                    int cfr_oracle_iterations, std::string use_bandits_for_cfr,
                    int seed) {

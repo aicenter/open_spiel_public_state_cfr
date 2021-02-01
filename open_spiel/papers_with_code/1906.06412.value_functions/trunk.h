@@ -74,6 +74,9 @@ void CopyValuesNetToTree(ParticlesInContext data_point,
                          const ParticleDims& dims,
                          std::optional<std::array<std::vector<bool>, 2>> mask);
 
+void PrintTrunkStrategies(algorithms::dlcfr::DepthLimitedCFR* trunk_with_net);
+
+
 
 }  // namespace papers_with_code
 }  // namespace open_spiel

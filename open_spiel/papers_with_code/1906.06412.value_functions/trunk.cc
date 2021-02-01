@@ -179,9 +179,6 @@ void WriteParticles(const algorithms::dlcfr::LeafPublicState& state,
   point->num_particles() = num_particles;
 }
 
-// This should be a value larger than any cf. value in the game.
-const float_tree kSparseTrunkDoNotFollowValue = -1000;
-
 void CopyValuesNetToTree(ParticlesInContext data_point,
                          algorithms::dlcfr::LeafPublicState& state,
                          const std::vector<HandTable>& hand_tables,
@@ -208,6 +205,17 @@ void CopyValuesNetToTree(ParticlesInContext data_point,
     }
   }
   SPIEL_CHECK_EQ(data_point.num_particles(), particle_index);
+}
+void PrintTrunkStrategies(algorithms::dlcfr::DepthLimitedCFR* trunk_with_net) {
+  auto& bandits = trunk_with_net->bandits();
+  auto& trees = trunk_with_net->trees();
+  for (int pl = 0; pl < 2; ++pl) {
+    std::cout << "# Trunk eq strategies -- player " << pl << std::endl;
+    for(DecisionId id : bandits[pl].range()) {
+      std::cout << "# " << trees[pl]->decision_infostate(id)->ToString()
+                << " " << bandits[pl][id]->AverageStrategy() << std::endl;
+    }
+  }
 }
 
 }  // namespace papers_with_code
