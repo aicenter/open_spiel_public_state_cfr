@@ -216,7 +216,7 @@ struct CFREvaluator : public LeafEvaluator {
   std::shared_ptr<Observer> infostate_observer;
   bool reset_subgames_on_evaluation = true;
   int num_cfr_iterations = 100;
-  std::string bandit_name = "PredictiveRegretMatchingPlus";
+  std::string bandit_name = "RegretMatchingPlus";
 
   CFREvaluator(std::shared_ptr<const Game> game, int depth_limit,
                std::shared_ptr<const LeafEvaluator> leaf_evaluator,
