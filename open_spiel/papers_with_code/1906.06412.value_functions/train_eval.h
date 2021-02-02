@@ -24,6 +24,7 @@
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_architectures.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_data.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/torch_utils.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/sparse_trunk.h"
 
 namespace open_spiel {
 namespace papers_with_code {
@@ -33,9 +34,9 @@ double TrainNetwork(ParticleValueNet* model, torch::Device* device,
                     BatchData* batch);
 
 std::vector<double> EvaluateNetwork(
-    algorithms::dlcfr::DepthLimitedCFR* trunk_with_net,
+    std::vector<std::unique_ptr<SparseTrunk>>& sparse_trunks_with_net,
     algorithms::ortools::SequenceFormLpSpecification* whole_game,
-    const std::vector<int>& evaluate_iters, bool eval_only_root = false);
+    const std::vector<int>& evaluate_iters);
 
 }  //  papers_with_code
 }  //  open_spiel

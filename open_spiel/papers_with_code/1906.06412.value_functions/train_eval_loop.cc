@@ -44,12 +44,13 @@ ABSL_FLAG(bool, shuffle_input, false,
 ABSL_FLAG(bool, shuffle_output, false,
           "Should experience replay particle data output be shuffled?");
 ABSL_FLAG(int, limit_particle_count, -1,
-          "How many particles should be used at most? -1 for all.");
-ABSL_FLAG(bool, apply_mask, false,
-          "Should equilibrium support mask be applied at evaluation?");
-ABSL_FLAG(bool, eval_only_root, false,
-          "Should evaluation be done only in the root? "
-          "Only some games supported! See FilterPolicy.");
+          "How many particles should be used at most in neural network training?"
+          " -1 for all.");
+ABSL_FLAG(int, limit_initial_states, -1,
+          "How many initial states should be used for the first infostate?"
+          " -1 for all.");
+ABSL_FLAG(int, sparse_roots_depth, -1,
+          "The depth at which sparse roots should be found.");
 
 // -----------------------------------------------------------------------------
 
@@ -60,6 +61,7 @@ ABSL_FLAG(bool, eval_only_root, false,
 #include "open_spiel/papers_with_code/1906.06412.value_functions/train_eval.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/generate_data.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_dl_evaluator.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/sparse_trunk.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/torch_utils.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/trunk.h"
 
@@ -159,6 +161,7 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   std::cout << "# Point input size: " << t->dims->point_input_size() << "\n";
   std::cout << "# Point output size: " << t->dims->point_output_size() << "\n";
   std::cout << "# Max particles: " << t->dims->max_particles << "\n";
+
   SPIEL_CHECK_GT(t->num_non_terminal_leaves, 0);  // The trunk is too deep?
 
   const ExpReplayInitPolicy init_policy =
@@ -173,7 +176,6 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   const int batch_size = absl::GetFlag(FLAGS_batch_size) > 0
       ? std::min(absl::GetFlag(FLAGS_batch_size), experience_replay_buffer_size)
       : experience_replay_buffer_size;
-  const bool eval_only_root = absl::GetFlag(FLAGS_eval_only_root);
 
   t->oracle_evaluator->num_cfr_iterations = cfr_oracle_iterations;
   torch::manual_seed(seed);
@@ -199,6 +201,15 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
 
   auto net_evaluator = std::make_shared<ParticleNetEvaluator>(
       t->hand_info.get(), &model, t->dims.get(), &eval_batch, &device);
+
+  std::vector<std::unique_ptr<SparseTrunk>> sparse_trunks_with_net
+      = MakeSparseTrunks(t->game, t->infostate_observer, t->public_observer,
+                         absl::GetFlag(FLAGS_sparse_roots_depth), t->trunk_depth,
+                         net_evaluator, t->terminal_evaluator,
+                         absl::GetFlag(FLAGS_limit_initial_states),
+                         use_bandits_for_cfr, rnd_gen);
+  std::cout << "# Sparse trunks: " << sparse_trunks_with_net.size() << "\n";
+
   auto trunk_with_net = std::make_unique<dlcfr::DepthLimitedCFR>(
       t->game, t->trunk_trees, net_evaluator, t->terminal_evaluator,
       t->public_observer,
@@ -241,7 +252,7 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
     model.eval();  // Eval mode.
     std::cout << "# Evaluating  " << std::flush;
     std::vector<double> evals = EvaluateNetwork(
-        trunk_with_net.get(), &whole_game, eval_iters, eval_only_root);
+        sparse_trunks_with_net, &whole_game, eval_iters);
     std::cout << std::endl;
 //    PrintTrunkStrategies(trunk_with_net.get());
 

@@ -35,47 +35,30 @@ double TrainNetwork(ParticleValueNet* model, torch::Device* device,
   return loss.item().to<double>();
 }
 
-// TODO: generalize this! A quick hack.
-class FilterPolicy : public Policy {
-  Policy* source_policy_;
-  const std::vector<std::string> root_infostates_{
-    "[Observer: 0][Private: 0][Round 1][Player: 0][Pot: 2][Money: 99 99][Ante: 1 1]",
-    "[Observer: 0][Private: 1][Round 1][Player: 0][Pot: 2][Money: 99 99][Ante: 1 1]",
-    "[Observer: 0][Private: 2][Round 1][Player: 0][Pot: 2][Money: 99 99][Ante: 1 1]",
-    "[Observer: 0][Private: 3][Round 1][Player: 0][Pot: 2][Money: 99 99][Ante: 1 1]",
-    "[Observer: 0][Private: 4][Round 1][Player: 0][Pot: 2][Money: 99 99][Ante: 1 1]",
-    "[Observer: 0][Private: 5][Round 1][Player: 0][Pot: 2][Money: 99 99][Ante: 1 1]",
-    "[Observer: 1][Private: 0][Round 1][Player: 1][Pot: 2][Money: 99 99][Ante: 1 1]",
-    "[Observer: 1][Private: 1][Round 1][Player: 1][Pot: 2][Money: 99 99][Ante: 1 1]",
-    "[Observer: 1][Private: 2][Round 1][Player: 1][Pot: 2][Money: 99 99][Ante: 1 1]",
-    "[Observer: 1][Private: 3][Round 1][Player: 1][Pot: 2][Money: 99 99][Ante: 1 1]",
-    "[Observer: 1][Private: 4][Round 1][Player: 1][Pot: 2][Money: 99 99][Ante: 1 1]",
-    "[Observer: 1][Private: 5][Round 1][Player: 1][Pot: 2][Money: 99 99][Ante: 1 1]",
-    "P0 hand: 1 2 3 4 \nP0 action sequence: \nPoint card sequence: 4 \nWin sequence: \nPoints: 0 0 \nTerminal?: 0\n",
-    "P1 hand: 1 2 3 4 \nP1 action sequence: \nPoint card sequence: 4 \nWin sequence: \nPoints: 0 0 \nTerminal?: 0\n",
-    "P0 hand: 1 2 3 4 5 \nP0 action sequence: \nPoint card sequence: 5 \nWin sequence: \nPoints: 0 0 \nTerminal?: 0\n",
-    "P1 hand: 1 2 3 4 5 \nP1 action sequence: \nPoint card sequence: 5 \nWin sequence: \nPoints: 0 0 \nTerminal?: 0\n",
+class TabularizePolicy : public Policy {
+  std::map<std::string, std::shared_ptr<Policy>> dispatch_table_;
+ public:
+  TabularizePolicy(std::vector<std::unique_ptr<SparseTrunk>>& sparse_trunks) {
+    for (std::unique_ptr<SparseTrunk>& sparse_trunk : sparse_trunks) {
+      dispatch_table_[sparse_trunk->eval_infostate] =
+          sparse_trunk->dlcfr->AveragePolicy();
+    }
   };
 
- public:
-  FilterPolicy(Policy* source_policy) : source_policy_(source_policy) {};
-
   ActionsAndProbs GetStatePolicy(const std::string& info_state) const override {
-    SPIEL_CHECK_TRUE(source_policy_);
-    for (const std::string& root_infostate : root_infostates_) {
-      if(root_infostate == info_state) {
-        return source_policy_->GetStatePolicy(info_state);
-      }
+    auto it = dispatch_table_.find(info_state);
+    if (it == dispatch_table_.end()) {
+      return {};
+    } else {
+      return it->second->GetStatePolicy(info_state);
     }
-    return {};
   }
 };
 
 std::vector<double> EvaluateNetwork(
-    dlcfr::DepthLimitedCFR* trunk_with_net,
+    std::vector<std::unique_ptr<SparseTrunk>>& sparse_trunks_with_net,
     ortools::SequenceFormLpSpecification* whole_game,
-    const std::vector<int>& evaluate_iters,
-    bool eval_only_root) {
+    const std::vector<int>& evaluate_iters) {
 
   auto should_evaluate = [&](int i){
     for (auto j : evaluate_iters) {
@@ -86,30 +69,31 @@ std::vector<double> EvaluateNetwork(
 
   std::vector<double> expls;
   expls.reserve(evaluate_iters.size());
-
-  trunk_with_net->Reset();
   int trunk_iters = *std::max_element(evaluate_iters.begin(),
                                       evaluate_iters.end());
+  TabularizePolicy eval_policy(sparse_trunks_with_net);
 
-  // Possibly specify a subset of the average policy, which should be fixed.
-  std::shared_ptr<Policy> trunk_policy = trunk_with_net->AveragePolicy();
-  FilterPolicy filter_policy(trunk_policy.get());
-  Policy* eval_policy = trunk_policy.get();
-  if (eval_only_root) {
-    eval_policy = &filter_policy;
+  // Important!! We must reset all the bandits & other memory for proper eval.
+  for (std::unique_ptr<SparseTrunk>& sparse_trunk: sparse_trunks_with_net) {
+    sparse_trunk->dlcfr->Reset();
   }
 
   for (int i = 1; i <= trunk_iters; ++i) {
-    ++trunk_with_net->num_iterations_;
-    trunk_with_net->UpdateReachProbs();
-    trunk_with_net->EvaluateLeaves();
+    for (std::unique_ptr<SparseTrunk>& sparse_trunk: sparse_trunks_with_net) {
+      dlcfr::DepthLimitedCFR* trunk_with_net = sparse_trunk->dlcfr.get();
+      ++trunk_with_net->num_iterations_;
+      trunk_with_net->UpdateReachProbs();
+      trunk_with_net->EvaluateLeaves();
+    }
 
     if (should_evaluate(i)) {
-      expls.push_back(ortools::TrunkExploitability(whole_game, *eval_policy));
+      expls.push_back(ortools::TrunkExploitability(whole_game, eval_policy));
       std::cout << '.' << std::flush;
     }
 
-    trunk_with_net->UpdateTrunk();
+    for (std::unique_ptr<SparseTrunk>& sparse_trunk: sparse_trunks_with_net) {
+      sparse_trunk->dlcfr->UpdateTrunk();
+    }
   }
 
   return expls;
