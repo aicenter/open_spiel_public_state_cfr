@@ -50,7 +50,8 @@ ABSL_FLAG(int, limit_initial_states, -1,
           "How many initial states should be used for the first infostate?"
           " -1 for all.");
 ABSL_FLAG(int, sparse_roots_depth, -1,
-          "The depth at which sparse roots should be found.");
+          "The depth at which sparse roots should be found."
+          " -1 will automatically use some reasonable depth based on the game.");
 
 // -----------------------------------------------------------------------------
 
@@ -148,6 +149,22 @@ std::vector<int> ItersFromString(const std::string& s) {
   return out;
 }
 
+int GetSparseRootsDepth(const Game& game) {
+  int cmd_flag = absl::GetFlag(FLAGS_sparse_roots_depth);
+  if (cmd_flag >= 0) return cmd_flag;
+
+  const std::string& name = game.GetType().short_name;
+  if (name == "kuhn_poker") {
+    return 2;
+  } else if (name == "leduc_poker") {
+    return 2;
+  } else if (name == "goospiel") {
+    return 1;
+  } else {
+    SpielFatalError("Exhausted pattern match!");
+  }
+}
+
 void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
                    int cfr_oracle_iterations, std::string use_bandits_for_cfr,
                    int seed) {
@@ -204,7 +221,7 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
 
   std::vector<std::unique_ptr<SparseTrunk>> sparse_trunks_with_net
       = MakeSparseTrunks(t->game, t->infostate_observer, t->public_observer,
-                         absl::GetFlag(FLAGS_sparse_roots_depth), t->trunk_depth,
+                         GetSparseRootsDepth(*t->game), t->trunk_depth,
                          net_evaluator, t->terminal_evaluator,
                          absl::GetFlag(FLAGS_limit_initial_states),
                          use_bandits_for_cfr, rnd_gen);
