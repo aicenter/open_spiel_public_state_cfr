@@ -165,6 +165,31 @@ int GetSparseRootsDepth(const Game& game) {
   }
 }
 
+void PrintPublicStatesStats(const std::vector<LeafPublicState>& public_leaves) {
+  for (const LeafPublicState& state : public_leaves) {
+    std::array<int, 2>
+        num_nodes = { (int) state.leaf_nodes[0].size(),
+                      (int) state.leaf_nodes[1].size() },
+        largest_infostates = {-1, -1},
+        smallest_infostates = {1000000, 1000000};
+    int num_states = 0;
+    for (int pl = 0; pl < 2; ++pl) {
+      for (const InfostateNode* node : state.leaf_nodes[pl]) {
+        int size = node->corresponding_states_size();
+        if (pl == 0) num_states += size;
+        largest_infostates[pl] = std::max(largest_infostates[pl], size);
+        smallest_infostates[pl] = std::min(smallest_infostates[pl], size);
+      }
+    }
+    std::cout << "# Public state #"       << state.public_id
+              << (state.IsTerminal() ? " (terminal)" : "")
+              << "  states: "             << num_states
+              << "  infostates: "         << num_nodes
+              << "  largest infostate: "  << largest_infostates
+              << "  smallest infostate: " << smallest_infostates << '\n';
+  }
+}
+
 void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
                    int cfr_oracle_iterations, std::string use_bandits_for_cfr,
                    int seed) {
@@ -178,7 +203,8 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   std::cout << "# Point input size: " << t->dims->point_input_size() << "\n";
   std::cout << "# Point output size: " << t->dims->point_output_size() << "\n";
   std::cout << "# Max particles: " << t->dims->max_particles << "\n";
-
+  std::cout << "# Public states stats: \n";
+  PrintPublicStatesStats(t->fixable_trunk_with_oracle->public_leaves());
   SPIEL_CHECK_GT(t->num_non_terminal_leaves, 0);  // The trunk is too deep?
 
   const ExpReplayInitPolicy init_policy =
