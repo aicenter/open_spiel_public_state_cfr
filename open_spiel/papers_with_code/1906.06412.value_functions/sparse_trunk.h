@@ -38,7 +38,7 @@ std::vector<std::unique_ptr<SparseTrunk>> MakeSparseTrunks(
     std::shared_ptr<const Game> game,
     std::shared_ptr<Observer> infostate_observer,
     std::shared_ptr<Observer> public_observer,
-    int depth,
+    int roots_depth, int trunk_depth,
     std::shared_ptr<const algorithms::dlcfr::LeafEvaluator> net_evaluator,
     std::shared_ptr<const algorithms::dlcfr::LeafEvaluator> terminal_evaluator,
     int limit_initial_states, const std::string& bandits_for_cfr,

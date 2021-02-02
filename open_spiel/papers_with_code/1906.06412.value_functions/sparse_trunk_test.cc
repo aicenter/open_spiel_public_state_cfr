@@ -28,6 +28,7 @@ void CheckSparseTrunksKuhnDepth2(
   for (int i = 0; i < sparse_trunks.size(); ++i) {
     // One char, i.e. card 0/1/2
     SPIEL_CHECK_EQ(sparse_trunks[i]->eval_infostate.size(), 1);
+    SPIEL_CHECK_EQ(sparse_trunks[i]->dlcfr->public_leaves().size(), 5);
 
     for (int pl = 0; pl < 2; ++pl) {
       SPIEL_CHECK_EQ(sparse_trunks[i]->dlcfr->trees()[pl]
@@ -49,10 +50,12 @@ void CheckSparseTrunksKuhnDepth3(
         // Pass infostate
         SPIEL_CHECK_EQ(sparse_trunks[i]->dlcfr->trees()[pl]
                        ->leaf_nodes().size(), num_states * 3);
+        SPIEL_CHECK_EQ(sparse_trunks[i]->dlcfr->public_leaves().size(), 3);
       } else if (sparse_trunks[i]->eval_infostate[1] == 'b') {
         // Bet infostate
         SPIEL_CHECK_EQ(sparse_trunks[i]->dlcfr->trees()[pl]
                        ->leaf_nodes().size(), num_states * 2);
+        SPIEL_CHECK_EQ(sparse_trunks[i]->dlcfr->public_leaves().size(), 2);
       } else {
         SpielFatalError("Exhausted pattern match!");
       }
@@ -67,6 +70,7 @@ void CheckSparseTrunksKuhnDepth4(
   for (int i = 0; i < sparse_trunks.size(); ++i) {
     // Three chars, i.e. card 0/1/2 followed by pb
     SPIEL_CHECK_EQ(sparse_trunks[i]->eval_infostate.size(), 3);
+    SPIEL_CHECK_EQ(sparse_trunks[i]->dlcfr->public_leaves().size(), 2);
 
     for (int pl = 0; pl < 2; ++pl) {
       SPIEL_CHECK_EQ(sparse_trunks[i]->dlcfr->trees()[pl]
@@ -93,14 +97,15 @@ void TestMakeSparseTrunks() {
   for (int limit = -1; limit <= 6; ++limit) {
     if (limit == 0) continue;
 
-    for (int depth = 2; depth <= 4; ++depth) {
+    for (int roots_depth = 2; roots_depth <= 4; ++roots_depth) {
       std::vector<std::unique_ptr<SparseTrunk>> sparse_trunks =
-          MakeSparseTrunks(game, infostate_observer, public_observer, depth,
+          MakeSparseTrunks(game, infostate_observer, public_observer,
+                           roots_depth, /*trunk_depth=*/1000,
                            dummy_eval, terminal_evaluator,
                            limit, bandits_for_cfr, rnd_gen);
       int num_states = limit > 0 ? limit : 6;
 
-      switch (depth) {
+      switch (roots_depth) {
         case 2: CheckSparseTrunksKuhnDepth2(sparse_trunks, num_states); break;
         case 3: CheckSparseTrunksKuhnDepth3(sparse_trunks, num_states); break;
         case 4: CheckSparseTrunksKuhnDepth4(sparse_trunks, num_states); break;

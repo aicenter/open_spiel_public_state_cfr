@@ -52,6 +52,11 @@ std::vector<int> PickIndices(std::vector<int>& public_state_perm,
                              const InfostateNode* node,
                              int limit_initial_states,
                              std::mt19937& rnd_gen) {
+
+  if (limit_initial_states < 0) {  // Pick all indices.
+    return public_state_perm;
+  }
+
   // Pick one starting state from the infostate node.
   int infostate_pick = std::uniform_int_distribution<>(
                 0, node->corresponding_states_size() - 1)(rnd_gen);
@@ -75,9 +80,12 @@ std::vector<int> PickIndices(std::vector<int>& public_state_perm,
 
   for (int pick_rnd_idx : public_state_perm) {
     if (pick_rnd_idx == picked_index) continue;  // Do not repeat selection.
-    if (limit_initial_states > 0 && picks.size() >= limit_initial_states) break;
+    if (picks.size() >= limit_initial_states) break;
     picks.push_back(pick_rnd_idx);
   }
+
+  SPIEL_DCHECK_EQ(picks.size(),
+                  std::min((int) states.size(), limit_initial_states));
 
   return picks;
 }
@@ -86,19 +94,21 @@ std::vector<std::unique_ptr<SparseTrunk>> MakeSparseTrunks(
     std::shared_ptr<const Game> game,
     std::shared_ptr<Observer> infostate_observer,
     std::shared_ptr<Observer> public_observer,
-    int depth_limit,
+    int roots_depth, int trunk_depth,
     std::shared_ptr<const LeafEvaluator> net_evaluator,
     std::shared_ptr<const LeafEvaluator> terminal_evaluator,
     int limit_initial_states,
     const std::string& bandits_for_cfr, std::mt19937& rnd_gen) {
-
-  // Negative values mean "all states", while positive values must be
-  // at least one.
+  // Must have a defined start.
+  SPIEL_CHECK_GT(roots_depth, 0);
+  // Without this the trunks would not contain any states.
+  SPIEL_CHECK_LT(roots_depth, trunk_depth);
+  // Negative values means "all states", and positive values must be >= 1.
   SPIEL_CHECK_NE(limit_initial_states, 0);
 
   // 1. First of all, build a temporary full trunk, so we can identify all
   //    public states, infostates and associated histories.
-  DepthLimitedCFR temp_trunk(game, depth_limit,
+  DepthLimitedCFR temp_trunk(game, roots_depth,
                              net_evaluator, terminal_evaluator);
 
   // 2. For each decision infostate, make a random subset of histories
@@ -132,11 +142,12 @@ std::vector<std::unique_ptr<SparseTrunk>> MakeSparseTrunks(
           start_chances.push_back(chances[pick_idx]);
         }
 
+        const int move_lim = trunk_depth - roots_depth;
         std::vector<std::shared_ptr<InfostateTree>> sparse_trees = {
             MakeInfostateTree(start_states, start_chances, infostate_observer,
-                              /*pl=*/0),
+                              /*pl=*/0, /*max_move_ahead_limit=*/move_lim),
             MakeInfostateTree(start_states, start_chances, infostate_observer,
-                              /*pl=*/1)
+                              /*pl=*/1, /*max_move_ahead_limit=*/move_lim)
         };
         auto sparse_trunk = std::make_unique<SparseTrunk>();
         sparse_trunk->dlcfr = std::make_unique<DepthLimitedCFR>(
