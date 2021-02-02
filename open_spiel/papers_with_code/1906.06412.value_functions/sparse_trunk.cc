@@ -110,6 +110,8 @@ std::vector<std::unique_ptr<SparseTrunk>> MakeSparseTrunks(
   //    public states, infostates and associated histories.
   DepthLimitedCFR temp_trunk(game, roots_depth,
                              net_evaluator, terminal_evaluator);
+  std::cout << "# Temp trunk public states stats: \n";
+  PrintPublicStatesStats(temp_trunk.public_leaves());
 
   // 2. For each decision infostate, make a random subset of histories
   //    within the public state + 1 special history that surely belongs

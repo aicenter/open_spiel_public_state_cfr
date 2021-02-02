@@ -257,6 +257,8 @@ struct CFREvaluator : public LeafEvaluator {
 };
 
 
+void PrintPublicStatesStats(const std::vector<LeafPublicState>& public_leaves);
+
 }  // namespace dlcfr
 }  // namespace algorithms
 }  // namespace open_spiel

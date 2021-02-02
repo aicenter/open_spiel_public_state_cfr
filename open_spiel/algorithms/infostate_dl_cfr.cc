@@ -440,6 +440,32 @@ double DepthLimitedCFR::RootValue(Player pl) const {
       player_ranges_[pl]);
 }
 
+
+void PrintPublicStatesStats(const std::vector<LeafPublicState>& public_leaves) {
+  for (const LeafPublicState& state : public_leaves) {
+    std::array<int, 2>
+        num_nodes = { (int) state.leaf_nodes[0].size(),
+                      (int) state.leaf_nodes[1].size() },
+        largest_infostates = {-1, -1},
+        smallest_infostates = {1000000, 1000000};
+    int num_states = 0;
+    for (int pl = 0; pl < 2; ++pl) {
+      for (const InfostateNode* node : state.leaf_nodes[pl]) {
+        int size = node->corresponding_states_size();
+        if (pl == 0) num_states += size;
+        largest_infostates[pl] = std::max(largest_infostates[pl], size);
+        smallest_infostates[pl] = std::min(smallest_infostates[pl], size);
+      }
+    }
+    std::cout << "# Public state #"       << state.public_id
+              << (state.IsTerminal() ? " (terminal)" : "")
+              << "  states: "             << num_states
+              << "  infostates: "         << num_nodes
+              << "  largest infostate: "  << largest_infostates
+              << "  smallest infostate: " << smallest_infostates << '\n';
+  }
+}
+
 }  // namespace dlcfr
 }  // namespace algorithms
 }  // namespace open_spiel
