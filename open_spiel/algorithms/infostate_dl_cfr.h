@@ -159,6 +159,15 @@ class DepthLimitedCFR {
   std::vector<std::unique_ptr<PublicStateContext>>& contexts() {
     return contexts_;
   }
+  template<class T>
+  std::vector<T*> contexts_as() {
+    std::vector<T*> casted;
+    casted.reserve(contexts_.size());
+    for (std::unique_ptr<PublicStateContext>& context : contexts_) {
+      casted.push_back(open_spiel::down_cast<T*>(context.get()));
+    }
+    return casted;
+  }
   std::vector<LeafPublicState>& public_leaves() { return public_leaves_; }
   std::vector<std::vector<double>>& reach_probs() { return reach_probs_; }
   std::vector<std::vector<double>>& cf_values() { return cf_values_; }
