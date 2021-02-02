@@ -21,24 +21,42 @@ namespace papers_with_code {
 using namespace open_spiel::algorithms;
 using namespace torch::indexing;  // Load all of the Slice, Ellipsis, etc.
 
+std::unique_ptr<PublicStateContext> NetEvaluator::CreateContext(
+    const LeafPublicState& leaf_state) const {
+
+  SPIEL_DCHECK_FALSE(leaf_state.IsTerminal());
+  auto net_context = std::make_unique<NetContext>(hand_info_);
+  Observation& hand = hand_info_->hand_buffer;
+
+  for (int pl = 0; pl < 2; ++pl) {
+    for (int tree_idx = 0;
+         tree_idx < leaf_state.leaf_nodes[pl].size(); ++tree_idx) {
+      const InfostateNode* node = leaf_state.leaf_nodes[pl][tree_idx];
+      const State& some_state = *node->corresponding_states().at(0);
+      hand.SetFrom(some_state, pl);
+
+      size_t net_idx = hand_info_->tables[pl].hand_index(hand);
+      net_context->hand_mapping[pl].put({tree_idx, net_idx});
+    }
+  }
+  return net_context;
+}
+
 // TODO: evaluate all public states with a batch.
-void NetEvaluator::EvaluatePublicState(
+void ParticleNetEvaluator::EvaluatePublicState(
     algorithms::dlcfr::LeafPublicState* state,
     algorithms::dlcfr::PublicStateContext* context) const {
   SPIEL_DCHECK_FALSE(state->IsTerminal());  // Only non-terminal leafs.
-  SPIEL_DCHECK_FALSE(context);
   SPIEL_DCHECK_FALSE(model_->is_training());
+  SPIEL_DCHECK_TRUE(context);
+  auto net_context = open_spiel::down_cast<NetContext*>(context);
   torch::NoGradGuard no_grad_guard;  // We run only inference.
-
-  // Optionally apply support mask.
-  std::optional<std::array<std::vector<bool>, 2>> mask = {};
-  if (sparse_eq_ranges_) mask = sparse_eq_ranges_->StateMask(*state);
 
   ParticlesInContext point = batch_->point_at(0);
   // !! Do not shuffle, so that we can get back the values in an ordered way !!
-  WriteParticles(*state, hand_tables_, *dims_, &point,
-                 mask, /*rnd_gen=*/nullptr,
-                 /*shuffle_input=*/false, /*shuffle_output=*/false);
+  WriteParticles(
+      *state, *net_context, *dims_, &point,
+      /*rnd_gen=*/nullptr, /*shuffle_input=*/false, /*shuffle_output=*/false);
 
   // Input must be batched.
   torch::Tensor input = point.data.to(*device_).unsqueeze(/*dim=*/0);
@@ -49,7 +67,7 @@ void NetEvaluator::EvaluatePublicState(
   point.target.index_put_({Slice(0, point.num_particles())}, output);
 
   // !! This does not work with shuffling !!
-  CopyValuesNetToTree(point, *state, hand_tables_, *dims_, mask);
+  CopyValuesNetToTree(point, *state, *dims_);
 }
 
 }  // namespace papers_with_code

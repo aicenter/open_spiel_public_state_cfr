@@ -60,7 +60,6 @@ ABSL_FLAG(bool, eval_only_root, false,
 #include "open_spiel/papers_with_code/1906.06412.value_functions/train_eval.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/generate_data.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_dl_evaluator.h"
-#include "open_spiel/papers_with_code/1906.06412.value_functions/sparse_eq_ranges.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/torch_utils.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/trunk.h"
 
@@ -84,6 +83,7 @@ ExpReplayInitPolicy GetInitPolicy(const std::string& s) {
 void FillExperienceReplay(ExpReplayInitPolicy init,
                           ExperienceReplay* experience_replay,
                           Trunk* trunk,
+                          const std::vector<NetContext*>& net_contexts,
                           ortools::SequenceFormLpSpecification* whole_game,
                           const std::vector<int>& eval_iters,
                           std::mt19937& rnd_gen) {
@@ -97,7 +97,7 @@ void FillExperienceReplay(ExpReplayInitPolicy init,
 
       std::cout << "# Computing reference expls for given trunk iterations.\n";
       GenerateDataDLCfrIterations(
-        trunk, experience_replay, trunk_eval_iterations,
+        trunk, net_contexts, experience_replay, trunk_eval_iterations,
         /*monitor_fn*/[&](int trunk_iter) {
           bool should_evaluate =
               std::find(eval_iters.begin(), eval_iters.end(), trunk_iter)
@@ -121,7 +121,7 @@ void FillExperienceReplay(ExpReplayInitPolicy init,
       std::cout << "# Generating random trunks to fill experience replay.\n# ";
       for (int i = 0; i < absl::GetFlag(FLAGS_num_trunks); ++i) {
         if (i % 10 == 0) std::cout << '.' << std::flush;
-        GenerateDataRandomRanges(trunk, experience_replay,
+        GenerateDataRandomRanges(trunk, net_contexts, experience_replay,
                                  absl::GetFlag(FLAGS_prob_pure_strat),
                                  absl::GetFlag(FLAGS_prob_fully_mixed),
                                  rnd_gen,
@@ -181,13 +181,6 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
 
   // 1. Create the LP spec for the whole game.
   ortools::SequenceFormLpSpecification whole_game(*t->game, "CLP");
-  std::unique_ptr<SparseEqRanges> sparse_eq_ranges;
-  if (absl::GetFlag(FLAGS_apply_mask)) {
-    // Find a valid sparse trunk, so that we can use it for evaluation.
-    sparse_eq_ranges = FindSparseEqRanges(&whole_game,
-                                      t->fixable_trunk_with_oracle.get());
-    sparse_eq_ranges->PrintMasks();
-  }
 
   // 2. Create network and optimizer.
   torch::Device device = FindDevice();
@@ -204,13 +197,13 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   BatchData eval_batch(1, t->dims->point_input_size(),
                        t->dims->point_output_size());
 
-  auto net_evaluator = std::make_shared<NetEvaluator>(
-      &model, &device, t->tables, &eval_batch, t->dims.get(),
-      std::move(sparse_eq_ranges));
+  auto net_evaluator = std::make_shared<ParticleNetEvaluator>(
+      t->hand_info.get(), &model, t->dims.get(), &eval_batch, &device);
   auto trunk_with_net = std::make_unique<dlcfr::DepthLimitedCFR>(
       t->game, t->trunk_trees, net_evaluator, t->terminal_evaluator,
       t->public_observer,
       MakeBanditVectors(t->trunk_trees, use_bandits_for_cfr));
+  auto net_contexts = trunk_with_net->contexts_as<NetContext>();
 
   // 4. Make experience replay buffer.
   std::cout << "# Allocating experience replay buffer: "
@@ -221,8 +214,8 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   ExperienceReplay experience_replay(experience_replay_buffer_size,
                                      t->dims->point_input_size(),
                                      t->dims->point_output_size());
-  FillExperienceReplay(init_policy, &experience_replay, t.get(), &whole_game,
-                       eval_iters, rnd_gen);
+  FillExperienceReplay(init_policy, &experience_replay, t.get(),
+                       net_contexts, &whole_game, eval_iters, rnd_gen);
 
   // 5. The train-eval loop.
   std::cout << "loop,avg_loss,";

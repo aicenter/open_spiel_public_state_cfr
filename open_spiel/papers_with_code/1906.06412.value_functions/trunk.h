@@ -38,7 +38,7 @@ struct Trunk {
   std::shared_ptr<algorithms::dlcfr::CFREvaluator> oracle_evaluator;
   std::unique_ptr<algorithms::dlcfr::DepthLimitedCFR> fixable_trunk_with_oracle;
   std::unique_ptr<algorithms::dlcfr::DepthLimitedCFR> iterable_trunk_with_oracle;
-  std::vector<HandTable> tables;
+  std::unique_ptr<HandInfo> hand_info;
   std::unique_ptr<ParticleDims> dims;
   int num_leaves;
   int num_non_terminal_leaves;
@@ -52,15 +52,14 @@ std::unique_ptr<Trunk> MakeTrunk(const std::string& game_name, int trunk_depth,
 
 void AddExperiencesFromTrunk(
     const std::vector<algorithms::dlcfr::LeafPublicState>& public_leaves,
-    const std::vector<HandTable>& hand_tables, const ParticleDims& dims,
+    const std::vector<NetContext*>& net_contexts, const ParticleDims& dims,
     ExperienceReplay* replay,
     std::mt19937& rnd_gen, bool shuffle_input, bool shuffle_output);
 
 void WriteParticles(
     const algorithms::dlcfr::LeafPublicState& state,
-    const std::vector<HandTable>& hand_tables,
+    const NetContext& net_context,
     const ParticleDims& dims, ParticlesInContext* point,
-    std::optional<std::array<std::vector<bool>, 2>> mask,
     std::mt19937* rnd_gen, bool shuffle_input, bool shuffle_output);
 
 void inline Copy(absl::Span<const float> source, absl::Span<float> target) {
@@ -70,9 +69,7 @@ void inline Copy(absl::Span<const float> source, absl::Span<float> target) {
 
 void CopyValuesNetToTree(ParticlesInContext data_point,
                          algorithms::dlcfr::LeafPublicState& state,
-                         const std::vector<HandTable>& hand_tables,
-                         const ParticleDims& dims,
-                         std::optional<std::array<std::vector<bool>, 2>> mask);
+                         const ParticleDims& dims);
 
 void PrintTrunkStrategies(algorithms::dlcfr::DepthLimitedCFR* trunk_with_net);
 

@@ -24,9 +24,7 @@ namespace papers_with_code {
 using namespace open_spiel::algorithms;
 
 
-size_t HandTable::num_hands() const { return private_hands.size(); }
-
-size_t HandTable::hand_index(const Observation& hand) {
+size_t HandTable::insert(const Observation& hand) {
   auto it = std::find(private_hands.begin(), private_hands.end(), hand);
   if (it == private_hands.end()) {
     private_hands.push_back(hand);
@@ -36,14 +34,25 @@ size_t HandTable::hand_index(const Observation& hand) {
   }
 }
 
-size_t HandTable::hand_tensor_size() const {
-  return private_hands.back().Tensor().size();
+size_t HandTable::hand_index(const Observation& hand) const {
+  auto it = std::find(private_hands.begin(), private_hands.end(), hand);
+  if (it == private_hands.end()) {
+    SpielFatalError("Hand not found!");
+  } else {
+    return std::distance(private_hands.begin(), it);
+  }
 }
 
-const Observation& HandTable::hand_observation_at(int public_id,
-                                                  int infostate_id) const {
-  int hand_index = bijections.at(public_id).tree_to_net().at(infostate_id);
-  return private_hands.at(hand_index);
+size_t HandInfo::num_hands() const {
+  int hands = 0;
+  for (const auto & table : tables) {
+    hands += table.private_hands.size();
+  }
+  return hands;
+}
+
+size_t HandInfo::hand_tensor_size() const {
+  return hand_buffer.Tensor().size();
 }
 
 bool AllInfoStatesHaveDistinctHands(
@@ -93,11 +102,12 @@ bool AllStatesHaveSameHands(const Observation& expected_hand, Player player,
   return true;
 }
 
-std::vector<HandTable> CreateHandTables(
+std::unique_ptr<HandInfo> CreateHandInfo(
     const Game& game, const std::shared_ptr<Observer>& hand_observer,
     const std::vector<dlcfr::LeafPublicState>& public_leaves) {
-  std::vector<HandTable> tables{public_leaves.size(), public_leaves.size()};
-  Observation hand(game, hand_observer);
+  auto hand_info = std::make_unique<HandInfo>(game, hand_observer);
+  Observation& hand = hand_info->hand_buffer;
+
   for (int state_idx = 0; state_idx < public_leaves.size(); ++state_idx) {
     const dlcfr::LeafPublicState& state = public_leaves[state_idx];
     // Terminal states are not handled by non-terminal leaf evaluators,
@@ -119,34 +129,22 @@ std::vector<HandTable> CreateHandTables(
         SPIEL_DCHECK_TRUE(  // Should hold for all states within an infostate.
             AllStatesHaveSameHands(hand, pl, node->corresponding_states()));
 
-        size_t net_idx = tables[pl].hand_index(hand);
-        tables[pl].bijections[state_idx].put({tree_idx, net_idx});
+        hand_info->tables[pl].insert(hand);
       }
     }
   }
-  return tables;
+  return hand_info;
 }
 
-void DebugPrintHandTables(const std::vector<HandTable>& tables) {
-  SPIEL_CHECK_EQ(tables.size(), 2);
+void DebugPrintHandInfo(const HandInfo& hand_info) {
+  SPIEL_CHECK_EQ(hand_info.tables.size(), 2);
   for (int pl = 0; pl < 2; ++pl) {
     std::cout << "# List of private hands for player " << pl << "\n";
-    const HandTable& table = tables[pl];
+    const HandTable& table = hand_info.tables[pl];
     for (int i = 0; i < table.private_hands.size(); ++i) {
       std::cout << "#   private_hand[" << i << "]:\n#      "
                 << ObservationToString(table.private_hands[i], "\n#      ")
                 << "\n";
-    }
-
-    std::cout << "# List of bijections (tree <-> net) for player "
-              << pl << "\n";
-    for (size_t i = 0; i < table.bijections.size(); ++i) {
-      std::cout << "#  Public state " << i << "\n";
-      const std::map<size_t, size_t>& tree_to_net =
-          table.bijections[i].tree_to_net();
-      for (auto&[key, val] : tree_to_net) {
-        std::cout << "#   " << key << " -> " << val << "\n";
-      }
     }
   }
 }

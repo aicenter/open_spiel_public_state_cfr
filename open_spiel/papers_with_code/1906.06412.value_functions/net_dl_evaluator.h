@@ -19,7 +19,6 @@
 
 #include "open_spiel/papers_with_code/1906.06412.value_functions/hand_table.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_architectures.h"
-#include "open_spiel/papers_with_code/1906.06412.value_functions/sparse_eq_ranges.h"
 #include "open_spiel/spiel.h"
 
 namespace open_spiel {
@@ -29,20 +28,55 @@ using PublicStateContext = algorithms::dlcfr::PublicStateContext;
 using LeafPublicState = algorithms::dlcfr::LeafPublicState;
 using LeafEvaluator = algorithms::dlcfr::LeafEvaluator;
 
-class NetEvaluator final : public LeafEvaluator {
-  ValueNet* model_;
+
+// A bijection within the scope of a public state. This is a mapping between
+// LeafPublicState::ranges coming from the tree (x) and the input position
+// of the neural network (y) which is assigned according to player's private
+// hands across all public states of the trunk.
+// This is used for encoding NN inputs (resp. outputs).
+struct HandMapping : BijectiveContainer<size_t> {
+  const std::map<size_t, size_t>& tree_to_net() const { return x2y; }
+  const std::map<size_t, size_t>& net_to_tree() const { return y2x; }
+};
+
+
+struct NetContext : public PublicStateContext {
+  HandInfo* hand_info_;
+  // Hand mapping for each player within a public state:
+  // a bijection between the network and tree positions.
+  std::vector<HandMapping> hand_mapping;
+  NetContext(HandInfo* hand_info) : hand_info_(hand_info), hand_mapping(2) {}
+
+  int net_index(Player pl, int tree_index) const {
+    return hand_mapping[pl].tree_to_net().at(tree_index);
+  }
+  int tree_index(Player pl, int net_index) const {
+    return hand_mapping[pl].net_to_tree().at(net_index);
+  }
+  const Observation& hand_at(Player pl, int infostate_id) const {
+    return hand_info_->tables[pl].private_hands.at(net_index(pl, infostate_id));
+  }
+};
+
+class NetEvaluator : public LeafEvaluator {
+  HandInfo* hand_info_;
+ public:
+  NetEvaluator(HandInfo* hand_info) : hand_info_(hand_info) {};
+  std::unique_ptr<PublicStateContext> CreateContext(
+      const LeafPublicState& leaf_state) const override;
+};
+
+class ParticleNetEvaluator final : public NetEvaluator {
+  ParticleValueNet* model_;
   torch::Device* device_;
-  const std::vector<HandTable>& hand_tables_;
   BatchData* batch_;
   ParticleDims* const dims_;
-  std::unique_ptr<SparseEqRanges> sparse_eq_ranges_;
  public:
-  NetEvaluator(ValueNet* model, torch::Device* device,
-               const std::vector<HandTable>& tables,
-               BatchData* batch, ParticleDims* const dims,
-               std::unique_ptr<SparseEqRanges> sparse_eq_ranges)
-      : model_(model), device_(device), hand_tables_(tables), batch_(batch),
-        dims_(dims), sparse_eq_ranges_(std::move(sparse_eq_ranges)) {}
+  ParticleNetEvaluator(HandInfo* hand_info,
+                       ParticleValueNet* model, ParticleDims* const dims,
+                       BatchData* batch, torch::Device* device)
+      : NetEvaluator(hand_info),
+        model_(model), device_(device), batch_(batch), dims_(dims) {}
 
   void EvaluatePublicState(LeafPublicState* state,
                            PublicStateContext* context) const override;

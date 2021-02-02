@@ -85,7 +85,8 @@ void RandomizeStrategy(std::vector<BanditVector>& bandits,
 
 
 void GenerateDataRandomRanges(
-    Trunk* trunk, ExperienceReplay* replay,
+    Trunk* trunk, const std::vector<NetContext*>& contexts,
+    ExperienceReplay* replay,
     double prob_pure_strat, double prob_fully_mixed,
     std::mt19937& rnd_gen, bool shuffle_input, bool shuffle_output) {
   trunk->fixable_trunk_with_oracle->Reset();
@@ -100,7 +101,7 @@ void GenerateDataRandomRanges(
   // Copy the leaves values to the experience replay.
   AddExperiencesFromTrunk(
       trunk->fixable_trunk_with_oracle->public_leaves(),
-      trunk->tables, *trunk->dims, replay,
+      contexts, *trunk->dims, replay,
       rnd_gen, shuffle_input, shuffle_output);
 
 //  if (verbose) {
@@ -116,7 +117,8 @@ void GenerateDataRandomRanges(
 // The network should imitate DL-CFR at each iteration
 // when we use this generation method.
 void GenerateDataDLCfrIterations(
-    Trunk* trunk, ExperienceReplay* replay, int trunk_iters,
+    Trunk* trunk, const std::vector<NetContext*>& contexts,
+    ExperienceReplay* replay, int trunk_iters,
     std::function<void(/*trunk_iter=*/int)> monitor_fn,
     std::mt19937& rnd_gen, bool shuffle_input, bool shuffle_output) {
   trunk->iterable_trunk_with_oracle->Reset();
@@ -126,7 +128,7 @@ void GenerateDataDLCfrIterations(
     trunk->iterable_trunk_with_oracle->EvaluateLeaves();
 
     AddExperiencesFromTrunk(trunk->iterable_trunk_with_oracle->public_leaves(),
-                            trunk->tables, *trunk->dims, replay,
+                            contexts, *trunk->dims, replay,
                             rnd_gen, shuffle_input, shuffle_output);
     monitor_fn(iter);
 

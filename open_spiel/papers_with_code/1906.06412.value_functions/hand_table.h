@@ -21,38 +21,35 @@
 namespace open_spiel {
 namespace papers_with_code {
 
-// A bijection within the scope of a public state. This is a mapping between
-// LeafPublicState::ranges coming from the tree (x) and the input position
-// of the neural network (y) which is assigned according to player's private
-// hands across all public states of the trunk.
-// This is used for encoding NN inputs (resp. outputs).
-struct HandMapping : BijectiveContainer<size_t> {
-  const std::map<size_t, size_t>& tree_to_net() const { return x2y; }
-  const std::map<size_t, size_t>& net_to_tree() const { return y2x; }
-};
-
 // Store all possible private hands within a trunk for one player.
 struct HandTable {
-  // Hand mapping per public state.
-  std::vector<HandMapping> bijections;
-
   // List all possible private observations ("hands") for the player.
   // Their position in the vector is the same as their network's input position.
   std::vector<Observation> private_hands;
 
-  HandTable(int num_public_states) : bijections(num_public_states) {}
-  size_t num_hands() const;
-  size_t hand_index(const Observation& obs);
-  size_t hand_tensor_size() const;
-  const Observation& hand_observation_at(int public_id, int infostate_id) const;
+  // Lookup or uniquely insert the observation and return its hand index.
+  size_t insert(const Observation& hand);
+  // Lookup the observation and return its hand index. Fail if not found.
+  size_t hand_index(const Observation& hand) const;
 };
 
-std::vector<HandTable> CreateHandTables(
+struct HandInfo {
+  Observation hand_buffer;        // A writable hand buffer for both players.
+  std::vector<HandTable> tables;  // Hand tables for each player.
+
+  HandInfo(const Game& game, const std::shared_ptr<Observer>& hand_observer)
+    : hand_buffer(Observation(game, hand_observer)), tables(2) {}
+
+  size_t num_hands() const;
+  size_t hand_tensor_size() const;
+};
+
+std::unique_ptr<HandInfo> CreateHandInfo(
     const Game& game,
     const std::shared_ptr<Observer>& hand_observer,
     const std::vector<algorithms::dlcfr::LeafPublicState>& public_leaves);
 
-void DebugPrintHandTables(const std::vector<HandTable>& tables);
+void DebugPrintHandInfo(const HandInfo& hand_info);
 
 }  // namespace papers_with_code
 }  // namespace open_spiel

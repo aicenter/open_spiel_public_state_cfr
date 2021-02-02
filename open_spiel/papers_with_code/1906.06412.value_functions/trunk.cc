@@ -54,25 +54,26 @@ Trunk::Trunk(const std::string& game_name, int depth, std::string use_bandits_fo
       MakeBanditVectors(trunk_trees, use_bandits_for_cfr));
 
   // 3. Make a Batch of data that encompasses all leaf public states.
-  tables = CreateHandTables(*game, hand_observer,
-                            fixable_trunk_with_oracle->public_leaves());
+  hand_info = CreateHandInfo(*game, hand_observer,
+                             fixable_trunk_with_oracle->public_leaves());
   const dlcfr::LeafPublicState& some_leaf =
       fixable_trunk_with_oracle->public_leaves().at(0);
 
   dims = std::make_unique<ParticleDims>();
   dims->public_features_size = some_leaf.public_tensor.Tensor().size();
   for (int pl = 0; pl < 2; ++pl) {
-    dims->net_ranges_size[pl] = tables[pl].num_hands();
+    dims->net_ranges_size[pl] = hand_info->tables[pl].private_hands.size();
     if (!dims->write_hand_features_positionally) {
-      dims->hand_features_size = tables[pl].hand_tensor_size();
+      dims->hand_features_size = hand_info->hand_tensor_size();
     }
   }
   if (dims->write_hand_features_positionally) {
     // Max per table, because we already encode player id as a feature.
-    dims->hand_features_size = std::max(tables[0].num_hands(),
-                                        tables[1].num_hands());
+    dims->hand_features_size = std::max(
+        hand_info->tables[0].private_hands.size(),
+        hand_info->tables[1].private_hands.size());
   }
-  dims->max_particles = tables[0].num_hands() + tables[1].num_hands();
+  dims->max_particles = hand_info->num_hands();
   num_leaves = fixable_trunk_with_oracle->public_leaves().size();
   num_non_terminal_leaves = 0;
   for (auto& leaf: fixable_trunk_with_oracle->public_leaves()) {
@@ -82,14 +83,15 @@ Trunk::Trunk(const std::string& game_name, int depth, std::string use_bandits_fo
 
 void AddExperiencesFromTrunk(
     const std::vector<algorithms::dlcfr::LeafPublicState>& public_leaves,
-    const std::vector<HandTable>& hand_tables,
+    const std::vector<NetContext*>& net_contexts,
     const ParticleDims& dims, ExperienceReplay* replay,
     std::mt19937& rnd_gen, bool shuffle_input, bool shuffle_output) {
   for (int i = 0; i < public_leaves.size(); ++i) {
     const dlcfr::LeafPublicState& leaf = public_leaves[i];
     if (leaf.IsTerminal()) continue;  // Add experiences only for non-terminals.
+    const NetContext& net_context = *net_contexts[i];
     ParticlesInContext data_point = replay->AddExperience(dims);
-    WriteParticles(leaf, hand_tables, dims, &data_point, /*mask=*/{},
+    WriteParticles(leaf, net_context, dims, &data_point,
                    &rnd_gen, shuffle_input, shuffle_output);
   }
 }
@@ -97,35 +99,20 @@ void AddExperiencesFromTrunk(
 // Rewrite all private hands into one-hot encoded positional hands.
 // The size of the encoding should be supplied and should be equal
 // to the maximum of the number of the private hands over the players.
-void WritePositionalHand(const HandMapping& map, int infostate_id,
-                         absl::Span<float_net> write_to) {
-  int net_id = map.tree_to_net().at(infostate_id);
+void WritePositionalHand(int net_id, absl::Span<float_net> write_to) {
   std::fill(write_to.begin(), write_to.end(), 0.);
   write_to[net_id] = 1.;
 }
 
 void WriteParticles(const algorithms::dlcfr::LeafPublicState& state,
-                    const std::vector<HandTable>& hand_tables,
+                    const NetContext& net_context,
                     const ParticleDims& dims, ParticlesInContext* point,
-                    std::optional<std::array<std::vector<bool>, 2>> reachable_mask,
                     std::mt19937* rnd_gen, bool shuffle_input, bool shuffle_output) {
+  // Important !!
   point->Reset();
 
   // Find out how many particles we will write.
-  int num_particles = 0;
-
-  if (reachable_mask.has_value()) {
-    for (int pl = 0; pl < 2; ++pl) {
-      // Mask must be over the same ranges!
-      SPIEL_DCHECK_EQ((*reachable_mask)[pl].size(), state.ranges[pl].size());
-      for (int i = 0; i < (*reachable_mask)[pl].size(); ++i) {
-        if((*reachable_mask)[pl][i]) num_particles++;
-      }
-    }
-  } else {
-    num_particles = state.leaf_nodes[0].size() + state.leaf_nodes[1].size();
-  }
-
+  int num_particles = state.leaf_nodes[0].size() + state.leaf_nodes[1].size();
   // Make a random permutation if something should be shuffled.
   std::vector<int> particle_placement(num_particles);
   if (shuffle_input || shuffle_output) {
@@ -139,19 +126,15 @@ void WriteParticles(const algorithms::dlcfr::LeafPublicState& state,
   int i = 0;
   for (int pl = 0; pl < 2; ++pl) {
     for (int j = 0; j < state.leaf_nodes[pl].size(); j++) {
-      // Skip this infostate!
-      if(reachable_mask.has_value() && !(*reachable_mask)[pl][j]) continue;
-
       ParticleData particle = point->particle_at(
           dims, shuffle_input ? particle_placement[i] : i);
       Copy(state.public_tensor.Tensor(), particle.public_features());
       // Hand features.
       if(dims.write_hand_features_positionally) {
-        WritePositionalHand(hand_tables[pl].bijections[state.public_id], j,
+        WritePositionalHand(net_context.net_index(pl, j),
                             particle.hand_features());
       } else {
-        const Observation& hand_observation =
-            hand_tables[pl].hand_observation_at(state.public_id, j);
+        const Observation& hand_observation = net_context.hand_at(pl, j);
         Copy(hand_observation.Tensor(), particle.hand_features());
       }
       particle.player_features()[pl] = 1.;
@@ -165,9 +148,6 @@ void WriteParticles(const algorithms::dlcfr::LeafPublicState& state,
   i = 0;
   for (int pl = 0; pl < 2; ++pl) {
     for (int j = 0; j < state.leaf_nodes[pl].size(); j++) {
-      // Skip this infostate!
-      if(reachable_mask.has_value() && !(*reachable_mask)[pl][j]) continue;
-
       ParticleData particle = point->particle_at(
           dims, shuffle_output ? particle_placement[i] : i);
       particle.value() = state.values[pl][j];
@@ -181,31 +161,18 @@ void WriteParticles(const algorithms::dlcfr::LeafPublicState& state,
 
 void CopyValuesNetToTree(ParticlesInContext data_point,
                          algorithms::dlcfr::LeafPublicState& state,
-                         const std::vector<HandTable>& hand_tables,
-                         const ParticleDims& dims,
-                         std::optional<std::array<std::vector<bool>, 2>> reachable_mask) {
+                         const ParticleDims& dims) {
   int particle_index = 0;
   for (int pl = 0; pl < 2; ++pl) {
-    if (reachable_mask.has_value())  // Mask must be over the same ranges!
-        SPIEL_DCHECK_EQ((*reachable_mask)[pl].size(), state.ranges[pl].size());
-
     for (int j = 0; j < state.leaf_nodes[pl].size(); j++) {
-      if(reachable_mask.has_value() && !(*reachable_mask)[pl][j]) {
-        // Write a big negative value for this infostate.
-        // This should be a value larger than any utility in the game.
-        state.values[pl][j] = kSparseTrunkDoNotFollowValue;
-        continue;  // Skip copying in this infostate!
-      }
-
       ParticleData particle = data_point.particle_at(dims, particle_index);
-      // Check no prediction was lower!
-      SPIEL_DCHECK_LT(kSparseTrunkDoNotFollowValue, particle.value());
       state.values[pl][j] = particle.value();
       particle_index++;
     }
   }
   SPIEL_CHECK_EQ(data_point.num_particles(), particle_index);
 }
+
 void PrintTrunkStrategies(algorithms::dlcfr::DepthLimitedCFR* trunk_with_net) {
   auto& bandits = trunk_with_net->bandits();
   auto& trees = trunk_with_net->trees();
