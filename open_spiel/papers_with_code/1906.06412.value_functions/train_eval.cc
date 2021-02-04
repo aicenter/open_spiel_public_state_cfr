@@ -40,8 +40,11 @@ class TabularizePolicy : public Policy {
  public:
   TabularizePolicy(std::vector<std::unique_ptr<SparseTrunk>>& sparse_trunks) {
     for (std::unique_ptr<SparseTrunk>& sparse_trunk : sparse_trunks) {
-      dispatch_table_[sparse_trunk->eval_infostate] =
-          sparse_trunk->dlcfr->AveragePolicy();
+      for (const std::string & eval_infostate : sparse_trunk->eval_infostates) {
+        SPIEL_CHECK_TRUE(dispatch_table_.find(eval_infostate)
+                         == dispatch_table_.end());
+        dispatch_table_[eval_infostate] = sparse_trunk->dlcfr->AveragePolicy();
+      }
     }
   };
 

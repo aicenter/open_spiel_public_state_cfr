@@ -155,7 +155,7 @@ std::vector<std::unique_ptr<SparseTrunk>> MakeSparseTrunks(
         sparse_trunk->dlcfr = std::make_unique<DepthLimitedCFR>(
             game, sparse_trees, net_evaluator, terminal_evaluator,
             public_observer, MakeBanditVectors(sparse_trees, bandits_for_cfr));
-        sparse_trunk->eval_infostate = node->infostate_string();
+        sparse_trunk->eval_infostates = {node->infostate_string()};
         sparse_trunks.push_back(std::move(sparse_trunk));
       }
     }

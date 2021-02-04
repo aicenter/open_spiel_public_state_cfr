@@ -26,8 +26,10 @@ void CheckSparseTrunksKuhnDepth2(
     int num_states) {
   SPIEL_CHECK_EQ(sparse_trunks.size(), 3);
   for (int i = 0; i < sparse_trunks.size(); ++i) {
+    SPIEL_CHECK_EQ(sparse_trunks[i]->eval_infostates.size(), 1);
+    const std::string& eval_infostate = sparse_trunks[i]->eval_infostates[0];
     // One char, i.e. card 0/1/2
-    SPIEL_CHECK_EQ(sparse_trunks[i]->eval_infostate.size(), 1);
+    SPIEL_CHECK_EQ(eval_infostate.size(), 1);
     SPIEL_CHECK_EQ(sparse_trunks[i]->dlcfr->public_leaves().size(), 5);
 
     for (int pl = 0; pl < 2; ++pl) {
@@ -42,16 +44,18 @@ void CheckSparseTrunksKuhnDepth3(
     int num_states) {
   SPIEL_CHECK_EQ(sparse_trunks.size(), 6);
   for (int i = 0; i < sparse_trunks.size(); ++i) {
+    SPIEL_CHECK_EQ(sparse_trunks[i]->eval_infostates.size(), 1);
+    const std::string& eval_infostate = sparse_trunks[i]->eval_infostates[0];
     // Two chars, i.e. card 0/1/2 followed by p/b
-    SPIEL_CHECK_EQ(sparse_trunks[i]->eval_infostate.size(), 2);
+    SPIEL_CHECK_EQ(eval_infostate.size(), 2);
 
     for (int pl = 0; pl < 2; ++pl) {
-      if (sparse_trunks[i]->eval_infostate[1] == 'p') {
+      if (eval_infostate[1] == 'p') {
         // Pass infostate
         SPIEL_CHECK_EQ(sparse_trunks[i]->dlcfr->trees()[pl]
                        ->leaf_nodes().size(), num_states * 3);
         SPIEL_CHECK_EQ(sparse_trunks[i]->dlcfr->public_leaves().size(), 3);
-      } else if (sparse_trunks[i]->eval_infostate[1] == 'b') {
+      } else if (eval_infostate[1] == 'b') {
         // Bet infostate
         SPIEL_CHECK_EQ(sparse_trunks[i]->dlcfr->trees()[pl]
                        ->leaf_nodes().size(), num_states * 2);
@@ -68,8 +72,10 @@ void CheckSparseTrunksKuhnDepth4(
     int num_states) {
   SPIEL_CHECK_EQ(sparse_trunks.size(), 3);
   for (int i = 0; i < sparse_trunks.size(); ++i) {
+    SPIEL_CHECK_EQ(sparse_trunks[i]->eval_infostates.size(), 1);
+    const std::string& eval_infostate = sparse_trunks[i]->eval_infostates[0];
     // Three chars, i.e. card 0/1/2 followed by pb
-    SPIEL_CHECK_EQ(sparse_trunks[i]->eval_infostate.size(), 3);
+    SPIEL_CHECK_EQ(eval_infostate.size(), 3);
     SPIEL_CHECK_EQ(sparse_trunks[i]->dlcfr->public_leaves().size(), 2);
 
     for (int pl = 0; pl < 2; ++pl) {

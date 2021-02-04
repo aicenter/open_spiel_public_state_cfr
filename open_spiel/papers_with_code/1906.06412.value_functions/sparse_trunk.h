@@ -25,7 +25,7 @@ namespace papers_with_code {
 // See comment below.
 struct SparseTrunk {
   std::unique_ptr<algorithms::dlcfr::DepthLimitedCFR> dlcfr;
-  std::string eval_infostate;
+  std::vector<std::string> eval_infostates;
 };
 
 // For each eval_infostate within each public state at the specified depth of
