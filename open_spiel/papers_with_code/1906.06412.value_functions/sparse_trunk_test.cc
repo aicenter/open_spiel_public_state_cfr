@@ -120,10 +120,31 @@ void TestMakeSparseTrunks() {
   }
 }
 
+void TestMakeSparseTrunkWithEqSupport() {
+  std::shared_ptr<const Game> game = LoadGame("kuhn_poker");
+  std::shared_ptr<Observer> infostate_observer =
+      game->MakeObserver(kInfoStateObsType, {});
+  std::shared_ptr<Observer> public_observer =
+      game->MakeObserver(kPublicStateObsType, {});
+  std::shared_ptr<dlcfr::LeafEvaluator> terminal_evaluator =
+      dlcfr::MakeTerminalEvaluator();
+  std::shared_ptr<dlcfr::LeafEvaluator> dummy_eval =
+      dlcfr::MakeDummyEvaluator();
+  std::string bandits_for_cfr = "RegretMatchingPlus";
+  ortools::SequenceFormLpSpecification whole_game(*game);
+
+  std::unique_ptr<SparseTrunk> sparse_trunks =
+      MakeSparseTrunkWithEqSupport(&whole_game, game, infostate_observer,
+                                   public_observer, 3, /*trunk_depth=*/1000,
+                                   dummy_eval, terminal_evaluator,
+                                   bandits_for_cfr);
+}
+
 }  // namespace
 }  // papers_with_code
 }  // open_spiel
 
 int main(int argc, char** argv) {
   open_spiel::papers_with_code::TestMakeSparseTrunks();
+  open_spiel::papers_with_code::TestMakeSparseTrunkWithEqSupport();
 }

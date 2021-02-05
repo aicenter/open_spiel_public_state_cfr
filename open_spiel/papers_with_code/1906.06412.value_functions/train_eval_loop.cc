@@ -195,6 +195,7 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   const int batch_size = absl::GetFlag(FLAGS_batch_size) > 0
       ? std::min(absl::GetFlag(FLAGS_batch_size), experience_replay_buffer_size)
       : experience_replay_buffer_size;
+  const int roots_depth = GetSparseRootsDepth(*t->game);
 
   t->oracle_evaluator->num_cfr_iterations = cfr_oracle_iterations;
   torch::manual_seed(seed);
@@ -223,10 +224,15 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
 
   std::vector<std::unique_ptr<SparseTrunk>> sparse_trunks_with_net
       = MakeSparseTrunks(t->game, t->infostate_observer, t->public_observer,
-                         GetSparseRootsDepth(*t->game), t->trunk_depth,
+                         roots_depth, t->trunk_depth,
                          net_evaluator, t->terminal_evaluator,
                          absl::GetFlag(FLAGS_limit_initial_states),
                          use_bandits_for_cfr, rnd_gen);
+  std::vector<std::unique_ptr<SparseTrunk>> sparse_eq_trunk_with_net;
+  sparse_eq_trunk_with_net.push_back(MakeSparseTrunkWithEqSupport(
+      &whole_game, t->game, t->infostate_observer, t->public_observer,
+      roots_depth, t->trunk_depth,
+      net_evaluator, t->terminal_evaluator, use_bandits_for_cfr));
   std::cout << "# Sparse trunks: " << sparse_trunks_with_net.size() << "\n";
 
   auto trunk_with_net = std::make_unique<dlcfr::DepthLimitedCFR>(
@@ -270,14 +276,19 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
 
     model.eval();  // Eval mode.
     std::cout << "# Evaluating  " << std::flush;
-    std::vector<double> evals = EvaluateNetwork(
+    std::vector<double> evals_random = EvaluateNetwork(
         sparse_trunks_with_net, &whole_game, eval_iters);
+    std::vector<double> evals_eq = EvaluateNetwork(
+        sparse_eq_trunk_with_net, &whole_game, eval_iters);
     std::cout << std::endl;
 //    PrintTrunkStrategies(trunk_with_net.get());
 
     const double avg_loss = cumul_loss / train_batches;
     std::cout << loop << ',' << avg_loss << ',';
-    for (float eval : evals) {
+    for (float eval : evals_random) {
+      std::cout << eval << ',';
+    }
+    for (float eval : evals_eq) {
       std::cout << eval << ',';
     }
     std::cout << std::endl;

@@ -44,6 +44,16 @@ std::vector<std::unique_ptr<SparseTrunk>> MakeSparseTrunks(
     int limit_initial_states, const std::string& bandits_for_cfr,
     std::mt19937& rnd_gen);
 
+std::unique_ptr<SparseTrunk> MakeSparseTrunkWithEqSupport(
+    algorithms::ortools::SequenceFormLpSpecification* whole_game,
+    std::shared_ptr<const Game> game,
+    std::shared_ptr<Observer> infostate_observer,
+    std::shared_ptr<Observer> public_observer,
+    int roots_depth, int trunk_depth,
+    std::shared_ptr<const algorithms::dlcfr::LeafEvaluator> net_evaluator,
+    std::shared_ptr<const algorithms::dlcfr::LeafEvaluator> terminal_evaluator,
+    const std::string& bandits_for_cfr);
+
 
 }  // papers_with_code
 }  // open_spiel
