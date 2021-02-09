@@ -13,6 +13,7 @@ add_library(paper_value_functions OBJECT
   hand_table.cc
   sparse_trunk.cc
   sparse_trunk.h
+  dispatch_policy.h
   torch_utils.cc
   torch_utils.h
   train_eval.h

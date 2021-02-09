@@ -108,16 +108,27 @@ std::vector<std::unique_ptr<SparseTrunk>> MakeSparseTrunks(
 
   // 1. First of all, build a temporary full trunk, so we can identify all
   //    public states, infostates and associated histories.
-  DepthLimitedCFR temp_trunk(game, roots_depth,
-                             net_evaluator, terminal_evaluator);
+  std::shared_ptr<LeafEvaluator> dummy_eval = MakeDummyEvaluator();
+  DepthLimitedCFR temp_trunk(game, roots_depth, dummy_eval, terminal_evaluator);
   std::cout << "# Temp trunk public states stats: \n";
   PrintPublicStatesStats(temp_trunk.public_leaves());
 
   // 2. For each decision infostate, make a random subset of histories
   //    within the public state + 1 special history that surely belongs
   //    to that infostate.
+  int num_sparse_trunks = 0;
+  for (const LeafPublicState& public_state: temp_trunk.public_leaves()) {
+    for (int pl = 0; pl < 2; ++pl) {
+      for (const InfostateNode* node : public_state.leaf_nodes[pl]) {
+        // We are interested only in sparsification for decision infostates.
+        if (node->type() != kDecisionInfostateNode) continue;
+        num_sparse_trunks++;
+      }
+    }
+  }
+  std::cout << "# Making " << num_sparse_trunks << " sparse trunks\n";
   std::vector<std::unique_ptr<SparseTrunk>> sparse_trunks;
-  sparse_trunks.reserve(temp_trunk.public_leaves().size() * 8);
+  sparse_trunks.reserve(num_sparse_trunks);
 
   for (const LeafPublicState& public_state: temp_trunk.public_leaves()) {
     std::vector<const State*> states = CollectStates(public_state);
@@ -164,28 +175,32 @@ std::vector<std::unique_ptr<SparseTrunk>> MakeSparseTrunks(
   return sparse_trunks;
 }
 
-std::vector<std::vector<Action>> GetActionsInSupport(
+constexpr double kSupportThreshold = 1e-5;
+//constexpr double kSupportThreshold = -1;
+
+// Return set of actions in support for each player.
+std::vector<ActionsAndProbs> GetActionsInSupport(
     const State& s, const Observer& infostate_observer,
-    const std::vector<TabularPolicy>& eq_policies,
-    double support_threshold = 1e-5) {
-  std::vector<std::vector<Action>> actions_in_support;
+    const TabularPolicy& eq_policies) {
+  SPIEL_CHECK_TRUE(s.IsPlayerNode() || s.IsSimultaneousNode());
+  std::vector<ActionsAndProbs> actions_in_support;
   actions_in_support.reserve(s.NumPlayers());
 
   for (int pl = 0; pl < s.NumPlayers(); ++pl) {
     if (s.IsPlayerActing(pl)) {
       const std::string infostate = infostate_observer.StringFrom(s, pl);
-      ActionsAndProbs local_policy = eq_policies[pl].GetStatePolicy(infostate);
+      ActionsAndProbs local_policy = eq_policies.GetStatePolicy(infostate);
       SPIEL_CHECK_FALSE(local_policy.empty());
-      std::vector<Action> play_actions;
+      ActionsAndProbs play_actions;
       play_actions.reserve(local_policy.size());
       for (const auto& [action, prob] : local_policy) {
-        if (prob > support_threshold) {
-          play_actions.push_back(action);
+        if (prob > kSupportThreshold) {
+          play_actions.push_back({action, prob});
         }
       }
       actions_in_support.push_back(play_actions);
     } else {
-      actions_in_support.push_back({kInvalidAction});
+      actions_in_support.push_back({{kInvalidAction, 1.}});
     }
   }
 
@@ -195,7 +210,7 @@ std::vector<std::vector<Action>> GetActionsInSupport(
 void GenerateHistoriesInSupportAtDepth(
     std::unique_ptr<State> s, double chn,
     const Observer& infostate_observer,
-    const std::vector<TabularPolicy>& eq_policies,
+    const TabularPolicy& eq_policies,
     int depth,
     std::vector<std::unique_ptr<State>>& states_out,
     std::vector<double>& chances_out) {
@@ -210,22 +225,6 @@ void GenerateHistoriesInSupportAtDepth(
     return;
   }
 
-  if (s->IsSimultaneousNode()) {
-    std::vector<std::vector<Action>> actions_in_support = GetActionsInSupport(
-        *s, infostate_observer, eq_policies);
-
-    for (Action action0 : actions_in_support[0]) {
-      for (Action action1 : actions_in_support[1]) {
-        std::unique_ptr<State> child = s->Clone();
-        child->ApplyActions({action0, action1});
-        GenerateHistoriesInSupportAtDepth(
-            std::move(child), chn, infostate_observer, eq_policies,
-            depth, states_out, chances_out);
-      }
-    }
-    return;
-  }
-
   if (s->IsChanceNode()) {
     for (const auto& [action, prob] : s->ChanceOutcomes()) {
       std::unique_ptr<State> child = s->Clone();
@@ -237,41 +236,51 @@ void GenerateHistoriesInSupportAtDepth(
     return;
   }
 
-  std::vector<std::vector<Action>> actions_in_support = GetActionsInSupport(
-      *s, infostate_observer, eq_policies);
-  for (const Action action :  actions_in_support[s->CurrentPlayer()]) {
+  if (s->IsSimultaneousNode()) {
+    std::vector<ActionsAndProbs> actions_in_support =
+        GetActionsInSupport(*s, infostate_observer, eq_policies);
+
+    for (auto& [action0, prob0] : actions_in_support[0]) {
+      for (auto& [action1, prob1] : actions_in_support[1]) {
+        std::unique_ptr<State> child = s->Clone();
+        child->ApplyActions({action0, action1});
+        GenerateHistoriesInSupportAtDepth(
+            std::move(child), chn * prob0 * prob1, infostate_observer, eq_policies,
+            depth, states_out, chances_out);
+      }
+    }
+    return;
+  }
+
+  SPIEL_CHECK_TRUE(s->IsPlayerNode());
+  std::vector<ActionsAndProbs> actions_in_support =
+      GetActionsInSupport(*s, infostate_observer, eq_policies);
+  for (const auto& [action, prob] :  actions_in_support[s->CurrentPlayer()]) {
     if (action == kInvalidAction) continue;
 
     std::unique_ptr<State> child = s->Clone();
     child->ApplyAction(action);
     GenerateHistoriesInSupportAtDepth(
-        std::move(child), chn, infostate_observer, eq_policies,
+        std::move(child), chn * prob, infostate_observer, eq_policies,
         depth, states_out, chances_out);
   }
 }
 
 
 std::unique_ptr<SparseTrunk> MakeSparseTrunkWithEqSupport(
-    algorithms::ortools::SequenceFormLpSpecification* whole_game,
+    const TabularPolicy& eq_policies,
     std::shared_ptr<const Game> game,
     std::shared_ptr<Observer> infostate_observer,
     std::shared_ptr<Observer> public_observer,
     int roots_depth, int trunk_depth,
-    std::shared_ptr<const algorithms::dlcfr::LeafEvaluator> net_evaluator,
+    std::shared_ptr<const algorithms::dlcfr::LeafEvaluator> leaf_evaluator,
     std::shared_ptr<const algorithms::dlcfr::LeafEvaluator> terminal_evaluator,
     const std::string& bandits_for_cfr) {
-
-  std::vector<TabularPolicy> policies;
-  for (int pl = 0; pl < 2; ++pl) {
-    whole_game->SpecifyLinearProgram(pl);
-    whole_game->Solve();
-    policies.push_back(whole_game->OptimalPolicy(pl));
-  }
 
   std::vector<std::unique_ptr<State>> start_states;
   std::vector<double> start_chances;
   GenerateHistoriesInSupportAtDepth(game->NewInitialState(), /*chn=*/1.,
-                                    *infostate_observer, policies, roots_depth,
+                                    *infostate_observer, eq_policies, roots_depth,
                                     start_states, start_chances);
 
   std::vector<const State*> start_states_ptrs;
@@ -300,7 +309,7 @@ std::unique_ptr<SparseTrunk> MakeSparseTrunkWithEqSupport(
   };
   auto sparse_trunk = std::make_unique<SparseTrunk>();
   sparse_trunk->dlcfr = std::make_unique<DepthLimitedCFR>(
-      game, sparse_trees, net_evaluator, terminal_evaluator,
+      game, sparse_trees, leaf_evaluator, terminal_evaluator,
       public_observer, MakeBanditVectors(sparse_trees, bandits_for_cfr));
   sparse_trunk->eval_infostates = start_infostates;
 

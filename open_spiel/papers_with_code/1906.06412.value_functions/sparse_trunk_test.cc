@@ -14,6 +14,8 @@
 
 
 #include "open_spiel/papers_with_code/1906.06412.value_functions/sparse_trunk.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/dispatch_policy.h"
+#include "open_spiel/algorithms/ortools/dl_oracle_evaluator.h"
 
 namespace open_spiel {
 namespace papers_with_code {
@@ -121,23 +123,62 @@ void TestMakeSparseTrunks() {
 }
 
 void TestMakeSparseTrunkWithEqSupport() {
-  std::shared_ptr<const Game> game = LoadGame("kuhn_poker");
+  const int no_move_limit = 1000;
+  std::shared_ptr<const Game> game = LoadGame(
+      "goofspiel(players=2,num_cards=5,imp_info=True,points_order=descending)");
   std::shared_ptr<Observer> infostate_observer =
       game->MakeObserver(kInfoStateObsType, {});
   std::shared_ptr<Observer> public_observer =
       game->MakeObserver(kPublicStateObsType, {});
   std::shared_ptr<dlcfr::LeafEvaluator> terminal_evaluator =
       dlcfr::MakeTerminalEvaluator();
-  std::shared_ptr<dlcfr::LeafEvaluator> dummy_eval =
-      dlcfr::MakeDummyEvaluator();
+  auto cfr_eval = std::make_shared<dlcfr::CFREvaluator>(
+      game, no_move_limit, /*leaf_evaluator=*/nullptr,
+      terminal_evaluator, public_observer, infostate_observer);
+  cfr_eval->num_cfr_iterations = 10000;
   std::string bandits_for_cfr = "RegretMatchingPlus";
-  ortools::SequenceFormLpSpecification whole_game(*game);
 
-  std::unique_ptr<SparseTrunk> sparse_trunks =
-      MakeSparseTrunkWithEqSupport(&whole_game, game, infostate_observer,
-                                   public_observer, 3, /*trunk_depth=*/1000,
-                                   dummy_eval, terminal_evaluator,
+  ortools::SequenceFormLpSpecification whole_game(*game, "CLP");
+  auto [eq_policy, game_value] = ortools::MakeEquilibriumPolicy(&whole_game);
+
+  const int roots_depth = 2;
+  const int trunk_depth = 3;
+  std::unique_ptr<SparseTrunk> sparse_slice =
+      MakeSparseTrunkWithEqSupport(eq_policy, game,
+                                   infostate_observer, public_observer,
+                                   roots_depth, trunk_depth,
+                                   cfr_eval, terminal_evaluator,
                                    bandits_for_cfr);
+  std::shared_ptr<Policy> slice_policy = sparse_slice->dlcfr->AveragePolicy();
+
+  // The sparse trunk is constructed as replacing the players' equilibrium
+  // policies as a chance in the upper game. By constructing the trunk with no
+  // move limit, we make an evaluation trunk.
+  std::unique_ptr<SparseTrunk> eval_trunk =
+      MakeSparseTrunkWithEqSupport(eq_policy, game,
+                                   infostate_observer, public_observer,
+                                   roots_depth, no_move_limit,
+                                   cfr_eval, terminal_evaluator,
+                                   bandits_for_cfr);
+  ortools::SequenceFormLpSpecification eq_fixed_as_chance_lp(
+      eval_trunk->dlcfr->trees(), "CLP");
+
+  // Make a special dispatch table for exploitability evaluation:
+  // The roots of the sparse slice will change with the DL-CFR iterations.
+  DispatchPolicy dispatch_policy;
+  dispatch_policy.AddDispatch(sparse_slice->eval_infostates, slice_policy);
+
+  double expl;
+  for (int i = 0; i < 100; ++i) {
+    cfr_eval->num_cfr_iterations = (i+1)*5;
+    sparse_slice->dlcfr->RunSimultaneousIterations(1);
+    if (i % 10 == 0) {
+      expl = ortools::TrunkExploitability(&eq_fixed_as_chance_lp,
+                                          dispatch_policy);
+      std::cout << i << " " << expl << std::endl;
+    }
+  }
+  SPIEL_CHECK_LT(expl, 2e-3);
 }
 
 }  // namespace
