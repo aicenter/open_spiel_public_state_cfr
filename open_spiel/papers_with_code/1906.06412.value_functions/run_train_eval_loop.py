@@ -19,58 +19,51 @@ experiment_name = "limit_particles_kuhn"
 def param_fn(param, context):
   if param == "game_name":
     return [
-      "kuhn_poker",
+      # "kuhn_poker",
       "leduc_poker",
-      "goofspiel(players=2,num_cards=3,imp_info=True,points_order=descending)",
-      "goofspiel(players=2,num_cards=4,imp_info=True,points_order=descending)",
+      # "goofspiel(players=2,num_cards=3,imp_info=True,points_order=descending)",
+      # "goofspiel(players=2,num_cards=4,imp_info=True,points_order=descending)",
       "goofspiel(players=2,num_cards=5,imp_info=True,points_order=descending)",
     ]
   elif param == "limit_particle_count":
-    if context["game_name"] == "kuhn_poker":
-      return list(range(1, 6+1))
-    elif context["game_name"] == "leduc_poker":
-      return list(range(1, 12+1))
-    elif "num_cards=3" in context["game_name"]:
-      return list(range(1, 6+1))
-    elif "num_cards=4" in context["game_name"]:
-      return list(range(1, 8+1))
+    if context["game_name"] == "leduc_poker":
+      return list(range(1, 12+1)) + [-1]
     elif "num_cards=5" in context["game_name"]:
-      return list(range(1, 10+1))
+      return list(range(10, 80+1, 10)) + [-1]
   elif param == "depth":
-    if context["game_name"] == "kuhn_poker":
-      return [3, 4]
-    elif context["game_name"] == "leduc_poker":
-      return [4, 6, 8]
-    elif "num_cards=3" in context["game_name"]:
-      return [1]
-    elif "num_cards=4" in context["game_name"]:
-      return [1, 2]
+    if context["game_name"] == "leduc_poker":
+      return [7]
     elif "num_cards=5" in context["game_name"]:
-      return [1, 2]
-  elif param == "data_generation":
-    return ["dl_cfr", "random"]
+      return [3]
+  elif param == "sparse_roots_depth":
+    if context["game_name"] == "leduc_poker":
+      return [5]
+    elif "num_cards=5" in context["game_name"]:
+      return [2]
 
 
-sweep.run_sweep(backend,
+sweep.run_sweep("dryrun",
                 backend_params,
                 binary_path=f"{home}/experiments/train_eval_loop",
                 base_output_dir=f"{home}/experiments/{experiment_name}",
                 base_params=dict(
                     cfr_oracle_iterations=100,
-                    num_loops=1000,
+                    num_loops=5000,
                     use_bandits_for_cfr="RegretMatchingPlus",
                     trunk_eval_iterations="1,2,5,10,20,50,100",
-                    train_batches=64,
-                    num_trunks=400,
+                    train_batches=8,
+                    num_trunks=1000,
                     batch_size=64,
                     prob_pure_strat=0.1,
                     shuffle_input="true",
-                    shuffle_output="true"
+                    shuffle_output="true",
+                    sparse_roots_depth=2,
+                    data_generation="random"
                 ),
                 comb_params=[
                   "game_name",
                   "depth",
-                  "data_generation",
+                  "sparse_roots_depth",
                   "limit_particle_count",
                 ],
                 comb_param_fn=param_fn)

@@ -46,9 +46,6 @@ ABSL_FLAG(bool, shuffle_output, false,
 ABSL_FLAG(int, limit_particle_count, -1,
           "How many particles should be used at most in neural network training?"
           " -1 for all.");
-ABSL_FLAG(int, limit_initial_states, -1,
-          "How many initial states should be used for the first infostate?"
-          " -1 for all.");
 ABSL_FLAG(int, sparse_roots_depth, -1,
           "The depth at which sparse roots should be found."
           " -1 will automatically use some reasonable depth based on the game.");
@@ -196,6 +193,7 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
       ? std::min(absl::GetFlag(FLAGS_batch_size), experience_replay_buffer_size)
       : experience_replay_buffer_size;
   const int roots_depth = GetSparseRootsDepth(*t->game);
+  const int no_move_limit = 1000;
 
   t->oracle_evaluator->num_cfr_iterations = cfr_oracle_iterations;
   torch::manual_seed(seed);
@@ -222,18 +220,31 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   auto net_evaluator = std::make_shared<ParticleNetEvaluator>(
       t->hand_info.get(), &model, t->dims.get(), &eval_batch, &device);
 
-  std::vector<std::unique_ptr<SparseTrunk>> sparse_trunks_with_net
-      = MakeSparseTrunks(t->game, t->infostate_observer, t->public_observer,
-                         roots_depth, t->trunk_depth,
-                         net_evaluator, t->terminal_evaluator,
-                         absl::GetFlag(FLAGS_limit_initial_states),
-                         use_bandits_for_cfr, rnd_gen);
+  auto [eq_policy, game_value] = ortools::MakeEquilibriumPolicy(&whole_game);
   std::vector<std::unique_ptr<SparseTrunk>> sparse_eq_trunk_with_net;
   sparse_eq_trunk_with_net.push_back(MakeSparseTrunkWithEqSupport(
-      &whole_game, t->game, t->infostate_observer, t->public_observer,
+      eq_policy, t->game, t->infostate_observer, t->public_observer,
       roots_depth, t->trunk_depth,
       net_evaluator, t->terminal_evaluator, use_bandits_for_cfr));
-  std::cout << "# Sparse trunks: " << sparse_trunks_with_net.size() << "\n";
+  std::cout << "# Equilibrium sparse trunk:"
+            << "\n# - Infostate leaves: "
+            << sparse_eq_trunk_with_net.back()->dlcfr->trees()[0]->num_leaves()
+            << "\n# - Eval infostates: "
+            << sparse_eq_trunk_with_net.back()->eval_infostates.size()
+            << "\n# Full trunk infostate leaves: "
+            << t->fixable_trunk_with_oracle->trees()[0]->num_leaves() << "\n";
+
+  // The sparse trunk is constructed as replacing the players' equilibrium
+  // policies as a chance in the upper game. By constructing the trunk with no
+  // move limit, we make an evaluation trunk.
+  std::unique_ptr<SparseTrunk> eval_trunk =
+      MakeSparseTrunkWithEqSupport(eq_policy, t->game,
+                                   t->infostate_observer, t->public_observer,
+                                   roots_depth, no_move_limit,
+                                   nullptr, t->terminal_evaluator,
+                                   use_bandits_for_cfr);
+  ortools::SequenceFormLpSpecification eq_fixed_as_chance_lp(
+      eval_trunk->dlcfr->trees(), "CLP");
 
   auto trunk_with_net = std::make_unique<dlcfr::DepthLimitedCFR>(
       t->game, t->trunk_trees, net_evaluator, t->terminal_evaluator,
@@ -276,18 +287,13 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
 
     model.eval();  // Eval mode.
     std::cout << "# Evaluating  " << std::flush;
-    std::vector<double> evals_random = EvaluateNetwork(
-        sparse_trunks_with_net, &whole_game, eval_iters);
     std::vector<double> evals_eq = EvaluateNetwork(
-        sparse_eq_trunk_with_net, &whole_game, eval_iters);
+        sparse_eq_trunk_with_net, &eq_fixed_as_chance_lp, eval_iters);
     std::cout << std::endl;
 //    PrintTrunkStrategies(trunk_with_net.get());
 
     const double avg_loss = cumul_loss / train_batches;
     std::cout << loop << ',' << avg_loss << ',';
-    for (float eval : evals_random) {
-      std::cout << eval << ',';
-    }
     for (float eval : evals_eq) {
       std::cout << eval << ',';
     }
