@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "open_spiel/papers_with_code/1906.06412.value_functions/train_eval.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/dispatch_policy.h"
 
 namespace open_spiel {
 namespace papers_with_code {
@@ -35,28 +36,6 @@ double TrainNetwork(ParticleValueNet* model, torch::Device* device,
   return loss.item().to<double>();
 }
 
-class TabularizePolicy : public Policy {
-  std::map<std::string, std::shared_ptr<Policy>> dispatch_table_;
- public:
-  TabularizePolicy(std::vector<std::unique_ptr<SparseTrunk>>& sparse_trunks) {
-    for (std::unique_ptr<SparseTrunk>& sparse_trunk : sparse_trunks) {
-      for (const std::string & eval_infostate : sparse_trunk->eval_infostates) {
-        SPIEL_CHECK_TRUE(dispatch_table_.find(eval_infostate)
-                         == dispatch_table_.end());
-        dispatch_table_[eval_infostate] = sparse_trunk->dlcfr->AveragePolicy();
-      }
-    }
-  };
-
-  ActionsAndProbs GetStatePolicy(const std::string& info_state) const override {
-    auto it = dispatch_table_.find(info_state);
-    if (it == dispatch_table_.end()) {
-      return {};
-    } else {
-      return it->second->GetStatePolicy(info_state);
-    }
-  }
-};
 
 std::vector<double> EvaluateNetwork(
     std::vector<std::unique_ptr<SparseTrunk>>& sparse_trunks_with_net,
@@ -74,11 +53,12 @@ std::vector<double> EvaluateNetwork(
   expls.reserve(evaluate_iters.size());
   int trunk_iters = *std::max_element(evaluate_iters.begin(),
                                       evaluate_iters.end());
-  TabularizePolicy eval_policy(sparse_trunks_with_net);
-
-  // Important!! We must reset all the bandits & other memory for proper eval.
+  DispatchPolicy eval_policy;
   for (std::unique_ptr<SparseTrunk>& sparse_trunk: sparse_trunks_with_net) {
+    // Important!! We must reset all the bandits & other memory for proper eval.
     sparse_trunk->dlcfr->Reset();
+    eval_policy.AddDispatch(sparse_trunk->eval_infostates,
+                            sparse_trunk->dlcfr->AveragePolicy());
   }
 
   for (int i = 1; i <= trunk_iters; ++i) {
