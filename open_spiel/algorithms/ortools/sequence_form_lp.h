@@ -119,6 +119,11 @@ class SequenceFormLpSpecification {
   void SpecifyObjective(const InfostateNode* opponent_root_node);
 };
 
+// Return equilibrium policy and game value.
+std::pair<TabularPolicy, double> MakeEquilibriumPolicy(
+    const Game& game);
+std::pair<TabularPolicy, double> MakeEquilibriumPolicy(
+    SequenceFormLpSpecification* specification);
 
 }  // namespace ortools
 }  // namespace algorithms

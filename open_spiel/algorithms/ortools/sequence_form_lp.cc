@@ -292,6 +292,33 @@ void SequenceFormLpSpecification::PrintProblemSpecification() {
   }
 }
 
+
+std::pair<TabularPolicy, double> MakeEquilibriumPolicy(
+    const Game& game) {
+  SequenceFormLpSpecification whole_game_spec(game);
+  return MakeEquilibriumPolicy(&whole_game_spec);
+}
+
+std::pair<TabularPolicy, double> MakeEquilibriumPolicy(
+    SequenceFormLpSpecification* lp) {
+  TabularPolicy joint_policy;
+  double game_value;
+  for (int pl = 0; pl < 2; ++pl) {
+    lp->SpecifyLinearProgram(pl);
+    if (pl == 0) {
+      game_value = lp->Solve();
+    } else {
+      lp->Solve();
+    }
+    TabularPolicy player_policy = lp->OptimalPolicy(pl);
+    joint_policy.PolicyTable().insert(
+        player_policy.PolicyTable().begin(),
+        player_policy.PolicyTable().end()
+    );
+  }
+  return {joint_policy, game_value};
+}
+
 }  // namespace ortools
 }  // namespace algorithms
 }  // namespace open_spiel
