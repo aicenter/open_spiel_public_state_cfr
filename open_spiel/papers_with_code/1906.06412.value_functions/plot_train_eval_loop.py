@@ -5,16 +5,18 @@ import pandas as pd
 import os
 
 param_sweep = [
-  ("data_generation", ".*"),
+  ("game_name", "goofspiel.*"),
+  ("depth", ".*"),
+  ("sparse_roots_depth", ".*"),
   ("limit_particle_count", ".*"),
 ]
 
 display_perm = [
-  ("data_generation",),
+  ("game_name", "depth", "sparse_roots_depth",),
   ("limit_particle_count", ),
 ]
 
-base_dir = "./experiments/limit_particles_kuhn"
+base_dir = "./experiments/eq_sparse_trunk"
 translation_map = {
   "goofspiel(players=2,num_cards=3,imp_info=True)": "GS 3 (rand)",
   "goofspiel(players=2,num_cards=3,imp_info=True,points_order=ascending)":
@@ -46,7 +48,8 @@ translation_map = {
   "b_depth": "trunk depth",
   "c_depth": "trunk depth",
   "c_trunk_eval_iterations": "trunk iters",
-  "d_subgame_cfr_iterations": "subgame iters"
+  "d_subgame_cfr_iterations": "subgame iters",
+  "limit_particle_count": "train ps"
 }
 
 target_expls = {
@@ -184,11 +187,11 @@ colors = plt.rcParams['axes.prop_cycle'].by_key()['color'][1:]
 
 def plot_item(ax, file, display_params, full_params):
   try:
-    game = "kuhn_poker" # str(full_params["game_name"])
-    depth = 3  # int(full_params["depth"])
+    game = str(full_params["game_name"])
+    # depth = int(full_params["depth"])
     col = "expl[100]"
-    v = target_expls[game][depth][6]
-    ax.semilogy([0, 1000], [v, v], label=f"DL-CFR target")
+    # v = target_expls[game][depth][6]
+    # ax.semilogy([0, 1000], [v, v], label=f"DL-CFR target")
 
     print(file)
     df = pd.read_csv(file, comment="#", skip_blank_lines=True)

@@ -49,6 +49,9 @@ ABSL_FLAG(int, limit_particle_count, -1,
 ABSL_FLAG(int, sparse_roots_depth, -1,
           "The depth at which sparse roots should be found."
           " -1 will automatically use some reasonable depth based on the game.");
+ABSL_FLAG(double, support_threshold, 1e-5,
+          "Pruning threshold for not playing actions from equilibrium, "
+          "used for trunk sparsification.");
 
 // -----------------------------------------------------------------------------
 
@@ -194,6 +197,7 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
       : experience_replay_buffer_size;
   const int roots_depth = GetSparseRootsDepth(*t->game);
   const int no_move_limit = 1000;
+  const double support_threshold = absl::GetFlag(FLAGS_support_threshold);
 
   t->oracle_evaluator->num_cfr_iterations = cfr_oracle_iterations;
   torch::manual_seed(seed);
@@ -225,7 +229,8 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   sparse_eq_trunk_with_net.push_back(MakeSparseTrunkWithEqSupport(
       eq_policy, t->game, t->infostate_observer, t->public_observer,
       roots_depth, t->trunk_depth,
-      net_evaluator, t->terminal_evaluator, use_bandits_for_cfr));
+      net_evaluator, t->terminal_evaluator, use_bandits_for_cfr,
+      support_threshold));
   std::cout << "# Equilibrium sparse trunk:"
             << "\n# - Infostate leaves: "
             << sparse_eq_trunk_with_net.back()->dlcfr->trees()[0]->num_leaves()
@@ -242,7 +247,7 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
                                    t->infostate_observer, t->public_observer,
                                    roots_depth, no_move_limit,
                                    nullptr, t->terminal_evaluator,
-                                   use_bandits_for_cfr);
+                                   use_bandits_for_cfr, support_threshold);
   ortools::SequenceFormLpSpecification eq_fixed_as_chance_lp(
       eval_trunk->dlcfr->trees(), "CLP");
 

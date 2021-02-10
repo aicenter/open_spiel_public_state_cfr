@@ -52,7 +52,8 @@ std::unique_ptr<SparseTrunk> MakeSparseTrunkWithEqSupport(
     int roots_depth, int trunk_depth,
     std::shared_ptr<const algorithms::dlcfr::LeafEvaluator> leaf_evaluator,
     std::shared_ptr<const algorithms::dlcfr::LeafEvaluator> terminal_evaluator,
-    const std::string& bandits_for_cfr);
+    const std::string& bandits_for_cfr,
+    double support_threshold);
 
 
 }  // papers_with_code

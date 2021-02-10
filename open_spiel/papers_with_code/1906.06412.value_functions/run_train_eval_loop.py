@@ -40,6 +40,35 @@ def param_fn(param, context):
       return [5]
     elif "num_cards=5" in context["game_name"]:
       return [2]
+  elif param == "support_threshold":
+    if context["game_name"] == "leduc_poker":
+      return [
+        -1,
+        0.,
+        0.0183325 + 1e-4,
+        0.0355551 + 1e-4,
+        0.0550263 + 1e-4,
+        0.0552292 + 1e-4,
+        0.0723499 + 1e-4,
+        0.102431  + 1e-4,
+        0.149214  + 1e-4,
+        0.150184  + 1e-4,
+        0.15372   + 1e-4,
+        0.247954  + 1e-4,
+        0.24823   + 1e-4,
+        0.258139  + 1e-4,
+      ]
+    elif "num_cards=5" in context["game_name"]:
+      return [
+       -1,
+        0.,
+        0.0132248 + 1e-4,
+        0.0549339 + 1e-4,
+        0.0827586 + 1e-4,
+        0.106355  + 1e-4,
+        0.137484  + 1e-4,
+        0.147508  + 1e-4,
+      ]
 
 
 sweep.run_sweep("dryrun",
@@ -57,13 +86,13 @@ sweep.run_sweep("dryrun",
                     prob_pure_strat=0.1,
                     shuffle_input="true",
                     shuffle_output="true",
-                    sparse_roots_depth=2,
+                    limit_particle_count=-1,
                     data_generation="random"
                 ),
                 comb_params=[
                   "game_name",
                   "depth",
                   "sparse_roots_depth",
-                  "limit_particle_count",
+                  "support_threshold",
                 ],
                 comb_param_fn=param_fn)

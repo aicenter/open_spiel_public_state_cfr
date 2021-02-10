@@ -181,7 +181,8 @@ constexpr double kSupportThreshold = 1e-5;
 // Return set of actions in support for each player.
 std::vector<ActionsAndProbs> GetActionsInSupport(
     const State& s, const Observer& infostate_observer,
-    const TabularPolicy& eq_policies) {
+    const TabularPolicy& eq_policies,
+    double support_threshold = kSupportThreshold) {
   SPIEL_CHECK_TRUE(s.IsPlayerNode() || s.IsSimultaneousNode());
   std::vector<ActionsAndProbs> actions_in_support;
   actions_in_support.reserve(s.NumPlayers());
@@ -194,7 +195,8 @@ std::vector<ActionsAndProbs> GetActionsInSupport(
       ActionsAndProbs play_actions;
       play_actions.reserve(local_policy.size());
       for (const auto& [action, prob] : local_policy) {
-        if (prob > kSupportThreshold) {
+        std::cout << "# " << prob << std::endl;
+        if (prob > support_threshold) {
           play_actions.push_back({action, prob});
         }
       }
@@ -213,7 +215,8 @@ void GenerateHistoriesInSupportAtDepth(
     const TabularPolicy& eq_policies,
     int depth,
     std::vector<std::unique_ptr<State>>& states_out,
-    std::vector<double>& chances_out) {
+    std::vector<double>& chances_out,
+    double support_threshold) {
 
   if (s->MoveNumber() == depth) {
     states_out.push_back(std::move(s));
@@ -231,14 +234,15 @@ void GenerateHistoriesInSupportAtDepth(
       child->ApplyAction(action);
       GenerateHistoriesInSupportAtDepth(
           std::move(child), chn * prob, infostate_observer, eq_policies,
-          depth, states_out, chances_out);
+          depth, states_out, chances_out, support_threshold);
     }
     return;
   }
 
   if (s->IsSimultaneousNode()) {
     std::vector<ActionsAndProbs> actions_in_support =
-        GetActionsInSupport(*s, infostate_observer, eq_policies);
+        GetActionsInSupport(*s, infostate_observer, eq_policies,
+                            support_threshold);
 
     for (auto& [action0, prob0] : actions_in_support[0]) {
       for (auto& [action1, prob1] : actions_in_support[1]) {
@@ -246,7 +250,7 @@ void GenerateHistoriesInSupportAtDepth(
         child->ApplyActions({action0, action1});
         GenerateHistoriesInSupportAtDepth(
             std::move(child), chn * prob0 * prob1, infostate_observer, eq_policies,
-            depth, states_out, chances_out);
+            depth, states_out, chances_out, support_threshold);
       }
     }
     return;
@@ -262,7 +266,7 @@ void GenerateHistoriesInSupportAtDepth(
     child->ApplyAction(action);
     GenerateHistoriesInSupportAtDepth(
         std::move(child), chn * prob, infostate_observer, eq_policies,
-        depth, states_out, chances_out);
+        depth, states_out, chances_out, support_threshold);
   }
 }
 
@@ -275,13 +279,14 @@ std::unique_ptr<SparseTrunk> MakeSparseTrunkWithEqSupport(
     int roots_depth, int trunk_depth,
     std::shared_ptr<const algorithms::dlcfr::LeafEvaluator> leaf_evaluator,
     std::shared_ptr<const algorithms::dlcfr::LeafEvaluator> terminal_evaluator,
-    const std::string& bandits_for_cfr) {
+    const std::string& bandits_for_cfr,
+    double support_threshold) {
 
   std::vector<std::unique_ptr<State>> start_states;
   std::vector<double> start_chances;
   GenerateHistoriesInSupportAtDepth(game->NewInitialState(), /*chn=*/1.,
                                     *infostate_observer, eq_policies, roots_depth,
-                                    start_states, start_chances);
+                                    start_states, start_chances, support_threshold);
 
   std::vector<const State*> start_states_ptrs;
   std::vector<std::string> start_infostates;
