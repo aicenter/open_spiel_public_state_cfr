@@ -247,7 +247,7 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
                                    t->infostate_observer, t->public_observer,
                                    roots_depth, no_move_limit,
                                    nullptr, t->terminal_evaluator,
-                                   use_bandits_for_cfr, support_threshold);
+                                   use_bandits_for_cfr, 1e-5);
   ortools::SequenceFormLpSpecification eq_fixed_as_chance_lp(
       eval_trunk->dlcfr->trees(), "CLP");
 
