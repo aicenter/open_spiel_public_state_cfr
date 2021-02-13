@@ -163,8 +163,14 @@ class DepthLimitedCFR {
   std::vector<T*> contexts_as() {
     std::vector<T*> casted;
     casted.reserve(contexts_.size());
-    for (std::unique_ptr<PublicStateContext>& context : contexts_) {
-      casted.push_back(open_spiel::down_cast<T*>(context.get()));
+    for (int i = 0; i < contexts_.size(); ++i) {
+      LeafPublicState& state = public_leaves_[i];
+      if (state.IsTerminal()) {
+        casted.push_back(nullptr);
+      } else {
+        std::unique_ptr<PublicStateContext>& context = contexts_[i];
+        casted.push_back(open_spiel::down_cast<T*>(context.get()));
+      }
     }
     return casted;
   }

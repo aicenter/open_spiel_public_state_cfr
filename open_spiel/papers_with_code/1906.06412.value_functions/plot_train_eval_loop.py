@@ -5,18 +5,18 @@ import pandas as pd
 import os
 
 param_sweep = [
-  ("game_name", "goofspiel.*"),
+  ("game_name", "goof.*"),
   ("depth", ".*"),
   ("sparse_roots_depth", ".*"),
-  ("limit_particle_count", ".*"),
+  ("support_threshold", ".*"),
 ]
 
 display_perm = [
   ("game_name", "depth", "sparse_roots_depth",),
-  ("limit_particle_count", ),
+  ("support_threshold", ),
 ]
 
-base_dir = "./experiments/eq_sparse_trunk"
+base_dir = "./experiments/eq_threshold_neweval"
 translation_map = {
   "goofspiel(players=2,num_cards=3,imp_info=True)": "GS 3 (rand)",
   "goofspiel(players=2,num_cards=3,imp_info=True,points_order=ascending)":
@@ -49,7 +49,8 @@ translation_map = {
   "c_depth": "trunk depth",
   "c_trunk_eval_iterations": "trunk iters",
   "d_subgame_cfr_iterations": "subgame iters",
-  "limit_particle_count": "train ps"
+  "limit_particle_count": "train ps",
+  "support_threshold": "th"
 }
 
 target_expls = {

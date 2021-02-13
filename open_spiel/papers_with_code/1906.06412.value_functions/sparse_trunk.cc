@@ -182,7 +182,7 @@ constexpr double kSupportThreshold = 1e-5;
 std::vector<ActionsAndProbs> GetActionsInSupport(
     const State& s, const Observer& infostate_observer,
     const TabularPolicy& eq_policies,
-    double support_threshold = kSupportThreshold) {
+    double support_threshold) {
   SPIEL_CHECK_TRUE(s.IsPlayerNode() || s.IsSimultaneousNode());
   std::vector<ActionsAndProbs> actions_in_support;
   actions_in_support.reserve(s.NumPlayers());
@@ -218,13 +218,13 @@ void GenerateHistoriesInSupportAtDepth(
     std::vector<double>& chances_out,
     double support_threshold) {
 
-  if (s->MoveNumber() == depth) {
-    states_out.push_back(std::move(s));
-    chances_out.push_back(chn);
+  if (s->IsTerminal()) {
     return;
   }
 
-  if (s->IsTerminal()) {
+  if (s->MoveNumber() == depth) {
+    states_out.push_back(std::move(s));
+    chances_out.push_back(chn);
     return;
   }
 
@@ -258,7 +258,8 @@ void GenerateHistoriesInSupportAtDepth(
 
   SPIEL_CHECK_TRUE(s->IsPlayerNode());
   std::vector<ActionsAndProbs> actions_in_support =
-      GetActionsInSupport(*s, infostate_observer, eq_policies);
+      GetActionsInSupport(*s, infostate_observer, eq_policies,
+                          support_threshold);
   for (const auto& [action, prob] :  actions_in_support[s->CurrentPlayer()]) {
     if (action == kInvalidAction) continue;
 
@@ -282,16 +283,24 @@ std::unique_ptr<SparseTrunk> MakeSparseTrunkWithEqSupport(
     const std::string& bandits_for_cfr,
     double support_threshold) {
 
-  std::vector<std::unique_ptr<State>> start_states;
-  std::vector<double> start_chances;
+  std::vector<std::unique_ptr<State>> all_start_states;
+  std::vector<double> all_start_chances;
   GenerateHistoriesInSupportAtDepth(game->NewInitialState(), /*chn=*/1.,
                                     *infostate_observer, eq_policies, roots_depth,
-                                    start_states, start_chances, support_threshold);
+                                    all_start_states, all_start_chances, 1e-5);
 
+  // Prune states based on reach prob.
   std::vector<const State*> start_states_ptrs;
+  std::vector<double> start_chances;
   std::vector<std::string> start_infostates;
-  for (std::unique_ptr<State>& s : start_states) {
+  for (int i = 0; i < all_start_chances.size(); ++i) {
+    if (all_start_chances[i] <= support_threshold) {
+      continue;
+    }
+
+    std::unique_ptr<State>& s = all_start_states[i];
     start_states_ptrs.push_back(s.get());
+    start_chances.push_back(all_start_chances[i]);
 
     for (int pl = 0; pl < 2; ++pl) {
       if (s->IsPlayerActing(pl)) {
@@ -304,6 +313,9 @@ std::unique_ptr<SparseTrunk> MakeSparseTrunkWithEqSupport(
       }
     }
   }
+
+  std::cout << "# Starting histories: " << all_start_states.size() << "\n";
+  std::cout << "# Starting infostates: " << start_infostates.size() << "\n";
 
   const int move_lim = trunk_depth - roots_depth;
   std::vector<std::shared_ptr<InfostateTree>> sparse_trees = {
