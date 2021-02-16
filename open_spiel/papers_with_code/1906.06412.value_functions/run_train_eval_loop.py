@@ -19,10 +19,7 @@ experiment_name = "limit_particles_kuhn"
 def param_fn(param, context):
   if param == "game_name":
     return [
-      # "kuhn_poker",
       "leduc_poker",
-      # "goofspiel(players=2,num_cards=3,imp_info=True,points_order=descending)",
-      # "goofspiel(players=2,num_cards=4,imp_info=True,points_order=descending)",
       "goofspiel(players=2,num_cards=5,imp_info=True,points_order=descending)",
     ]
   elif param == "limit_particle_count":
@@ -32,44 +29,11 @@ def param_fn(param, context):
       return list(range(10, 80+1, 10)) + [-1]
   elif param == "depth":
     if context["game_name"] == "leduc_poker":
-      return [7]
-    elif "num_cards=5" in context["game_name"]:
-      return [3]
-  elif param == "sparse_roots_depth":
-    if context["game_name"] == "leduc_poker":
-      return [5]
+      return [6]
     elif "num_cards=5" in context["game_name"]:
       return [2]
-  elif param == "support_threshold":
-    if context["game_name"] == "leduc_poker":
-      return [
-        -1,
-        0.,
-        0.00031032,  # 1
-        0.00037930,  # 2
-        0.00063324,  # 3
-        0.00093430,  # 4
-        0.00116098,  # 5
-        0.00145379,  # 6
-        0.00219816,  # 7
-        0.00261279,  # 8
-        0.00477722,  # 9
-      ]
-    elif "num_cards=5" in context["game_name"]:
-      return [
-       -1,
-        0.,
-        0.0001614, # 1
-        0.0010183, # 2
-        0.0013163, # 3
-        0.0032164, # 4
-        0.0040236, # 5
-        0.0045824, # 6
-        0.0078920, # 7
-        0.0107214, # 8
-        0.0181064, # 9
-      ]
-
+  elif param == "seed":
+    return list(range(10))
 
 sweep.run_sweep("dryrun",
                 backend_params,
@@ -77,22 +41,18 @@ sweep.run_sweep("dryrun",
                 base_output_dir=f"{home}/experiments/{experiment_name}",
                 base_params=dict(
                     cfr_oracle_iterations=100,
-                    num_loops=5000,
-                    use_bandits_for_cfr="RegretMatchingPlus",
+                    num_loops=4096,
                     trunk_eval_iterations="1,2,5,10,20,50,100",
-                    train_batches=8,
+                    train_batches=16,
                     num_trunks=1000,
                     batch_size=64,
-                    prob_pure_strat=0.1,
                     shuffle_input="true",
                     shuffle_output="true",
-                    limit_particle_count=-1,
                     data_generation="random"
                 ),
                 comb_params=[
                   "game_name",
                   "depth",
-                  "sparse_roots_depth",
-                  "support_threshold",
+                  "seed"
                 ],
                 comb_param_fn=param_fn)
