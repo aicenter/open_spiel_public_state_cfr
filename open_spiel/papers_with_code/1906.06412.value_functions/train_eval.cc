@@ -37,6 +37,31 @@ double TrainNetwork(ParticleValueNet* model, torch::Device* device,
 }
 
 
+class UniformISTreePolicy : public Policy {
+  const std::vector<std::shared_ptr<InfostateTree>>& trees_;
+ public:
+  UniformISTreePolicy(const std::vector<std::shared_ptr<InfostateTree>>& trees)
+    : trees_(trees) {}
+  ActionsAndProbs GetStatePolicy(const std::string& info_state) const override {
+    for (int pl = 0; pl < 2; ++pl) {
+      const InfostateNode* node =
+          trees_[pl]->DecisionNodeFromInfostateString(info_state);
+      if (node) {
+        const std::vector<Action>& actions = node->legal_actions();
+        const double p = 1. / actions.size();
+        ActionsAndProbs ap;
+        ap.reserve(actions.size());
+        for (int i = 0; i < actions.size(); ++i) {
+          ap.push_back({actions[i], p});
+        }
+        return ap;
+      }
+    }
+    return {};
+  }
+};
+
+
 std::vector<double> EvaluateNetwork(
     std::vector<std::unique_ptr<SparseTrunk>>& sparse_trunks_with_net,
     ortools::SequenceFormLpSpecification* whole_game,
@@ -53,12 +78,17 @@ std::vector<double> EvaluateNetwork(
   expls.reserve(evaluate_iters.size());
   int trunk_iters = *std::max_element(evaluate_iters.begin(),
                                       evaluate_iters.end());
+
+  auto uniform_policy = std::make_shared<UniformISTreePolicy>(
+      whole_game->trees());
   DispatchPolicy eval_policy;
   for (std::unique_ptr<SparseTrunk>& sparse_trunk: sparse_trunks_with_net) {
     // Important!! We must reset all the bandits & other memory for proper eval.
     sparse_trunk->dlcfr->Reset();
-    eval_policy.AddDispatch(sparse_trunk->eval_infostates,
+    eval_policy.AddDispatch(sparse_trunk->fixate_infostates,
                             sparse_trunk->dlcfr->AveragePolicy());
+    eval_policy.AddDispatch(sparse_trunk->uniform_infostates,
+                            uniform_policy);
   }
 
   for (int i = 1; i <= trunk_iters; ++i) {

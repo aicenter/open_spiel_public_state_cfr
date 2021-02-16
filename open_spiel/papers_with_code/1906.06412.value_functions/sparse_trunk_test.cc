@@ -28,8 +28,8 @@ void CheckSparseTrunksKuhnDepth2(
     int num_states) {
   SPIEL_CHECK_EQ(sparse_trunks.size(), 3);
   for (int i = 0; i < sparse_trunks.size(); ++i) {
-    SPIEL_CHECK_EQ(sparse_trunks[i]->eval_infostates.size(), 1);
-    const std::string& eval_infostate = sparse_trunks[i]->eval_infostates[0];
+    SPIEL_CHECK_EQ(sparse_trunks[i]->fixate_infostates.size(), 1);
+    const std::string& eval_infostate = sparse_trunks[i]->fixate_infostates[0];
     // One char, i.e. card 0/1/2
     SPIEL_CHECK_EQ(eval_infostate.size(), 1);
     SPIEL_CHECK_EQ(sparse_trunks[i]->dlcfr->public_leaves().size(), 5);
@@ -46,8 +46,8 @@ void CheckSparseTrunksKuhnDepth3(
     int num_states) {
   SPIEL_CHECK_EQ(sparse_trunks.size(), 6);
   for (int i = 0; i < sparse_trunks.size(); ++i) {
-    SPIEL_CHECK_EQ(sparse_trunks[i]->eval_infostates.size(), 1);
-    const std::string& eval_infostate = sparse_trunks[i]->eval_infostates[0];
+    SPIEL_CHECK_EQ(sparse_trunks[i]->fixate_infostates.size(), 1);
+    const std::string& eval_infostate = sparse_trunks[i]->fixate_infostates[0];
     // Two chars, i.e. card 0/1/2 followed by p/b
     SPIEL_CHECK_EQ(eval_infostate.size(), 2);
 
@@ -74,8 +74,8 @@ void CheckSparseTrunksKuhnDepth4(
     int num_states) {
   SPIEL_CHECK_EQ(sparse_trunks.size(), 3);
   for (int i = 0; i < sparse_trunks.size(); ++i) {
-    SPIEL_CHECK_EQ(sparse_trunks[i]->eval_infostates.size(), 1);
-    const std::string& eval_infostate = sparse_trunks[i]->eval_infostates[0];
+    SPIEL_CHECK_EQ(sparse_trunks[i]->fixate_infostates.size(), 1);
+    const std::string& eval_infostate = sparse_trunks[i]->fixate_infostates[0];
     // Three chars, i.e. card 0/1/2 followed by pb
     SPIEL_CHECK_EQ(eval_infostate.size(), 3);
     SPIEL_CHECK_EQ(sparse_trunks[i]->dlcfr->public_leaves().size(), 2);
@@ -166,7 +166,7 @@ void TestMakeSparseTrunkWithEqSupport() {
   // Make a special dispatch table for exploitability evaluation:
   // The roots of the sparse slice will change with the DL-CFR iterations.
   DispatchPolicy dispatch_policy;
-  dispatch_policy.AddDispatch(sparse_slice->eval_infostates, slice_policy);
+  dispatch_policy.AddDispatch(sparse_slice->fixate_infostates, slice_policy);
 
   double expl;
   for (int i = 0; i < 100; ++i) {

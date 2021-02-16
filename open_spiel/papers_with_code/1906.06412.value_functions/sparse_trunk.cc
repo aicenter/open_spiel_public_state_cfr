@@ -166,7 +166,7 @@ std::vector<std::unique_ptr<SparseTrunk>> MakeSparseTrunks(
         sparse_trunk->dlcfr = std::make_unique<DepthLimitedCFR>(
             game, sparse_trees, net_evaluator, terminal_evaluator,
             public_observer, MakeBanditVectors(sparse_trees, bandits_for_cfr));
-        sparse_trunk->eval_infostates = {node->infostate_string()};
+        sparse_trunk->fixate_infostates = {node->infostate_string()};
         sparse_trunks.push_back(std::move(sparse_trunk));
       }
     }
@@ -195,7 +195,6 @@ std::vector<ActionsAndProbs> GetActionsInSupport(
       ActionsAndProbs play_actions;
       play_actions.reserve(local_policy.size());
       for (const auto& [action, prob] : local_policy) {
-        std::cout << "# " << prob << std::endl;
         if (prob > support_threshold) {
           play_actions.push_back({action, prob});
         }
@@ -288,34 +287,56 @@ std::unique_ptr<SparseTrunk> MakeSparseTrunkWithEqSupport(
   GenerateHistoriesInSupportAtDepth(game->NewInitialState(), /*chn=*/1.,
                                     *infostate_observer, eq_policies, roots_depth,
                                     all_start_states, all_start_chances, 1e-5);
+  SPIEL_CHECK_EQ(all_start_states.size(), all_start_chances.size());
 
   // Prune states based on reach prob.
   std::vector<const State*> start_states_ptrs;
   std::vector<double> start_chances;
-  std::vector<std::string> start_infostates;
+  std::vector<std::string> fixate_infostates;
+  std::vector<std::string> uniform_infostates;
   for (int i = 0; i < all_start_chances.size(); ++i) {
-    if (all_start_chances[i] <= support_threshold) {
-      continue;
-    }
+    // Print the chance dist
+//    std::cout << "# " << all_start_chances[i] << std::endl;
+    const bool in_support = all_start_chances[i] > support_threshold;
 
     std::unique_ptr<State>& s = all_start_states[i];
-    start_states_ptrs.push_back(s.get());
-    start_chances.push_back(all_start_chances[i]);
+    if (in_support) {
+      start_states_ptrs.push_back(s.get());
+      start_chances.push_back(all_start_chances[i]);
+    }
 
     for (int pl = 0; pl < 2; ++pl) {
       if (s->IsPlayerActing(pl)) {
         std::string info_state = infostate_observer->StringFrom(*s, pl);
-        if (std::find(start_infostates.begin(),
-                      start_infostates.end(),
-                      info_state) == start_infostates.end()) {
-          start_infostates.push_back(info_state);
+        const auto it_fixate = std::find(fixate_infostates.begin(),
+                                         fixate_infostates.end(),
+                                         info_state);
+        const auto it_uniform = std::find(uniform_infostates.begin(),
+                                          uniform_infostates.end(),
+                                          info_state);
+
+        if (in_support) {
+          if (it_fixate == fixate_infostates.end()) {
+            fixate_infostates.push_back(info_state);
+          }
+          // Remove from uniform, as we have now added the infostate
+          // to the fixated infostates.
+          if (it_uniform != uniform_infostates.end()) {
+            uniform_infostates.erase(it_uniform);
+          }
+        } else {
+          if (it_fixate == fixate_infostates.end()
+              && it_uniform == uniform_infostates.end()) {
+            uniform_infostates.push_back(info_state);
+          }
         }
       }
     }
   }
 
   std::cout << "# Starting histories: " << all_start_states.size() << "\n";
-  std::cout << "# Starting infostates: " << start_infostates.size() << "\n";
+  std::cout << "# Fixate infostates: " << fixate_infostates.size() << "\n";
+  std::cout << "# Uniform infostates: " << uniform_infostates.size() << "\n";
 
   const int move_lim = trunk_depth - roots_depth;
   std::vector<std::shared_ptr<InfostateTree>> sparse_trees = {
@@ -328,7 +349,8 @@ std::unique_ptr<SparseTrunk> MakeSparseTrunkWithEqSupport(
   sparse_trunk->dlcfr = std::make_unique<DepthLimitedCFR>(
       game, sparse_trees, leaf_evaluator, terminal_evaluator,
       public_observer, MakeBanditVectors(sparse_trees, bandits_for_cfr));
-  sparse_trunk->eval_infostates = start_infostates;
+  sparse_trunk->fixate_infostates = fixate_infostates;
+  sparse_trunk->uniform_infostates = uniform_infostates;
 
   return sparse_trunk;
 }

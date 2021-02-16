@@ -235,7 +235,7 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
             << "\n# - Infostate leaves: "
             << sparse_eq_trunk_with_net.back()->dlcfr->trees()[0]->num_leaves()
             << "\n# - Eval infostates: "
-            << sparse_eq_trunk_with_net.back()->eval_infostates.size()
+            << sparse_eq_trunk_with_net.back()->fixate_infostates.size()
             << "\n# Full trunk infostate leaves: "
             << t->fixable_trunk_with_oracle->trees()[0]->num_leaves() << "\n";
 

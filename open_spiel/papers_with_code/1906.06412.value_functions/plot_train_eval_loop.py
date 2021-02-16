@@ -16,7 +16,7 @@ display_perm = [
   ("support_threshold", ),
 ]
 
-base_dir = "./experiments/eq_threshold_neweval"
+base_dir = "./experiments/eq_threshold_particles"
 translation_map = {
   "goofspiel(players=2,num_cards=3,imp_info=True)": "GS 3 (rand)",
   "goofspiel(players=2,num_cards=3,imp_info=True,points_order=ascending)":
