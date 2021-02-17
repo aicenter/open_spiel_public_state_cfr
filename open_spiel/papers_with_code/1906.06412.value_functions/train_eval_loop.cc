@@ -166,7 +166,8 @@ int GetSparseRootsDepth(const Game& game) {
     SpielFatalError("Exhausted pattern match!");
   }
 }
-
+// GS 5: 0.419816
+// Leduc: 0.0793766
 
 void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
                    int cfr_oracle_iterations, std::string use_bandits_for_cfr,
@@ -233,14 +234,7 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
       eq_policy, t->game, t->infostate_observer, t->public_observer,
       roots_depth, t->trunk_depth,
       net_evaluator, t->terminal_evaluator, use_bandits_for_cfr,
-      support_threshold, prune_chance_histories));
-  std::cout << "# Equilibrium sparse trunk:"
-            << "\n# - Infostate leaves: "
-            << sparse_eq_trunk_with_net.back()->dlcfr->trees()[0]->num_leaves()
-            << "\n# - Eval infostates: "
-            << sparse_eq_trunk_with_net.back()->fixate_infostates.size()
-            << "\n# Full trunk infostate leaves: "
-            << t->fixable_trunk_with_oracle->trees()[0]->num_leaves() << "\n";
+      10, prune_chance_histories));
 
   // The sparse trunk is constructed as replacing the players' equilibrium
   // policies as a chance in the upper game. By constructing the trunk with no
@@ -254,59 +248,14 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   ortools::SequenceFormLpSpecification eq_fixed_as_chance_lp(
       eval_trunk->dlcfr->trees(), "CLP");
 
-  auto trunk_with_net = std::make_unique<dlcfr::DepthLimitedCFR>(
-      t->game, t->trunk_trees, net_evaluator, t->terminal_evaluator,
-      t->public_observer,
-      MakeBanditVectors(t->trunk_trees, use_bandits_for_cfr));
-  auto net_contexts = trunk_with_net->contexts_as<NetContext>();
+  std::vector<double> evals_eq = EvaluateNetwork(
+      sparse_eq_trunk_with_net, &eq_fixed_as_chance_lp, eval_iters);
 
-  // 4. Make experience replay buffer.
-  std::cout << "# Allocating experience replay buffer: "
-            << experience_replay_buffer_size << " sample points ("
-            << experience_replay_buffer_size
-               * (t->dims->point_input_size() + t->dims->point_output_size())
-            << " floats)" << std::endl;
-  ExperienceReplay experience_replay(experience_replay_buffer_size,
-                                     t->dims->point_input_size(),
-                                     t->dims->point_output_size());
-  FillExperienceReplay(init_policy, &experience_replay, t.get(),
-                       net_contexts, &whole_game, eval_iters, rnd_gen);
-
-  // 5. The train-eval loop.
-  std::cout << "loop,avg_loss,";
-  for (int i : eval_iters) {
-    std::cout << "expl[" << i << "],";
+  std::cout << 0 << ',' << 0 << ',';
+  for (float eval : evals_eq) {
+    std::cout << eval << ',';
   }
   std::cout << std::endl;
-
-  for (int loop = 0; loop < num_loops; ++loop) {
-    model.train();  // Train mode.
-    std::cout << "# Training  ";
-
-    double cumul_loss = 0.;
-    torch::Tensor output, loss;
-    for (int i = 0; i < train_batches; ++i) {
-      // Train using generated data. This data may be shuffled.
-      experience_replay.SampleBatch(&train_batch, rnd_gen);
-      cumul_loss += TrainNetwork(&model, &device, &optimizer, &train_batch);
-      std::cout << '.' << std::flush;
-    }
-    std::cout << std::endl;
-
-    model.eval();  // Eval mode.
-    std::cout << "# Evaluating  " << std::flush;
-    std::vector<double> evals_eq = EvaluateNetwork(
-        sparse_eq_trunk_with_net, &eq_fixed_as_chance_lp, eval_iters);
-    std::cout << std::endl;
-//    PrintTrunkStrategies(trunk_with_net.get());
-
-    const double avg_loss = cumul_loss / train_batches;
-    std::cout << loop << ',' << avg_loss << ',';
-    for (float eval : evals_eq) {
-      std::cout << eval << ',';
-    }
-    std::cout << std::endl;
-  }
 }
 
 }  // namespace papers_with_code

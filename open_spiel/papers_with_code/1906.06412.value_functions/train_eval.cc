@@ -67,48 +67,19 @@ std::vector<double> EvaluateNetwork(
     ortools::SequenceFormLpSpecification* whole_game,
     const std::vector<int>& evaluate_iters) {
 
-  auto should_evaluate = [&](int i){
-    for (auto j : evaluate_iters) {
-      if (i == j) return true;
-    }
-    return false;
-  };
-
   std::vector<double> expls;
   expls.reserve(evaluate_iters.size());
-  int trunk_iters = *std::max_element(evaluate_iters.begin(),
-                                      evaluate_iters.end());
 
   auto uniform_policy = std::make_shared<UniformISTreePolicy>(
       whole_game->trees());
   DispatchPolicy eval_policy;
   for (std::unique_ptr<SparseTrunk>& sparse_trunk: sparse_trunks_with_net) {
     // Important!! We must reset all the bandits & other memory for proper eval.
-    sparse_trunk->dlcfr->Reset();
-    eval_policy.AddDispatch(sparse_trunk->fixate_infostates,
-                            sparse_trunk->dlcfr->AveragePolicy());
     eval_policy.AddDispatch(sparse_trunk->uniform_infostates,
                             uniform_policy);
   }
 
-  for (int i = 1; i <= trunk_iters; ++i) {
-    for (std::unique_ptr<SparseTrunk>& sparse_trunk: sparse_trunks_with_net) {
-      dlcfr::DepthLimitedCFR* trunk_with_net = sparse_trunk->dlcfr.get();
-      ++trunk_with_net->num_iterations_;
-      trunk_with_net->UpdateReachProbs();
-      trunk_with_net->EvaluateLeaves();
-    }
-
-    if (should_evaluate(i)) {
-      expls.push_back(ortools::TrunkExploitability(whole_game, eval_policy));
-      std::cout << '.' << std::flush;
-    }
-
-    for (std::unique_ptr<SparseTrunk>& sparse_trunk: sparse_trunks_with_net) {
-      sparse_trunk->dlcfr->UpdateTrunk();
-    }
-  }
-
+  expls.push_back(ortools::TrunkExploitability(whole_game, eval_policy));
   return expls;
 }
 
