@@ -280,13 +280,14 @@ std::unique_ptr<SparseTrunk> MakeSparseTrunkWithEqSupport(
     std::shared_ptr<const algorithms::dlcfr::LeafEvaluator> leaf_evaluator,
     std::shared_ptr<const algorithms::dlcfr::LeafEvaluator> terminal_evaluator,
     const std::string& bandits_for_cfr,
-    double support_threshold) {
+    double support_threshold,
+    bool prune_chance_histories) {
 
   std::vector<std::unique_ptr<State>> all_start_states;
   std::vector<double> all_start_chances;
   GenerateHistoriesInSupportAtDepth(game->NewInitialState(), /*chn=*/1.,
                                     *infostate_observer, eq_policies, roots_depth,
-                                    all_start_states, all_start_chances, 1e-5);
+                                    all_start_states, all_start_chances, -1);
   SPIEL_CHECK_EQ(all_start_states.size(), all_start_chances.size());
 
   // Prune states based on reach prob.
@@ -294,13 +295,18 @@ std::unique_ptr<SparseTrunk> MakeSparseTrunkWithEqSupport(
   std::vector<double> start_chances;
   std::vector<std::string> fixate_infostates;
   std::vector<std::string> uniform_infostates;
+  int num_hist_nonzero_reach = 0;
   for (int i = 0; i < all_start_chances.size(); ++i) {
     // Print the chance dist
-//    std::cout << "# " << all_start_chances[i] << std::endl;
     const bool in_support = all_start_chances[i] > support_threshold;
+    if (all_start_chances[i] > 0) num_hist_nonzero_reach++;
 
     std::unique_ptr<State>& s = all_start_states[i];
-    if (in_support) {
+    if (s->IsPlayerNode()) {
+      std::cout << "# " << all_start_chances[i] << std::endl;
+    }
+
+    if (in_support && (!prune_chance_histories || s->IsPlayerNode())) {
       start_states_ptrs.push_back(s.get());
       start_chances.push_back(all_start_chances[i]);
     }
@@ -334,7 +340,9 @@ std::unique_ptr<SparseTrunk> MakeSparseTrunkWithEqSupport(
     }
   }
 
-  std::cout << "# Starting histories: " << all_start_states.size() << "\n";
+  std::cout << "# All histories: " << all_start_states.size() << "\n";
+  std::cout << "# Histories with non-zero reach: " << num_hist_nonzero_reach << "\n";
+  std::cout << "# Selected starting histories: " << start_states_ptrs.size() << "\n";
   std::cout << "# Fixate infostates: " << fixate_infostates.size() << "\n";
   std::cout << "# Uniform infostates: " << uniform_infostates.size() << "\n";
 

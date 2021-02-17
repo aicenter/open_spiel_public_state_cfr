@@ -52,6 +52,8 @@ ABSL_FLAG(int, sparse_roots_depth, -1,
 ABSL_FLAG(double, support_threshold, 1e-5,
           "Pruning threshold for not playing actions from equilibrium, "
           "used for trunk sparsification.");
+ABSL_FLAG(bool, prune_chance_histories, false,
+          "If true, do not start at chance histories.");
 
 // -----------------------------------------------------------------------------
 
@@ -198,6 +200,7 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   const int roots_depth = GetSparseRootsDepth(*t->game);
   const int no_move_limit = 1000;
   const double support_threshold = absl::GetFlag(FLAGS_support_threshold);
+  const bool prune_chance_histories = absl::GetFlag(FLAGS_prune_chance_histories);
 
   t->oracle_evaluator->num_cfr_iterations = cfr_oracle_iterations;
   torch::manual_seed(seed);
@@ -230,7 +233,7 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
       eq_policy, t->game, t->infostate_observer, t->public_observer,
       roots_depth, t->trunk_depth,
       net_evaluator, t->terminal_evaluator, use_bandits_for_cfr,
-      support_threshold));
+      support_threshold, prune_chance_histories));
   std::cout << "# Equilibrium sparse trunk:"
             << "\n# - Infostate leaves: "
             << sparse_eq_trunk_with_net.back()->dlcfr->trees()[0]->num_leaves()
@@ -247,7 +250,7 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
                                    t->infostate_observer, t->public_observer,
                                    roots_depth, no_move_limit,
                                    nullptr, t->terminal_evaluator,
-                                   use_bandits_for_cfr, 1e-5);
+                                   use_bandits_for_cfr, 1e-5, false);
   ortools::SequenceFormLpSpecification eq_fixed_as_chance_lp(
       eval_trunk->dlcfr->trees(), "CLP");
 
