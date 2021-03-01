@@ -7,16 +7,15 @@ import os
 param_sweep = [
   ("game_name", "goof.*"),
   ("depth", ".*"),
-  ("sparse_roots_depth", ".*"),
-  ("support_threshold", ".*"),
+  ("seed", ".*")
 ]
 
 display_perm = [
-  ("game_name", "depth", "sparse_roots_depth",),
-  ("support_threshold", ),
+  ("game_name", "depth", ),
+  ("seed", ),
 ]
 
-base_dir = "./experiments/eq_threshold_particles"
+base_dir = "./experiments/paper/paper_particles"
 translation_map = {
   "goofspiel(players=2,num_cards=3,imp_info=True)": "GS 3 (rand)",
   "goofspiel(players=2,num_cards=3,imp_info=True,points_order=ascending)":
