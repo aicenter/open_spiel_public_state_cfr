@@ -80,12 +80,11 @@ void FillExperienceReplay(ExpReplayInitPolicy init,
 
   switch (init) {
     case kGenerateDlcfrIterations: {
-      int trunk_eval_iterations = *std::max_element(eval_iters.begin(),
-                                                    eval_iters.end());
-
       std::cout << "# Computing reference expls for given trunk iterations.\n";
+      std::cout << "# <ref_expl>\n";
+      std::cout << "# trunk_iter,expl\n";
       GenerateDataDLCfrIterations(
-        trunk, experience_replay, trunk_eval_iterations,
+        trunk, experience_replay, absl::GetFlag(FLAGS_num_trunks),
         /*monitor_fn*/[&](int trunk_iter) {
           bool should_evaluate =
               std::find(eval_iters.begin(), eval_iters.end(), trunk_iter)
@@ -95,10 +94,10 @@ void FillExperienceReplay(ExpReplayInitPolicy init,
             double expl = ortools::TrunkExploitability(
                 whole_game,
                 *trunk->iterable_trunk_with_oracle->AveragePolicy());
-            std::cout << "# " << trunk_iter << ": "
-                      << "expl = " << expl << std::endl;
+            std::cout << "# " << trunk_iter << "," << expl << std::endl;
           }
         });
+      std::cout << "# </ref_expl>\n";
       break;
     }
 
@@ -146,9 +145,7 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
       GetInitPolicy(absl::GetFlag(FLAGS_data_generation));
   const std::vector<int> eval_iters =
       ItersFromString(absl::GetFlag(FLAGS_trunk_eval_iterations));
-  const int num_trunks = init_policy == kGenerateDlcfrIterations
-      ? eval_iters.back()
-      : absl::GetFlag(FLAGS_num_trunks);
+  const int num_trunks = absl::GetFlag(FLAGS_num_trunks);
   const int experience_replay_buffer_size =
       t->num_non_terminal_leaves * num_trunks;
   const int batch_size = absl::GetFlag(FLAGS_batch_size) > 0
@@ -197,10 +194,8 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
                        eval_iters, rnd_gen);
 
   // 5. The train-eval loop.
-  std::cout << "loop,avg_loss,";
-  for (int i : eval_iters) {
-    std::cout << "expl[" << i << "],";
-  }
+  std::cout << "loop,avg_loss";
+  for (int i : eval_iters) std::cout << ",expl[" << i << "]";
   std::cout << std::endl;
 
   for (int loop = 0; loop < num_loops; ++loop) {
@@ -225,9 +220,7 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
 
     const double avg_loss = cumul_loss / train_batches;
     std::cout << loop << ',' << avg_loss << ',';
-    for (float eval : evals) {
-      std::cout << eval << ',';
-    }
+    std::cout << absl::StrJoin(evals, ",");
     std::cout << std::endl;
   }
 }
