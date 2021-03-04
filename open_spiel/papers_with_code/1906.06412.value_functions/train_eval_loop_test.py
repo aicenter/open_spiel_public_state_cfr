@@ -1,13 +1,19 @@
 import io
 import itertools
 import subprocess
+import sys
 from functools import reduce
 from typing import Dict, Any, List, Union
 
 import numpy as np
 import pandas as pd
+from absl import flags
 from absl.testing import absltest
 from absl.testing import parameterized
+
+FLAGS = flags.FLAGS
+flags.DEFINE_bool("with_results", False, "Print actual experiment results, "
+                                         "do not just parse them.")
 
 _REPO = "/home/michal/Code/open_spiel/open_spiel"
 _BINARY_PATH = f"{_REPO}/cmake-build-release/papers_with_code/1906.06412" \
@@ -21,8 +27,8 @@ _BASE_ARGS = dict(
     num_loops=100,
     cfr_oracle_iterations=100,
     trunk_eval_iterations=100,
-    num_layers=3,
-    num_width=3,
+    num_layers=5,
+    num_width=5,
     num_trunks=10,
     seed=0,
     use_bandits_for_cfr="RegretMatchingPlus",
@@ -124,6 +130,11 @@ def read_experiment_results_from_shell(cmd_args: Dict[str, Any],
     output, error = proc.communicate()
     if proc.returncode == 0:
       with io.StringIO(output.decode()) as buffer:
+        if FLAGS.with_results:
+          for line in buffer.readlines():
+            print(line, end="")
+            sys.stdout.flush()
+
         try:
           results = [evaluator(buffer) for evaluator in read_evaluations]
         except Exception as e:
@@ -131,8 +142,7 @@ def read_experiment_results_from_shell(cmd_args: Dict[str, Any],
           print("Buffer:", "--------------", sep="\n")
           print("".join(buffer.readlines()))
           raise e
-        # buffer.seek(0)
-        # print("".join(buffer.readlines()))
+
     else:
       message = ("Shell command returned non-zero exit status: {0}\n\n"
                  "Command was:\n{1}\n\n"
@@ -152,6 +162,7 @@ class VFTest(parameterized.TestCase, absltest.TestCase):
   def test_kuhn_eval_iters_dlcfr_regression(self, **data_gen_spec):
     args = {**_BASE_ARGS, **data_gen_spec,
             **dict(num_loops=10, num_trunks=100, data_generation="dl_cfr",
+                   num_layers=3, num_width=3,
                    trunk_eval_iterations="1,5,10")}
     actual_eval, actual_expl = read_experiment_results_from_shell(
         args, eval_in_time, reference_exploitabilities)
@@ -164,8 +175,8 @@ class VFTest(parameterized.TestCase, absltest.TestCase):
 
   def test_kuhn_eval_iters_random_regression(self, **data_gen_spec):
     args = {**_BASE_ARGS, **data_gen_spec,
-            **dict(num_loops=10, num_trunks=100, data_generation="random",
-                   trunk_eval_iterations="1,5,10")}
+            **dict(num_loops=10, num_trunks=100, num_layers=3, num_width=3,
+                   data_generation="random", trunk_eval_iterations="1,5,10")}
     actual_eval, = read_experiment_results_from_shell(args, eval_in_time)
     expected_eval = df_from_lines(_REFERENCE_KUHN_RANDOM_EVAL)
     np.testing.assert_array_equal(actual_eval.values, expected_eval.values)
@@ -173,19 +184,45 @@ class VFTest(parameterized.TestCase, absltest.TestCase):
   @parameterized.parameters(dict_prod(_TEST_GAMES, _DATA_GENERATION))
   def test_fit_one_sample(self, **game_spec):
     args = {**_BASE_ARGS, **game_spec,
-            **dict(num_loops=100, num_trunks=1, trunk_eval_iterations=0)}
-    df, = read_experiment_results_from_shell(args, eval_in_time)
-    actual_loss = df["avg_loss"].values[-1]
+            **dict(num_loops=20, batch_size=-1,
+                   num_trunks=1, trunk_eval_iterations=0)}
+    actual_eval, = read_experiment_results_from_shell(args, eval_in_time)
+    actual_loss = actual_eval["avg_loss"].values[-1]
     self.assertLess(actual_loss, 1e-8)
 
   @parameterized.parameters(dict_prod(_TEST_GAMES, _DATA_GENERATION))
   def test_fit_two_samples(self, **game_spec):
     args = {**_BASE_ARGS, **game_spec,
-            **dict(num_loops=100, num_trunks=2, trunk_eval_iterations=0)}
-    df, = read_experiment_results_from_shell(args, eval_in_time)
-    actual_loss = df["avg_loss"].values[-1]
+            **dict(num_loops=20, batch_size=-1,
+                   num_trunks=2, trunk_eval_iterations=0)}
+    actual_eval, = read_experiment_results_from_shell(args, eval_in_time)
+    actual_loss = actual_eval["avg_loss"].values[-1]
     self.assertLess(actual_loss, 1e-6)
 
+  @parameterized.parameters(_TEST_GAMES)
+  def test_imitate_dlcfr_iterations(self, **game_spec):
+    if game_spec["game_name"] == "kuhn_poker" and game_spec["depth"] == 4:
+      # Skip this setting, as getting the precise DL-CFR iterations is
+      # difficult: the iterations are sensitive to the smallest changes in
+      # values.
+      return
+
+    num_iters = 3
+    args = {**_BASE_ARGS, **game_spec,
+            # Run just 1 loop, as per-loop evals are the most expensive part.
+            **dict(num_loops=1, train_batches=400,
+                   batch_size=-1, data_generation="dl_cfr",
+                   num_trunks=num_iters,
+                   trunk_eval_iterations=",".join(str(i) for i in range(1, num_iters + 1))
+                   )}
+    expected_expl, actual_eval = read_experiment_results_from_shell(
+        args, reference_exploitabilities, eval_in_time)
+    expl_cols = [f"expl[{i}]" for i in range(1, num_iters+1)]
+    actual_expl = actual_eval.tail(1)[expl_cols]
+
+    np.testing.assert_array_almost_equal(actual_expl.values.flatten(),
+                                         expected_expl["expl"].values.flatten(),
+                                         decimal=3)
 
 if __name__ == "__main__":
   absltest.main()
