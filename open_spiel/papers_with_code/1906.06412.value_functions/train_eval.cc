@@ -21,9 +21,9 @@ namespace papers_with_code {
 using namespace algorithms;
 using namespace torch::indexing;  // Load all of the Slice, Ellipsis, etc.
 
-double TrainNetwork(ParticleValueNet* model, torch::Device* device,
-                           torch::optim::Optimizer* optimizer,
-                           BatchData* batch) {
+double TrainNetwork(ValueNet* model, torch::Device* device,
+                    torch::optim::Optimizer* optimizer,
+                    BatchData* batch) {
   SPIEL_DCHECK_TRUE(model->is_training());
   torch::Tensor data = batch->data.to(*device);
   torch::Tensor target = model->PrepareTarget(batch).to(*device);

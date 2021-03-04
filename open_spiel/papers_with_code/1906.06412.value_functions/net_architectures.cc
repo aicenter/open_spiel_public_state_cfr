@@ -81,10 +81,9 @@ torch::Tensor PositionalValueNet::forward(torch::Tensor x) {
 
 // -- ParticleValueNet ---------------------------------------------------------
 
-ParticleValueNet::ParticleValueNet(ParticleDims* particle_dims, int batch_size,
+ParticleValueNet::ParticleValueNet(ParticleDims* particle_dims,
                                    ActivationFunction activation)
-    : dims(particle_dims), activation_fn(activation),
-      max_batch_size(batch_size) {
+    : dims(particle_dims), activation_fn(activation) {
   int dim_context = context_size();
   int num_layers_kernel = 4;
   int num_layers_context = 3;
@@ -95,8 +94,6 @@ ParticleValueNet::ParticleValueNet(ParticleDims* particle_dims, int batch_size,
              dim_context, dim_context * 3, regression_size());
   RegisterLayers(fc_basis, "fc_basis_");
   RegisterLayers(fc_context, "fc_context_");
-
-//  forward_out = torch::zeros({max_batch_size, dims->max_particles});
 }
 
 torch::Tensor ParticleValueNet::change_of_basis(torch::Tensor fs) {             CHECK_SHAPE(fs, {_, dims->features_size()});
@@ -104,7 +101,7 @@ torch::Tensor ParticleValueNet::change_of_basis(torch::Tensor fs) {             
     fs = fc_basis[i]->forward(fs);
     fs = Activation(activation_fn, fs);
   }
-  torch::Tensor bs = fc_basis.back()->forward(fs);                             CHECK_SHAPE(bs, {_, context_size()});
+  torch::Tensor bs = fc_basis.back()->forward(fs);                              CHECK_SHAPE(bs, {_, context_size()});
   return bs;
 }
 
@@ -132,11 +129,7 @@ torch::Tensor ParticleValueNet::regression(torch::Tensor xs) {                  
 
 torch::Tensor ParticleValueNet::forward(torch::Tensor xss) {
   int batch_size = xss.size(0);
-  SPIEL_CHECK_LE(batch_size, max_batch_size);
   CHECK_SHAPE(xss, {batch_size, dims->point_input_size()});
-
-//  forward_out.retain_grad();
-//  forward_out.zero_();  // Reset the output tensor.
 
   std::vector<torch::Tensor> out;
   out.reserve(batch_size);
@@ -170,11 +163,8 @@ torch::Tensor ParticleValueNet::forward(torch::Tensor xss) {
     torch::Tensor ys = regression(context).expand({num_particles, -1});         CHECK_SHAPE(ys, {num_particles, regression_size()});
     torch::Tensor proj = (ys * bs).sum(/*dim=*/1).unsqueeze(0);                 CHECK_SHAPE(proj, {1, num_particles});
     out.push_back(proj);
-//    forward_out.index_put_({i, Slice(0, num_particles)}, proj);
   }
   return torch::cat(out, /*dim=*/1);
-//  // Return slice of the same size as the input batch.
-//  return forward_out.index({Slice(0, batch_size), Slice()});
 }
 
 torch::Tensor ParticleValueNet::PrepareTarget(BatchData* batch) {

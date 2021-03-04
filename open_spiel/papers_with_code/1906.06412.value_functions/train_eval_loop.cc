@@ -21,6 +21,8 @@
 
 ABSL_FLAG(std::string, game_name, "kuhn_poker", "Game to run.");
 ABSL_FLAG(int, depth, 3, "Depth of the trunk.");
+ABSL_FLAG(std::string, arch, "particle_vf",
+          "Which architecture of the value function should be used.");
 ABSL_FLAG(int, train_batches, 32,
           "Number of training batches before the evalution is run.");
 ABSL_FLAG(int, batch_size, 32,
@@ -46,7 +48,7 @@ ABSL_FLAG(bool, shuffle_output, false,
 ABSL_FLAG(int, limit_particle_count, -1,
           "How many particles should be used at most in neural network training?"
           " -1 for all.");
-ABSL_FLAG(int, sparse_roots_depth, -1,
+ABSL_FLAG(int, sparse_roots_depth, 0,
           "The depth at which sparse roots should be found."
           " -1 will automatically use some reasonable depth based on the game.");
 ABSL_FLAG(double, support_threshold, 1e-5,
@@ -162,10 +164,44 @@ int GetSparseRootsDepth(const Game& game) {
   } else if (name == "goospiel") {
     return 1;
   } else {
-    SpielFatalError("Exhausted pattern match!");
+    SpielFatalError("Exhausted pattern match! No default value "
+                    "for sparse roots depth available.");
   }
 }
 
+std::unique_ptr<ValueNet> MakeModel(ParticleDims* dims) {
+  std::string arch = absl::GetFlag(FLAGS_arch);
+  if (arch == "particle_vf") {
+    auto model = std::make_unique<ParticleValueNet>(dims,
+                                                    ActivationFunction::kRelu);
+    model->limit_particle_count = absl::GetFlag(FLAGS_limit_particle_count);
+    return model;
+  } else if (arch == "positional_vf") {
+//  PositionalValueNet model(
+//    t->dims.net_input_size(), t->dims.net_output_size(),
+//    t->dims.net_input_size() * absl::GetFlag(FLAGS_num_width),
+//    absl::GetFlag(FLAGS_num_layers),
+//    PositionalValueNet::ActivationFunction::kRelu);
+    SpielFatalError("Not implemented.");
+  } else {
+    SpielFatalError("Exhausted pattern match! Architecture not recognized.");
+  }
+}
+
+std::shared_ptr<NetEvaluator> MakeEvaluator(Trunk* t, ValueNet* model,
+                                            BatchData* eval_batch,
+                                            torch::Device* device) {
+  std::string arch = absl::GetFlag(FLAGS_arch);
+  if (arch == "particle_vf") {
+    auto particle_model = open_spiel::down_cast<ParticleValueNet*>(model);
+    return std::make_shared<ParticleNetEvaluator>(
+        t->hand_info.get(), particle_model, t->dims.get(), eval_batch, device);
+  } else if (arch == "positional_vf") {
+    SpielFatalError("Not implemented.");
+  } else {
+    SpielFatalError("Exhausted pattern match! Architecture not recognized.");
+  }
+}
 
 void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
                    int cfr_oracle_iterations, std::string use_bandits_for_cfr,
@@ -198,6 +234,7 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   const int no_move_limit = 1000;
   const double support_threshold = absl::GetFlag(FLAGS_support_threshold);
   const bool prune_chance_histories = absl::GetFlag(FLAGS_prune_chance_histories);
+  const std::string arch = absl::GetFlag(FLAGS_arch);
 
   t->oracle_evaluator->num_cfr_iterations = cfr_oracle_iterations;
   torch::manual_seed(seed);
@@ -208,15 +245,9 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
 
   // 2. Create network and optimizer.
   torch::Device device = FindDevice();
-  ParticleValueNet model(t->dims.get(), batch_size, ActivationFunction::kRelu);
-//  PositionalValueNet model(
-//    t->dims.net_input_size(), t->dims.net_output_size(),
-//    t->dims.net_input_size() * absl::GetFlag(FLAGS_num_width),
-//    absl::GetFlag(FLAGS_num_layers),
-//    PositionalValueNet::ActivationFunction::kRelu);
-  model.limit_particle_count = absl::GetFlag(FLAGS_limit_particle_count);
-  model.to(device);
-  torch::optim::Adam optimizer(model.parameters());
+  std::unique_ptr<ValueNet> model = MakeModel(t->dims.get());
+  model->to(device);
+  torch::optim::Adam optimizer(model->parameters());
 
   // 3. Create trunk net evaluator.
   std::cout << "# Batch size: " << batch_size << "\n";
@@ -225,9 +256,8 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
                         t->dims->point_output_size());
   BatchData eval_batch(1, t->dims->point_input_size(),
                        t->dims->point_output_size());
-
-  auto net_evaluator = std::make_shared<ParticleNetEvaluator>(
-      t->hand_info.get(), &model, t->dims.get(), &eval_batch, &device);
+  std::shared_ptr<NetEvaluator> net_evaluator = MakeEvaluator(
+      t.get(), model.get(), &eval_batch, &device);
 
   auto [eq_policy, game_value] = ortools::MakeEquilibriumPolicy(&whole_game);
   std::vector<std::unique_ptr<SparseTrunk>> sparse_eq_trunk_with_net;
@@ -280,7 +310,7 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   std::cout << std::endl;
 
   for (int loop = 0; loop < num_loops; ++loop) {
-    model.train();  // Train mode.
+    model->train();  // Train mode.
     std::cout << "# Training  ";
 
     double cumul_loss = 0.;
@@ -288,12 +318,13 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
     for (int i = 0; i < train_batches; ++i) {
       // Train using generated data. This data may be shuffled.
       experience_replay.SampleBatch(&train_batch, rnd_gen);
-      cumul_loss += TrainNetwork(&model, &device, &optimizer, &train_batch);
+      cumul_loss += TrainNetwork(model.get(), &device,
+                                 &optimizer, &train_batch);
       std::cout << '.' << std::flush;
     }
     std::cout << std::endl;
 
-    model.eval();  // Eval mode.
+    model->eval();  // Eval mode.
     std::cout << "# Evaluating  " << std::flush;
     std::vector<double> evals_eq = EvaluateNetwork(
         sparse_eq_trunk_with_net, &eq_fixed_as_chance_lp, eval_iters);

@@ -25,6 +25,7 @@ namespace papers_with_code {
 // A base class for various possible value network architectures.
 struct ValueNet : public torch::nn::Module {
   virtual torch::Tensor forward(torch::Tensor x) = 0;
+  virtual torch::Tensor PrepareTarget(BatchData* batch) = 0;
 
   void MakeLayers(std::vector<torch::nn::Linear>& layers, int num_layers,
                   int inputs_size, int hidden_size, int outputs_size);
@@ -57,6 +58,9 @@ struct PositionalValueNet final : public ValueNet {
                      size_t hidden_size, size_t num_layers = 3,
                      ActivationFunction activation = kRelu);
   torch::Tensor forward(torch::Tensor x) override;
+  torch::Tensor PrepareTarget(BatchData* batch) override {
+      SpielFatalError("Not implemented!");
+  };
 };
 
 
@@ -66,19 +70,16 @@ struct ParticleValueNet final : public ValueNet {
   std::vector<torch::nn::Linear> fc_context;
   std::vector<torch::nn::Linear> fc_basis;
   int limit_particle_count = -1;
-  const int max_batch_size;
-  torch::Tensor forward_out;
 
-  ParticleValueNet(ParticleDims* particle_dims, int max_batch_size,
+  ParticleValueNet(ParticleDims* particle_dims,
                    ActivationFunction activation = kRelu);
+  torch::Tensor forward(torch::Tensor xss) override;
+  torch::Tensor PrepareTarget(BatchData* batch) override;
 
   torch::Tensor change_of_basis(torch::Tensor fs);
   torch::Tensor base_coordinates(torch::Tensor bs, torch::Tensor scales);
   torch::Tensor pool(torch::Tensor xs);
   torch::Tensor regression(torch::Tensor xs);
-  torch::Tensor forward(torch::Tensor xss);
-
-  torch::Tensor PrepareTarget(BatchData* batch);
 
   int context_size() { return dims->max_particles; }
   int regression_size() { return dims->max_particles; }
