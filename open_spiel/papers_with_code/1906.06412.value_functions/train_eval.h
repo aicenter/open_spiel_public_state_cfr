@@ -25,6 +25,7 @@
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_data.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/torch_utils.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/sparse_trunk.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/trunk.h"
 
 namespace open_spiel {
 namespace papers_with_code {
@@ -32,6 +33,21 @@ namespace papers_with_code {
 double TrainNetwork(ValueNet* model, torch::Device* device,
                     torch::optim::Optimizer* optimizer,
                     BatchData* batch);
+
+
+struct Evaluator {
+  virtual std::string name() const = 0;
+  virtual void PrintHeader(std::ostream& os) const = 0;
+  virtual void PrintEval(std::ostream& os) const = 0;
+  virtual void Reset() = 0;
+  virtual void Evaluate(std::ostream& progress) = 0;
+};
+
+std::unique_ptr<Evaluator> MakeFullTrunkEvaluator(
+    std::vector<int> evaluate_iters, algorithms::dlcfr::DepthLimitedCFR* trunk_with_net,
+    algorithms::ortools::SequenceFormLpSpecification* whole_game);
+
+void EvaluateNetwork(std::vector<std::unique_ptr<Evaluator>>& evaluators);
 
 std::vector<double> EvaluateNetwork(
     std::vector<std::unique_ptr<SparseTrunk>>& sparse_trunks_with_net,

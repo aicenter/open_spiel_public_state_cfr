@@ -50,40 +50,66 @@ _DATA_GENERATION = [
   dict(data_generation="random")
 ]
 
-_REFERENCE_KUHN_DLCFR_EVAL = """
-loop,avg_loss,expl[1],expl[5],expl[10]
-0,0.105115,0.0694444,0.0509253,0.0542922
-1,0.0274438,0.0694444,0.0509253,0.0542922
-2,0.00937781,0.0694444,0.0141567,0.0206512
-3,0.00830411,0.0694444,0.0171355,0.00288411
-4,0.00712066,0.0694444,0.0196713,0.0227157
-5,0.00684092,0.0694444,0.011997,0.0136929
-6,0.006719,0.0694444,0.00624333,0.00670182
-7,0.00628849,0.0694444,0.00682326,0.00374965
-8,0.00639248,0.0694444,0.00636514,0.0148459
-9,0.00565729,0.0694444,0.00650681,0.00784207
-"""
+_VALUE_NETS = [
+  dict(arch="particle_vf"),
+  # dict(arch="positional_vf")
+]
 
-_REFERENCE_KUHN_DLCFR_EXPL = """
-trunk_iter,expl
-1,0.0694444
-5,0.0371064
-10,0.0056756
-"""
+_REFERENCE_KUHN_DLCFR_EVAL = dict(
+    positional_vf="""loop,avg_loss,expl[1],expl[5],expl[10]
+                     0,0.105115,0.0694444,0.0509253,0.0542922
+                     1,0.0274438,0.0694444,0.0509253,0.0542922
+                     2,0.00937781,0.0694444,0.0141567,0.0206512
+                     3,0.00830411,0.0694444,0.0171355,0.00288411
+                     4,0.00712066,0.0694444,0.0196713,0.0227157
+                     5,0.00684092,0.0694444,0.011997,0.0136929
+                     6,0.006719,0.0694444,0.00624333,0.00670182
+                     7,0.00628849,0.0694444,0.00682326,0.00374965
+                     8,0.00639248,0.0694444,0.00636514,0.0148459
+                     9,0.00565729,0.0694444,0.00650681,0.00784207""",
+    particle_vf  ="""loop,avg_loss,expl[1],expl[5],expl[10]
+                     0,0.08465,0.0694444,0.00463028,0.00126331
+                     1,0.045953,0.0694444,0.0506477,0.0524562
+                     2,0.0117353,0.0694444,0.0900613,0.102181
+                     3,0.00991366,0.0694444,0.0294029,0.021842
+                     4,0.00843621,0.0694444,0.008172,0.00456634
+                     5,0.0082433,0.0694444,0.00434396,0.0148551
+                     6,0.00799375,0.0694444,0.00773945,0.00945485
+                     7,0.0077094,0.0694444,0.0146659,0.00838035
+                     8,0.00808868,0.0694444,0.0102013,0.0308031
+                     9,0.00758692,0.0694444,0.0113289,0.0244972""",
+)
 
-_REFERENCE_KUHN_RANDOM_EVAL = """
-loop,avg_loss,expl[1],expl[5],expl[10]
-0,0.113564,0.0694444,0.0509253,0.0542922
-1,0.0224779,0.0694444,0.044374,0.0525055
-2,0.00940264,0.0694444,0.0351531,0.0499907
-3,0.0076646,0.0694444,0.0215225,0.0454593
-4,0.00558716,0.0694444,0.0169912,0.0384209
-5,0.00533079,0.0694444,0.0198618,0.0336662
-6,0.00469655,0.0694444,0.0207966,0.025176
-7,0.00424157,0.0694444,0.0211623,0.0139415
-8,0.00402533,0.0694444,0.0257171,0.0175642
-9,0.00372721,0.0694444,0.0258115,0.0204999
-"""
+
+_REFERENCE_KUHN_DLCFR_EXPL = """trunk_iter,expl
+                                1,0.0694444
+                                5,0.0371064
+                                10,0.0056756"""
+
+_REFERENCE_KUHN_RANDOM_EVAL = dict(
+    positional_vf="""loop,avg_loss,expl[1],expl[5],expl[10]
+                     0,0.113564,0.0694444,0.0509253,0.0542922
+                     1,0.0224779,0.0694444,0.044374,0.0525055
+                     2,0.00940264,0.0694444,0.0351531,0.0499907
+                     3,0.0076646,0.0694444,0.0215225,0.0454593
+                     4,0.00558716,0.0694444,0.0169912,0.0384209
+                     5,0.00533079,0.0694444,0.0198618,0.0336662
+                     6,0.00469655,0.0694444,0.0207966,0.025176
+                     7,0.00424157,0.0694444,0.0211623,0.0139415
+                     8,0.00402533,0.0694444,0.0257171,0.0175642
+                     9,0.00372721,0.0694444,0.0258115,0.0204999""",
+    particle_vf=  """loop,avg_loss,expl[1],expl[5],expl[10]
+                     0,0.0968018,0.0694444,0.00463028,0.00126331
+                     1,0.0577754,0.0694444,0.034451,0.0495971
+                     2,0.0158033,0.0694444,0.00463028,0.00126331
+                     3,0.011827,0.0694444,0.00283357,0.000772691
+                     4,0.00956443,0.0694444,0.00314458,0.000857512
+                     5,0.00973787,0.0694444,0.00339268,0.000925175
+                     6,0.00940136,0.0694444,0.00352629,0.000961614
+                     7,0.00918091,0.0694444,0.00345693,0.000942698
+                     8,0.00960886,0.0694444,0.00334956,0.000913416
+                     9,0.00925711,0.0694444,0.00323938,0.000883365"""
+)
 
 
 def df_from_lines(lines: Union[str, List[str]], **kwargs) -> pd.DataFrame:
@@ -159,47 +185,50 @@ def dict_prod(*iterables):
 
 class VFTest(parameterized.TestCase, absltest.TestCase):
 
-  def test_kuhn_eval_iters_dlcfr_regression(self, **data_gen_spec):
-    args = {**_BASE_ARGS, **data_gen_spec,
+  @parameterized.parameters(_VALUE_NETS)
+  def test_kuhn_eval_iters_dlcfr_regression(self, **arch_spec):
+    args = {**_BASE_ARGS, **arch_spec,
             **dict(num_loops=10, num_trunks=100, data_generation="dl_cfr",
-                   num_layers=3, num_width=3,
-                   trunk_eval_iterations="1,5,10")}
+                   num_layers=3, num_width=3, trunk_eval_iterations="1,5,10")}
     actual_eval, actual_expl = read_experiment_results_from_shell(
         args, eval_in_time, reference_exploitabilities)
 
-    expected_eval = df_from_lines(_REFERENCE_KUHN_DLCFR_EVAL)
+    arch = arch_spec["arch"]
+    expected_eval = df_from_lines(_REFERENCE_KUHN_DLCFR_EVAL[arch])
     expected_expl = df_from_lines(_REFERENCE_KUHN_DLCFR_EXPL)
 
     np.testing.assert_array_equal(actual_eval.values, expected_eval.values)
     np.testing.assert_array_equal(actual_expl.values, expected_expl.values)
 
-  def test_kuhn_eval_iters_random_regression(self, **data_gen_spec):
-    args = {**_BASE_ARGS, **data_gen_spec,
+  @parameterized.parameters(_VALUE_NETS)
+  def test_kuhn_eval_iters_random_regression(self, **arch_spec):
+    args = {**_BASE_ARGS, **arch_spec,
             **dict(num_loops=10, num_trunks=100, num_layers=3, num_width=3,
                    data_generation="random", trunk_eval_iterations="1,5,10")}
     actual_eval, = read_experiment_results_from_shell(args, eval_in_time)
-    expected_eval = df_from_lines(_REFERENCE_KUHN_RANDOM_EVAL)
+    arch = arch_spec["arch"]
+    expected_eval = df_from_lines(_REFERENCE_KUHN_RANDOM_EVAL[arch])
     np.testing.assert_array_equal(actual_eval.values, expected_eval.values)
 
-  @parameterized.parameters(dict_prod(_TEST_GAMES, _DATA_GENERATION))
+  @parameterized.parameters(dict_prod(_TEST_GAMES, _DATA_GENERATION, _VALUE_NETS))
   def test_fit_one_sample(self, **game_spec):
     args = {**_BASE_ARGS, **game_spec,
             **dict(num_loops=20, batch_size=-1,
                    num_trunks=1, trunk_eval_iterations=0)}
     actual_eval, = read_experiment_results_from_shell(args, eval_in_time)
-    actual_loss = actual_eval["avg_loss"].values[-1]
+    actual_loss = actual_eval["avg_loss"].values.min()
     self.assertLess(actual_loss, 1e-8)
 
-  @parameterized.parameters(dict_prod(_TEST_GAMES, _DATA_GENERATION))
+  @parameterized.parameters(dict_prod(_TEST_GAMES, _DATA_GENERATION, _VALUE_NETS))
   def test_fit_two_samples(self, **game_spec):
     args = {**_BASE_ARGS, **game_spec,
-            **dict(num_loops=20, batch_size=-1,
+            **dict(num_loops=150, batch_size=-1,
                    num_trunks=2, trunk_eval_iterations=0)}
     actual_eval, = read_experiment_results_from_shell(args, eval_in_time)
-    actual_loss = actual_eval["avg_loss"].values[-1]
+    actual_loss = actual_eval["avg_loss"].values.min()
     self.assertLess(actual_loss, 1e-6)
 
-  @parameterized.parameters(_TEST_GAMES)
+  @parameterized.parameters(dict_prod(_TEST_GAMES, _VALUE_NETS))
   def test_imitate_dlcfr_iterations(self, **game_spec):
     if game_spec["game_name"] == "kuhn_poker" and game_spec["depth"] == 4:
       # Skip this setting, as getting the precise DL-CFR iterations is
@@ -210,7 +239,7 @@ class VFTest(parameterized.TestCase, absltest.TestCase):
     num_iters = 3
     args = {**_BASE_ARGS, **game_spec,
             # Run just 1 loop, as per-loop evals are the most expensive part.
-            **dict(num_loops=1, train_batches=400,
+            **dict(num_loops=10, train_batches=100,
                    batch_size=-1, data_generation="dl_cfr",
                    num_trunks=num_iters,
                    trunk_eval_iterations=",".join(str(i) for i in range(1, num_iters + 1))
@@ -220,9 +249,9 @@ class VFTest(parameterized.TestCase, absltest.TestCase):
     expl_cols = [f"expl[{i}]" for i in range(1, num_iters+1)]
     actual_expl = actual_eval.tail(1)[expl_cols]
 
-    np.testing.assert_array_almost_equal(actual_expl.values.flatten(),
-                                         expected_expl["expl"].values.flatten(),
-                                         decimal=3)
+    np.testing.assert_allclose(actual_expl.values.flatten(),
+                               expected_expl["expl"].values.flatten(),
+                               atol=5e-3)
 
 if __name__ == "__main__":
   absltest.main()

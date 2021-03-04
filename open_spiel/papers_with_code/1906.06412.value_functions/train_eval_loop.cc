@@ -147,7 +147,7 @@ std::vector<int> ItersFromString(const std::string& s) {
   std::vector<std::string> xs = absl::StrSplit(s, ',');
   std::vector<int> out;
   for (auto& x : xs) {
-    out.push_back(std::stoi(x));
+    if (!x.empty()) out.push_back(std::stoi(x));
   }
   return out;
 }
@@ -172,8 +172,9 @@ int GetSparseRootsDepth(const Game& game) {
 std::unique_ptr<ValueNet> MakeModel(ParticleDims* dims) {
   std::string arch = absl::GetFlag(FLAGS_arch);
   if (arch == "particle_vf") {
-    auto model = std::make_unique<ParticleValueNet>(dims,
-                                                    ActivationFunction::kRelu);
+    auto model = std::make_unique<ParticleValueNet>(
+        dims, absl::GetFlag(FLAGS_num_layers), absl::GetFlag(FLAGS_num_width),
+        ActivationFunction::kRelu);
     model->limit_particle_count = absl::GetFlag(FLAGS_limit_particle_count);
     return model;
   } else if (arch == "positional_vf") {
@@ -202,6 +203,54 @@ std::shared_ptr<NetEvaluator> MakeEvaluator(Trunk* t, ValueNet* model,
     SpielFatalError("Exhausted pattern match! Architecture not recognized.");
   }
 }
+
+
+//auto [eq_policy, game_value] = ortools::MakeEquilibriumPolicy(&whole_game);
+//std::vector<std::unique_ptr<SparseTrunk>> sparse_eq_trunk_with_net;
+//sparse_eq_trunk_with_net.push_back(MakeSparseTrunkWithEqSupport(
+//    eq_policy, t->game, t->infostate_observer, t->public_observer,
+//    roots_depth, t->trunk_depth,
+//    net_evaluator, t->terminal_evaluator, use_bandits_for_cfr,
+//    support_threshold, prune_chance_histories));
+//std::cout << "# Equilibrium sparse trunk:"
+//<< "\n# - Infostate leaves: "
+//<< sparse_eq_trunk_with_net.back()->dlcfr->trees()[0]->num_leaves()
+//<< "\n# - Eval infostates: "
+//<< sparse_eq_trunk_with_net.back()->fixate_infostates.size()
+//<< "\n# Full trunk infostate leaves: "
+//<< t->fixable_trunk_with_oracle->trees()[0]->num_leaves() << "\n";
+//
+//// The sparse trunk is constructed as replacing the players' equilibrium
+//// policies as a chance in the upper game. By constructing the trunk with no
+//// move limit, we make an evaluation trunk.
+//std::unique_ptr<SparseTrunk> eval_trunk =
+//    MakeSparseTrunkWithEqSupport(eq_policy, t->game,
+//                                 t->infostate_observer, t->public_observer,
+//                                 roots_depth, no_move_limit,
+//                                 nullptr, t->terminal_evaluator,
+//                                 use_bandits_for_cfr, 1e-5, false);
+//ortools::SequenceFormLpSpecification eq_fixed_as_chance_lp(
+//    eval_trunk->dlcfr->trees(), "CLP");
+
+void PrintHeaders(const std::vector<std::unique_ptr<Evaluator>>& evaluators) {
+  std::cout << "loop,avg_loss";
+  for (const std::unique_ptr<Evaluator>& evaluator : evaluators) {
+    std::cout << ',';
+    evaluator->PrintHeader(std::cout);
+  }
+  std::cout << std::endl;
+}
+
+void PrintEvaluations(int loop, double avg_loss,
+                      const std::vector<std::unique_ptr<Evaluator>>& evaluators) {
+  std::cout << loop << ',' << avg_loss;
+  for (const std::unique_ptr<Evaluator>& evaluator : evaluators) {
+    std::cout << ',';
+    evaluator->PrintEval(std::cout);
+  }
+  std::cout << std::endl;
+}
+
 
 void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
                    int cfr_oracle_iterations, std::string use_bandits_for_cfr,
@@ -249,43 +298,19 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   model->to(device);
   torch::optim::Adam optimizer(model->parameters());
 
-  // 3. Create trunk net evaluator.
+  // 3. Create a value function associated to the trunk.
   std::cout << "# Batch size: " << batch_size << "\n";
+  // Train on multiple public states at once.
   BatchData train_batch(batch_size,
                         t->dims->point_input_size(),
                         t->dims->point_output_size());
+  // Evaluate a single public state.
+  // TODO: Maybe extend this to parallel evaluation?
   BatchData eval_batch(1, t->dims->point_input_size(),
                        t->dims->point_output_size());
-  std::shared_ptr<NetEvaluator> net_evaluator = MakeEvaluator(
-      t.get(), model.get(), &eval_batch, &device);
-
-  auto [eq_policy, game_value] = ortools::MakeEquilibriumPolicy(&whole_game);
-  std::vector<std::unique_ptr<SparseTrunk>> sparse_eq_trunk_with_net;
-  sparse_eq_trunk_with_net.push_back(MakeSparseTrunkWithEqSupport(
-      eq_policy, t->game, t->infostate_observer, t->public_observer,
-      roots_depth, t->trunk_depth,
-      net_evaluator, t->terminal_evaluator, use_bandits_for_cfr,
-      support_threshold, prune_chance_histories));
-  std::cout << "# Equilibrium sparse trunk:"
-            << "\n# - Infostate leaves: "
-            << sparse_eq_trunk_with_net.back()->dlcfr->trees()[0]->num_leaves()
-            << "\n# - Eval infostates: "
-            << sparse_eq_trunk_with_net.back()->fixate_infostates.size()
-            << "\n# Full trunk infostate leaves: "
-            << t->fixable_trunk_with_oracle->trees()[0]->num_leaves() << "\n";
-
-  // The sparse trunk is constructed as replacing the players' equilibrium
-  // policies as a chance in the upper game. By constructing the trunk with no
-  // move limit, we make an evaluation trunk.
-  std::unique_ptr<SparseTrunk> eval_trunk =
-      MakeSparseTrunkWithEqSupport(eq_policy, t->game,
-                                   t->infostate_observer, t->public_observer,
-                                   roots_depth, no_move_limit,
-                                   nullptr, t->terminal_evaluator,
-                                   use_bandits_for_cfr, 1e-5, false);
-  ortools::SequenceFormLpSpecification eq_fixed_as_chance_lp(
-      eval_trunk->dlcfr->trees(), "CLP");
-
+  // Use eval batch only for the net evaluator.
+  std::shared_ptr<NetEvaluator> net_evaluator =  // TODO: rename to VF
+      MakeEvaluator(t.get(), model.get(), &eval_batch, &device);
   auto trunk_with_net = std::make_unique<dlcfr::DepthLimitedCFR>(
       t->game, t->trunk_trees, net_evaluator, t->terminal_evaluator,
       t->public_observer,
@@ -304,19 +329,20 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   FillExperienceReplay(init_policy, &experience_replay, t.get(),
                        net_contexts, &whole_game, eval_iters, rnd_gen);
 
-  // 5. The train-eval loop.
-  std::cout << "loop,avg_loss";
-  for (int i : eval_iters) std::cout << ",expl[" << i << "]";
-  std::cout << std::endl;
+  // 5. Create training evaluators.
+  std::vector<std::unique_ptr<Evaluator>> evaluators;
+  if (!eval_iters.empty()) {
+    evaluators.push_back(
+        MakeFullTrunkEvaluator(eval_iters, trunk_with_net.get(), &whole_game));
+  }
 
+  // 6. The train-eval loop.
+  PrintHeaders(evaluators);
   for (int loop = 0; loop < num_loops; ++loop) {
-    model->train();  // Train mode.
     std::cout << "# Training  ";
-
+    model->train();  // Train mode.
     double cumul_loss = 0.;
-    torch::Tensor output, loss;
     for (int i = 0; i < train_batches; ++i) {
-      // Train using generated data. This data may be shuffled.
       experience_replay.SampleBatch(&train_batch, rnd_gen);
       cumul_loss += TrainNetwork(model.get(), &device,
                                  &optimizer, &train_batch);
@@ -324,17 +350,11 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
     }
     std::cout << std::endl;
 
+    std::cout << "# Evaluating " << std::endl;
     model->eval();  // Eval mode.
-    std::cout << "# Evaluating  " << std::flush;
-    std::vector<double> evals_eq = EvaluateNetwork(
-        sparse_eq_trunk_with_net, &eq_fixed_as_chance_lp, eval_iters);
-    std::cout << std::endl;
+    EvaluateNetwork(evaluators);
+    PrintEvaluations(loop, cumul_loss / train_batches, evaluators);
 //    PrintTrunkStrategies(trunk_with_net.get());
-
-    const double avg_loss = cumul_loss / train_batches;
-    std::cout << loop << ',' << avg_loss << ',';
-    std::cout << absl::StrJoin(evals_eq, ",");
-    std::cout << std::endl;
   }
 }
 

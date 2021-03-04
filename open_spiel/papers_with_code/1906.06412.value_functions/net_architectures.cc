@@ -82,18 +82,19 @@ torch::Tensor PositionalValueNet::forward(torch::Tensor x) {
 // -- ParticleValueNet ---------------------------------------------------------
 
 ParticleValueNet::ParticleValueNet(ParticleDims* particle_dims,
+                                   size_t num_layers_regression,
+                                   size_t num_width_regression,
                                    ActivationFunction activation)
     : dims(particle_dims), activation_fn(activation) {
   int dim_context = context_size();
   int num_layers_kernel = 4;
-  int num_layers_context = 3;
 
   MakeLayers(fc_basis, num_layers_kernel,
              dims->particle_size() - 1, dims->particle_size(), dim_context);
-  MakeLayers(fc_context, num_layers_context,
-             dim_context, dim_context * 3, regression_size());
+  MakeLayers(fc_regression, num_layers_regression, dim_context,
+             dim_context * num_width_regression, regression_size());
   RegisterLayers(fc_basis, "fc_basis_");
-  RegisterLayers(fc_context, "fc_context_");
+  RegisterLayers(fc_regression, "fc_regression_");
 }
 
 torch::Tensor ParticleValueNet::change_of_basis(torch::Tensor fs) {             CHECK_SHAPE(fs, {_, dims->features_size()});
@@ -119,11 +120,11 @@ torch::Tensor ParticleValueNet::pool(torch::Tensor cs) {                        
 }
 
 torch::Tensor ParticleValueNet::regression(torch::Tensor xs) {                  CHECK_SHAPE(xs, {1, context_size()});
-  for (int i = 0; i < fc_context.size() - 1; ++i) {
-    xs = fc_context[i]->forward(xs);
+  for (int i = 0; i < fc_regression.size() - 1; ++i) {
+    xs = fc_regression[i]->forward(xs);
     xs = Activation(activation_fn, xs);
   }
-  xs = fc_context.back()->forward(xs);                                          CHECK_SHAPE(xs, {1, regression_size()});
+  xs = fc_regression.back()->forward(xs);                                          CHECK_SHAPE(xs, {1, regression_size()});
   return xs;
 }
 

@@ -36,81 +36,209 @@ double TrainNetwork(ValueNet* model, torch::Device* device,
   return loss.item().to<double>();
 }
 
+//std::unique_ptr<Evaluator> MakeSparseTrunkEvaluator() {
+//  std::vector<std::unique_ptr<SparseTrunk>>& sparse_trunks_with_net,
+//  ortools::SequenceFormLpSpecification* whole_game,
+//  const std::vector<int>& evaluate_iters) {
+//
+//    auto should_evaluate = [&](int i){
+//        for (auto j : evaluate_iters) {
+//          if (i == j) return true;
+//        }
+//        return false;
+//    };
+//
+//    std::vector<double> expls;
+//    expls.reserve(evaluate_iters.size());
+//    int trunk_iters = *std::max_element(evaluate_iters.begin(),
+//                                        evaluate_iters.end());
+//
+//    auto uniform_policy = std::make_shared<UniformISTreePolicy>(
+//        whole_game->trees());
+//    DispatchPolicy eval_policy;
+//    for (std::unique_ptr<SparseTrunk>& sparse_trunk: sparse_trunks_with_net) {
+//      // Important!! We must reset all the bandits & other memory for proper eval.
+//      sparse_trunk->dlcfr->Reset();
+//      eval_policy.AddDispatch(sparse_trunk->fixate_infostates,
+//                              sparse_trunk->dlcfr->AveragePolicy());
+//      eval_policy.AddDispatch(sparse_trunk->uniform_infostates,
+//                              uniform_policy);
+//    }
+//
+//    for (int i = 1; i <= trunk_iters; ++i) {
+//      for (std::unique_ptr<SparseTrunk>& sparse_trunk: sparse_trunks_with_net) {
+//        dlcfr::DepthLimitedCFR* trunk_with_net = sparse_trunk->dlcfr.get();
+//        ++trunk_with_net->num_iterations_;
+//        trunk_with_net->UpdateReachProbs();
+//        trunk_with_net->EvaluateLeaves();
+//      }
+//
+//      if (should_evaluate(i)) {
+//        expls.push_back(ortools::TrunkExploitability(whole_game, eval_policy));
+//        std::cout << '.' << std::flush;
+//      }
+//
+//      for (std::unique_ptr<SparseTrunk>& sparse_trunk: sparse_trunks_with_net) {
+//        sparse_trunk->dlcfr->UpdateTrunk();
+//      }
+//    }
+//}
 
-class UniformISTreePolicy : public Policy {
-  const std::vector<std::shared_ptr<InfostateTree>>& trees_;
+class FullTrunkEvaluator : public Evaluator {
+  std::vector<int> evaluate_iters_;
+  std::vector<double> expls_;
+  dlcfr::DepthLimitedCFR* trunk_with_net_;
+  ortools::SequenceFormLpSpecification* whole_game_;
+
  public:
-  UniformISTreePolicy(const std::vector<std::shared_ptr<InfostateTree>>& trees)
-    : trees_(trees) {}
-  ActionsAndProbs GetStatePolicy(const std::string& info_state) const override {
-    for (int pl = 0; pl < 2; ++pl) {
-      const InfostateNode* node =
-          trees_[pl]->DecisionNodeFromInfostateString(info_state);
-      if (node) {
-        const std::vector<Action>& actions = node->legal_actions();
-        const double p = 1. / actions.size();
-        ActionsAndProbs ap;
-        ap.reserve(actions.size());
-        for (int i = 0; i < actions.size(); ++i) {
-          ap.push_back({actions[i], p});
-        }
-        return ap;
-      }
+  FullTrunkEvaluator(std::vector<int> evaluate_iters,
+                     dlcfr::DepthLimitedCFR* trunk_with_net,
+                     ortools::SequenceFormLpSpecification* whole_game)
+     : evaluate_iters_(std::move(evaluate_iters)),
+       expls_(evaluate_iters_.size()),
+       trunk_with_net_(trunk_with_net),
+       whole_game_(whole_game) {}
+
+  std::string name() const override { return "full_trunk_expl"; }
+
+  void PrintHeader(std::ostream& os) const override {
+    bool first = true;
+    for (int iter: evaluate_iters_) {
+      if (!first) os << ",";
+      else first = false;
+      os << "expl[" << iter << "]";
     }
-    return {};
+  }
+
+  void PrintEval(std::ostream& os) const override {
+    bool first = true;
+    for (double expl: expls_) {
+      if (!first) os << ",";
+      else first = false;
+      os << expl;
+    }
+  }
+
+  void Reset() override { std::fill(expls_.begin(), expls_.end(), 0.); }
+
+  void Evaluate(std::ostream& progress) override {
+    std::shared_ptr<Policy> eval_policy = trunk_with_net_->AveragePolicy();
+    int j = 0;
+
+    // Important!! We must reset all the bandits & other memory for proper eval.
+    trunk_with_net_->Reset();
+
+    for (int i = 1; i <= evaluate_iters_.back(); ++i) {
+      ++trunk_with_net_->num_iterations_;
+      trunk_with_net_->UpdateReachProbs();
+      trunk_with_net_->EvaluateLeaves();
+
+      if (should_evaluate_at_iter(i)) {
+        expls_[j++] = ortools::TrunkExploitability(whole_game_, *eval_policy);
+        progress << '.' << std::flush;
+      }
+      trunk_with_net_->UpdateTrunk();
+    }
+  }
+
+ private:
+  bool should_evaluate_at_iter(int iter) const {
+    for (auto j : evaluate_iters_)
+      if (iter == j) return true;
+    return false;
   }
 };
 
-
-std::vector<double> EvaluateNetwork(
-    std::vector<std::unique_ptr<SparseTrunk>>& sparse_trunks_with_net,
-    ortools::SequenceFormLpSpecification* whole_game,
-    const std::vector<int>& evaluate_iters) {
-
-  auto should_evaluate = [&](int i){
-    for (auto j : evaluate_iters) {
-      if (i == j) return true;
-    }
-    return false;
-  };
-
-  std::vector<double> expls;
-  expls.reserve(evaluate_iters.size());
-  int trunk_iters = *std::max_element(evaluate_iters.begin(),
-                                      evaluate_iters.end());
-
-  auto uniform_policy = std::make_shared<UniformISTreePolicy>(
-      whole_game->trees());
-  DispatchPolicy eval_policy;
-  for (std::unique_ptr<SparseTrunk>& sparse_trunk: sparse_trunks_with_net) {
-    // Important!! We must reset all the bandits & other memory for proper eval.
-    sparse_trunk->dlcfr->Reset();
-    eval_policy.AddDispatch(sparse_trunk->fixate_infostates,
-                            sparse_trunk->dlcfr->AveragePolicy());
-    eval_policy.AddDispatch(sparse_trunk->uniform_infostates,
-                            uniform_policy);
-  }
-
-  for (int i = 1; i <= trunk_iters; ++i) {
-    for (std::unique_ptr<SparseTrunk>& sparse_trunk: sparse_trunks_with_net) {
-      dlcfr::DepthLimitedCFR* trunk_with_net = sparse_trunk->dlcfr.get();
-      ++trunk_with_net->num_iterations_;
-      trunk_with_net->UpdateReachProbs();
-      trunk_with_net->EvaluateLeaves();
-    }
-
-    if (should_evaluate(i)) {
-      expls.push_back(ortools::TrunkExploitability(whole_game, eval_policy));
-      std::cout << '.' << std::flush;
-    }
-
-    for (std::unique_ptr<SparseTrunk>& sparse_trunk: sparse_trunks_with_net) {
-      sparse_trunk->dlcfr->UpdateTrunk();
-    }
-  }
-
-  return expls;
+std::unique_ptr<Evaluator> MakeFullTrunkEvaluator(
+    std::vector<int> evaluate_iters, dlcfr::DepthLimitedCFR* trunk_with_net,
+    ortools::SequenceFormLpSpecification* whole_game) {
+  return std::make_unique<FullTrunkEvaluator>(std::move(evaluate_iters),
+                                              trunk_with_net, whole_game);
 }
+
+void EvaluateNetwork(std::vector<std::unique_ptr<Evaluator>>& evaluators) {
+  for (std::unique_ptr<Evaluator>& evaluator : evaluators) {
+    evaluator->Reset();
+    std::cout << "# " << evaluator->name() << " " << std::flush;
+    evaluator->Evaluate(std::cout);
+    std::cout << std::endl;
+  }
+}
+
+//class UniformISTreePolicy : public Policy {
+//  const std::vector<std::shared_ptr<InfostateTree>>& trees_;
+// public:
+//  UniformISTreePolicy(const std::vector<std::shared_ptr<InfostateTree>>& trees)
+//    : trees_(trees) {}
+//  ActionsAndProbs GetStatePolicy(const std::string& info_state) const override {
+//    for (int pl = 0; pl < 2; ++pl) {
+//      const InfostateNode* node =
+//          trees_[pl]->DecisionNodeFromInfostateString(info_state);
+//      if (node) {
+//        const std::vector<Action>& actions = node->legal_actions();
+//        const double p = 1. / actions.size();
+//        ActionsAndProbs ap;
+//        ap.reserve(actions.size());
+//        for (int i = 0; i < actions.size(); ++i) {
+//          ap.push_back({actions[i], p});
+//        }
+//        return ap;
+//      }
+//    }
+//    return {};
+//  }
+//};
+//
+//
+//std::vector<double> EvaluateNetwork(
+//    std::vector<std::unique_ptr<SparseTrunk>>& sparse_trunks_with_net,
+//    ortools::SequenceFormLpSpecification* whole_game,
+//    const std::vector<int>& evaluate_iters) {
+//
+//  auto should_evaluate = [&](int i){
+//    for (auto j : evaluate_iters) {
+//      if (i == j) return true;
+//    }
+//    return false;
+//  };
+//
+//  std::vector<double> expls;
+//  expls.reserve(evaluate_iters.size());
+//  int trunk_iters = *std::max_element(evaluate_iters.begin(),
+//                                      evaluate_iters.end());
+//
+//  auto uniform_policy = std::make_shared<UniformISTreePolicy>(
+//      whole_game->trees());
+//  DispatchPolicy eval_policy;
+//  for (std::unique_ptr<SparseTrunk>& sparse_trunk: sparse_trunks_with_net) {
+//    // Important!! We must reset all the bandits & other memory for proper eval.
+//    sparse_trunk->dlcfr->Reset();
+//    eval_policy.AddDispatch(sparse_trunk->fixate_infostates,
+//                            sparse_trunk->dlcfr->AveragePolicy());
+//    eval_policy.AddDispatch(sparse_trunk->uniform_infostates,
+//                            uniform_policy);
+//  }
+//
+//  for (int i = 1; i <= trunk_iters; ++i) {
+//    for (std::unique_ptr<SparseTrunk>& sparse_trunk: sparse_trunks_with_net) {
+//      dlcfr::DepthLimitedCFR* trunk_with_net = sparse_trunk->dlcfr.get();
+//      ++trunk_with_net->num_iterations_;
+//      trunk_with_net->UpdateReachProbs();
+//      trunk_with_net->EvaluateLeaves();
+//    }
+//
+//    if (should_evaluate(i)) {
+//      expls.push_back(ortools::TrunkExploitability(whole_game, eval_policy));
+//      std::cout << '.' << std::flush;
+//    }
+//
+//    for (std::unique_ptr<SparseTrunk>& sparse_trunk: sparse_trunks_with_net) {
+//      sparse_trunk->dlcfr->UpdateTrunk();
+//    }
+//  }
+//
+//  return expls;
+//}
 
 }  // namespace papers_with_code
 }  // namespace open_spiel

@@ -67,11 +67,12 @@ struct PositionalValueNet final : public ValueNet {
 struct ParticleValueNet final : public ValueNet {
   ParticleDims* dims;
   ActivationFunction activation_fn;
-  std::vector<torch::nn::Linear> fc_context;
+  std::vector<torch::nn::Linear> fc_regression;
   std::vector<torch::nn::Linear> fc_basis;
   int limit_particle_count = -1;
 
   ParticleValueNet(ParticleDims* particle_dims,
+                   size_t num_layers_regression, size_t num_width_regression,
                    ActivationFunction activation = kRelu);
   torch::Tensor forward(torch::Tensor xss) override;
   torch::Tensor PrepareTarget(BatchData* batch) override;
