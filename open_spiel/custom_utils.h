@@ -16,11 +16,13 @@ inline std::string CommandOutput(const std::string& command) {
   if (!lsofFile_p) { return ""; }
   char buffer[1024];
   char *line_p = fgets(buffer, sizeof(buffer), lsofFile_p);
+  if (!line_p) { return ""; }
   pclose(lsofFile_p);
   return buffer;
 }
 
-inline void _InitiliazeExperimentRunner(std::string origin_file, int argc, char** argv) {
+inline void _InitiliazeExperimentRunner(std::string origin_file,
+                                        int argc, char** argv) {
   absl::ParseCommandLine(argc, argv);
 
   std::string git_version = CommandOutput("git rev-parse HEAD");
@@ -29,16 +31,8 @@ inline void _InitiliazeExperimentRunner(std::string origin_file, int argc, char*
 
   std::cout << "# Running " << origin_file << "\n";
   std::cout << "# Git version " << git_version << "\n";
-  if (!is_clean) {
-    std::cout << "# Warning! The working tree is not clean!\n"
-                 "# This may result in non-reproducible experiment.\n"
-                 "# Artificially waiting to notice this " << std::flush;
-    for (int i = 0; i < 3; ++i) {
-      std::this_thread::sleep_for(static_cast<std::chrono::seconds>(1));
-      std::cout << '.' << std::flush;
-    }
-    std::cout << "\n" << std::endl;
-  }
+  std::cout << "# Working tree clean? " << (is_clean ? "true" : "false") << "\n";
+  std::cout << "# Launch command:\n";
 
   for (int i = 0; i < argc; ++i) {
     std::cout << "# " << argv[i];
