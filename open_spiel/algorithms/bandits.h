@@ -139,7 +139,7 @@ class FixedStrategy final : public Bandit {
 
 // A bandit that can be dynamically set to return a requested strategy,
 // via mutable_strategy(). Reset() makes it to be uniform.
-class FixableStrategy final : public Bandit {
+class FixableStrategy : public Bandit {
  public:
   FixableStrategy(int num_actions) : Bandit(num_actions) {}
   // Return a writable view for the strategy.

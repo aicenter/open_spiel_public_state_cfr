@@ -49,8 +49,7 @@ ABSL_FLAG(int, limit_particle_count, -1,
           "How many particles should be used at most in neural network training?"
           " -1 for all.");
 ABSL_FLAG(int, sparse_roots_depth, 0,
-          "The depth at which sparse roots should be found."
-          " -1 will automatically use some reasonable depth based on the game.");
+          "The depth at which sparse roots should be found.");
 ABSL_FLAG(double, support_threshold, 1e-5,
           "Pruning threshold for not playing actions from equilibrium, "
           "used for trunk sparsification.");
@@ -63,8 +62,7 @@ ABSL_FLAG(bool, prune_chance_histories, false,
 #include "torch/torch.h"
 
 #include "open_spiel/papers_with_code/1906.06412.value_functions/experience_replay.h"
-#include "open_spiel/papers_with_code/1906.06412.value_functions/evaluators.h"
-#include "open_spiel/papers_with_code/1906.06412.value_functions/generate_data.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/metrics.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_dl_evaluator.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/sparse_trunk.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/torch_utils.h"
@@ -75,17 +73,6 @@ namespace open_spiel {
 namespace papers_with_code {
 
 using namespace algorithms;
-
-enum ExpReplayInitPolicy {
-  kGenerateDlcfrIterations,
-  kGenerateRandomRangesAndSubgameValues,
-};
-
-ExpReplayInitPolicy GetInitPolicy(const std::string& s) {
-  if (s == "dl_cfr") return kGenerateDlcfrIterations;
-  if (s == "random") return kGenerateRandomRangesAndSubgameValues;
-  SpielFatalError("Exhausted pattern match: data_generation");
-}
 
 void FillExperienceReplay(ExpReplayInitPolicy init,
                           const BasicDims& dims,
@@ -155,34 +142,6 @@ std::vector<int> ItersFromString(const std::string& s) {
   return out;
 }
 
-int GetSparseRootsDepth(const Game& game) {
-  int cmd_flag = absl::GetFlag(FLAGS_sparse_roots_depth);
-  if (cmd_flag >= 0) return cmd_flag;
-
-  const std::string& name = game.GetType().short_name;
-  if (name == "kuhn_poker") {
-    return 2;
-  } else if (name == "leduc_poker") {
-    return 2;
-  } else if (name == "goospiel") {
-    return 1;
-  } else {
-    SpielFatalError("Exhausted pattern match! No default value "
-                    "for sparse roots depth available.");
-  }
-}
-
-NetArchitecture GetArchitecture(const std::string& arch) {
-  if (arch == "particle_vf") {
-    return NetArchitecture::kParticle;
-  } else  if (arch == "positional_vf") {
-    return NetArchitecture::kPositional;
-  } else {
-    SpielFatalError("Exhausted pattern match! Architecture not recognized.");
-  }
-}
-
-
 std::unique_ptr<ValueNet> MakeModel(NetArchitecture arch, BasicDims* dims) {
   switch(arch) {
     case NetArchitecture::kParticle: {
@@ -230,21 +189,21 @@ std::shared_ptr<NetEvaluator> MakeEvaluator(
   }
 }
 
-void PrintHeaders(const std::vector<std::unique_ptr<Evaluator>>& evaluators) {
+void PrintHeaders(const std::vector<std::unique_ptr<Metric>>& metrics) {
   std::cout << "loop,avg_loss";
-  for (const std::unique_ptr<Evaluator>& evaluator : evaluators) {
+  for (const std::unique_ptr<Metric>& metric : metrics) {
     std::cout << ',';
-    evaluator->PrintHeader(std::cout);
+    metric->PrintHeader(std::cout);
   }
   std::cout << std::endl;
 }
 
-void PrintEvaluations(int loop, double avg_loss,
-                      const std::vector<std::unique_ptr<Evaluator>>& evaluators) {
+void PrintMetrics(int loop, double avg_loss,
+                  const std::vector<std::unique_ptr<Metric>>& metrics) {
   std::cout << loop << ',' << avg_loss;
-  for (const std::unique_ptr<Evaluator>& evaluator : evaluators) {
+  for (const std::unique_ptr<Metric>& metric : metrics) {
     std::cout << ',';
-    evaluator->PrintEval(std::cout);
+    metric->PrintMetric(std::cout);
   }
   std::cout << std::endl;
 }
@@ -264,13 +223,20 @@ double TrainNetwork(ValueNet* model, torch::Device* device,
   return loss.item().to<double>();
 }
 
-void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
-                   int cfr_oracle_iterations, std::string use_bandits_for_cfr,
-                   int seed) {
-  // Replicable experiments!
+void TrainEvalLoop() {
+  // Replicable experiments FTW!
+  int seed = absl::GetFlag(FLAGS_seed);
   torch::manual_seed(seed);
   std::mt19937 rnd_gen(seed);
 
+  const int train_batches = absl::GetFlag(FLAGS_train_batches);
+  const int num_loops = absl::GetFlag(FLAGS_num_loops);
+  const int cfr_oracle_iterations = absl::GetFlag(FLAGS_cfr_oracle_iterations);
+  const std::string use_bandits_for_cfr =
+      absl::GetFlag(FLAGS_use_bandits_for_cfr);
+  const std::unique_ptr<Trunk> t = MakeTrunk(
+      absl::GetFlag(FLAGS_game_name), absl::GetFlag(FLAGS_depth),
+      absl::GetFlag(FLAGS_use_bandits_for_cfr));
   const ExpReplayInitPolicy init_policy =
       GetInitPolicy(absl::GetFlag(FLAGS_data_generation));
   const std::vector<int> eval_iters =
@@ -281,7 +247,7 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   const int batch_size = absl::GetFlag(FLAGS_batch_size) > 0
       ? std::min(absl::GetFlag(FLAGS_batch_size), experience_replay_buffer_size)
       : experience_replay_buffer_size;
-  const int roots_depth = GetSparseRootsDepth(*t->game);
+  const int roots_depth = absl::GetFlag(FLAGS_sparse_roots_depth);
   const int no_move_limit = 1000;
   const double support_threshold = absl::GetFlag(FLAGS_support_threshold);
   const bool prune_chance_histories = absl::GetFlag(FLAGS_prune_chance_histories);
@@ -344,15 +310,15 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   FillExperienceReplay(init_policy, *dims, arch, &experience_replay, t.get(),
                        net_contexts, &whole_game, eval_iters, rnd_gen);
 
-  // 5. Create training evaluators.
-  std::vector<std::unique_ptr<Evaluator>> evaluators;
+  // 5. Create training metrics.
+  std::vector<std::unique_ptr<Metric>> metrics;
   if (!eval_iters.empty()) {
-    evaluators.push_back(
-        MakeFullTrunkEvaluator(eval_iters, trunk_with_net.get(), &whole_game));
+    metrics.push_back(
+        MakeFullTrunkExplMetric(eval_iters, trunk_with_net.get(), &whole_game));
   }
 
   // 6. The train-eval loop.
-  PrintHeaders(evaluators);
+  PrintHeaders(metrics);
   for (int loop = 0; loop < num_loops; ++loop) {
     std::cout << "# Training  ";
     model->train();  // Train mode.
@@ -367,8 +333,8 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
 
     std::cout << "# Evaluating " << std::endl;
     model->eval();  // Eval mode.
-    EvaluateNetwork(evaluators);
-    PrintEvaluations(loop, cumul_loss / train_batches, evaluators);
+    ComputeMetrics(metrics);
+    PrintMetrics(loop, cumul_loss / train_batches, metrics);
 //    PrintTrunkStrategies(trunk_with_net.get());
   }
 }
@@ -380,12 +346,5 @@ int main(int argc, char** argv) {
   using namespace open_spiel::papers_with_code;
   INIT_EXPERIMENT();
 
-  TrainEvalLoop(
-      MakeTrunk(absl::GetFlag(FLAGS_game_name), absl::GetFlag(FLAGS_depth),
-                absl::GetFlag(FLAGS_use_bandits_for_cfr)),
-      absl::GetFlag(FLAGS_train_batches),
-      absl::GetFlag(FLAGS_num_loops),
-      absl::GetFlag(FLAGS_cfr_oracle_iterations),
-      absl::GetFlag(FLAGS_use_bandits_for_cfr),
-      absl::GetFlag(FLAGS_seed));
+  TrainEvalLoop();
 }

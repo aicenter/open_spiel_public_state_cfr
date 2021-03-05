@@ -26,6 +26,7 @@ enum class NetArchitecture {
   kPositional,
   kParticle
 };
+NetArchitecture GetArchitecture(const std::string& arch);  // Enum from string.
 
 // A base class for various possible value network architectures.
 struct ValueNet : public torch::nn::Module {
@@ -40,19 +41,7 @@ struct ValueNet : public torch::nn::Module {
 };
 
 enum ActivationFunction { kNone, kRelu, kLeakyRelu, kSigmoid };
-
-inline torch::Tensor Activation(ActivationFunction f, torch::Tensor x) {
-  switch (f) {
-    case kNone:
-      return x;
-    case kRelu:
-      return torch::relu(x);
-    case kLeakyRelu:
-      return torch::leaky_relu(x);
-    case kSigmoid:
-      return torch::sigmoid(x);
-  }
-}
+torch::Tensor Activation(ActivationFunction f, torch::Tensor x);
 
 // A simple MLP neural network.
 struct PositionalValueNet final : public ValueNet {
@@ -96,8 +85,6 @@ struct ParticleValueNet final : public ValueNet {
   int context_size() { return dims->max_particles; }
   int regression_size() { return dims->max_particles; }
 };
-
-#undef _
 
 }  // namespace papers_with_code
 }  // namespace open_spiel

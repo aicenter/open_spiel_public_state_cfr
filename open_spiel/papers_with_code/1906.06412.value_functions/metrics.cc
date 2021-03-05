@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "open_spiel/papers_with_code/1906.06412.value_functions/evaluators.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/metrics.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/dispatch_policy.h"
 
 namespace open_spiel {
@@ -96,16 +96,16 @@ using namespace torch::indexing;  // Load all of the Slice, Ellipsis, etc.
 //    }
 //}
 
-class FullTrunkEvaluator : public Evaluator {
+class FullTrunkExplMetric : public Metric {
   std::vector<int> evaluate_iters_;
   std::vector<double> expls_;
   dlcfr::DepthLimitedCFR* trunk_with_net_;
   ortools::SequenceFormLpSpecification* whole_game_;
 
  public:
-  FullTrunkEvaluator(std::vector<int> evaluate_iters,
-                     dlcfr::DepthLimitedCFR* trunk_with_net,
-                     ortools::SequenceFormLpSpecification* whole_game)
+  FullTrunkExplMetric(std::vector<int> evaluate_iters,
+                      dlcfr::DepthLimitedCFR* trunk_with_net,
+                      ortools::SequenceFormLpSpecification* whole_game)
      : evaluate_iters_(std::move(evaluate_iters)),
        expls_(evaluate_iters_.size()),
        trunk_with_net_(trunk_with_net),
@@ -122,7 +122,7 @@ class FullTrunkEvaluator : public Evaluator {
     }
   }
 
-  void PrintEval(std::ostream& os) const override {
+  void PrintMetric(std::ostream& os) const override {
     bool first = true;
     for (double expl: expls_) {
       if (!first) os << ",";
@@ -161,15 +161,15 @@ class FullTrunkEvaluator : public Evaluator {
   }
 };
 
-std::unique_ptr<Evaluator> MakeFullTrunkEvaluator(
+std::unique_ptr<Metric> MakeFullTrunkExplMetric(
     std::vector<int> evaluate_iters, dlcfr::DepthLimitedCFR* trunk_with_net,
     ortools::SequenceFormLpSpecification* whole_game) {
-  return std::make_unique<FullTrunkEvaluator>(std::move(evaluate_iters),
-                                              trunk_with_net, whole_game);
+  return std::make_unique<FullTrunkExplMetric>(std::move(evaluate_iters),
+                                               trunk_with_net, whole_game);
 }
 
-void EvaluateNetwork(std::vector<std::unique_ptr<Evaluator>>& evaluators) {
-  for (std::unique_ptr<Evaluator>& evaluator : evaluators) {
+void ComputeMetrics(std::vector<std::unique_ptr<Metric>>& metrics) {
+  for (std::unique_ptr<Metric>& evaluator : metrics) {
     evaluator->Reset();
     std::cout << "# " << evaluator->name() << " " << std::flush;
     evaluator->Evaluate(std::cout);
@@ -202,7 +202,7 @@ void EvaluateNetwork(std::vector<std::unique_ptr<Evaluator>>& evaluators) {
 //};
 //
 //
-//std::vector<double> EvaluateNetwork(
+//std::vector<double> ComputeMetrics(
 //    std::vector<std::unique_ptr<SparseTrunk>>& sparse_trunks_with_net,
 //    ortools::SequenceFormLpSpecification* whole_game,
 //    const std::vector<int>& evaluate_iters) {

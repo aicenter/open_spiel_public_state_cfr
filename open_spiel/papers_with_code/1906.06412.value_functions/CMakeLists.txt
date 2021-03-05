@@ -1,8 +1,6 @@
 add_library(paper_value_functions OBJECT
   experience_replay.h
   experience_replay.cc
-  generate_data.h
-  generate_data.cc
   net_architectures.h
   net_architectures.cc
   net_data.h
@@ -16,8 +14,8 @@ add_library(paper_value_functions OBJECT
   dispatch_policy.h
   torch_utils.cc
   torch_utils.h
-  evaluators.h
-  evaluators.cc
+  metrics.h
+  metrics.cc
   trunk.cc
   trunk.h
   )

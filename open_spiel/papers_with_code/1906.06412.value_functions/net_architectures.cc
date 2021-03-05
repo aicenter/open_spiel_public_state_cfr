@@ -17,10 +17,12 @@
 namespace open_spiel {
 namespace papers_with_code {
 
+using namespace torch::indexing;  // Load all of the Slice, Ellipsis, etc.
+
 #define _ -1  // A shape placeholder.
 #ifndef NDEBUG
-inline void CHECK_SHAPE(const torch::Tensor& tensor,
-                        std::initializer_list<int64_t> shape) {
+void CHECK_SHAPE(const torch::Tensor& tensor,
+                 std::initializer_list<int64_t> shape) {
   const std::vector<int64_t> expected_shape(shape);
   SPIEL_DCHECK_EQ(tensor.dim(), expected_shape.size());
   for (int i = 0; i < expected_shape.size(); i++) {
@@ -36,11 +38,9 @@ inline void CHECK_SHAPE(const torch::Tensor& tensor,
   }
 }
 #else
-inline void CHECK_SHAPE(const torch::Tensor& tensor,
-                        std::initializer_list<int64_t> shape) {}
+void CHECK_SHAPE(const torch::Tensor& tensor,
+                 std::initializer_list<int64_t> shape) {}
 #endif
-
-using namespace torch::indexing;  // Load all of the Slice, Ellipsis, etc.
 
 void ValueNet::MakeLayers(std::vector<torch::nn::Linear>& layers, int num_layers,
                      int inputs_size, int hidden_size, int outputs_size) {
@@ -124,7 +124,7 @@ torch::Tensor ParticleValueNet::regression(torch::Tensor xs) {                  
     xs = fc_regression[i]->forward(xs);
     xs = Activation(activation_fn, xs);
   }
-  xs = fc_regression.back()->forward(xs);                                          CHECK_SHAPE(xs, {1, regression_size()});
+  xs = fc_regression.back()->forward(xs);                                       CHECK_SHAPE(xs, {1, regression_size()});
   return xs;
 }
 
@@ -181,6 +181,29 @@ torch::Tensor ParticleValueNet::PrepareTarget(BatchData* batch) {
     target_slices.push_back(batch->target.index({i, Slice(0, num_particles)}));
   }
   return torch::cat(target_slices).unsqueeze(/*dim=*/0);
+}
+
+NetArchitecture GetArchitecture(const std::string& arch) {
+  if (arch == "particle_vf") {
+    return NetArchitecture::kParticle;
+  } else  if (arch == "positional_vf") {
+    return NetArchitecture::kPositional;
+  } else {
+    SpielFatalError("Exhausted pattern match! Architecture not recognized.");
+  }
+}
+
+torch::Tensor Activation(ActivationFunction f, torch::Tensor x) {
+  switch (f) {
+    case kNone:
+      return x;
+    case kRelu:
+      return torch::relu(x);
+    case kLeakyRelu:
+      return torch::leaky_relu(x);
+    case kSigmoid:
+      return torch::sigmoid(x);
+  }
 }
 
 }  // namespace papers_with_code

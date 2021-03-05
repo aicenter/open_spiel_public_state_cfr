@@ -104,35 +104,6 @@ std::unique_ptr<BasicDims> DeduceDims(const Trunk& trunk, NetArchitecture arch) 
   return dims;
 }
 
-void AddExperiencesFromTrunk(
-    const std::vector<algorithms::dlcfr::LeafPublicState>& public_leaves,
-    const std::vector<NetContext*>& net_contexts,
-    const BasicDims& dims, NetArchitecture arch, ExperienceReplay* replay,
-    std::mt19937& rnd_gen, bool shuffle_input, bool shuffle_output) {
-  for (int i = 0; i < public_leaves.size(); ++i) {
-    const dlcfr::LeafPublicState& leaf = public_leaves[i];
-    if (leaf.IsTerminal()) continue;  // Add experiences only for non-terminals.
-    const NetContext& net_context = *net_contexts[i];
-
-    switch(arch) {
-      case NetArchitecture::kParticle: {
-        auto particle_dims = open_spiel::down_cast<const ParticleDims&>(dims);
-        ParticlesInContext data_point = replay->AddExperience(particle_dims);
-        WriteParticles(leaf, net_context, particle_dims, &data_point,
-                       &rnd_gen, shuffle_input, shuffle_output);
-        break;
-      }
-      case NetArchitecture::kPositional: {
-        auto pos_dims = open_spiel::down_cast<const PositionalDims&>(dims);
-        PositionalData data_point = replay->AddExperience(pos_dims);
-        WritePositional(leaf, net_context, pos_dims, &data_point);
-        break;
-      }
-    }
-
-  }
-}
-
 // Rewrite all private hands into one-hot encoded positional hands.
 // The size of the encoding should be supplied and should be equal
 // to the maximum of the number of the private hands over the players.

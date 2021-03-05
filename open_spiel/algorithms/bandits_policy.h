@@ -76,6 +76,11 @@ class BanditsCurrentPolicy : public BanditsPolicy {
   }
 };
 
+// The bandits must be derived from FixableStrategy class.
+void RandomizeStrategy(std::vector<algorithms::BanditVector>& bandits,
+                       double prob_pure_strat, double prob_fully_mixed,
+                       std::mt19937& rnd_gen);
+
 }  // namespace algorithms
 }  // namespace open_spiel
 

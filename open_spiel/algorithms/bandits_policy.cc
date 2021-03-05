@@ -73,6 +73,62 @@ ActionsAndProbs BanditsPolicy::GetInfoStatePolicy(
   return out;
 }
 
+void AssignUniformRandom(absl::Span<double> policy) {
+  for (int i = 0; i < policy.size(); ++i) {
+    policy[i] = 1. / policy.size();
+  }
+}
+
+void AssignSingleAction(absl::Span<double> policy, std::mt19937& rnd_gen) {
+  const int which_action =
+      std::uniform_int_distribution<>(0, policy.size() - 1)(rnd_gen);
+  std::fill(policy.begin(), policy.end(), 0.);
+  policy[which_action] = 1.;
+}
+
+void AssignMixedStrategy(absl::Span<double> policy, std::mt19937& rnd_gen,
+                         double prob_pure_strat) {
+  // Mixed strategy.
+  for (int i = 0; i < policy.size(); ++i) {
+    const bool in_support =
+        std::bernoulli_distribution(1. - prob_pure_strat)(rnd_gen);
+    policy[i] = in_support
+                ? std::uniform_real_distribution<>(0., 1.)(rnd_gen)
+                : 0.;
+  }
+  // We need to normalize the result!
+  const double normalizer = absl::c_accumulate(policy, 0.);
+  const double uniform_prob = 1.0 / policy.size();
+  for (int i = 0; i < policy.size(); ++i) {
+    policy[i] = normalizer < 1e-3
+                ? uniform_prob
+                : policy[i] / normalizer;
+  }
+}
+
+void RandomizeStrategy(std::vector<BanditVector>& bandits,
+                       double prob_pure_strat, double prob_fully_mixed,
+                       std::mt19937& rnd_gen) {
+  for (int pl = 0; pl < 2; ++pl) {
+    for (DecisionId id : bandits[pl].range()) {
+      // Randomize current policy
+      bandits::Bandit* bandit = bandits[pl][id].get();
+      auto* fixable_bandit =
+          open_spiel::down_cast<bandits::FixableStrategy*>(bandit);
+      absl::Span<double> policy = fixable_bandit->mutable_strategy();
+      SPIEL_DCHECK_EQ(policy.size(), bandit->num_actions());
+
+      if (std::bernoulli_distribution(prob_fully_mixed)(rnd_gen)) {
+        // Special case since uniform random is a starting point of CFR.
+        AssignUniformRandom(policy);
+      } else if (std::bernoulli_distribution(prob_pure_strat)(rnd_gen)) {
+        AssignSingleAction(policy, rnd_gen);
+      } else {
+        AssignMixedStrategy(policy, rnd_gen, prob_pure_strat);
+      }
+    }
+  }
+}
 
 }  // namespace algorithms
 }  // namespace open_spiel

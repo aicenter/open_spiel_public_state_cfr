@@ -21,7 +21,6 @@
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_data.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/hand_table.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_dl_evaluator.h"
-#include "open_spiel/papers_with_code/1906.06412.value_functions/experience_replay.h"
 #include "open_spiel/spiel.h"
 
 namespace open_spiel {
@@ -51,11 +50,6 @@ std::unique_ptr<Trunk> MakeTrunk(const std::string& game_name, int trunk_depth,
 
 std::unique_ptr<BasicDims> DeduceDims(const Trunk& trunk, NetArchitecture arch);
 
-void AddExperiencesFromTrunk(
-    const std::vector<algorithms::dlcfr::LeafPublicState>& public_leaves,
-    const std::vector<NetContext*>& net_contexts,
-    const BasicDims& dims, NetArchitecture arch, ExperienceReplay* replay,
-    std::mt19937& rnd_gen, bool shuffle_input, bool shuffle_output);
 
 void WriteParticles(
     const algorithms::dlcfr::LeafPublicState& state,

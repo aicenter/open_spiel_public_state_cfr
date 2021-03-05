@@ -15,7 +15,11 @@
 #ifndef OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_EXPERIENCE_REPLAY_
 #define OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_EXPERIENCE_REPLAY_
 
+#include "open_spiel/algorithms/infostate_dl_cfr.h"
+
+
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_data.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/trunk.h"
 
 namespace open_spiel {
 namespace papers_with_code {
@@ -36,8 +40,31 @@ class ExperienceReplay : public BatchData {
   void SampleBatch(BatchData* batch, std::mt19937& rnd_gen) const;
  protected:
   void AdvanceHead();
-
 };
+
+enum ExpReplayInitPolicy {
+  kGenerateDlcfrIterations,
+  kGenerateRandomRangesAndSubgameValues,
+};
+ExpReplayInitPolicy GetInitPolicy(const std::string& s);  // Enum from string.
+
+void AddExperiencesFromTrunk(
+    const std::vector<algorithms::dlcfr::LeafPublicState>& public_leaves,
+    const std::vector<NetContext*>& net_contexts,
+    const BasicDims& dims, NetArchitecture arch, ExperienceReplay* replay,
+    std::mt19937& rnd_gen, bool shuffle_input, bool shuffle_output);
+
+void GenerateDataRandomRanges(
+    Trunk* trunk, const std::vector<NetContext*>& contexts,
+    const BasicDims& dims, NetArchitecture arch, ExperienceReplay* replay,
+    double prob_pure_strat, double prob_fully_mixed,
+    std::mt19937& rnd_gen, bool shuffle_input, bool shuffle_output);
+
+void GenerateDataDLCfrIterations(
+    Trunk* trunk, const std::vector<NetContext*>& contexts,
+    const BasicDims& dims, NetArchitecture arch, ExperienceReplay* replay,
+    int trunk_iters, std::function<void(/*trunk_iter=*/int)> monitor_fn,
+    std::mt19937& rnd_gen, bool shuffle_input, bool shuffle_output);
 
 }  // papers_with_code
 }  // open_spiel
