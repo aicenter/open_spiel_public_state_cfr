@@ -32,8 +32,8 @@ ABSL_FLAG(int, cfr_oracle_iterations, 100, "Number of oracle iterations.");
 ABSL_FLAG(std::string, trunk_eval_iterations, "1,2,5,10,20,50,100,200,500,1000",
           "List of trunk eval iterations.");
 ABSL_FLAG(int, num_layers, 3, "Number of hidden layers.");
-ABSL_FLAG(int, num_width, 3, "Multiplicative constant of the number "
-                             "of neurons per layer.");
+ABSL_FLAG(int, num_width, 3, "Multiplicative constant of the number of neurons "
+                             "per layer compared to the input size.");
 ABSL_FLAG(int, num_trunks, 100, "Size of experience replay in terms of trunks");
 ABSL_FLAG(int, seed, 0, "Seed.");
 ABSL_FLAG(std::string, use_bandits_for_cfr, "RegretMatchingPlus",

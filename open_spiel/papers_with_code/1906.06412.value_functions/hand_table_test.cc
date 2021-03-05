@@ -20,27 +20,18 @@ namespace open_spiel {
 namespace papers_with_code {
 namespace {
 
-
 void TestCreateHandTable() {
   std::shared_ptr<const Game> game = LoadGame("kuhn_poker");
-  std::shared_ptr<Observer> hand_observer = game->MakeObserver(kHandObsType, {});
+  std::shared_ptr<Observer>
+      hand_observer = game->MakeObserver(kHandObsType, {});
   auto leaf_evaluator = algorithms::dlcfr::MakeDummyEvaluator();
   algorithms::dlcfr::DepthLimitedCFR dl_cfr(game, 3, leaf_evaluator, nullptr);
 
-  std::vector<HandTable> tables = CreateHandTables(*game, hand_observer,
-                                                   dl_cfr.public_leaves());
-  SPIEL_CHECK_EQ(tables.size(), game->NumPlayers());
-
-  for (const HandTable& player_table : tables) {
+  std::unique_ptr<HandInfo> hand_info = CreateHandInfo(*game, hand_observer,
+                                                       dl_cfr.public_leaves());
+  SPIEL_CHECK_EQ(hand_info->tables.size(), game->NumPlayers());
+  for (const HandTable& player_table : hand_info->tables) {
     SPIEL_CHECK_EQ(player_table.private_hands.size(), 3);
-    SPIEL_CHECK_EQ(player_table.bijections.size(),
-                   dl_cfr.public_leaves().size());
-
-    for (const BijectiveContainer<size_t>& state_bij : player_table.bijections) {
-      SPIEL_CHECK_EQ(state_bij.size(), player_table.private_hands.size());
-      for (const auto& xy : state_bij.x2y) SPIEL_CHECK_EQ(xy.first, xy.second);
-      for (const auto& yx : state_bij.y2x) SPIEL_CHECK_EQ(yx.first, yx.second);
-    }
   }
 }
 
