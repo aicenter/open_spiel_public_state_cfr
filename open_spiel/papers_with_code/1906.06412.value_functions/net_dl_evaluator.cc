@@ -69,6 +69,25 @@ void ParticleNetEvaluator::EvaluatePublicState(
   CopyValuesNetToTree(point, *state, *dims_);
 }
 
+void PositionalNetEvaluator::EvaluatePublicState(
+    algorithms::dlcfr::LeafPublicState* state,
+    algorithms::dlcfr::PublicStateContext* context) const {
+  SPIEL_DCHECK_FALSE(state->IsTerminal());  // Only non-terminal leafs.
+  SPIEL_DCHECK_FALSE(model_->is_training());
+  SPIEL_DCHECK_TRUE(context);
+  auto net_context = open_spiel::down_cast<NetContext*>(context);
+  torch::NoGradGuard no_grad_guard;  // We run only inference.
+
+  PositionalData point = batch_->point_at(0, *dims_);
+  WritePositional(*state, *net_context, *dims_, &point);
+
+  torch::Tensor input = point.data.to(*device_);
+  torch::Tensor output = model_->forward(input);
+  SPIEL_DCHECK_EQ(output.sizes(), point.target.sizes());
+  point.target.copy_(output);
+  CopyValuesNetToTree(&point, *state, *net_context);
+}
+
 }  // namespace papers_with_code
 }  // namespace open_spiel
 

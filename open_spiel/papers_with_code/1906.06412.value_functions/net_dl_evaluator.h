@@ -82,6 +82,22 @@ class ParticleNetEvaluator final : public NetEvaluator {
                            PublicStateContext* context) const override;
 };
 
+class PositionalNetEvaluator final : public NetEvaluator {
+  PositionalValueNet* model_;
+  torch::Device* device_;
+  BatchData* batch_;
+  PositionalDims* const dims_;
+ public:
+  PositionalNetEvaluator(HandInfo* hand_info,
+                         PositionalValueNet* model, PositionalDims* const dims,
+                       BatchData* batch, torch::Device* device)
+      : NetEvaluator(hand_info),
+        model_(model), device_(device), batch_(batch), dims_(dims) {}
+
+  void EvaluatePublicState(LeafPublicState* state,
+                           PublicStateContext* context) const override;
+};
+
 }  // namespace papers_with_code
 }  // namespace open_spiel
 

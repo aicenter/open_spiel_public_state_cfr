@@ -28,7 +28,8 @@ std::unique_ptr<Trunk> MakeTrunk(const std::string& game_name,
   return std::make_unique<Trunk>(game_name, trunk_depth, use_bandits_for_cfr);
 }
 
-Trunk::Trunk(const std::string& game_name, int depth, std::string use_bandits_for_cfr) {
+Trunk::Trunk(const std::string& game_name, int depth,
+             std::string use_bandits_for_cfr) {
   // 1. Prepare the game, observers and depth-limited (trunk) trees.
   game = LoadGame(game_name);
   trunk_depth = depth;
@@ -56,24 +57,7 @@ Trunk::Trunk(const std::string& game_name, int depth, std::string use_bandits_fo
   // 3. Make a Batch of data that encompasses all leaf public states.
   hand_info = CreateHandInfo(*game, hand_observer,
                              fixable_trunk_with_oracle->public_leaves());
-  const dlcfr::LeafPublicState& some_leaf =
-      fixable_trunk_with_oracle->public_leaves().at(0);
 
-  dims = std::make_unique<ParticleDims>();
-  dims->public_features_size = some_leaf.public_tensor.Tensor().size();
-  for (int pl = 0; pl < 2; ++pl) {
-    dims->net_ranges_size[pl] = hand_info->tables[pl].private_hands.size();
-    if (!dims->write_hand_features_positionally) {
-      dims->hand_features_size = hand_info->hand_tensor_size();
-    }
-  }
-  if (dims->write_hand_features_positionally) {
-    // Max per table, because we already encode player id as a feature.
-    dims->hand_features_size = std::max(
-        hand_info->tables[0].private_hands.size(),
-        hand_info->tables[1].private_hands.size());
-  }
-  dims->max_particles = hand_info->num_hands();
   num_leaves = fixable_trunk_with_oracle->public_leaves().size();
   num_non_terminal_leaves = 0;
   for (auto& leaf: fixable_trunk_with_oracle->public_leaves()) {
@@ -81,18 +65,71 @@ Trunk::Trunk(const std::string& game_name, int depth, std::string use_bandits_fo
   }
 }
 
+std::unique_ptr<BasicDims> DeduceDims(const Trunk& trunk, NetArchitecture arch) {
+  const dlcfr::LeafPublicState& some_leaf =
+      trunk.fixable_trunk_with_oracle->public_leaves().at(0);
+  const HandInfo& hand_info = *trunk.hand_info;
+
+  std::unique_ptr<BasicDims> dims;
+  switch (arch) {
+    case NetArchitecture::kParticle:
+      dims = std::make_unique<ParticleDims>();
+      break;
+    case NetArchitecture::kPositional:
+      dims = std::make_unique<PositionalDims>();
+      break;
+  }
+
+  // Fill basic dims.
+  dims->public_features_size = some_leaf.public_tensor.Tensor().size();
+  for (int pl = 0; pl < 2; ++pl) {
+    dims->net_ranges_size[pl] = hand_info.tables[pl].private_hands.size();
+    if (!dims->write_hand_features_positionally()) {
+      dims->hand_features_size = hand_info.hand_tensor_size();
+    }
+  }
+  if (dims->write_hand_features_positionally()) {
+    // Max per table, because we already encode player id as a feature.
+    dims->hand_features_size = std::max(
+        hand_info.tables[0].private_hands.size(),
+        hand_info.tables[1].private_hands.size());
+  }
+
+  // Fill custom dims.
+  if (arch == NetArchitecture::kParticle) {
+    auto particle_dims = open_spiel::down_cast<ParticleDims*>(dims.get());
+    particle_dims->max_particles = hand_info.num_hands();
+  }
+
+  return dims;
+}
+
 void AddExperiencesFromTrunk(
     const std::vector<algorithms::dlcfr::LeafPublicState>& public_leaves,
     const std::vector<NetContext*>& net_contexts,
-    const ParticleDims& dims, ExperienceReplay* replay,
+    const BasicDims& dims, NetArchitecture arch, ExperienceReplay* replay,
     std::mt19937& rnd_gen, bool shuffle_input, bool shuffle_output) {
   for (int i = 0; i < public_leaves.size(); ++i) {
     const dlcfr::LeafPublicState& leaf = public_leaves[i];
     if (leaf.IsTerminal()) continue;  // Add experiences only for non-terminals.
     const NetContext& net_context = *net_contexts[i];
-    ParticlesInContext data_point = replay->AddExperience(dims);
-    WriteParticles(leaf, net_context, dims, &data_point,
-                   &rnd_gen, shuffle_input, shuffle_output);
+
+    switch(arch) {
+      case NetArchitecture::kParticle: {
+        auto particle_dims = open_spiel::down_cast<const ParticleDims&>(dims);
+        ParticlesInContext data_point = replay->AddExperience(particle_dims);
+        WriteParticles(leaf, net_context, particle_dims, &data_point,
+                       &rnd_gen, shuffle_input, shuffle_output);
+        break;
+      }
+      case NetArchitecture::kPositional: {
+        auto pos_dims = open_spiel::down_cast<const PositionalDims&>(dims);
+        PositionalData data_point = replay->AddExperience(pos_dims);
+        WritePositional(leaf, net_context, pos_dims, &data_point);
+        break;
+      }
+    }
+
   }
 }
 
@@ -130,7 +167,7 @@ void WriteParticles(const algorithms::dlcfr::LeafPublicState& state,
           dims, shuffle_input ? particle_placement[i] : i);
       Copy(state.public_tensor.Tensor(), particle.public_features());
       // Hand features.
-      if(dims.write_hand_features_positionally) {
+      if(dims.write_hand_features_positionally()) {
         WritePositionalHand(net_context.net_index(pl, j),
                             particle.hand_features());
       } else {
@@ -172,6 +209,88 @@ void CopyValuesNetToTree(ParticlesInContext data_point,
   }
   SPIEL_CHECK_EQ(data_point.num_particles(), particle_index);
 }
+
+void WritePositional(const algorithms::dlcfr::LeafPublicState& state,
+                     const NetContext& net_context,
+                     const PositionalDims& dims, PositionalData* point) {
+  // Important !!
+  point->Reset();
+
+  // Write inputs
+  Copy(state.public_tensor.Tensor(), point->public_features());
+  for (int pl = 0; pl < 2; ++pl) {
+    for (int j = 0; j < state.leaf_nodes[pl].size(); j++) {
+      point->range_at(pl, net_context.net_index(pl, j)) = state.ranges[pl][j];
+    }
+  }
+  // Write outputs
+  for (int pl = 0; pl < 2; ++pl) {
+    for (int j = 0; j < state.leaf_nodes[pl].size(); j++) {
+      point->value_at(pl, net_context.net_index(pl, j)) = state.values[pl][j];
+    }
+  }
+}
+
+void CopyValuesNetToTree(PositionalData* point,
+                         algorithms::dlcfr::LeafPublicState& state,
+                         const NetContext& net_context) {
+  for (int pl = 0; pl < 2; ++pl) {
+    for (int j = 0; j < state.leaf_nodes[pl].size(); j++) {
+      state.values[pl][j] = point->value_at(pl, net_context.net_index(pl, j));
+    }
+  }
+}
+
+//// Copy non-contiguous vectors using a permutation map.
+//// This also converts float <-> double as needed.
+//template<typename From, typename To>
+//void PlacementCopy(const std::vector<From>& from, absl::Span<To> to,
+//                   const std::map<size_t, size_t>& from_to) {
+//  for (const auto&[f, t] : from_to) {
+//    to[t] = from[f];
+//  }
+//}
+//template<typename From, typename To>
+//void PlacementCopy(absl::Span<From> from, std::vector<To>& to,
+//                   const std::map<size_t, size_t>& from_to) {
+//  for (const auto&[f, t] : from_to) {
+//    to[t] = from[f];
+//  }
+//}
+//
+//void CopyRangesTreeToNet(const dlcfr::LeafPublicState& leaf,
+//                         PositionalData data_point,
+//                         const std::vector<dlcfr::RangeTable>& tables) {
+//  for (int pl = 0; pl < 2; ++pl) {
+//    PlacementCopy<float_tree, float_net>(
+//        /*tree=*/ leaf.ranges[pl],
+//        /*net=*/  data_point.net_ranges[pl],
+//                  tables[pl].bijections[leaf.public_id].tree_to_net());
+//  }
+//}
+//
+//void CopyValuesTreeToNet(const dlcfr::LeafPublicState& leaf,
+//                         PositionalData data_point,
+//                         const std::vector<dlcfr::RangeTable>& tables) {
+//  for (int pl = 0; pl < 2; ++pl) {
+//    PlacementCopy<float_tree, float_net>(
+//        /*tree=*/ leaf.values[pl],
+//        /*net=*/  data_point.net_values[pl],
+//                  tables[pl].bijections[leaf.public_id].tree_to_net());
+//  }
+//}
+//
+//void CopyValuesNetToTree(PositionalData data_point,
+//                         dlcfr::LeafPublicState& leaf,
+//                         const std::vector<dlcfr::RangeTable>& tables) {
+//  for (int pl = 0; pl < 2; ++pl) {
+//    PlacementCopy<float_net, float_tree>(
+//        /*net=*/  data_point.net_values[pl],
+//        /*tree=*/ leaf.values[pl],
+//                  tables[pl].bijections[leaf.public_id].net_to_tree());
+//  }
+//}
+
 
 void PrintTrunkStrategies(algorithms::dlcfr::DepthLimitedCFR* trunk_with_net) {
   auto& bandits = trunk_with_net->bandits();

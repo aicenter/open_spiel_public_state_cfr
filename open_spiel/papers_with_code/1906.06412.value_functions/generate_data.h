@@ -33,14 +33,14 @@ void RandomizeStrategy(std::vector<algorithms::BanditVector>& bandits,
 
 void GenerateDataRandomRanges(
     Trunk* trunk, const std::vector<NetContext*>& contexts,
-    ExperienceReplay* replay,
+    const BasicDims& dims, NetArchitecture arch, ExperienceReplay* replay,
     double prob_pure_strat, double prob_fully_mixed,
     std::mt19937& rnd_gen, bool shuffle_input, bool shuffle_output);
 
 void GenerateDataDLCfrIterations(
     Trunk* trunk, const std::vector<NetContext*>& contexts,
-    ExperienceReplay* replay, int trunk_iters,
-    std::function<void(/*trunk_iter=*/int)> monitor_fn,
+    const BasicDims& dims, NetArchitecture arch, ExperienceReplay* replay,
+    int trunk_iters, std::function<void(/*trunk_iter=*/int)> monitor_fn,
     std::mt19937& rnd_gen, bool shuffle_input, bool shuffle_output);
 
 }  // papers_with_code

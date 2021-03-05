@@ -87,6 +87,23 @@ float_net& ParticlesInContext::num_particles() {
   return data_ptr()[num_particles_offset()];
 }
 
+PositionalData::PositionalData(const PositionalDims& positional_dims,
+                               torch::Tensor data, torch::Tensor target)
+  : DataPoint(data, target), dims(positional_dims) {
+  SPIEL_DCHECK_EQ(data.size(0), dims.point_input_size());
+  SPIEL_DCHECK_EQ(target.size(0), dims.point_output_size());
+}
+absl::Span<float_net> PositionalData::public_features() {
+  return absl::MakeSpan(&data_ptr()[public_features_offset()],
+                        dims.public_features_size);
+}
+float_net& PositionalData::range_at(Player pl, int index) {
+  return data_ptr()[ranges_offset(pl) + index];
+}
+float_net& PositionalData::value_at(Player pl, int index) {
+  return target_ptr()[values_offset(pl) + index];
+}
+
 BatchData::BatchData(int batch_size, int input_size, int output_size)
     : // Pre-allocate all tensors.
       data(torch::empty({batch_size, input_size}, kDataPointOptions)),
@@ -98,6 +115,11 @@ BatchData::BatchData(int batch_size, int input_size, int output_size)
 
 ParticlesInContext BatchData::point_at(int index) {
   return ParticlesInContext(data[index], target[index]);
+}
+
+PositionalData BatchData::point_at(int index,
+                                   const PositionalDims& positional_dims) {
+  return PositionalData(positional_dims, data[index], target[index]);
 }
 
 void BatchData::Reset() {

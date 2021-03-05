@@ -52,7 +52,7 @@ _DATA_GENERATION = [
 
 _VALUE_NETS = [
   dict(arch="particle_vf"),
-  # dict(arch="positional_vf")
+  dict(arch="positional_vf")
 ]
 
 _REFERENCE_KUHN_DLCFR_EVAL = dict(

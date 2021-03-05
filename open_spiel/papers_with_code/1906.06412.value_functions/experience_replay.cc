@@ -24,6 +24,12 @@ ParticlesInContext ExperienceReplay::AddExperience(const ParticleDims& dims) {
   return point;
 }
 
+PositionalData ExperienceReplay::AddExperience(const PositionalDims& dims) {
+  PositionalData point = point_at(head_, dims);
+  AdvanceHead();
+  return point;
+}
+
 void ExperienceReplay::AdvanceHead() {
   ++head_;
   if (head_ >= size()) {

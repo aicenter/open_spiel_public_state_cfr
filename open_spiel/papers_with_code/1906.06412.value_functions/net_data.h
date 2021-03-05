@@ -52,11 +52,12 @@ struct BasicDims {
   int hand_features_size;
   std::array<int, 2> net_ranges_size;
   const int player_features_size = 2;
-  bool write_hand_features_positionally = false;
 
   // I/O sizes so we know how to construct batch data.
   virtual int point_input_size() const = 0;
   virtual int point_output_size() const = 0;
+  virtual bool write_hand_features_positionally() const = 0;
+  virtual ~BasicDims() = default;
 };
 
 struct ParticleDims final : public BasicDims {
@@ -69,6 +70,8 @@ struct ParticleDims final : public BasicDims {
   }
   int point_output_size() const override { return max_particles; }
 
+  bool write_hand_features_positionally() const override { return false; }
+
   int features_size() const {
     return public_features_size
          + hand_features_size
@@ -77,6 +80,30 @@ struct ParticleDims final : public BasicDims {
   int particle_size() const {
     return features_size() + range_size;
   }
+};
+
+
+// Positional encoding.
+//
+// The data is arranged as:
+// - public_features
+// - ranges player 0
+// - ranges player 1
+//
+// The target is arranged as:
+// - values player 0
+// - values player 1
+//
+// The ranges and values are positionally encoded according
+// to HandTable::hand_index().
+struct PositionalDims final : public BasicDims {
+  int point_input_size() const override {
+    return public_features_size + net_ranges_size[0] +  net_ranges_size[1];
+  }
+  int point_output_size() const override {
+    return net_ranges_size[0] +  net_ranges_size[1];
+  }
+  bool write_hand_features_positionally() const override { return true; }
 };
 
 // A single particle.
@@ -128,6 +155,25 @@ struct ParticlesInContext final : DataPoint {
   int particle_storage_offset() const { return 1; }
 };
 
+struct PositionalData final : DataPoint {
+  const PositionalDims& dims;
+  PositionalData(const PositionalDims& positional_dims,
+                 torch::Tensor data, torch::Tensor target);
+  // Individual accessors.
+  absl::Span<float_net> public_features();
+  float_net& range_at(Player pl, int index);
+  float_net& value_at(Player pl, int index);
+ private:
+  // Encoding of the input / output -- offsets:
+  constexpr int public_features_offset() const { return 0; }
+  int ranges_offset(Player pl) const {
+    return dims.public_features_size + (pl == 0 ? 0 : dims.net_ranges_size[0]);
+  }
+  int values_offset(Player pl) const {
+    return (pl == 0 ? 0 : dims.net_ranges_size[0]);
+  }
+};
+
 struct BatchData {
   torch::Tensor data;
   torch::Tensor target;
@@ -138,6 +184,7 @@ struct BatchData {
 
   // Views for individual data points.
   ParticlesInContext point_at(int index);
+  PositionalData point_at(int index, const PositionalDims& positional_dims);
 };
 
 

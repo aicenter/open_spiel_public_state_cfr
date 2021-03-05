@@ -88,6 +88,8 @@ ExpReplayInitPolicy GetInitPolicy(const std::string& s) {
 }
 
 void FillExperienceReplay(ExpReplayInitPolicy init,
+                          const BasicDims& dims,
+                          NetArchitecture arch,
                           ExperienceReplay* experience_replay,
                           Trunk* trunk,
                           const std::vector<NetContext*>& net_contexts,
@@ -103,7 +105,8 @@ void FillExperienceReplay(ExpReplayInitPolicy init,
       std::cout << "# <ref_expl>\n";
       std::cout << "# trunk_iter,expl\n";
       GenerateDataDLCfrIterations(
-        trunk, net_contexts, experience_replay, absl::GetFlag(FLAGS_num_trunks),
+        trunk, net_contexts, dims, arch, experience_replay,
+        absl::GetFlag(FLAGS_num_trunks),
         /*monitor_fn*/[&](int trunk_iter) {
           bool should_evaluate =
               std::find(eval_iters.begin(), eval_iters.end(), trunk_iter)
@@ -127,7 +130,7 @@ void FillExperienceReplay(ExpReplayInitPolicy init,
       std::cout << "# Generating random trunks to fill experience replay.\n# ";
       for (int i = 0; i < absl::GetFlag(FLAGS_num_trunks); ++i) {
         if (i % 10 == 0) std::cout << '.' << std::flush;
-        GenerateDataRandomRanges(trunk, net_contexts, experience_replay,
+        GenerateDataRandomRanges(trunk, net_contexts, dims, arch, experience_replay,
                                  absl::GetFlag(FLAGS_prob_pure_strat),
                                  absl::GetFlag(FLAGS_prob_fully_mixed),
                                  rnd_gen,
@@ -169,68 +172,63 @@ int GetSparseRootsDepth(const Game& game) {
   }
 }
 
-std::unique_ptr<ValueNet> MakeModel(ParticleDims* dims) {
-  std::string arch = absl::GetFlag(FLAGS_arch);
+NetArchitecture GetArchitecture(const std::string& arch) {
   if (arch == "particle_vf") {
-    auto model = std::make_unique<ParticleValueNet>(
-        dims, absl::GetFlag(FLAGS_num_layers), absl::GetFlag(FLAGS_num_width),
-        ActivationFunction::kRelu);
-    model->limit_particle_count = absl::GetFlag(FLAGS_limit_particle_count);
-    return model;
-  } else if (arch == "positional_vf") {
-//  PositionalValueNet model(
-//    t->dims.net_input_size(), t->dims.net_output_size(),
-//    t->dims.net_input_size() * absl::GetFlag(FLAGS_num_width),
-//    absl::GetFlag(FLAGS_num_layers),
-//    PositionalValueNet::ActivationFunction::kRelu);
-    SpielFatalError("Not implemented.");
-  } else {
-    SpielFatalError("Exhausted pattern match! Architecture not recognized.");
-  }
-}
-
-std::shared_ptr<NetEvaluator> MakeEvaluator(Trunk* t, ValueNet* model,
-                                            BatchData* eval_batch,
-                                            torch::Device* device) {
-  std::string arch = absl::GetFlag(FLAGS_arch);
-  if (arch == "particle_vf") {
-    auto particle_model = open_spiel::down_cast<ParticleValueNet*>(model);
-    return std::make_shared<ParticleNetEvaluator>(
-        t->hand_info.get(), particle_model, t->dims.get(), eval_batch, device);
-  } else if (arch == "positional_vf") {
-    SpielFatalError("Not implemented.");
+    return NetArchitecture::kParticle;
+  } else  if (arch == "positional_vf") {
+    return NetArchitecture::kPositional;
   } else {
     SpielFatalError("Exhausted pattern match! Architecture not recognized.");
   }
 }
 
 
-//auto [eq_policy, game_value] = ortools::MakeEquilibriumPolicy(&whole_game);
-//std::vector<std::unique_ptr<SparseTrunk>> sparse_eq_trunk_with_net;
-//sparse_eq_trunk_with_net.push_back(MakeSparseTrunkWithEqSupport(
-//    eq_policy, t->game, t->infostate_observer, t->public_observer,
-//    roots_depth, t->trunk_depth,
-//    net_evaluator, t->terminal_evaluator, use_bandits_for_cfr,
-//    support_threshold, prune_chance_histories));
-//std::cout << "# Equilibrium sparse trunk:"
-//<< "\n# - Infostate leaves: "
-//<< sparse_eq_trunk_with_net.back()->dlcfr->trees()[0]->num_leaves()
-//<< "\n# - Eval infostates: "
-//<< sparse_eq_trunk_with_net.back()->fixate_infostates.size()
-//<< "\n# Full trunk infostate leaves: "
-//<< t->fixable_trunk_with_oracle->trees()[0]->num_leaves() << "\n";
-//
-//// The sparse trunk is constructed as replacing the players' equilibrium
-//// policies as a chance in the upper game. By constructing the trunk with no
-//// move limit, we make an evaluation trunk.
-//std::unique_ptr<SparseTrunk> eval_trunk =
-//    MakeSparseTrunkWithEqSupport(eq_policy, t->game,
-//                                 t->infostate_observer, t->public_observer,
-//                                 roots_depth, no_move_limit,
-//                                 nullptr, t->terminal_evaluator,
-//                                 use_bandits_for_cfr, 1e-5, false);
-//ortools::SequenceFormLpSpecification eq_fixed_as_chance_lp(
-//    eval_trunk->dlcfr->trees(), "CLP");
+std::unique_ptr<ValueNet> MakeModel(NetArchitecture arch, BasicDims* dims) {
+  switch(arch) {
+    case NetArchitecture::kParticle: {
+      auto particle_dims = open_spiel::down_cast<ParticleDims*>(dims);
+      auto model = std::make_unique<ParticleValueNet>(
+          particle_dims,
+          absl::GetFlag(FLAGS_num_layers),
+          absl::GetFlag(FLAGS_num_width),
+          ActivationFunction::kRelu);
+      model->limit_particle_count = absl::GetFlag(FLAGS_limit_particle_count);
+      return model;
+    }
+    case NetArchitecture::kPositional: {
+      auto positional_dims = open_spiel::down_cast<PositionalDims*>(dims);
+      return std::make_unique<PositionalValueNet>(
+          positional_dims->point_input_size(),
+          positional_dims->point_output_size(),
+          positional_dims->point_input_size() * absl::GetFlag(FLAGS_num_width),
+          absl::GetFlag(FLAGS_num_layers),
+          ActivationFunction::kRelu);
+    }
+  }
+}
+
+std::shared_ptr<NetEvaluator> MakeEvaluator(
+    BasicDims* dims, HandInfo* hand_info, ValueNet* model,
+    BatchData* eval_batch, torch::Device* device) {
+  switch(model->architecture()) {
+    case NetArchitecture::kParticle: {
+      auto particle_model =
+          open_spiel::down_cast<ParticleValueNet*>(model);
+      auto particle_dims =
+          open_spiel::down_cast<ParticleDims*>(dims);
+      return std::make_shared<ParticleNetEvaluator>(
+          hand_info, particle_model, particle_dims, eval_batch, device);
+    }
+    case NetArchitecture::kPositional: {
+      auto positional_model =
+          open_spiel::down_cast<PositionalValueNet*>(model);
+      auto positional_dims =
+          open_spiel::down_cast<PositionalDims*>(dims);
+      return std::make_shared<PositionalNetEvaluator>(
+          hand_info, positional_model, positional_dims, eval_batch, device);
+    }
+  }
+}
 
 void PrintHeaders(const std::vector<std::unique_ptr<Evaluator>>& evaluators) {
   std::cout << "loop,avg_loss";
@@ -269,19 +267,9 @@ double TrainNetwork(ValueNet* model, torch::Device* device,
 void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
                    int cfr_oracle_iterations, std::string use_bandits_for_cfr,
                    int seed) {
-
-  std::cout << "# Number of public states: " << t->num_leaves << "\n";
-  std::cout << "# Number of non-terminal public states: "
-            << t->num_non_terminal_leaves << "\n";
-  std::cout << "# Public features: " << t->dims->public_features_size << "\n";
-  std::cout << "# Hand features: " << t->dims->hand_features_size << "\n";
-  std::cout << "# Ranges size: " << t->dims->net_ranges_size << "\n";
-  std::cout << "# Point input size: " << t->dims->point_input_size() << "\n";
-  std::cout << "# Point output size: " << t->dims->point_output_size() << "\n";
-  std::cout << "# Max particles: " << t->dims->max_particles << "\n";
-  std::cout << "# Public states stats: \n";
-  dlcfr::PrintPublicStatesStats(t->fixable_trunk_with_oracle->public_leaves());
-  SPIEL_CHECK_GT(t->num_non_terminal_leaves, 0);  // The trunk is too deep?
+  // Replicable experiments!
+  torch::manual_seed(seed);
+  std::mt19937 rnd_gen(seed);
 
   const ExpReplayInitPolicy init_policy =
       GetInitPolicy(absl::GetFlag(FLAGS_data_generation));
@@ -297,18 +285,32 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   const int no_move_limit = 1000;
   const double support_threshold = absl::GetFlag(FLAGS_support_threshold);
   const bool prune_chance_histories = absl::GetFlag(FLAGS_prune_chance_histories);
-  const std::string arch = absl::GetFlag(FLAGS_arch);
-
+  const NetArchitecture arch = GetArchitecture(absl::GetFlag(FLAGS_arch));
   t->oracle_evaluator->num_cfr_iterations = cfr_oracle_iterations;
-  torch::manual_seed(seed);
-  std::mt19937 rnd_gen(seed);
+
+  // General info about the problem.
+  std::cout << "# Number of public states: " << t->num_leaves << "\n";
+  std::cout << "# Number of non-terminal public states: "
+            << t->num_non_terminal_leaves << "\n";
+  std::cout << "# Public states stats: \n";
+  dlcfr::PrintPublicStatesStats(t->fixable_trunk_with_oracle->public_leaves());
+  SPIEL_CHECK_GT(t->num_non_terminal_leaves, 0);  // The trunk is too deep?
+
+  const std::unique_ptr<BasicDims> dims = DeduceDims(*t, arch);
+  std::cout << "# Public features: " << dims->public_features_size << "\n";
+  std::cout << "# Hand features: " << dims->hand_features_size << "\n";
+  std::cout << "# Ranges size: " << dims->net_ranges_size << "\n";
+  std::cout << "# Point input size: " << dims->point_input_size() << "\n";
+  std::cout << "# Point output size: " << dims->point_output_size() << "\n";
+//  std::cout << "# Max particles: " << t->dims->max_particles << "\n";
+
 
   // 1. Create the LP spec for the whole game.
   ortools::SequenceFormLpSpecification whole_game(*t->game, "CLP");
 
   // 2. Create network and optimizer.
   torch::Device device = FindDevice();
-  std::unique_ptr<ValueNet> model = MakeModel(t->dims.get());
+  std::unique_ptr<ValueNet> model = MakeModel(arch, dims.get());
   model->to(device);
   torch::optim::Adam optimizer(model->parameters());
 
@@ -316,15 +318,14 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   std::cout << "# Batch size: " << batch_size << "\n";
   // Train on multiple public states at once.
   BatchData train_batch(batch_size,
-                        t->dims->point_input_size(),
-                        t->dims->point_output_size());
+                        dims->point_input_size(), dims->point_output_size());
   // Evaluate a single public state.
   // TODO: Maybe extend this to parallel evaluation?
-  BatchData eval_batch(1, t->dims->point_input_size(),
-                       t->dims->point_output_size());
+  BatchData eval_batch(1, dims->point_input_size(), dims->point_output_size());
   // Use eval batch only for the net evaluator.
   std::shared_ptr<NetEvaluator> net_evaluator =  // TODO: rename to VF
-      MakeEvaluator(t.get(), model.get(), &eval_batch, &device);
+      MakeEvaluator(dims.get(), t->hand_info.get(), model.get(),
+                    &eval_batch, &device);
   auto trunk_with_net = std::make_unique<dlcfr::DepthLimitedCFR>(
       t->game, t->trunk_trees, net_evaluator, t->terminal_evaluator,
       t->public_observer,
@@ -335,12 +336,12 @@ void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
   std::cout << "# Allocating experience replay buffer: "
             << experience_replay_buffer_size << " sample points ("
             << experience_replay_buffer_size
-               * (t->dims->point_input_size() + t->dims->point_output_size())
+               * (dims->point_input_size() + dims->point_output_size())
             << " floats)" << std::endl;
   ExperienceReplay experience_replay(experience_replay_buffer_size,
-                                     t->dims->point_input_size(),
-                                     t->dims->point_output_size());
-  FillExperienceReplay(init_policy, &experience_replay, t.get(),
+                                     dims->point_input_size(),
+                                     dims->point_output_size());
+  FillExperienceReplay(init_policy, *dims, arch, &experience_replay, t.get(),
                        net_contexts, &whole_game, eval_iters, rnd_gen);
 
   // 5. Create training evaluators.

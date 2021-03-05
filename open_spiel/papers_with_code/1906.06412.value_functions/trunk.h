@@ -39,7 +39,6 @@ struct Trunk {
   std::unique_ptr<algorithms::dlcfr::DepthLimitedCFR> fixable_trunk_with_oracle;
   std::unique_ptr<algorithms::dlcfr::DepthLimitedCFR> iterable_trunk_with_oracle;
   std::unique_ptr<HandInfo> hand_info;
-  std::unique_ptr<ParticleDims> dims;
   int num_leaves;
   int num_non_terminal_leaves;
 
@@ -50,10 +49,12 @@ struct Trunk {
 std::unique_ptr<Trunk> MakeTrunk(const std::string& game_name, int trunk_depth,
     std::string use_bandits_for_cfr = "RegretMatchingPlus");
 
+std::unique_ptr<BasicDims> DeduceDims(const Trunk& trunk, NetArchitecture arch);
+
 void AddExperiencesFromTrunk(
     const std::vector<algorithms::dlcfr::LeafPublicState>& public_leaves,
-    const std::vector<NetContext*>& net_contexts, const ParticleDims& dims,
-    ExperienceReplay* replay,
+    const std::vector<NetContext*>& net_contexts,
+    const BasicDims& dims, NetArchitecture arch, ExperienceReplay* replay,
     std::mt19937& rnd_gen, bool shuffle_input, bool shuffle_output);
 
 void WriteParticles(
@@ -62,14 +63,22 @@ void WriteParticles(
     const ParticleDims& dims, ParticlesInContext* point,
     std::mt19937* rnd_gen, bool shuffle_input, bool shuffle_output);
 
+void CopyValuesNetToTree(ParticlesInContext data_point,
+                         algorithms::dlcfr::LeafPublicState& state,
+                         const ParticleDims& dims);
+
+void WritePositional(const algorithms::dlcfr::LeafPublicState& state,
+                     const NetContext& net_context,
+                     const PositionalDims& dims, PositionalData* point);
+
+void CopyValuesNetToTree(PositionalData* point,
+                         algorithms::dlcfr::LeafPublicState& state,
+                         const NetContext& net_context);
+
 void inline Copy(absl::Span<const float> source, absl::Span<float> target) {
   SPIEL_CHECK_LE(source.size(), target.size());
   std::copy(source.begin(), source.end(), target.begin());
 }
-
-void CopyValuesNetToTree(ParticlesInContext data_point,
-                         algorithms::dlcfr::LeafPublicState& state,
-                         const ParticleDims& dims);
 
 void PrintTrunkStrategies(algorithms::dlcfr::DepthLimitedCFR* trunk_with_net);
 

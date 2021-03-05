@@ -22,14 +22,19 @@
 namespace open_spiel {
 namespace papers_with_code {
 
+enum class NetArchitecture {
+  kPositional,
+  kParticle
+};
+
 // A base class for various possible value network architectures.
 struct ValueNet : public torch::nn::Module {
   virtual torch::Tensor forward(torch::Tensor x) = 0;
   virtual torch::Tensor PrepareTarget(BatchData* batch) = 0;
+  virtual NetArchitecture architecture() const = 0;
 
   void MakeLayers(std::vector<torch::nn::Linear>& layers, int num_layers,
                   int inputs_size, int hidden_size, int outputs_size);
-
   void RegisterLayers(const std::vector<torch::nn::Linear>& layers,
                       const std::string& layer_name);
 };
@@ -59,8 +64,11 @@ struct PositionalValueNet final : public ValueNet {
                      ActivationFunction activation = kRelu);
   torch::Tensor forward(torch::Tensor x) override;
   torch::Tensor PrepareTarget(BatchData* batch) override {
-      SpielFatalError("Not implemented!");
+    return batch->target;
   };
+  NetArchitecture architecture() const override {
+    return NetArchitecture::kPositional;
+  }
 };
 
 
@@ -76,6 +84,9 @@ struct ParticleValueNet final : public ValueNet {
                    ActivationFunction activation = kRelu);
   torch::Tensor forward(torch::Tensor xss) override;
   torch::Tensor PrepareTarget(BatchData* batch) override;
+  NetArchitecture architecture() const override {
+    return NetArchitecture::kParticle;
+  }
 
   torch::Tensor change_of_basis(torch::Tensor fs);
   torch::Tensor base_coordinates(torch::Tensor bs, torch::Tensor scales);
