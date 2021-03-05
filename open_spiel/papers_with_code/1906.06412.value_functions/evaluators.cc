@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "open_spiel/papers_with_code/1906.06412.value_functions/train_eval.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/evaluators.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/dispatch_policy.h"
 
 namespace open_spiel {
@@ -21,20 +21,32 @@ namespace papers_with_code {
 using namespace algorithms;
 using namespace torch::indexing;  // Load all of the Slice, Ellipsis, etc.
 
-double TrainNetwork(ValueNet* model, torch::Device* device,
-                    torch::optim::Optimizer* optimizer,
-                    BatchData* batch) {
-  SPIEL_DCHECK_TRUE(model->is_training());
-  torch::Tensor data = batch->data.to(*device);
-  torch::Tensor target = model->PrepareTarget(batch).to(*device);
-  optimizer->zero_grad();
-  torch::Tensor output = model->forward(data);
-  torch::Tensor loss = torch::mse_loss(output, target);
-  SPIEL_CHECK_FALSE(std::isnan(loss.template item<float>()));
-  loss.backward();
-  optimizer->step();
-  return loss.item().to<double>();
-}
+//auto [eq_policy, game_value] = ortools::MakeEquilibriumPolicy(&whole_game);
+//std::vector<std::unique_ptr<SparseTrunk>> sparse_eq_trunk_with_net;
+//sparse_eq_trunk_with_net.push_back(MakeSparseTrunkWithEqSupport(
+//    eq_policy, t->game, t->infostate_observer, t->public_observer,
+//    roots_depth, t->trunk_depth,
+//    net_evaluator, t->terminal_evaluator, use_bandits_for_cfr,
+//    support_threshold, prune_chance_histories));
+//std::cout << "# Equilibrium sparse trunk:"
+//<< "\n# - Infostate leaves: "
+//<< sparse_eq_trunk_with_net.back()->dlcfr->trees()[0]->num_leaves()
+//<< "\n# - Eval infostates: "
+//<< sparse_eq_trunk_with_net.back()->fixate_infostates.size()
+//<< "\n# Full trunk infostate leaves: "
+//<< t->fixable_trunk_with_oracle->trees()[0]->num_leaves() << "\n";
+//
+//// The sparse trunk is constructed as replacing the players' equilibrium
+//// policies as a chance in the upper game. By constructing the trunk with no
+//// move limit, we make an evaluation trunk.
+//std::unique_ptr<SparseTrunk> eval_trunk =
+//    MakeSparseTrunkWithEqSupport(eq_policy, t->game,
+//                                 t->infostate_observer, t->public_observer,
+//                                 roots_depth, no_move_limit,
+//                                 nullptr, t->terminal_evaluator,
+//                                 use_bandits_for_cfr, 1e-5, false);
+//ortools::SequenceFormLpSpecification eq_fixed_as_chance_lp(
+//    eval_trunk->dlcfr->trees(), "CLP");
 
 //std::unique_ptr<Evaluator> MakeSparseTrunkEvaluator() {
 //  std::vector<std::unique_ptr<SparseTrunk>>& sparse_trunks_with_net,

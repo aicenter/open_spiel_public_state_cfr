@@ -30,12 +30,8 @@
 namespace open_spiel {
 namespace papers_with_code {
 
-double TrainNetwork(ValueNet* model, torch::Device* device,
-                    torch::optim::Optimizer* optimizer,
-                    BatchData* batch);
-
-
 struct Evaluator {
+  virtual ~Evaluator() = default;
   virtual std::string name() const = 0;
   virtual void PrintHeader(std::ostream& os) const = 0;
   virtual void PrintEval(std::ostream& os) const = 0;
@@ -44,15 +40,11 @@ struct Evaluator {
 };
 
 std::unique_ptr<Evaluator> MakeFullTrunkEvaluator(
-    std::vector<int> evaluate_iters, algorithms::dlcfr::DepthLimitedCFR* trunk_with_net,
+    std::vector<int> evaluate_iters,
+    algorithms::dlcfr::DepthLimitedCFR* trunk_with_net,
     algorithms::ortools::SequenceFormLpSpecification* whole_game);
 
 void EvaluateNetwork(std::vector<std::unique_ptr<Evaluator>>& evaluators);
-
-std::vector<double> EvaluateNetwork(
-    std::vector<std::unique_ptr<SparseTrunk>>& sparse_trunks_with_net,
-    algorithms::ortools::SequenceFormLpSpecification* whole_game,
-    const std::vector<int>& evaluate_iters);
 
 }  //  papers_with_code
 }  //  open_spiel

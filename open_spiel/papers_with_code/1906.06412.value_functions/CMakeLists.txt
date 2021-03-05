@@ -16,8 +16,8 @@ add_library(paper_value_functions OBJECT
   dispatch_policy.h
   torch_utils.cc
   torch_utils.h
-  train_eval.h
-  train_eval.cc
+  evaluators.h
+  evaluators.cc
   trunk.cc
   trunk.h
   )

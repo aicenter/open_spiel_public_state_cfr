@@ -63,7 +63,7 @@ ABSL_FLAG(bool, prune_chance_histories, false,
 #include "torch/torch.h"
 
 #include "open_spiel/papers_with_code/1906.06412.value_functions/experience_replay.h"
-#include "open_spiel/papers_with_code/1906.06412.value_functions/train_eval.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/evaluators.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/generate_data.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_dl_evaluator.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/sparse_trunk.h"
@@ -251,6 +251,20 @@ void PrintEvaluations(int loop, double avg_loss,
   std::cout << std::endl;
 }
 
+double TrainNetwork(ValueNet* model, torch::Device* device,
+                    torch::optim::Optimizer* optimizer,
+                    BatchData* batch) {
+  SPIEL_DCHECK_TRUE(model->is_training());
+  torch::Tensor data = batch->data.to(*device);
+  torch::Tensor target = model->PrepareTarget(batch).to(*device);
+  optimizer->zero_grad();
+  torch::Tensor output = model->forward(data);
+  torch::Tensor loss = torch::mse_loss(output, target);
+  SPIEL_CHECK_FALSE(std::isnan(loss.template item<float>()));
+  loss.backward();
+  optimizer->step();
+  return loss.item().to<double>();
+}
 
 void TrainEvalLoop(std::unique_ptr<Trunk> t, int train_batches, int num_loops,
                    int cfr_oracle_iterations, std::string use_bandits_for_cfr,
