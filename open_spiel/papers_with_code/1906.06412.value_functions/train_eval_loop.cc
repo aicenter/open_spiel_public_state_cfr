@@ -55,6 +55,8 @@ ABSL_FLAG(double, support_threshold, 1e-5,
           "used for trunk sparsification.");
 ABSL_FLAG(bool, prune_chance_histories, false,
           "If true, do not start at chance histories.");
+ABSL_FLAG(double, learning_rate, 1e-3, "Optimizer (adam/sgd) learning rate.");
+ABSL_FLAG(double, lr_decay, 1., "Learning rate decay after each loop.");
 
 // -----------------------------------------------------------------------------
 
@@ -222,6 +224,15 @@ double TrainNetwork(ValueNet* model, torch::Device* device,
   return loss.item().to<double>();
 }
 
+void DecayLearningRate(torch::optim::Optimizer& optimizer, double lr_decay) {
+  for (auto &group : optimizer.param_groups()) {
+    if(group.has_options()) {
+      auto &options = static_cast<torch::optim::AdamOptions &>(group.options());
+      options.lr(options.lr() * lr_decay);
+    }
+  }
+}
+
 void TrainEvalLoop() {
   // Replicable experiments FTW!
   int seed = absl::GetFlag(FLAGS_seed);
@@ -251,6 +262,7 @@ void TrainEvalLoop() {
   const double support_threshold = absl::GetFlag(FLAGS_support_threshold);
   const bool prune_chance_histories = absl::GetFlag(FLAGS_prune_chance_histories);
   const NetArchitecture arch = GetArchitecture(absl::GetFlag(FLAGS_arch));
+  const double lr_decay = absl::GetFlag(FLAGS_lr_decay);
   t->oracle_evaluator->num_cfr_iterations = cfr_oracle_iterations;
 
   // General info about the problem.
@@ -277,7 +289,9 @@ void TrainEvalLoop() {
   torch::Device device = FindDevice();
   std::unique_ptr<ValueNet> model = MakeModel(arch, dims.get());
   model->to(device);
-  torch::optim::Adam optimizer(model->parameters());
+  const auto options = torch::optim::AdamOptions()
+      .lr(absl::GetFlag(FLAGS_learning_rate));
+  torch::optim::Adam optimizer(model->parameters(), options);
 
   // 3. Create a value function associated to the trunk.
   std::cout << "# Batch size: " << batch_size << "\n";
@@ -334,6 +348,8 @@ void TrainEvalLoop() {
     model->eval();  // Eval mode.
     ComputeMetrics(metrics);
     PrintMetrics(loop, cumul_loss / train_batches, metrics);
+
+    DecayLearningRate(optimizer, lr_decay);
 //    PrintTrunkStrategies(trunk_with_net.get());
   }
 }
