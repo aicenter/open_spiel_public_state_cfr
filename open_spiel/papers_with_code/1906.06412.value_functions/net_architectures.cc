@@ -60,23 +60,26 @@ void ValueNet::RegisterLayers(const std::vector<torch::nn::Linear>& layers,
 
 // -- PositionalValueNet -------------------------------------------------------
 
-PositionalValueNet::PositionalValueNet(size_t inputs_size, size_t outputs_size,
-                                       size_t hidden_size, size_t num_layers,
+PositionalValueNet::PositionalValueNet(PositionalDims* positional_dims,
+                                       size_t num_width_regression,
+                                       size_t num_layers_regression,
                                        ActivationFunction activation)
     : activation_fn(activation) {
-  SPIEL_CHECK_GE(num_layers, 1);
-  MakeLayers(fc_layers, num_layers, inputs_size, hidden_size, outputs_size);
-  RegisterLayers(fc_layers, "fc_");
+  MakeLayers(fc_regression, num_layers_regression,
+             positional_dims->point_input_size(),
+             positional_dims->point_input_size() * num_width_regression,
+             positional_dims->point_output_size());
+  RegisterLayers(fc_regression, "fc_");
 }
 
 torch::Tensor PositionalValueNet::forward(torch::Tensor x) {
-  int num_layers_with_activation = fc_layers.size() - 1;
+  int num_layers_with_activation = fc_regression.size() - 1;
   for (int i = 0; i < num_layers_with_activation; ++i) {
-    x = fc_layers[i]->forward(x);
+    x = fc_regression[i]->forward(x);
     x = Activation(activation_fn, x);
   }
   // Last layer has no activation function -- just linear output.
-  return fc_layers.back()->forward(x);
+  return fc_regression.back()->forward(x);
 }
 
 // -- ParticleValueNet ---------------------------------------------------------

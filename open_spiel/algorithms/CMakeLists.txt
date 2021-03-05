@@ -23,6 +23,7 @@ add_library (algorithms OBJECT
   corr_dev_builder.h
   deterministic_policy.cc
   deterministic_policy.h
+  dispatch_policy.h
   evaluate_bots.cc
   evaluate_bots.h
   expected_returns.cc

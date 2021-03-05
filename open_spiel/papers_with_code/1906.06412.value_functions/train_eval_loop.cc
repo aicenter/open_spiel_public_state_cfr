@@ -143,13 +143,15 @@ std::vector<int> ItersFromString(const std::string& s) {
 }
 
 std::unique_ptr<ValueNet> MakeModel(NetArchitecture arch, BasicDims* dims) {
+  int num_layers_regression = absl::GetFlag(FLAGS_num_layers);
+  int num_width_regression = absl::GetFlag(FLAGS_num_width);
+  SPIEL_CHECK_GE(num_layers_regression, 1);
+  SPIEL_CHECK_GE(num_width_regression, 1);
   switch(arch) {
     case NetArchitecture::kParticle: {
       auto particle_dims = open_spiel::down_cast<ParticleDims*>(dims);
       auto model = std::make_unique<ParticleValueNet>(
-          particle_dims,
-          absl::GetFlag(FLAGS_num_layers),
-          absl::GetFlag(FLAGS_num_width),
+          particle_dims, num_layers_regression, num_width_regression,
           ActivationFunction::kRelu);
       model->limit_particle_count = absl::GetFlag(FLAGS_limit_particle_count);
       return model;
@@ -157,10 +159,7 @@ std::unique_ptr<ValueNet> MakeModel(NetArchitecture arch, BasicDims* dims) {
     case NetArchitecture::kPositional: {
       auto positional_dims = open_spiel::down_cast<PositionalDims*>(dims);
       return std::make_unique<PositionalValueNet>(
-          positional_dims->point_input_size(),
-          positional_dims->point_output_size(),
-          positional_dims->point_input_size() * absl::GetFlag(FLAGS_num_width),
-          absl::GetFlag(FLAGS_num_layers),
+          positional_dims, num_layers_regression, num_width_regression,
           ActivationFunction::kRelu);
     }
   }

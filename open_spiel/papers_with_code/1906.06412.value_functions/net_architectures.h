@@ -45,11 +45,11 @@ torch::Tensor Activation(ActivationFunction f, torch::Tensor x);
 
 // A simple MLP neural network.
 struct PositionalValueNet final : public ValueNet {
-  std::vector<torch::nn::Linear> fc_layers;
+  std::vector<torch::nn::Linear> fc_regression;
   ActivationFunction activation_fn;
 
-  PositionalValueNet(size_t inputs_size, size_t outputs_size,
-                     size_t hidden_size, size_t num_layers = 3,
+  PositionalValueNet(PositionalDims* positional_dims,
+                     size_t num_layers_regression, size_t num_width_regression,
                      ActivationFunction activation = kRelu);
   torch::Tensor forward(torch::Tensor x) override;
   torch::Tensor PrepareTarget(BatchData* batch) override {
@@ -60,7 +60,7 @@ struct PositionalValueNet final : public ValueNet {
   }
 };
 
-
+// A particle neural network that uses MLPs for regression and change of basis.
 struct ParticleValueNet final : public ValueNet {
   ParticleDims* dims;
   ActivationFunction activation_fn;

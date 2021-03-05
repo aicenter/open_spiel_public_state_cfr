@@ -18,6 +18,7 @@
 #include "absl/random/random.h"
 #include "torch/torch.h"
 
+#include "open_spiel/algorithms/dispatch_policy.h"
 #include "open_spiel/algorithms/infostate_dl_cfr.h"
 #include "open_spiel/algorithms/ortools/dl_oracle_evaluator.h"
 

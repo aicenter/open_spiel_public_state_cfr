@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include "open_spiel/papers_with_code/1906.06412.value_functions/metrics.h"
-#include "open_spiel/papers_with_code/1906.06412.value_functions/dispatch_policy.h"
+#include "open_spiel/algorithms/dispatch_policy.h"
 
 namespace open_spiel {
 namespace papers_with_code {

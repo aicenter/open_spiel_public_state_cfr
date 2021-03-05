@@ -28,7 +28,6 @@ using PublicStateContext = algorithms::dlcfr::PublicStateContext;
 using LeafPublicState = algorithms::dlcfr::LeafPublicState;
 using LeafEvaluator = algorithms::dlcfr::LeafEvaluator;
 
-
 // A bijection within the scope of a public state. This is a mapping between
 // LeafPublicState::ranges coming from the tree (x) and the input position
 // of the neural network (y) which is assigned according to player's private
@@ -38,7 +37,6 @@ struct HandMapping : BijectiveContainer<size_t> {
   const std::map<size_t, size_t>& tree_to_net() const { return x2y; }
   const std::map<size_t, size_t>& net_to_tree() const { return y2x; }
 };
-
 
 struct NetContext : public PublicStateContext {
   HandInfo* hand_info_;
@@ -90,7 +88,7 @@ class PositionalNetEvaluator final : public NetEvaluator {
  public:
   PositionalNetEvaluator(HandInfo* hand_info,
                          PositionalValueNet* model, PositionalDims* const dims,
-                       BatchData* batch, torch::Device* device)
+                         BatchData* batch, torch::Device* device)
       : NetEvaluator(hand_info),
         model_(model), device_(device), batch_(batch), dims_(dims) {}
 
