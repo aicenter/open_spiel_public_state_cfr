@@ -40,7 +40,7 @@ _BASE_ARGS = dict(
 _TEST_GAMES = [
   dict(game_name="kuhn_poker", depth=3),
   dict(game_name="kuhn_poker", depth=4),
-  dict(game_name="leduc_poker", depth=5),
+  # dict(game_name="leduc_poker", depth=5),
   dict(game_name="goofspiel(players=2,num_cards=3,imp_info=True,"
                  "points_order=descending)", depth=1),
 ]
@@ -116,8 +116,8 @@ def df_from_lines(lines: Union[str, List[str]], **kwargs) -> pd.DataFrame:
   return pd.read_csv(io.StringIO(lines), **kwargs)
 
 
-def read_evaluation(buffer, tag, comment="# ", single_occurrence=True,
-                    parser=df_from_lines):
+def read_metric(buffer, tag, comment="# ", single_occurrence=True,
+                parser=df_from_lines):
   buffer.seek(0)
   data_lines = []
   tag_opened = False
@@ -139,17 +139,20 @@ def read_evaluation(buffer, tag, comment="# ", single_occurrence=True,
   return parser(data)
 
 
-def eval_in_time(buffer) -> pd.DataFrame:
+def metric_avg_loss(buffer) -> pd.DataFrame:
   buffer.seek(0)
   return pd.read_csv(buffer, comment="#", skip_blank_lines=True)
 
 
-def reference_exploitabilities(buffer) -> pd.DataFrame:
-  return read_evaluation(buffer, "ref_expl")
+def metric_ref_expls(buffer) -> pd.DataFrame:
+  """
+  Read reference exploitabilities as given by DL-CFR iterations. 
+  """
+  return read_metric(buffer, "ref_expl")
 
 
 def read_experiment_results_from_shell(cmd_args: Dict[str, Any],
-                                       *read_evaluations):
+                                       *read_metrics):
   cmd = [_BINARY_PATH] + [f"--{k}={v}" for k, v in cmd_args.items()]
   with subprocess.Popen(cmd, stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE) as proc:
@@ -162,7 +165,7 @@ def read_experiment_results_from_shell(cmd_args: Dict[str, Any],
             sys.stdout.flush()
 
         try:
-          results = [evaluator(buffer) for evaluator in read_evaluations]
+          results = [metric(buffer) for metric in read_metrics]
         except Exception as e:
           buffer.seek(0)
           print("Buffer:", "--------------", sep="\n")
@@ -191,7 +194,7 @@ class VFTest(parameterized.TestCase, absltest.TestCase):
             **dict(num_loops=10, num_trunks=100, data_generation="dl_cfr",
                    num_layers=3, num_width=3, trunk_eval_iterations="1,5,10")}
     actual_eval, actual_expl = read_experiment_results_from_shell(
-        args, eval_in_time, reference_exploitabilities)
+        args, metric_avg_loss, metric_ref_expls)
 
     arch = arch_spec["arch"]
     expected_eval = df_from_lines(_REFERENCE_KUHN_DLCFR_EVAL[arch])
@@ -205,26 +208,27 @@ class VFTest(parameterized.TestCase, absltest.TestCase):
     args = {**_BASE_ARGS, **arch_spec,
             **dict(num_loops=10, num_trunks=100, num_layers=3, num_width=3,
                    data_generation="random", trunk_eval_iterations="1,5,10")}
-    actual_eval, = read_experiment_results_from_shell(args, eval_in_time)
+    actual_eval, = read_experiment_results_from_shell(args, metric_avg_loss)
     arch = arch_spec["arch"]
     expected_eval = df_from_lines(_REFERENCE_KUHN_RANDOM_EVAL[arch])
     np.testing.assert_array_equal(actual_eval.values, expected_eval.values)
 
-  @parameterized.parameters(dict_prod(_TEST_GAMES, _DATA_GENERATION, _VALUE_NETS))
+  @parameterized.parameters(dict_prod(_TEST_GAMES, _VALUE_NETS))
   def test_fit_one_sample(self, **game_spec):
     args = {**_BASE_ARGS, **game_spec,
-            **dict(num_loops=20, batch_size=-1,
-                   num_trunks=1, trunk_eval_iterations=0)}
-    actual_eval, = read_experiment_results_from_shell(args, eval_in_time)
+            **dict(num_loops=20, batch_size=-1, data_generation="random",
+                   num_trunks=1, trunk_eval_iterations="")}
+    actual_eval, = read_experiment_results_from_shell(args, metric_avg_loss)
     actual_loss = actual_eval["avg_loss"].values.min()
     self.assertLess(actual_loss, 1e-8)
 
-  @parameterized.parameters(dict_prod(_TEST_GAMES, _DATA_GENERATION, _VALUE_NETS))
+  @parameterized.parameters(dict_prod(_TEST_GAMES, _VALUE_NETS))
   def test_fit_two_samples(self, **game_spec):
     args = {**_BASE_ARGS, **game_spec,
-            **dict(num_loops=150, batch_size=-1,
+            **dict(num_loops=60, batch_size=-1, data_generation="random",
+                   learning_rate=0.01, lr_decay=0.99,
                    num_trunks=2, trunk_eval_iterations=0)}
-    actual_eval, = read_experiment_results_from_shell(args, eval_in_time)
+    actual_eval, = read_experiment_results_from_shell(args, metric_avg_loss)
     actual_loss = actual_eval["avg_loss"].values.min()
     self.assertLess(actual_loss, 1e-6)
 
@@ -245,7 +249,7 @@ class VFTest(parameterized.TestCase, absltest.TestCase):
                    trunk_eval_iterations=",".join(str(i) for i in range(1, num_iters + 1))
                    )}
     expected_expl, actual_eval = read_experiment_results_from_shell(
-        args, reference_exploitabilities, eval_in_time)
+        args, metric_ref_expls, metric_avg_loss)
     expl_cols = [f"expl[{i}]" for i in range(1, num_iters+1)]
     actual_expl = actual_eval.tail(1)[expl_cols]
 
