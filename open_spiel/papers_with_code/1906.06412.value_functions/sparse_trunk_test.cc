@@ -87,6 +87,7 @@ void CheckSparseTrunksKuhnDepth4(
   }
 }
 
+// Test that sparse trunks are constructed correctly.
 void TestMakeSparseTrunks() {
   std::shared_ptr<const Game> game = LoadGame("kuhn_poker");
   std::shared_ptr<Observer> infostate_observer =
@@ -122,8 +123,11 @@ void TestMakeSparseTrunks() {
   }
 }
 
+// Test that we can converge to an equilibrium in a slice of the game that is in
+// a support of some NE from the whole game. We make a sparse depth-limited
+// subgame rooted in the slice, and call DL-CFR at the leaves of this subgame.
 void TestMakeSparseTrunkWithEqSupport() {
-  const int no_move_limit = 1000;
+  const int no_move_limit = 1000;  // Some big number.
   std::shared_ptr<const Game> game = LoadGame(
       "goofspiel(players=2,num_cards=5,imp_info=True,points_order=descending)");
   std::shared_ptr<Observer> infostate_observer =
@@ -135,7 +139,6 @@ void TestMakeSparseTrunkWithEqSupport() {
   auto cfr_eval = std::make_shared<dlcfr::CFREvaluator>(
       game, no_move_limit, /*leaf_evaluator=*/nullptr,
       terminal_evaluator, public_observer, infostate_observer);
-  cfr_eval->num_cfr_iterations = 10000;
   std::string bandits_for_cfr = "RegretMatchingPlus";
 
   ortools::SequenceFormLpSpecification whole_game(*game, "CLP");
@@ -143,34 +146,39 @@ void TestMakeSparseTrunkWithEqSupport() {
 
   const int roots_depth = 2;
   const int trunk_depth = 3;
+  double support_threshold = 0.0;
+  bool prune_chance_histories = false;
+
   std::unique_ptr<SparseTrunk> sparse_slice =
       MakeSparseTrunkWithEqSupport(eq_policy, game,
                                    infostate_observer, public_observer,
-                                   roots_depth, trunk_depth,
+                                   roots_depth, trunk_depth,  // ! <--
                                    cfr_eval, terminal_evaluator,
-                                   bandits_for_cfr);
+                                   bandits_for_cfr,
+                                   support_threshold, prune_chance_histories);
   std::shared_ptr<Policy> slice_policy = sparse_slice->dlcfr->AveragePolicy();
-
-  // The sparse trunk is constructed as replacing the players' equilibrium
-  // policies as a chance in the upper game. By constructing the trunk with no
-  // move limit, we make an evaluation trunk.
-  std::unique_ptr<SparseTrunk> eval_trunk =
-      MakeSparseTrunkWithEqSupport(eq_policy, game,
-                                   infostate_observer, public_observer,
-                                   roots_depth, no_move_limit,
-                                   cfr_eval, terminal_evaluator,
-                                   bandits_for_cfr);
-  ortools::SequenceFormLpSpecification eq_fixed_as_chance_lp(
-      eval_trunk->dlcfr->trees(), "CLP");
 
   // Make a special dispatch table for exploitability evaluation:
   // The roots of the sparse slice will change with the DL-CFR iterations.
   DispatchPolicy dispatch_policy;
   dispatch_policy.AddDispatch(sparse_slice->fixate_infostates, slice_policy);
 
+  // For evaluation, the sparse trunk is constructed as replacing the players'
+  // equilibrium policies as a chance in the upper game. By constructing the
+  // trunk with no move limit, we make an evaluation trunk.
+  std::unique_ptr<SparseTrunk> eval_trunk =
+      MakeSparseTrunkWithEqSupport(eq_policy, game,
+                                   infostate_observer, public_observer,
+                                   roots_depth, no_move_limit,  // ! <--
+                                   cfr_eval, terminal_evaluator,
+                                   bandits_for_cfr,
+                                   support_threshold, prune_chance_histories);
+  ortools::SequenceFormLpSpecification eq_fixed_as_chance_lp(
+      eval_trunk->dlcfr->trees(), "CLP");
+
   double expl;
-  for (int i = 0; i < 100; ++i) {
-    cfr_eval->num_cfr_iterations = (i+1)*5;
+  for (int i = 0; i <= 50; ++i) {
+    cfr_eval->num_cfr_iterations = (i+1)*5;  // For faster convergence.
     sparse_slice->dlcfr->RunSimultaneousIterations(1);
     if (i % 10 == 0) {
       expl = ortools::TrunkExploitability(&eq_fixed_as_chance_lp,
@@ -178,7 +186,7 @@ void TestMakeSparseTrunkWithEqSupport() {
       std::cout << i << " " << expl << std::endl;
     }
   }
-  SPIEL_CHECK_LT(expl, 2e-3);
+  SPIEL_CHECK_LT(expl, 5e-3);
 }
 
 }  // namespace
