@@ -49,6 +49,7 @@
 #include "open_spiel/abseil-cpp/absl/container/inlined_vector.h"
 #include "open_spiel/abseil-cpp/absl/strings/string_view.h"
 #include "open_spiel/abseil-cpp/absl/types/span.h"
+#include "open_spiel/game_parameters.h"
 #include "open_spiel/spiel_utils.h"
 
 namespace open_spiel {
@@ -57,13 +58,19 @@ namespace open_spiel {
 class Game;
 class State;
 
+using ObservationParams = GameParameters;
+
 // Viewing a span as a multi-dimensional tensor.
 struct DimensionedSpan {
   absl::InlinedVector<int, 4> shape;
   absl::Span<float> data;
 
   DimensionedSpan(absl::Span<float> data, absl::InlinedVector<int, 4> shape)
-      : shape(std::move(shape)), data(data) {}
+      : shape(std::move(shape)), data(data) {
+    int m = std::accumulate(
+        this->shape.begin(), this->shape.end(), 1, std::multiplies<int>());
+    SPIEL_CHECK_EQ(m, data.size());
+  }
 
   float& at(int idx) const {
     SPIEL_DCHECK_EQ(shape.size(), 1);
@@ -81,7 +88,7 @@ struct DimensionedSpan {
   }
 
   float& at(int idx1, int idx2, int idx3, int idx4) const {
-    SPIEL_DCHECK_EQ(shape.size(), 3);
+    SPIEL_DCHECK_EQ(shape.size(), 4);
     return data[((idx1 * shape[1] + idx2) * shape[2] + idx3) * shape[3] + idx4];
   }
 };
@@ -373,6 +380,44 @@ class Observation {
   std::shared_ptr<Observer> observer_;
   std::vector<float> buffer_;
   std::vector<TensorInfo> tensors_;
+};
+
+// Allows to registers observers to a game. Usage:
+// ObserverRegisterer unused_name(game_name, observer_name, creator);
+//
+// Once an observer is registered, it can be created by
+// game.MakeObserver(iig_obs_type, observer_name)
+class ObserverRegisterer {
+ public:
+  // Function type which creates an observer. The game and params argument
+  // cannot be assumed to exist beyond the scope of this call.
+  using CreateFunc = std::function<std::shared_ptr<Observer>(
+      const Game& game, absl::optional<IIGObservationType> iig_obs_type,
+      const ObservationParams& params)>;
+
+  ObserverRegisterer(const std::string& game_name,
+                     const std::string& observer_name,
+                     CreateFunc creator);
+  static void RegisterObserver(const std::string& game_name,
+                               const std::string& observer_name,
+                               CreateFunc creator);
+
+  static std::shared_ptr<Observer> CreateByName(
+      const std::string& observer_name,
+      const Game& game,
+      absl::optional<IIGObservationType> iig_obs_type,
+      const ObservationParams& params);
+
+ private:
+  // Returns a "global" map of registrations (i.e. an object that lives from
+  // initialization to the end of the program). Note that we do not just use
+  // a static data member, as we want the map to be initialized before first
+  // use.
+  static std::map<std::pair<std::string, std::string>, CreateFunc>&
+  observers() {
+    static std::map<std::pair<std::string, std::string>, CreateFunc> impl;
+    return impl;
+  }
 };
 
 }  // namespace open_spiel

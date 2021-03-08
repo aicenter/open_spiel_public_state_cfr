@@ -15,18 +15,16 @@
 #ifndef OPEN_SPIEL_ALGORITHMS_ORTOOLS_SEQUENCE_FORM_LP_H_
 #define OPEN_SPIEL_ALGORITHMS_ORTOOLS_SEQUENCE_FORM_LP_H_
 
-#include <vector>
-#include <string>
-#include <memory>
 #include <array>
+#include <memory>
+#include <string>
 #include <unordered_map>
-
-#include "ortools/linear_solver/linear_solver.h"
+#include <vector>
 
 #include "open_spiel/policy.h"
 #include "open_spiel/algorithms/infostate_tree.h"
 #include "open_spiel/utils/data_structures.h"
-
+#include "ortools/linear_solver/linear_solver.h"
 
 // An implementation of a sequence-form linear program for computing Nash
 // equilibria in sequential games, based on [1]. The implementation constructs
@@ -37,10 +35,38 @@
 // [1]:  Efficient Computation of Equilibria for Extensive Two-Person Games
 //       http://www.maths.lse.ac.uk/Personal/stengel/TEXTE/geb1996b.pdf
 
-
 namespace open_spiel {
 namespace algorithms {
 namespace ortools {
+
+using MPSolver = operations_research::MPSolver;
+
+// See also MPSolver::OptimizationProblemType
+inline constexpr const char* kDefaultLinProgSolver = "GLOP";
+
+template <class T>
+struct BijectiveContainer {
+  std::map<T, T> x2y;
+  std::map<T, T> y2x;
+
+  void put(std::pair<T, T> xy) {
+    const T& x = xy.first;
+    const T& y = xy.second;
+    SPIEL_CHECK_TRUE(x2y.find(x) == x2y.end());
+    SPIEL_CHECK_TRUE(y2x.find(y) == y2x.end());
+    x2y[x] = y;
+    y2x[y] = x;
+  }
+  // Direction is equivalent to player id.
+  const std::map<T, T>& association(int direction) const {
+    SPIEL_CHECK_TRUE(direction == 0 || direction == 1);
+    if (direction == 0) {
+      return x2y;
+    } else {
+      return y2x;
+    }
+  }
+};
 
 BijectiveContainer<const InfostateNode*> ConnectTerminals(
     const InfostateTree& tree_a, const InfostateTree& tree_b);
@@ -55,18 +81,12 @@ struct NodeSpecification {
   operations_research::MPConstraint* ct_parent_reach_prob;
 };
 
-constexpr const char* kDefaultLinProgSolver = "GLOP";
-
 class SequenceFormLpSpecification {
- using MPSolver = operations_research::MPSolver;
  public:
   SequenceFormLpSpecification(
-      const Game& game,
-      // See also MPSolver::OptimizationProblemType
-      const std::string& solver_id = kDefaultLinProgSolver);
+      const Game& game, const std::string& solver_id = kDefaultLinProgSolver);
   SequenceFormLpSpecification(
       std::vector<std::shared_ptr<InfostateTree>> trees,
-      // See also MPSolver::OptimizationProblemType
       const std::string& solver_id = kDefaultLinProgSolver);
 
   // Specify the linear program for given player.
@@ -95,8 +115,7 @@ class SequenceFormLpSpecification {
     return trees_;
   }
   std::array<const InfostateNode*, 2> roots() const {
-    return {trees_[0]->mutable_root(),
-            trees_[1]->mutable_root()};
+    return {trees_[0]->mutable_root(), trees_[1]->mutable_root()};
   }
   std::unordered_map<const InfostateNode*, NodeSpecification>& node_spec() {
     return node_spec_;

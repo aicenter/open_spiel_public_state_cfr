@@ -44,6 +44,7 @@
 #include <vector>
 
 #include "open_spiel/observer.h"
+#include "open_spiel/policy.h"
 #include "open_spiel/spiel.h"
 
 namespace open_spiel {
@@ -101,6 +102,11 @@ class LeducState : public State {
   std::vector<int> padded_betting_sequence() const;
   std::unique_ptr<State> ResampleFromInfostate(
       int player_id, std::function<double()> rng) const override;
+
+  std::vector<Action> ActionsConsistentWithInformationFrom(
+      Action action) const override {
+    return {action};
+  }
 
  protected:
   // The meaning of `action_id` varies:
@@ -221,6 +227,15 @@ class LeducGame : public Game {
   // rank.
   bool suit_isomorphism_;
 };
+
+// Returns policy that always folds.
+TabularPolicy GetAlwaysFoldPolicy(const Game& game);
+
+// Returns policy that always calls.
+TabularPolicy GetAlwaysCallPolicy(const Game& game);
+
+// Returns policy that always raises.
+TabularPolicy GetAlwaysRaisePolicy(const Game& game);
 
 }  // namespace leduc_poker
 }  // namespace open_spiel

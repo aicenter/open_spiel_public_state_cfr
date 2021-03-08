@@ -24,7 +24,8 @@ from absl.testing import absltest
 from absl.testing import parameterized
 import numpy as np
 
-from open_spiel.python.games import tic_tac_toe
+from open_spiel.python.games import kuhn_poker  # pylint: disable=unused-import
+from open_spiel.python.games import tic_tac_toe  # pylint: disable=unused-import
 import pyspiel
 from open_spiel.python.utils import file_utils
 
@@ -169,6 +170,9 @@ class GamesSimTest(parameterized.TestCase):
         self.assertEmpty(state.legal_actions(player))
       # Print utilities for each player.
       utilities = state.returns()
+      # Check that player returns are correct
+      for player in range(game.num_players()):
+        self.assertEqual(state.player_return(player), utilities[player])
       # Check that each one is in range
       for utility in utilities:
         self.assertGreaterEqual(utility, game.min_utility())
@@ -207,17 +211,6 @@ class GamesSimTest(parameterized.TestCase):
     # make a smaller lower win score
     game = pyspiel.load_game("pig(players=2,winscore=15)")
     self.sim_game(game)
-
-  def test_python_tic_tac_toe(self):
-    # run this test to a Python-only game
-    game = tic_tac_toe.TicTacToeGame()
-    for _ in range(0, 100):
-      # cannot use pyspiel's serialization since the python-only games don't
-      # implement them
-      self.sim_game(
-          game,
-          check_pyspiel_serialization=False,
-          check_pickle_serialization=True)
 
   def test_efg_game(self):
     game = pyspiel.load_efg_game(pyspiel.get_sample_efg_data())

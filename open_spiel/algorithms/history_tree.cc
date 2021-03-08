@@ -36,9 +36,7 @@ std::unique_ptr<HistoryNode> RecursivelyBuildGameTree(
   switch (node->GetType()) {
     case StateType::kChance: {
       double probability_sum = 0;
-      for (const auto& outcome_and_prob : state_ptr->ChanceOutcomes()) {
-        Action outcome = outcome_and_prob.first;
-        double prob = outcome_and_prob.second;
+      for (const auto& [outcome, prob] : state_ptr->ChanceOutcomes()) {
         std::unique_ptr<State> child = state_ptr->Child(outcome);
         if (child == nullptr) {
           SpielFatalError("Can't add child; child is null.");
@@ -140,9 +138,7 @@ HistoryNode* HistoryTree::GetByHistory(const std::string& history) {
 std::vector<std::string> HistoryTree::GetHistories() {
   std::vector<std::string> histories;
   histories.reserve(state_to_node_.size());
-  for (const auto& kv : state_to_node_) {
-    histories.push_back(kv.first);
-  }
+  for (const auto& [history, _] : state_to_node_) histories.push_back(history);
   return histories;
 }
 
@@ -199,14 +195,14 @@ std::vector<std::pair<std::unique_ptr<State>, double>> DecisionNodes(
     // this is fine for now.
     std::vector<std::pair<std::unique_ptr<State>, double>> children =
         DecisionNodes(*child, best_responder, policy);
-    const double prob = GetProb(actions_and_probs, action);
-    SPIEL_CHECK_GE(prob, 0);
-    for (auto& state_and_prob : children) {
+    const double policy_prob = GetProb(actions_and_probs, action);
+    SPIEL_CHECK_GE(policy_prob, 0);
+    for (auto& [state, prob] : children) {
       states_and_probs.push_back(
-          {std::move(state_and_prob.first),
+          {std::move(state),
            // We weight the child probabilities by the probability of taking
            // the action that would lead to them.
-           prob * state_and_prob.second});
+           policy_prob * prob});
     }
   }
   return states_and_probs;
@@ -222,13 +218,10 @@ GetAllInfoSets(std::unique_ptr<State> state, Player best_responder,
   std::vector<std::pair<std::unique_ptr<State>, double>> states_and_probs =
       DecisionNodes(*state, best_responder, policy);
   infosets.reserve(states_and_probs.size());
-  for (const auto& state_and_prob : states_and_probs) {
+  for (const auto& [state, prob] : states_and_probs) {
     // We look at each decision from the perspective of the best_responder.
-    std::string infostate =
-        state_and_prob.first->InformationStateString(best_responder);
-    infosets[infostate].push_back(
-        {tree->GetByHistory(state_and_prob.first->HistoryString()),
-         state_and_prob.second});
+    std::string infostate = state->InformationStateString(best_responder);
+    infosets[infostate].push_back({tree->GetByHistory(*state), prob});
   }
   return infosets;
 }

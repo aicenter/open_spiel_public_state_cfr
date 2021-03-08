@@ -108,6 +108,9 @@ class HistoryTree {
   const HistoryNode& Root() const { return *root_; }
 
   HistoryNode* GetByHistory(const std::string& history);
+  HistoryNode* GetByHistory(const State& state) {
+    return GetByHistory(state.HistoryString());
+  }
 
   // For test use only.
   std::vector<std::string> GetHistories();

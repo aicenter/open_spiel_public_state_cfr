@@ -11,6 +11,8 @@ add_library(open_spiel_ortools OBJECT
   lp_solver.h
   sequence_form_lp.cc
   sequence_form_lp.h
+  sequence_form_lp.cc
+  sequence_form_lp.h
   dl_oracle_evaluator.cc
   dl_oracle_evaluator.h
 )

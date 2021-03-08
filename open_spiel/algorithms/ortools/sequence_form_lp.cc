@@ -30,18 +30,20 @@ namespace opres = operations_research;
 
 SequenceFormLpSpecification::SequenceFormLpSpecification(
     const Game& game, const std::string& solver_id)
-    : SequenceFormLpSpecification({
-                                      MakeInfostateTree(game, 0),
-                                      MakeInfostateTree(game, 1),
-                                  }, solver_id) {}
+    : SequenceFormLpSpecification(
+          {
+              MakeInfostateTree(game, 0),
+              MakeInfostateTree(game, 1),
+          },
+          solver_id) {}
 
 SequenceFormLpSpecification::SequenceFormLpSpecification(
     std::vector<std::shared_ptr<InfostateTree>> trees,
     const std::string& solver_id)
     : trees_(std::move(trees)),
-      terminal_bijection_(
-          ConnectTerminals(*trees_[0], *trees_[1])),
-      solver_(MPSolver::CreateSolver(solver_id)), node_spec_() {
+      terminal_bijection_(ConnectTerminals(*trees_[0], *trees_[1])),
+      solver_(MPSolver::CreateSolver(solver_id)),
+      node_spec_() {
   SPIEL_CHECK_TRUE(solver_);
   SPIEL_CHECK_EQ(trees_.size(), 2);
 }
@@ -148,7 +150,7 @@ void SequenceFormLpSpecification::SpecifyObjective(
 
 void SequenceFormLpSpecification::ClearSpecification() {
   solver_->Clear();
-  for (auto&[node, spec] : node_spec_) {
+  for (auto& [node, spec] : node_spec_) {
     spec.var_cf_value = nullptr;
     spec.var_reach_prob = nullptr;
     spec.ct_child_cf_value = nullptr;
@@ -164,27 +166,25 @@ void SequenceFormLpSpecification::SpecifyLinearProgram(Player pl) {
   SpecifyReachProbsConstraints(
       /*player_node=*/trees_[pl]->mutable_root());
   SpecifyRootConstraints(
-      /*player_node=*/trees_[pl]->mutable_root());
+      /*player_root_node=*/trees_[pl]->mutable_root());
   SpecifyCfValuesConstraints(
       /*opponent_node=*/trees_[1 - pl]->mutable_root());
   SpecifyObjective(
-      /*opponent_node=*/trees_[1 - pl]->mutable_root());
+      /*opponent_root_node=*/trees_[1 - pl]->mutable_root());
 }
 
 double SequenceFormLpSpecification::Solve() {
   opres::MPSolver::ResultStatus status = solver_->Solve();
-//  // Export the model if the result was not optimal.
-//  // You can then use external debugging tools (like cplex studio).
-//  if (status != opres::MPSolver::ResultStatus::OPTIMAL) {
-//    std::string out;
-//    // Pick the format.
-//    solver_->ExportModelAsMpsFormat(false, false, &out);
-//    solver_->ExportModelAsLpFormat(false, &out);
-//    std::cout << out << "\n";
-//  }
-  if (status != opres::MPSolver::ResultStatus::OPTIMAL) {
-    return nan("");
-  }
+  //  // Export the model if the result was not optimal.
+  //  // You can then use external debugging tools (like cplex studio).
+  //  if (status != opres::MPSolver::ResultStatus::OPTIMAL) {
+  //    std::string out;
+  //    // Pick the format.
+  //    solver_->ExportModelAsMpsFormat(false, false, &out);
+  //    solver_->ExportModelAsLpFormat(false, &out);
+  //    std::cout << out << "\n";
+  //  }
+  SPIEL_CHECK_EQ(status, opres::MPSolver::ResultStatus::OPTIMAL);
   return -solver_->Objective().Value();
 }
 
@@ -205,8 +205,8 @@ TabularPolicy SequenceFormLpSpecification::OptimalPolicy(Player for_player) {
     for (int i = 0; i < actions.size(); ++i) {
       double prob;
       if (rp_sum) {
-        prob = node_spec_[node->child_at(i)].var_reach_prob->solution_value()
-             / rp_sum;
+        prob = node_spec_[node->child_at(i)].var_reach_prob->solution_value() /
+               rp_sum;
       } else {
         // If the infostate is unreachable, the strategy is not defined.
         // However some code in the library may require having the strategy,
@@ -220,8 +220,7 @@ TabularPolicy SequenceFormLpSpecification::OptimalPolicy(Player for_player) {
   return policy;
 }
 
-SfStrategy SequenceFormLpSpecification::OptimalSfStrategy(
-    Player for_player) {
+SfStrategy SequenceFormLpSpecification::OptimalSfStrategy(Player for_player) {
   SPIEL_CHECK_TRUE(for_player == 0 || for_player == 1);
   const InfostateTree* tree = trees_[for_player].get();
   SfStrategy strategy(tree);
@@ -256,8 +255,11 @@ void SequenceFormLpSpecification::PrintProblemSpecification() {
   const opres::MPObjective& objective = solver_->Objective();
 
   std::cout << "Objective:" << std::endl;
-  if (objective.maximization()) std::cout << "max ";
-  else std::cout << "min ";
+  if (objective.maximization()) {
+    std::cout << "max ";
+  } else {
+    std::cout << "min ";
+  }
   bool first_obj = true;
   for (int i = 0; i < variables.size(); ++i) {
     const double coef = objective.GetCoefficient(variables[i]);
@@ -287,11 +289,11 @@ void SequenceFormLpSpecification::PrintProblemSpecification() {
   std::cout << "Variables:" << std::endl;
   for (int i = 0; i < variables.size(); i++) {
     const auto& var = variables[i];
-    std::cout << var->lb() << " <= " << "x" << i << " <= " << var->ub()
-              << " (" << var->name() << ")" << std::endl;
+    std::cout << var->lb() << " <= "
+              << "x" << i << " <= " << var->ub() << " (" << var->name() << ")"
+              << std::endl;
   }
 }
-
 
 std::pair<TabularPolicy, double> MakeEquilibriumPolicy(
     const Game& game) {

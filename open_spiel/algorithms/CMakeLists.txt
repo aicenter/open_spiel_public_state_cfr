@@ -19,6 +19,10 @@ add_library (algorithms OBJECT
   corr_dist/efcce.h
   corr_dist/efce.cc
   corr_dist/efce.h
+  corr_dist/cce.cc
+  corr_dist/cce.h
+  corr_dist/ce.cc
+  corr_dist/ce.h
   corr_dev_builder.cc
   corr_dev_builder.h
   deterministic_policy.cc
@@ -32,6 +36,8 @@ add_library (algorithms OBJECT
   external_sampling_mccfr.h
   get_all_histories.cc
   get_all_histories.h
+  get_all_infostates.cc
+  get_all_infostates.h
   get_all_states.cc
   get_all_states.h
   get_legal_actions_map.cc
@@ -64,6 +70,10 @@ add_library (algorithms OBJECT
   state_distribution.h
   tabular_exploitability.cc
   tabular_exploitability.h
+  tabular_q_learning.cc
+  tabular_q_learning.h
+  tabular_sarsa.cc
+  tabular_sarsa.h
   tensor_game_utils.cc
   tensor_game_utils.h
   trajectories.cc
