@@ -1,5 +1,6 @@
 import io
 import itertools
+import os
 import subprocess
 import sys
 from functools import reduce
@@ -15,8 +16,8 @@ FLAGS = flags.FLAGS
 flags.DEFINE_bool("with_results", False, "Print actual experiment results, "
                                          "do not just parse them.")
 
-_REPO = "/home/michal/Code/open_spiel/open_spiel"
-_BINARY_PATH = f"{_REPO}/cmake-build-release/papers_with_code/1906.06412" \
+_BUILD_PATH = os.environ.get("CMAKE_BINARY_DIR") or "../../../build"
+_BINARY_PATH = f"{_BUILD_PATH}/papers_with_code/1906.06412" \
                f".value_functions/train_eval_loop"
 
 _BASE_ARGS = dict(

@@ -87,6 +87,9 @@ endif()
 if (BUILD_WITH_GAMUT)
   set(PYTHON_TESTS ${PYTHON_TESTS} ../games/gamut/gamut_test.py)
 endif()
+if (BUILD_WITH_PAPERS)
+  set(PYTHON_TESTS ${PYTHON_TESTS} ../papers_with_code/1906.06412.value_functions/train_eval_loop_test.py)
+endif()
 
 
 # List of all Python tests to run.
@@ -183,6 +186,7 @@ foreach(py_test_file IN LISTS PYTHON_TESTS)
   #  from open_spiel.python import rl_environment.
   set_property(TEST python_${py_test}
       PROPERTY ENVIRONMENT
+      CMAKE_BINARY_DIR=${CMAKE_BINARY_DIR};
       PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR}:${CMAKE_CURRENT_SOURCE_DIR}/../..;
       TEST_SRCDIR=${CMAKE_CURRENT_SOURCE_DIR}/../..)
 endforeach(py_test_file)
