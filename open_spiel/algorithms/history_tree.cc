@@ -79,9 +79,11 @@ HistoryNode::HistoryNode(std::unique_ptr<State> game_state)
       history_(state_->HistoryString()),
       type_(state_->GetType()),
       action_view_(*state_) {
-  infostates_.reserve(state_->NumPlayers());
-  for (int pl = 0; pl < state_->NumPlayers(); ++pl) {
-    infostates_.push_back(state_->InformationStateString(pl));
+  if (type_ == StateType::kDecision) {
+    infostates_.reserve(state_->NumPlayers());
+    for (int pl = 0; pl < state_->NumPlayers(); ++pl) {
+      infostates_.push_back(state_->InformationStateString(pl));
+    }
   }
 
   if (type_ == StateType::kTerminal) {

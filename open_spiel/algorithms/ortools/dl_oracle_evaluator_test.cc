@@ -74,20 +74,22 @@ void TestTrunkExploitabilityInKuhn() {
   for (double a : std::vector<double>{0., 1 / 6., 1 / 3.,}) {
     auto bandit_policy = MakeKuhnParametricPolicy(whole_game.trees(), a);
     BanditsCurrentPolicy policy(whole_game.trees(), bandit_policy);
-    const double actual_expl = TrunkExploitability(&whole_game, policy);
+    const double actual_expl = TrunkExploitability(&whole_game, policy,
+                                                   /*strategy_epsilon=*/0.);
     SPIEL_CHECK_FLOAT_NEAR(actual_expl, 0., 1e-10);
 
     const double value0 = ComputeRootValueWhileFixingStrategy(
-        &whole_game, policy, /*pl=*/0);
+        &whole_game, policy, /*pl=*/0, /*strategy_epsilon=*/0.);
     SPIEL_CHECK_FLOAT_NEAR(value0, -1. / 18., 1e-10);
 
     const double value1 = ComputeRootValueWhileFixingStrategy(
-        &whole_game, policy, /*pl=*/1);
+        &whole_game, policy, /*pl=*/1, /*strategy_epsilon=*/0.);
     SPIEL_CHECK_FLOAT_NEAR(value1, 1. / 18., 1e-10);
 
     for (int pl = 0; pl < 2; ++pl) {
       const double actual_pl_expl =
-          TrunkPlayerExploitability(&whole_game, policy, /*pl=*/pl);
+          TrunkPlayerExploitability(&whole_game, policy, /*pl=*/pl,
+                                    {}, /*strategy_epsilon=*/0.);
       SPIEL_CHECK_FLOAT_NEAR(actual_pl_expl, 0., 1e-10);
     }
   }
@@ -97,7 +99,8 @@ void TestTrunkExploitabilityInKuhn() {
     auto bandit_policy =
         MakeBanditVectors(whole_game.trees(), "UniformStrategy");
     BanditsCurrentPolicy policy(whole_game.trees(), bandit_policy);
-    const double actual_expl = TrunkExploitability(&whole_game, policy);
+    const double actual_expl = TrunkExploitability(&whole_game, policy,
+                                                   /*strategy_epsilon=*/0.);
     SPIEL_CHECK_GT(actual_expl, 0.);
   }
 }
