@@ -52,10 +52,10 @@ void ParticleNetEvaluator::EvaluatePublicState(
   auto net_context = open_spiel::down_cast<NetContext*>(context);
   torch::NoGradGuard no_grad_guard;  // We run only inference.
 
-  ParticlesInContext point = batch_->point_at(0);
+  ParticlesInContext point = batch_->point_at(0, *dims_);
   // !! Do not shuffle, so that we can get back the values in an ordered way !!
-  WriteParticles(*state, *net_context, *dims_, &point, /*rnd_gen=*/nullptr,
-      /*shuffle_input_output=*/false);
+  WriteParticles(*state, *net_context, *dims_, &point,
+                 /*rnd_gen=*/nullptr, /*shuffle_input_output=*/false);
 
   // Input must be batched.
   torch::Tensor input = point.data.to(*device_).unsqueeze(/*dim=*/0);

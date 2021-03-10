@@ -134,8 +134,8 @@ void WriteParticles(const algorithms::dlcfr::LeafPublicState& state,
   int i = 0;
   for (int pl = 0; pl < 2; ++pl) {
     for (int j = 0; j < state.leaf_nodes[pl].size(); j++) {
-      ParticleData particle = point->particle_at(
-          dims, shuffle_input_output ? particle_placement[i] : i);
+      ParticleData particle = point->particle_at(shuffle_input_output
+                                                 ? particle_placement[i] : i);
       Copy(state.public_tensor.Tensor(), particle.public_features());
       // Hand features.
       if(dims.write_hand_features_positionally()) {
@@ -151,20 +151,21 @@ void WriteParticles(const algorithms::dlcfr::LeafPublicState& state,
     }
   }
   SPIEL_CHECK_EQ(i, num_particles);
+  point->num_particles() = num_particles;
+  Copy(state.public_tensor.Tensor(), point->public_features());
 
   // Write outputs
   i = 0;
   for (int pl = 0; pl < 2; ++pl) {
     for (int j = 0; j < state.leaf_nodes[pl].size(); j++) {
-      ParticleData particle = point->particle_at(
-          dims, shuffle_input_output ? particle_placement[i] : i);
+      ParticleData particle = point->particle_at(shuffle_input_output
+                                                 ? particle_placement[i] : i);
       particle.value() = state.values[pl][j];
       i++;
     }
   }
 
   SPIEL_CHECK_EQ(i, num_particles);
-  point->num_particles() = num_particles;
 }
 
 void CopyValuesNetToTree(ParticlesInContext data_point,
@@ -173,7 +174,7 @@ void CopyValuesNetToTree(ParticlesInContext data_point,
   int particle_index = 0;
   for (int pl = 0; pl < 2; ++pl) {
     for (int j = 0; j < state.leaf_nodes[pl].size(); j++) {
-      ParticleData particle = data_point.particle_at(dims, particle_index);
+      ParticleData particle = data_point.particle_at(particle_index);
       state.values[pl][j] = particle.value();
       particle_index++;
     }

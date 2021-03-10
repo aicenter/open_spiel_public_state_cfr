@@ -34,8 +34,7 @@ bool DataPoint::is_valid_view() const {
       && target.dim() == 1;
 }
 
-ParticleData ParticlesInContext::particle_at(const ParticleDims& dims,
-                                             int particle_index) {
+ParticleData ParticlesInContext::particle_at(int particle_index) {
   SPIEL_CHECK_LT(particle_index, dims.max_particles);
   const int offset = particle_storage_offset();
   return ParticleData(
@@ -80,11 +79,17 @@ ParticleData::ParticleData(const ParticleDims& particle_dims,
   SPIEL_DCHECK_EQ(target.size(0), 1);
 }
 
-ParticlesInContext::ParticlesInContext(torch::Tensor data, torch::Tensor target)
-    : DataPoint(data, target) {}
+ParticlesInContext::ParticlesInContext(const ParticleDims& particle_dims,
+                                       torch::Tensor data, torch::Tensor target)
+    : DataPoint(data, target), dims(particle_dims) {}
 
 float_net& ParticlesInContext::num_particles() {
   return data_ptr()[num_particles_offset()];
+}
+
+absl::Span<float_net> ParticlesInContext::public_features() {
+  return absl::MakeSpan(&data_ptr()[public_features_offset()],
+                        dims.public_features_size);
 }
 
 PositionalData::PositionalData(const PositionalDims& positional_dims,
@@ -113,8 +118,9 @@ BatchData::BatchData(int batch_size, int input_size, int output_size)
   SPIEL_CHECK_GT(output_size, 0);
 }
 
-ParticlesInContext BatchData::point_at(int index) {
-  return ParticlesInContext(data[index], target[index]);
+ParticlesInContext BatchData::point_at(int index,
+                                       const ParticleDims& particle_dims) {
+  return ParticlesInContext(particle_dims, data[index], target[index]);
 }
 
 PositionalData BatchData::point_at(int index,

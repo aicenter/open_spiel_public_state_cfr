@@ -89,13 +89,16 @@ ParticleValueNet::ParticleValueNet(ParticleDims* particle_dims,
                                    size_t num_width_regression,
                                    ActivationFunction activation)
     : dims(particle_dims), activation_fn(activation) {
-  int dim_context = context_size();
   int num_layers_kernel = 4;
 
   MakeLayers(fc_basis, num_layers_kernel,
-             dims->particle_size() - 1, dims->particle_size(), dim_context);
-  MakeLayers(fc_regression, num_layers_regression, dim_context,
-             dim_context * num_width_regression, regression_size());
+             dims->particle_size() - 1,
+             dims->particle_size() * 3,
+             pooled_size());
+  MakeLayers(fc_regression, num_layers_regression,
+             context_size(),
+             context_size() * num_width_regression,
+             regression_size());
   RegisterLayers(fc_basis, "fc_basis_");
   RegisterLayers(fc_regression, "fc_regression_");
 }
@@ -105,20 +108,20 @@ torch::Tensor ParticleValueNet::change_of_basis(torch::Tensor fs) {             
     fs = fc_basis[i]->forward(fs);
     fs = Activation(activation_fn, fs);
   }
-  torch::Tensor bs = fc_basis.back()->forward(fs);                              CHECK_SHAPE(bs, {_, context_size()});
+  torch::Tensor bs = fc_basis.back()->forward(fs);                              CHECK_SHAPE(bs, {_, pooled_size()});
   return bs;
 }
 
 torch::Tensor ParticleValueNet::base_coordinates(torch::Tensor bs,
                                                  torch::Tensor scales) {
-  CHECK_SHAPE(bs, {_, context_size()});
+  CHECK_SHAPE(bs, {_, pooled_size()});
   CHECK_SHAPE(scales, {_, 1});
-  torch::Tensor cs = bs.mul(scales);                                            CHECK_SHAPE(cs, {_, context_size()});
+  torch::Tensor cs = bs.mul(scales);                                            CHECK_SHAPE(cs, {_, pooled_size()});
   return cs;
 }
 
-torch::Tensor ParticleValueNet::pool(torch::Tensor cs) {                        CHECK_SHAPE(cs, {_, context_size()});
-  torch::Tensor context = torch::sum(cs, {0});                                  CHECK_SHAPE(context, {context_size()});
+torch::Tensor ParticleValueNet::pool(torch::Tensor cs) {                        CHECK_SHAPE(cs, {_, pooled_size()});
+  torch::Tensor context = torch::sum(cs, {0});                                  CHECK_SHAPE(context, {pooled_size()});
   return context;
 }
 
@@ -147,12 +150,23 @@ torch::Tensor ParticleValueNet::forward(torch::Tensor xss) {
     if (is_training() && limit_particle_count > 0) {
       num_particles = std::min(num_particles, limit_particle_count);
     }
-
-    const int num_particles_offset = 1;
-    torch::Tensor particles = xs
+    // FIXME: nice offsets!
+    const int pub_features_offset = 1;
+    torch::Tensor public_features = xs
         // Skip the num_particles item.
-        .index({ Slice(1, num_particles_offset
-                          + num_particles * dims->particle_size()) })
+        .index({
+          Slice(pub_features_offset,
+                pub_features_offset + dims->public_features_size)
+        })
+        .reshape({1, dims->public_features_size});                              CHECK_SHAPE(public_features, {1, dims->public_features_size});
+
+    const int num_particles_offset = 1 + dims->public_features_size;
+    torch::Tensor particles = xs
+        // Skip the num_particles + public features item.
+        .index({
+          Slice(num_particles_offset,
+                num_particles_offset + num_particles * dims->particle_size())
+        })
         // Rearrange into particles.
         .reshape({num_particles, dims->particle_size()});                       CHECK_SHAPE(particles, {num_particles, dims->particle_size()});
 
@@ -161,9 +175,10 @@ torch::Tensor ParticleValueNet::forward(torch::Tensor xss) {
     torch::Tensor ranges = particles  // Skip all features.
         .index({Slice(), Slice(dims->features_size(), dims->particle_size())}); CHECK_SHAPE(ranges, {num_particles, 1});
 
-    torch::Tensor bs = change_of_basis(fs);                                     CHECK_SHAPE(bs, {num_particles, context_size()});
-    torch::Tensor cs = base_coordinates(bs, ranges);                            CHECK_SHAPE(cs, {num_particles, context_size()});
-    torch::Tensor context = pool(cs).unsqueeze(/*dim=*/0);                      CHECK_SHAPE(context, {1, context_size()});
+    torch::Tensor bs = change_of_basis(fs);                                     CHECK_SHAPE(bs, {num_particles, pooled_size()});
+    torch::Tensor cs = base_coordinates(bs, ranges);                            CHECK_SHAPE(cs, {num_particles, pooled_size()});
+    torch::Tensor pooled = pool(cs).unsqueeze(/*dim=*/0);                       CHECK_SHAPE(pooled, {1, pooled_size()});
+    torch::Tensor context = torch::cat({pooled, public_features}, /*dim=*/1);   CHECK_SHAPE(context, {1, context_size()});
     torch::Tensor ys = regression(context).expand({num_particles, -1});         CHECK_SHAPE(ys, {num_particles, regression_size()});
     torch::Tensor proj = (ys * bs).sum(/*dim=*/1).unsqueeze(0);                 CHECK_SHAPE(proj, {1, num_particles});
     out.push_back(proj);

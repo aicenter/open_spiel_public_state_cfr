@@ -66,6 +66,7 @@ struct ParticleDims final : public BasicDims {
 
   int point_input_size() const override {
     return 1  // Store the number of particles in the given point.
+         + public_features_size  // Public features.
          + max_particles * particle_size();  // Particle contents.
   }
   int point_output_size() const override { return max_particles; }
@@ -146,13 +147,17 @@ struct ParticleData final : DataPoint {
 
 // Particles for one public state, collected into a single data point.
 struct ParticlesInContext final : DataPoint {
-  ParticlesInContext(torch::Tensor data, torch::Tensor target);
+  const ParticleDims& dims;
+  ParticlesInContext(const ParticleDims& particle_dims,
+                     torch::Tensor data, torch::Tensor target);
   float_net& num_particles();
-  ParticleData particle_at(const ParticleDims& dims, int particle_index);
+  absl::Span<float_net> public_features();
+  ParticleData particle_at(int particle_index);
  private:
   // Offsets for number of particles and the storage.
   int num_particles_offset() const { return 0; }
-  int particle_storage_offset() const { return 1; }
+  int public_features_offset() const { return 1; }
+  int particle_storage_offset() const { return dims.public_features_size + 1; }
 };
 
 struct PositionalData final : DataPoint {
@@ -183,7 +188,7 @@ struct BatchData {
   int size() const;
 
   // Views for individual data points.
-  ParticlesInContext point_at(int index);
+  ParticlesInContext point_at(int index, const ParticleDims& particle_dims);
   PositionalData point_at(int index, const PositionalDims& positional_dims);
 };
 

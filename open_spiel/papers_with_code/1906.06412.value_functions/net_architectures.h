@@ -82,7 +82,8 @@ struct ParticleValueNet final : public ValueNet {
   torch::Tensor pool(torch::Tensor xs);
   torch::Tensor regression(torch::Tensor xs);
 
-  int context_size() { return dims->max_particles; }
+  int context_size() { return pooled_size() + dims->public_features_size; }
+  int pooled_size() { return dims->max_particles; }
   int regression_size() { return dims->max_particles; }
 };
 
