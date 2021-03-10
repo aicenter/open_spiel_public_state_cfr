@@ -19,13 +19,13 @@
 #include "open_spiel/abseil-cpp/absl/flags/usage.h"
 #include "open_spiel/abseil-cpp/absl/flags/parse.h"
 
-// General
+// -- General --
 ABSL_FLAG(int, seed, 0, "Seed.");
 ABSL_FLAG(std::string, game_name, "kuhn_poker", "Game to run.");
 ABSL_FLAG(std::string, use_bandits_for_cfr, "RegretMatchingPlus",
           "Which bandit should be used in the trunk.");
 
-// Data generation
+// -- Data generation --
 ABSL_FLAG(std::string, data_generation, "random", "One of random,dl_cfr");
 ABSL_FLAG(int, depth, 3, "Depth of the trunk.");
 ABSL_FLAG(double, prob_pure_strat, 0.1, "Params for random generation.");
@@ -35,7 +35,7 @@ ABSL_FLAG(bool, shuffle_input_output, false,
 ABSL_FLAG(int, num_trunks, 100, "Size of experience replay in terms of trunks");
 ABSL_FLAG(int, cfr_oracle_iterations, 100, "Number of oracle iterations.");
 
-// Training
+// -- Training --
 ABSL_FLAG(int, train_batches, 32,
           "Number of training batches before the evalution is run.");
 ABSL_FLAG(int, batch_size, 32,
@@ -44,16 +44,20 @@ ABSL_FLAG(int, num_loops, 5000, "Number of train-eval loops.");
 ABSL_FLAG(double, learning_rate, 1e-3, "Optimizer (adam/sgd) learning rate.");
 ABSL_FLAG(double, lr_decay, 1., "Learning rate decay after each loop.");
 
-// Network
+// -- Network --
 ABSL_FLAG(std::string, arch, "particle_vf",
           "Which architecture of the value function should be used.");
 ABSL_FLAG(int, num_layers, 3, "Number of hidden layers.");
 ABSL_FLAG(int, num_width, 3, "Multiplicative constant of the number of neurons "
                              "per layer compared to the input size.");
 
-// Metrics
+// -- Metrics --
+// FullTrunkExplMetric
 ABSL_FLAG(std::string, trunk_expl_iterations, "1,2,5,10,20,50,100,200,500,1000",
-          "Evaluate exploitability for each trunk iteration.");
+          "Evaluate trunk exploitability for each trunk iteration.");
+// SparseRootsExplMetric
+ABSL_FLAG(std::string, roots_expl_iterations, "",
+          "Evaluate roots exploitability for each sparse trunk iteration.");
 ABSL_FLAG(int, sparse_roots_depth, 0,
           "The depth at which sparse roots should be found.");
 ABSL_FLAG(double, support_threshold, 1e-5,
@@ -81,6 +85,15 @@ namespace papers_with_code {
 
 using namespace algorithms;
 
+std::vector<int> ItersFromString(const std::string& s) {
+  std::vector<std::string> xs = absl::StrSplit(s, ',');
+  std::vector<int> out;
+  for (auto& x : xs) {
+    if (!x.empty()) out.push_back(std::stoi(x));
+  }
+  return out;
+}
+
 void FillExperienceReplay(ExpReplayInitPolicy init,
                           const BasicDims& dims,
                           NetArchitecture arch,
@@ -88,7 +101,6 @@ void FillExperienceReplay(ExpReplayInitPolicy init,
                           Trunk* trunk,
                           const std::vector<NetContext*>& net_contexts,
                           ortools::SequenceFormLpSpecification* whole_game,
-                          const std::vector<int>& eval_iters,
                           std::mt19937& rnd_gen) {
 
   std::cout << "# Filling experience replay buffer." << std::endl;
@@ -98,6 +110,8 @@ void FillExperienceReplay(ExpReplayInitPolicy init,
       std::cout << "# Computing reference expls for given trunk iterations.\n";
       std::cout << "# <ref_expl>\n";
       std::cout << "# trunk_iter,expl\n";
+      const std::vector<int> eval_iters =
+          ItersFromString(absl::GetFlag(FLAGS_trunk_expl_iterations));
       GenerateDataDLCfrIterations(
         trunk, net_contexts, dims, arch, experience_replay,
         absl::GetFlag(FLAGS_num_trunks),
@@ -135,15 +149,6 @@ void FillExperienceReplay(ExpReplayInitPolicy init,
     default:
       SpielFatalError("Exhausted pattern match: data_generation");
   }
-}
-
-std::vector<int> ItersFromString(const std::string& s) {
-  std::vector<std::string> xs = absl::StrSplit(s, ',');
-  std::vector<int> out;
-  for (auto& x : xs) {
-    if (!x.empty()) out.push_back(std::stoi(x));
-  }
-  return out;
 }
 
 std::unique_ptr<ValueNet> MakeModel(NetArchitecture arch, BasicDims* dims) {
@@ -192,6 +197,38 @@ std::shared_ptr<NetEvaluator> MakeEvaluator(
 }
 
 
+std::vector<std::unique_ptr<Metric>> MakeMetrics(
+    Trunk* full_trunk,
+    ortools::SequenceFormLpSpecification* whole_game,
+    std::shared_ptr<NetEvaluator> net_evaluator,
+    dlcfr::DepthLimitedCFR* trunk_with_net) {
+  std::vector<std::unique_ptr<Metric>> out;
+
+  {
+    const std::vector<int> trunk_expl_iterations = ItersFromString(
+        absl::GetFlag(FLAGS_trunk_expl_iterations));
+    if (!trunk_expl_iterations.empty()) {
+      out.push_back(MakeFullTrunkExplMetric(
+          trunk_expl_iterations, trunk_with_net, whole_game));
+    }
+  }
+
+  {
+    const std::vector<int> roots_expl_iterations =
+        ItersFromString(absl::GetFlag(FLAGS_roots_expl_iterations));
+    if (!roots_expl_iterations.empty()) {
+      out.push_back(MakeSparseRootsExplMetric(
+        full_trunk, whole_game, net_evaluator,
+        // Settings.
+        roots_expl_iterations,
+        absl::GetFlag(FLAGS_sparse_roots_depth),
+        absl::GetFlag(FLAGS_support_threshold),
+        absl::GetFlag(FLAGS_prune_chance_histories)));
+    }
+  }
+  return out;
+}
+
 double TrainNetwork(ValueNet* model, torch::Device* device,
                     torch::optim::Optimizer* optimizer,
                     BatchData* batch) {
@@ -232,17 +269,12 @@ void TrainEvalLoop() {
       use_bandits_for_cfr);
   const ExpReplayInitPolicy init_policy =
       GetInitPolicy(absl::GetFlag(FLAGS_data_generation));
-  const std::vector<int> eval_iters =
-      ItersFromString(absl::GetFlag(FLAGS_trunk_expl_iterations));
   const int num_trunks = absl::GetFlag(FLAGS_num_trunks);
   const int experience_replay_buffer_size =
       t->num_non_terminal_leaves * num_trunks;
   const int batch_size = absl::GetFlag(FLAGS_batch_size) > 0
       ? std::min(absl::GetFlag(FLAGS_batch_size), experience_replay_buffer_size)
       : experience_replay_buffer_size;
-  const int roots_depth = absl::GetFlag(FLAGS_sparse_roots_depth);
-  const double support_threshold = absl::GetFlag(FLAGS_support_threshold);
-  const bool prune_chance_histories = absl::GetFlag(FLAGS_prune_chance_histories);
   const NetArchitecture arch = GetArchitecture(absl::GetFlag(FLAGS_arch));
   const double lr_decay = absl::GetFlag(FLAGS_lr_decay);
   t->oracle_evaluator->num_cfr_iterations = cfr_oracle_iterations;
@@ -262,7 +294,6 @@ void TrainEvalLoop() {
   std::cout << "# Point input size: " << dims->point_input_size() << "\n";
   std::cout << "# Point output size: " << dims->point_output_size() << "\n";
 //  std::cout << "# Max particles: " << t->dims->max_particles << "\n";
-
 
   // 1. Create the LP spec for the whole game.
   ortools::SequenceFormLpSpecification whole_game(*t->game, "CLP");
@@ -302,14 +333,11 @@ void TrainEvalLoop() {
                                      dims->point_input_size(),
                                      dims->point_output_size());
   FillExperienceReplay(init_policy, *dims, arch, &experience_replay, t.get(),
-                       net_contexts, &whole_game, eval_iters, rnd_gen);
+                       net_contexts, &whole_game, rnd_gen);
 
   // 5. Create training metrics.
-  std::vector<std::unique_ptr<Metric>> metrics;
-  if (!eval_iters.empty()) {
-    metrics.push_back(
-        MakeFullTrunkExplMetric(eval_iters, trunk_with_net.get(), &whole_game));
-  }
+  std::vector<std::unique_ptr<Metric>> metrics = MakeMetrics(
+      t.get(), &whole_game, net_evaluator, trunk_with_net.get());
 
   // 6. The train-eval loop.
   std::cout << "loop,avg_loss";
