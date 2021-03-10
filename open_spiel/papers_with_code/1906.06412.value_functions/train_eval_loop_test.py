@@ -27,7 +27,7 @@ _BASE_ARGS = dict(
     batch_size=32,
     num_loops=100,
     cfr_oracle_iterations=100,
-    trunk_eval_iterations=100,
+    trunk_expl_iterations=100,
     num_layers=5,
     num_width=5,
     num_trunks=10,
@@ -193,7 +193,7 @@ class VFTest(parameterized.TestCase, absltest.TestCase):
   def test_kuhn_eval_iters_dlcfr_regression(self, **arch_spec):
     args = {**_BASE_ARGS, **arch_spec,
             **dict(num_loops=10, num_trunks=100, data_generation="dl_cfr",
-                   num_layers=3, num_width=3, trunk_eval_iterations="1,5,10")}
+                   num_layers=3, num_width=3, trunk_expl_iterations="1,5,10")}
     actual_eval, actual_expl = read_experiment_results_from_shell(
         args, metric_avg_loss, metric_ref_expls)
 
@@ -208,7 +208,7 @@ class VFTest(parameterized.TestCase, absltest.TestCase):
   def test_kuhn_eval_iters_random_regression(self, **arch_spec):
     args = {**_BASE_ARGS, **arch_spec,
             **dict(num_loops=10, num_trunks=100, num_layers=3, num_width=3,
-                   data_generation="random", trunk_eval_iterations="1,5,10")}
+                   data_generation="random", trunk_expl_iterations="1,5,10")}
     actual_eval, = read_experiment_results_from_shell(args, metric_avg_loss)
     arch = arch_spec["arch"]
     expected_eval = df_from_lines(_REFERENCE_KUHN_RANDOM_EVAL[arch])
@@ -218,7 +218,7 @@ class VFTest(parameterized.TestCase, absltest.TestCase):
   def test_fit_one_sample(self, **game_spec):
     args = {**_BASE_ARGS, **game_spec,
             **dict(num_loops=20, batch_size=-1, data_generation="random",
-                   num_trunks=1, trunk_eval_iterations="")}
+                   num_trunks=1, trunk_expl_iterations="")}
     actual_eval, = read_experiment_results_from_shell(args, metric_avg_loss)
     actual_loss = actual_eval["avg_loss"].values.min()
     self.assertLess(actual_loss, 1e-8)
@@ -228,7 +228,7 @@ class VFTest(parameterized.TestCase, absltest.TestCase):
     args = {**_BASE_ARGS, **game_spec,
             **dict(num_loops=60, batch_size=-1, data_generation="random",
                    learning_rate=0.01, lr_decay=0.99,
-                   num_trunks=2, trunk_eval_iterations=0)}
+                   num_trunks=2, trunk_expl_iterations=0)}
     actual_eval, = read_experiment_results_from_shell(args, metric_avg_loss)
     actual_loss = actual_eval["avg_loss"].values.min()
     self.assertLess(actual_loss, 1e-6)
@@ -247,7 +247,7 @@ class VFTest(parameterized.TestCase, absltest.TestCase):
             **dict(num_loops=10, train_batches=100,
                    batch_size=-1, data_generation="dl_cfr",
                    num_trunks=num_iters,
-                   trunk_eval_iterations=",".join(str(i) for i in range(1, num_iters + 1))
+                   trunk_expl_iterations=",".join(str(i) for i in range(1, num_iters + 1))
                    )}
     expected_expl, actual_eval = read_experiment_results_from_shell(
         args, metric_ref_expls, metric_avg_loss)

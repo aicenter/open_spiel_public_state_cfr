@@ -42,7 +42,7 @@ sweep.run_sweep("dryrun",
                 base_params=dict(
                     cfr_oracle_iterations=100,
                     num_loops=4096,
-                    trunk_eval_iterations="1,2,5,10,20,50,100",
+                    trunk_expl_iterations="1,2,5,10,20,50,100",
                     train_batches=16,
                     num_trunks=1000,
                     batch_size=64,

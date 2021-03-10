@@ -45,10 +45,6 @@ translation_map = {
   "PredictiveRegretMatchingPlus": "PRM+",
   "RegretMatching": "RM",
   "RegretMatchingPlus": "RM+",
-  "b_depth": "trunk depth",
-  "c_depth": "trunk depth",
-  "c_trunk_eval_iterations": "trunk iters",
-  "d_subgame_cfr_iterations": "subgame iters",
   "limit_particle_count": "train ps",
   "support_threshold": "th"
 }

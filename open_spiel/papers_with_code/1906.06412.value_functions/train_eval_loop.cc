@@ -19,33 +19,41 @@
 #include "open_spiel/abseil-cpp/absl/flags/usage.h"
 #include "open_spiel/abseil-cpp/absl/flags/parse.h"
 
+// General
+ABSL_FLAG(int, seed, 0, "Seed.");
 ABSL_FLAG(std::string, game_name, "kuhn_poker", "Game to run.");
+ABSL_FLAG(std::string, use_bandits_for_cfr, "RegretMatchingPlus",
+          "Which bandit should be used in the trunk.");
+
+// Data generation
+ABSL_FLAG(std::string, data_generation, "random", "One of random,dl_cfr");
 ABSL_FLAG(int, depth, 3, "Depth of the trunk.");
-ABSL_FLAG(std::string, arch, "particle_vf",
-          "Which architecture of the value function should be used.");
+ABSL_FLAG(double, prob_pure_strat, 0.1, "Params for random generation.");
+ABSL_FLAG(double, prob_fully_mixed, 0.05, "Params for random generation.");
+ABSL_FLAG(bool, shuffle_input_output, false,
+          "Should experience replay particle data input/output be shuffled?");
+ABSL_FLAG(int, num_trunks, 100, "Size of experience replay in terms of trunks");
+ABSL_FLAG(int, cfr_oracle_iterations, 100, "Number of oracle iterations.");
+
+// Training
 ABSL_FLAG(int, train_batches, 32,
           "Number of training batches before the evalution is run.");
 ABSL_FLAG(int, batch_size, 32,
           "Batch size per train step. If <1, then full replay buffer is used.");
 ABSL_FLAG(int, num_loops, 5000, "Number of train-eval loops.");
-ABSL_FLAG(int, cfr_oracle_iterations, 100, "Number of oracle iterations.");
-ABSL_FLAG(std::string, trunk_eval_iterations, "1,2,5,10,20,50,100,200,500,1000",
-          "List of trunk eval iterations.");
+ABSL_FLAG(double, learning_rate, 1e-3, "Optimizer (adam/sgd) learning rate.");
+ABSL_FLAG(double, lr_decay, 1., "Learning rate decay after each loop.");
+
+// Network
+ABSL_FLAG(std::string, arch, "particle_vf",
+          "Which architecture of the value function should be used.");
 ABSL_FLAG(int, num_layers, 3, "Number of hidden layers.");
 ABSL_FLAG(int, num_width, 3, "Multiplicative constant of the number of neurons "
                              "per layer compared to the input size.");
-ABSL_FLAG(int, num_trunks, 100, "Size of experience replay in terms of trunks");
-ABSL_FLAG(int, seed, 0, "Seed.");
-ABSL_FLAG(std::string, use_bandits_for_cfr, "RegretMatchingPlus",
-          "Which bandit should be used in the trunk.");
-ABSL_FLAG(std::string, data_generation, "random", "One of random,dl_cfr");
-ABSL_FLAG(double, prob_pure_strat, 0.1, "Params for random generation.");
-ABSL_FLAG(double, prob_fully_mixed, 0.05, "Params for random generation.");
-ABSL_FLAG(bool, shuffle_input_output, false,
-          "Should experience replay particle data input/output be shuffled?");
-ABSL_FLAG(int, limit_particle_count, -1,
-          "How many particles should be used at most in neural network training?"
-          " -1 for all.");
+
+// Metrics
+ABSL_FLAG(std::string, trunk_expl_iterations, "1,2,5,10,20,50,100,200,500,1000",
+          "Evaluate exploitability for each trunk iteration.");
 ABSL_FLAG(int, sparse_roots_depth, 0,
           "The depth at which sparse roots should be found.");
 ABSL_FLAG(double, support_threshold, 1e-5,
@@ -53,8 +61,7 @@ ABSL_FLAG(double, support_threshold, 1e-5,
           "used for trunk sparsification.");
 ABSL_FLAG(bool, prune_chance_histories, false,
           "If true, do not start at chance histories.");
-ABSL_FLAG(double, learning_rate, 1e-3, "Optimizer (adam/sgd) learning rate.");
-ABSL_FLAG(double, lr_decay, 1., "Learning rate decay after each loop.");
+
 
 // -----------------------------------------------------------------------------
 
@@ -150,7 +157,6 @@ std::unique_ptr<ValueNet> MakeModel(NetArchitecture arch, BasicDims* dims) {
       auto model = std::make_unique<ParticleValueNet>(
           particle_dims, num_layers_regression, num_width_regression,
           ActivationFunction::kRelu);
-      model->limit_particle_count = absl::GetFlag(FLAGS_limit_particle_count);
       return model;
     }
     case NetArchitecture::kPositional: {
@@ -223,11 +229,11 @@ void TrainEvalLoop() {
       absl::GetFlag(FLAGS_use_bandits_for_cfr);
   const std::unique_ptr<Trunk> t = MakeTrunk(
       absl::GetFlag(FLAGS_game_name), absl::GetFlag(FLAGS_depth),
-      absl::GetFlag(FLAGS_use_bandits_for_cfr));
+      use_bandits_for_cfr);
   const ExpReplayInitPolicy init_policy =
       GetInitPolicy(absl::GetFlag(FLAGS_data_generation));
   const std::vector<int> eval_iters =
-      ItersFromString(absl::GetFlag(FLAGS_trunk_eval_iterations));
+      ItersFromString(absl::GetFlag(FLAGS_trunk_expl_iterations));
   const int num_trunks = absl::GetFlag(FLAGS_num_trunks);
   const int experience_replay_buffer_size =
       t->num_non_terminal_leaves * num_trunks;
