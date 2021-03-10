@@ -241,7 +241,6 @@ void TrainEvalLoop() {
       ? std::min(absl::GetFlag(FLAGS_batch_size), experience_replay_buffer_size)
       : experience_replay_buffer_size;
   const int roots_depth = absl::GetFlag(FLAGS_sparse_roots_depth);
-  const int no_move_limit = 1000;
   const double support_threshold = absl::GetFlag(FLAGS_support_threshold);
   const bool prune_chance_histories = absl::GetFlag(FLAGS_prune_chance_histories);
   const NetArchitecture arch = GetArchitecture(absl::GetFlag(FLAGS_arch));

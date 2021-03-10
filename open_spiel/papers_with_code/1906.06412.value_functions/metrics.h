@@ -45,6 +45,13 @@ std::unique_ptr<Metric> MakeFullTrunkExplMetric(
     algorithms::dlcfr::DepthLimitedCFR* trunk_with_net,
     algorithms::ortools::SequenceFormLpSpecification* whole_game);
 
+std::unique_ptr<Metric> MakeSparseRootsExplMetric(
+    Trunk* full_trunk,
+    algorithms::ortools::SequenceFormLpSpecification* whole_game,
+    std::shared_ptr<NetEvaluator> net_evaluator,
+    std::vector<int> evaluate_iters,
+    int roots_depth, double support_threshold, bool prune_chance_histories);
+
 void ComputeMetrics(std::vector<std::unique_ptr<Metric>>& metrics);
 void PrintHeaders(const std::vector<std::unique_ptr<Metric>>& metrics);
 void PrintMetrics(const std::vector<std::unique_ptr<Metric>>& metrics);
