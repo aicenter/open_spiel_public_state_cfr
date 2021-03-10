@@ -46,6 +46,8 @@ std::unique_ptr<Metric> MakeFullTrunkExplMetric(
     algorithms::ortools::SequenceFormLpSpecification* whole_game);
 
 void ComputeMetrics(std::vector<std::unique_ptr<Metric>>& metrics);
+void PrintHeaders(const std::vector<std::unique_ptr<Metric>>& metrics);
+void PrintMetrics(const std::vector<std::unique_ptr<Metric>>& metrics);
 
 }  //  papers_with_code
 }  //  open_spiel

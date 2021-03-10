@@ -190,24 +190,6 @@ std::shared_ptr<NetEvaluator> MakeEvaluator(
   }
 }
 
-void PrintHeaders(const std::vector<std::unique_ptr<Metric>>& metrics) {
-  std::cout << "loop,avg_loss";
-  for (const std::unique_ptr<Metric>& metric : metrics) {
-    std::cout << ',';
-    metric->PrintHeader(std::cout);
-  }
-  std::cout << std::endl;
-}
-
-void PrintMetrics(int loop, double avg_loss,
-                  const std::vector<std::unique_ptr<Metric>>& metrics) {
-  std::cout << loop << ',' << avg_loss;
-  for (const std::unique_ptr<Metric>& metric : metrics) {
-    std::cout << ',';
-    metric->PrintMetric(std::cout);
-  }
-  std::cout << std::endl;
-}
 
 double TrainNetwork(ValueNet* model, torch::Device* device,
                     torch::optim::Optimizer* optimizer,
@@ -331,7 +313,10 @@ void TrainEvalLoop() {
   }
 
   // 6. The train-eval loop.
+  std::cout << "loop,avg_loss";
   PrintHeaders(metrics);
+  std::cout << std::endl;
+
   for (int loop = 0; loop < num_loops; ++loop) {
     std::cout << "# Training  ";
     model->train();  // Train mode.
@@ -347,7 +332,9 @@ void TrainEvalLoop() {
     std::cout << "# Evaluating " << std::endl;
     model->eval();  // Eval mode.
     ComputeMetrics(metrics);
-    PrintMetrics(loop, cumul_loss / train_batches, metrics);
+    std::cout << loop << ',' << cumul_loss / train_batches;
+    PrintMetrics(metrics);
+    std::cout << std::endl;
 
     DecayLearningRate(optimizer, lr_decay);
 //    PrintTrunkStrategies(trunk_with_net.get());
@@ -358,8 +345,6 @@ void TrainEvalLoop() {
 }  // namespace open_spiel
 
 int main(int argc, char** argv) {
-  using namespace open_spiel::papers_with_code;
   INIT_EXPERIMENT();
-
-  TrainEvalLoop();
+  open_spiel::papers_with_code::TrainEvalLoop();
 }

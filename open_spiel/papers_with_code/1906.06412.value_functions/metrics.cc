@@ -176,6 +176,18 @@ void ComputeMetrics(std::vector<std::unique_ptr<Metric>>& metrics) {
     std::cout << std::endl;
   }
 }
+void PrintHeaders(const std::vector<std::unique_ptr<Metric>>& metrics) {
+  for (const std::unique_ptr<Metric>& metric : metrics) {
+    std::cout << ',';
+    metric->PrintHeader(std::cout);
+  }
+}
+void PrintMetrics(const std::vector<std::unique_ptr<Metric>>& metrics) {
+  for (const std::unique_ptr<Metric>& metric : metrics) {
+    std::cout << ',';
+    metric->PrintMetric(std::cout);
+  }
+}
 
 //class UniformISTreePolicy : public Policy {
 //  const std::vector<std::shared_ptr<InfostateTree>>& trees_;
