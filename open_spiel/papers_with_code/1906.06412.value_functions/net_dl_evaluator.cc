@@ -55,7 +55,7 @@ void ParticleNetEvaluator::EvaluatePublicState(
   ParticlesInContext point = batch_->point_at(0);
   // !! Do not shuffle, so that we can get back the values in an ordered way !!
   WriteParticles(*state, *net_context, *dims_, &point, /*rnd_gen=*/nullptr,
-                 /*shuffle_input_output=*/false);
+      /*shuffle_input_output=*/false);
 
   // Input must be batched.
   torch::Tensor input = point.data.to(*device_).unsqueeze(/*dim=*/0);
@@ -88,6 +88,28 @@ void PositionalNetEvaluator::EvaluatePublicState(
   CopyValuesNetToTree(&point, *state, *net_context);
 }
 
+std::shared_ptr<NetEvaluator> MakeNetEvaluator(
+    BasicDims* dims, HandInfo* hand_info, ValueNet* model,
+    BatchData* eval_batch, torch::Device* device) {
+  switch (model->architecture()) {
+    case NetArchitecture::kParticle: {
+      auto particle_model =
+          open_spiel::down_cast<ParticleValueNet*>(model);
+      auto particle_dims =
+          open_spiel::down_cast<ParticleDims*>(dims);
+      return std::make_shared<ParticleNetEvaluator>(
+          hand_info, particle_model, particle_dims, eval_batch, device);
+    }
+    case NetArchitecture::kPositional: {
+      auto positional_model =
+          open_spiel::down_cast<PositionalValueNet*>(model);
+      auto positional_dims =
+          open_spiel::down_cast<PositionalDims*>(dims);
+      return std::make_shared<PositionalNetEvaluator>(
+          hand_info, positional_model, positional_dims, eval_batch, device);
+    }
+  }
+}
 }  // namespace papers_with_code
 }  // namespace open_spiel
 

@@ -86,6 +86,12 @@ struct ParticleValueNet final : public ValueNet {
   int regression_size() { return dims->max_particles; }
 };
 
+
+std::unique_ptr<ValueNet> MakeModel(NetArchitecture arch, BasicDims* dims,
+                                    int num_layers_regression,
+                                    int num_width_regression);
+
+
 }  // namespace papers_with_code
 }  // namespace open_spiel
 

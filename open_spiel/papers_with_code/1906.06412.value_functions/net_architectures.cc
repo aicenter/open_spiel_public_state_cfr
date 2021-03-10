@@ -208,6 +208,27 @@ torch::Tensor Activation(ActivationFunction f, torch::Tensor x) {
       return torch::sigmoid(x);
   }
 }
+std::unique_ptr<ValueNet> MakeModel(
+    NetArchitecture arch, BasicDims* dims,
+    int num_layers_regression, int num_width_regression) {
+  SPIEL_CHECK_GE(num_layers_regression, 1);
+  SPIEL_CHECK_GE(num_width_regression, 1);
+  switch (arch) {
+    case NetArchitecture::kParticle: {
+      auto particle_dims = open_spiel::down_cast<ParticleDims*>(dims);
+      auto model = std::make_unique<ParticleValueNet>(
+          particle_dims, num_layers_regression, num_width_regression,
+          ActivationFunction::kRelu);
+      return model;
+    }
+    case NetArchitecture::kPositional: {
+      auto positional_dims = open_spiel::down_cast<PositionalDims*>(dims);
+      return std::make_unique<PositionalValueNet>(
+          positional_dims, num_layers_regression, num_width_regression,
+          ActivationFunction::kRelu);
+    }
+  }
+}
 
 }  // namespace papers_with_code
 }  // namespace open_spiel

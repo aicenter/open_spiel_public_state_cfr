@@ -151,52 +151,6 @@ void FillExperienceReplay(ExpReplayInitPolicy init,
   }
 }
 
-std::unique_ptr<ValueNet> MakeModel(NetArchitecture arch, BasicDims* dims) {
-  int num_layers_regression = absl::GetFlag(FLAGS_num_layers);
-  int num_width_regression = absl::GetFlag(FLAGS_num_width);
-  SPIEL_CHECK_GE(num_layers_regression, 1);
-  SPIEL_CHECK_GE(num_width_regression, 1);
-  switch(arch) {
-    case NetArchitecture::kParticle: {
-      auto particle_dims = open_spiel::down_cast<ParticleDims*>(dims);
-      auto model = std::make_unique<ParticleValueNet>(
-          particle_dims, num_layers_regression, num_width_regression,
-          ActivationFunction::kRelu);
-      return model;
-    }
-    case NetArchitecture::kPositional: {
-      auto positional_dims = open_spiel::down_cast<PositionalDims*>(dims);
-      return std::make_unique<PositionalValueNet>(
-          positional_dims, num_layers_regression, num_width_regression,
-          ActivationFunction::kRelu);
-    }
-  }
-}
-
-std::shared_ptr<NetEvaluator> MakeEvaluator(
-    BasicDims* dims, HandInfo* hand_info, ValueNet* model,
-    BatchData* eval_batch, torch::Device* device) {
-  switch(model->architecture()) {
-    case NetArchitecture::kParticle: {
-      auto particle_model =
-          open_spiel::down_cast<ParticleValueNet*>(model);
-      auto particle_dims =
-          open_spiel::down_cast<ParticleDims*>(dims);
-      return std::make_shared<ParticleNetEvaluator>(
-          hand_info, particle_model, particle_dims, eval_batch, device);
-    }
-    case NetArchitecture::kPositional: {
-      auto positional_model =
-          open_spiel::down_cast<PositionalValueNet*>(model);
-      auto positional_dims =
-          open_spiel::down_cast<PositionalDims*>(dims);
-      return std::make_shared<PositionalNetEvaluator>(
-          hand_info, positional_model, positional_dims, eval_batch, device);
-    }
-  }
-}
-
-
 std::vector<std::unique_ptr<Metric>> MakeMetrics(
     Trunk* full_trunk,
     ortools::SequenceFormLpSpecification* whole_game,
@@ -300,7 +254,9 @@ void TrainEvalLoop() {
 
   // 2. Create network and optimizer.
   torch::Device device = FindDevice();
-  std::unique_ptr<ValueNet> model = MakeModel(arch, dims.get());
+  std::unique_ptr<ValueNet> model = MakeModel(arch, dims.get(),
+                                              absl::GetFlag(FLAGS_num_layers),
+                                              absl::GetFlag(FLAGS_num_width));
   model->to(device);
   const auto options = torch::optim::AdamOptions()
       .lr(absl::GetFlag(FLAGS_learning_rate));
@@ -315,7 +271,7 @@ void TrainEvalLoop() {
   // TODO: Maybe extend this to parallel evaluation?
   BatchData eval_batch(1, dims->point_input_size(), dims->point_output_size());
   // Use eval batch only for the net evaluator.
-  std::shared_ptr<NetEvaluator> net_evaluator = MakeEvaluator(
+  std::shared_ptr<NetEvaluator> net_evaluator = MakeNetEvaluator(
       dims.get(), t->hand_info.get(), model.get(), &eval_batch, &device);
   auto trunk_with_net = std::make_unique<dlcfr::DepthLimitedCFR>(
       t->game, t->trunk_trees, net_evaluator, t->terminal_evaluator,

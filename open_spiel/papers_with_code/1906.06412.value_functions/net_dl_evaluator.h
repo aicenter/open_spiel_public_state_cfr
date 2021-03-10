@@ -96,6 +96,10 @@ class PositionalNetEvaluator final : public NetEvaluator {
                            PublicStateContext* context) const override;
 };
 
+std::shared_ptr<NetEvaluator> MakeNetEvaluator(
+    BasicDims* dims, HandInfo* hand_info, ValueNet* model,
+    BatchData* eval_batch, torch::Device* device);
+
 }  // namespace papers_with_code
 }  // namespace open_spiel
 
