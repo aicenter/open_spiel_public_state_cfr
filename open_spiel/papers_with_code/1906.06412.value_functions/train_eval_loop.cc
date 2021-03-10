@@ -53,17 +53,17 @@ ABSL_FLAG(int, num_width, 3, "Multiplicative constant of the number of neurons "
 
 // -- Metrics --
 // FullTrunkExplMetric
-ABSL_FLAG(std::string, trunk_expl_iterations, "1,2,5,10,20,50,100,200,500,1000",
+ABSL_FLAG(std::string, trunk_expl_iterations, "",
           "Evaluate trunk exploitability for each trunk iteration.");
 // SparseRootsExplMetric
-ABSL_FLAG(std::string, roots_expl_iterations, "",
+ABSL_FLAG(std::string, sparse_expl_iterations, "",
           "Evaluate roots exploitability for each sparse trunk iteration.");
 ABSL_FLAG(int, sparse_roots_depth, 0,
           "The depth at which sparse roots should be found.");
-ABSL_FLAG(double, support_threshold, 1e-5,
+ABSL_FLAG(double, sparse_support_threshold, 1e-5,
           "Pruning threshold for not playing actions from equilibrium, "
           "used for trunk sparsification.");
-ABSL_FLAG(bool, prune_chance_histories, false,
+ABSL_FLAG(bool, sparse_prune_chance_histories, false,
           "If true, do not start at chance histories.");
 
 
@@ -168,16 +168,16 @@ std::vector<std::unique_ptr<Metric>> MakeMetrics(
   }
 
   {
-    const std::vector<int> roots_expl_iterations =
-        ItersFromString(absl::GetFlag(FLAGS_roots_expl_iterations));
-    if (!roots_expl_iterations.empty()) {
+    const std::vector<int> sparse_expl_iterations =
+        ItersFromString(absl::GetFlag(FLAGS_sparse_expl_iterations));
+    if (!sparse_expl_iterations.empty()) {
       out.push_back(MakeSparseRootsExplMetric(
         full_trunk, whole_game, net_evaluator,
         // Settings.
-        roots_expl_iterations,
+        sparse_expl_iterations,
         absl::GetFlag(FLAGS_sparse_roots_depth),
-        absl::GetFlag(FLAGS_support_threshold),
-        absl::GetFlag(FLAGS_prune_chance_histories)));
+        absl::GetFlag(FLAGS_sparse_support_threshold),
+        absl::GetFlag(FLAGS_sparse_prune_chance_histories)));
     }
   }
   return out;
@@ -209,7 +209,7 @@ void DecayLearningRate(torch::optim::Optimizer& optimizer, double lr_decay) {
 
 void TrainEvalLoop() {
   // Replicable experiments FTW!
-  int seed = absl::GetFlag(FLAGS_seed);
+  const int seed = absl::GetFlag(FLAGS_seed);
   torch::manual_seed(seed);
   std::mt19937 rnd_gen(seed);
 
@@ -279,7 +279,16 @@ void TrainEvalLoop() {
       MakeBanditVectors(t->trunk_trees, use_bandits_for_cfr));
   auto net_contexts = trunk_with_net->contexts_as<NetContext>();
 
-  // 4. Make experience replay buffer.
+  // 4. Create training metrics.
+  std::vector<std::unique_ptr<Metric>> metrics = MakeMetrics(
+      t.get(), &whole_game, net_evaluator, trunk_with_net.get());
+  std::cout << "# Using evaluation metrics: ";
+  for(const std::unique_ptr<Metric>& metric : metrics) {
+    std::cout << metric->name() << " ";
+  }
+  std::cout << "\n";
+
+  // 5. Make experience replay buffer.
   std::cout << "# Allocating experience replay buffer: "
             << experience_replay_buffer_size << " sample points ("
             << experience_replay_buffer_size
@@ -290,10 +299,6 @@ void TrainEvalLoop() {
                                      dims->point_output_size());
   FillExperienceReplay(init_policy, *dims, arch, &experience_replay, t.get(),
                        net_contexts, &whole_game, rnd_gen);
-
-  // 5. Create training metrics.
-  std::vector<std::unique_ptr<Metric>> metrics = MakeMetrics(
-      t.get(), &whole_game, net_evaluator, trunk_with_net.get());
 
   // 6. The train-eval loop.
   std::cout << "loop,avg_loss";

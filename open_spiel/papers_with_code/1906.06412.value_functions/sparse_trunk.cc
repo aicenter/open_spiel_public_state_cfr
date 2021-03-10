@@ -110,8 +110,8 @@ std::vector<std::unique_ptr<SparseTrunk>> MakeSparseTrunks(
   //    public states, infostates and associated histories.
   std::shared_ptr<LeafEvaluator> dummy_eval = MakeDummyEvaluator();
   DepthLimitedCFR temp_trunk(game, roots_depth, dummy_eval, terminal_evaluator);
-  std::cout << "# Temp trunk public states stats: \n";
-  PrintPublicStatesStats(temp_trunk.public_leaves());
+//  std::cout << "# Temp trunk public states stats: \n";
+//  PrintPublicStatesStats(temp_trunk.public_leaves());
 
   // 2. For each decision infostate, make a random subset of histories
   //    within the public state + 1 special history that surely belongs
@@ -126,7 +126,7 @@ std::vector<std::unique_ptr<SparseTrunk>> MakeSparseTrunks(
       }
     }
   }
-  std::cout << "# Making " << num_sparse_trunks << " sparse trunks\n";
+//  std::cout << "# Making " << num_sparse_trunks << " sparse trunks\n";
   std::vector<std::unique_ptr<SparseTrunk>> sparse_trunks;
   sparse_trunks.reserve(num_sparse_trunks);
 
@@ -303,7 +303,7 @@ std::unique_ptr<SparseTrunk> MakeSparseTrunkWithEqSupport(
 
     std::unique_ptr<State>& s = all_start_states[i];
     if (s->IsPlayerNode()) {
-      std::cout << "# " << all_start_chances[i] << std::endl;
+//      std::cout << "# " << all_start_chances[i] << std::endl;
     }
 
     if (in_support && (!prune_chance_histories || s->IsPlayerNode())) {
@@ -340,11 +340,11 @@ std::unique_ptr<SparseTrunk> MakeSparseTrunkWithEqSupport(
     }
   }
 
-  std::cout << "# All histories: " << all_start_states.size() << "\n";
-  std::cout << "# Histories with non-zero reach: " << num_hist_nonzero_reach << "\n";
-  std::cout << "# Selected starting histories: " << start_states_ptrs.size() << "\n";
-  std::cout << "# Fixate infostates: " << fixate_infostates.size() << "\n";
-  std::cout << "# Uniform infostates: " << uniform_infostates.size() << "\n";
+//  std::cout << "# All histories: " << all_start_states.size() << "\n";
+//  std::cout << "# Histories with non-zero reach: " << num_hist_nonzero_reach << "\n";
+//  std::cout << "# Selected starting histories: " << start_states_ptrs.size() << "\n";
+//  std::cout << "# Fixate infostates: " << fixate_infostates.size() << "\n";
+//  std::cout << "# Uniform infostates: " << uniform_infostates.size() << "\n";
 
   const int move_lim = trunk_depth - roots_depth;
   std::vector<std::shared_ptr<InfostateTree>> sparse_trees = {
