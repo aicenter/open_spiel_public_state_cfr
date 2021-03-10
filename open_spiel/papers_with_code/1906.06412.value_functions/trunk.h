@@ -55,7 +55,7 @@ void WriteParticles(
     const algorithms::dlcfr::LeafPublicState& state,
     const NetContext& net_context,
     const ParticleDims& dims, ParticlesInContext* point,
-    std::mt19937* rnd_gen, bool shuffle_input, bool shuffle_output);
+    std::mt19937* rnd_gen, bool shuffle_input_output);
 
 void CopyValuesNetToTree(ParticlesInContext data_point,
                          algorithms::dlcfr::LeafPublicState& state,

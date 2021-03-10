@@ -59,7 +59,7 @@ void GenerateDataRandomRanges(
     Trunk* trunk, const std::vector<NetContext*>& contexts,
     const BasicDims& dims, NetArchitecture arch, ExperienceReplay* replay,
     double prob_pure_strat, double prob_fully_mixed,
-    std::mt19937& rnd_gen, bool shuffle_input, bool shuffle_output) {
+    std::mt19937& rnd_gen, bool shuffle_input_output) {
   trunk->fixable_trunk_with_oracle->Reset();
 
   // Randomize strategy in the trunk.
@@ -72,8 +72,7 @@ void GenerateDataRandomRanges(
   // Copy the leaves values to the experience replay.
   AddExperiencesFromTrunk(
       trunk->fixable_trunk_with_oracle->public_leaves(),
-      contexts, dims, arch, replay,
-      rnd_gen, shuffle_input, shuffle_output);
+      contexts, dims, arch, replay, rnd_gen, shuffle_input_output);
 
 //  if (verbose) {
 //    for (int i = 0; i < batch->batch_size; ++i) {
@@ -92,7 +91,7 @@ void GenerateDataDLCfrIterations(
     const BasicDims& dims, NetArchitecture arch, ExperienceReplay* replay,
     int trunk_iters,
     std::function<void(/*trunk_iter=*/int)> monitor_fn,
-    std::mt19937& rnd_gen, bool shuffle_input, bool shuffle_output) {
+    std::mt19937& rnd_gen, bool shuffle_input_output) {
   trunk->iterable_trunk_with_oracle->Reset();
   for (int iter = 1; iter <= trunk_iters; ++iter) {
     ++trunk->iterable_trunk_with_oracle->num_iterations_;
@@ -101,7 +100,7 @@ void GenerateDataDLCfrIterations(
 
     AddExperiencesFromTrunk(trunk->iterable_trunk_with_oracle->public_leaves(),
                             contexts, dims, arch, replay,
-                            rnd_gen, shuffle_input, shuffle_output);
+                            rnd_gen, shuffle_input_output);
     monitor_fn(iter);
 
     trunk->iterable_trunk_with_oracle->UpdateTrunk();
@@ -118,7 +117,7 @@ void AddExperiencesFromTrunk(
     const std::vector<algorithms::dlcfr::LeafPublicState>& public_leaves,
     const std::vector<NetContext*>& net_contexts,
     const BasicDims& dims, NetArchitecture arch, ExperienceReplay* replay,
-    std::mt19937& rnd_gen, bool shuffle_input, bool shuffle_output) {
+    std::mt19937& rnd_gen, bool shuffle_input_output) {
   for (int i = 0; i < public_leaves.size(); ++i) {
     const algorithms::dlcfr::LeafPublicState& leaf = public_leaves[i];
     if (leaf.IsTerminal()) continue;  // Add experiences only for non-terminals.
@@ -129,7 +128,7 @@ void AddExperiencesFromTrunk(
         auto particle_dims = open_spiel::down_cast<const ParticleDims&>(dims);
         ParticlesInContext data_point = replay->AddExperience(particle_dims);
         WriteParticles(leaf, net_context, particle_dims, &data_point,
-                       &rnd_gen, shuffle_input, shuffle_output);
+                       &rnd_gen, shuffle_input_output);
         break;
       }
       case NetArchitecture::kPositional: {

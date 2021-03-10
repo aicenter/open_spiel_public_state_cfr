@@ -41,10 +41,8 @@ ABSL_FLAG(std::string, use_bandits_for_cfr, "RegretMatchingPlus",
 ABSL_FLAG(std::string, data_generation, "random", "One of random,dl_cfr");
 ABSL_FLAG(double, prob_pure_strat, 0.1, "Params for random generation.");
 ABSL_FLAG(double, prob_fully_mixed, 0.05, "Params for random generation.");
-ABSL_FLAG(bool, shuffle_input, false,
-          "Should experience replay particle data input be shuffled?");
-ABSL_FLAG(bool, shuffle_output, false,
-          "Should experience replay particle data output be shuffled?");
+ABSL_FLAG(bool, shuffle_input_output, false,
+          "Should experience replay particle data input/output be shuffled?");
 ABSL_FLAG(int, limit_particle_count, -1,
           "How many particles should be used at most in neural network training?"
           " -1 for all.");
@@ -108,9 +106,7 @@ void FillExperienceReplay(ExpReplayInitPolicy init,
             std::cout << "# " << trunk_iter << "," << expl << std::endl;
           }
         },
-        rnd_gen,
-        absl::GetFlag(FLAGS_shuffle_input),
-        absl::GetFlag(FLAGS_shuffle_output));
+        rnd_gen, absl::GetFlag(FLAGS_shuffle_input_output));
       std::cout << "# </ref_expl>\n";
       break;
     }
@@ -123,8 +119,7 @@ void FillExperienceReplay(ExpReplayInitPolicy init,
                                  absl::GetFlag(FLAGS_prob_pure_strat),
                                  absl::GetFlag(FLAGS_prob_fully_mixed),
                                  rnd_gen,
-                                 absl::GetFlag(FLAGS_shuffle_input),
-                                 absl::GetFlag(FLAGS_shuffle_output));
+                                 absl::GetFlag(FLAGS_shuffle_input_output));
       }
       std::cout << std::endl;
       break;
@@ -284,9 +279,8 @@ void TrainEvalLoop() {
   // TODO: Maybe extend this to parallel evaluation?
   BatchData eval_batch(1, dims->point_input_size(), dims->point_output_size());
   // Use eval batch only for the net evaluator.
-  std::shared_ptr<NetEvaluator> net_evaluator =  // TODO: rename to VF
-      MakeEvaluator(dims.get(), t->hand_info.get(), model.get(),
-                    &eval_batch, &device);
+  std::shared_ptr<NetEvaluator> net_evaluator = MakeEvaluator(
+      dims.get(), t->hand_info.get(), model.get(), &eval_batch, &device);
   auto trunk_with_net = std::make_unique<dlcfr::DepthLimitedCFR>(
       t->game, t->trunk_trees, net_evaluator, t->terminal_evaluator,
       t->public_observer,

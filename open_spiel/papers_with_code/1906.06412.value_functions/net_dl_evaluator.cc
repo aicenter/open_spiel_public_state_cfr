@@ -55,7 +55,7 @@ void ParticleNetEvaluator::EvaluatePublicState(
   ParticlesInContext point = batch_->point_at(0);
   // !! Do not shuffle, so that we can get back the values in an ordered way !!
   WriteParticles(*state, *net_context, *dims_, &point, /*rnd_gen=*/nullptr,
-                 /*shuffle_input=*/false, /*shuffle_output=*/false);
+                 /*shuffle_input_output=*/false);
 
   // Input must be batched.
   torch::Tensor input = point.data.to(*device_).unsqueeze(/*dim=*/0);

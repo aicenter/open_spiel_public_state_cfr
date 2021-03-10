@@ -115,7 +115,7 @@ void WritePositionalHand(int net_id, absl::Span<float_net> write_to) {
 void WriteParticles(const algorithms::dlcfr::LeafPublicState& state,
                     const NetContext& net_context,
                     const ParticleDims& dims, ParticlesInContext* point,
-                    std::mt19937* rnd_gen, bool shuffle_input, bool shuffle_output) {
+                    std::mt19937* rnd_gen, bool shuffle_input_output) {
   // Important !!
   point->Reset();
 
@@ -123,7 +123,7 @@ void WriteParticles(const algorithms::dlcfr::LeafPublicState& state,
   int num_particles = state.leaf_nodes[0].size() + state.leaf_nodes[1].size();
   // Make a random permutation if something should be shuffled.
   std::vector<int> particle_placement(num_particles);
-  if (shuffle_input || shuffle_output) {
+  if (shuffle_input_output) {
     SPIEL_CHECK_TRUE(rnd_gen);
     std::iota(particle_placement.begin(), particle_placement.end(), 0);
     std::shuffle(particle_placement.begin(), particle_placement.end(),
@@ -135,7 +135,7 @@ void WriteParticles(const algorithms::dlcfr::LeafPublicState& state,
   for (int pl = 0; pl < 2; ++pl) {
     for (int j = 0; j < state.leaf_nodes[pl].size(); j++) {
       ParticleData particle = point->particle_at(
-          dims, shuffle_input ? particle_placement[i] : i);
+          dims, shuffle_input_output ? particle_placement[i] : i);
       Copy(state.public_tensor.Tensor(), particle.public_features());
       // Hand features.
       if(dims.write_hand_features_positionally()) {
@@ -157,7 +157,7 @@ void WriteParticles(const algorithms::dlcfr::LeafPublicState& state,
   for (int pl = 0; pl < 2; ++pl) {
     for (int j = 0; j < state.leaf_nodes[pl].size(); j++) {
       ParticleData particle = point->particle_at(
-          dims, shuffle_output ? particle_placement[i] : i);
+          dims, shuffle_input_output ? particle_placement[i] : i);
       particle.value() = state.values[pl][j];
       i++;
     }

@@ -52,19 +52,19 @@ void AddExperiencesFromTrunk(
     const std::vector<algorithms::dlcfr::LeafPublicState>& public_leaves,
     const std::vector<NetContext*>& net_contexts,
     const BasicDims& dims, NetArchitecture arch, ExperienceReplay* replay,
-    std::mt19937& rnd_gen, bool shuffle_input, bool shuffle_output);
+    std::mt19937& rnd_gen, bool shuffle_input_output);
 
 void GenerateDataRandomRanges(
     Trunk* trunk, const std::vector<NetContext*>& contexts,
     const BasicDims& dims, NetArchitecture arch, ExperienceReplay* replay,
     double prob_pure_strat, double prob_fully_mixed,
-    std::mt19937& rnd_gen, bool shuffle_input, bool shuffle_output);
+    std::mt19937& rnd_gen, bool shuffle_input_output);
 
 void GenerateDataDLCfrIterations(
     Trunk* trunk, const std::vector<NetContext*>& contexts,
     const BasicDims& dims, NetArchitecture arch, ExperienceReplay* replay,
     int trunk_iters, std::function<void(/*trunk_iter=*/int)> monitor_fn,
-    std::mt19937& rnd_gen, bool shuffle_input, bool shuffle_output);
+    std::mt19937& rnd_gen, bool shuffle_input_output);
 
 }  // papers_with_code
 }  // open_spiel
