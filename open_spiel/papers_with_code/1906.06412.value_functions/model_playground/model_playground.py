@@ -117,13 +117,13 @@ def linear_model_experiment():
   X_train, Y_train = make_data()
   X_test, Y_test = make_data()
 
-  for i in range(1000):
+  for i in range(3000):
     optimizer.zero_grad()
     Y_train_pred = model.forward(X_train)
     train_loss = loss_fn(Y_train, Y_train_pred)
     train_loss.backward()
     optimizer.step()
-    if i % 100 == 0:
+    if i % 10 == 0:
       with torch.no_grad():
         Y_test_pred = model.forward(X_test)
         test_loss = loss_fn(Y_test, Y_test_pred)
@@ -338,7 +338,7 @@ if __name__ == '__main__':
   args = parser.parse_args()
 
   print("steps,train_loss,test_loss")
-  particle_model_experiment(dim_m)
-  # linear_model_experiment()
+  # particle_model_experiment(dim_m)
+  linear_model_experiment()
   # contextual_model_experiment()
   # pw_linear_model_experiment()

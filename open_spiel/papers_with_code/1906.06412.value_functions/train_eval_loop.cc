@@ -266,10 +266,13 @@ void TrainEvalLoop() {
   std::cout << "# Batch size: " << batch_size << "\n";
   // Train on multiple public states at once.
   BatchData train_batch(batch_size,
-                        dims->point_input_size(), dims->point_output_size());
+                        dims->point_input_size(),
+                        dims->point_output_size());
   // Evaluate a single public state.
   // TODO: Maybe extend this to parallel evaluation?
-  BatchData eval_batch(1, dims->point_input_size(), dims->point_output_size());
+  BatchData eval_batch(1,
+                       dims->point_input_size(),
+                       dims->point_output_size());
   // Use eval batch only for the net evaluator.
   std::shared_ptr<NetEvaluator> net_evaluator = MakeNetEvaluator(
       dims.get(), t->hand_info.get(), model.get(), &eval_batch, &device);

@@ -347,16 +347,18 @@ std::unique_ptr<SparseTrunk> MakeSparseTrunkWithEqSupport(
 //  std::cout << "# Uniform infostates: " << uniform_infostates.size() << "\n";
 
   const int move_lim = trunk_depth - roots_depth;
-  std::vector<std::shared_ptr<InfostateTree>> sparse_trees = {
-      MakeInfostateTree(start_states_ptrs, start_chances, infostate_observer,
-          /*pl=*/0, /*max_move_ahead_limit=*/move_lim),
-      MakeInfostateTree(start_states_ptrs, start_chances, infostate_observer,
-          /*pl=*/1, /*max_move_ahead_limit=*/move_lim)
-  };
   auto sparse_trunk = std::make_unique<SparseTrunk>();
-  sparse_trunk->dlcfr = std::make_unique<DepthLimitedCFR>(
-      game, sparse_trees, leaf_evaluator, terminal_evaluator,
-      public_observer, MakeBanditVectors(sparse_trees, bandits_for_cfr));
+  if (!fixate_infostates.empty()) {
+    std::vector<std::shared_ptr<InfostateTree>> sparse_trees = {
+        MakeInfostateTree(start_states_ptrs, start_chances, infostate_observer,
+            /*pl=*/0, /*max_move_ahead_limit=*/move_lim),
+        MakeInfostateTree(start_states_ptrs, start_chances, infostate_observer,
+            /*pl=*/1, /*max_move_ahead_limit=*/move_lim)
+    };
+    sparse_trunk->dlcfr = std::make_unique<DepthLimitedCFR>(
+        game, sparse_trees, leaf_evaluator, terminal_evaluator,
+        public_observer, MakeBanditVectors(sparse_trees, bandits_for_cfr));
+  }
   sparse_trunk->fixate_infostates = fixate_infostates;
   sparse_trunk->uniform_infostates = uniform_infostates;
 
