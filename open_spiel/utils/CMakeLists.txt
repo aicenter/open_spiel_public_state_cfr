@@ -22,6 +22,7 @@ add_library (utils OBJECT
   serialization.h
   stats.h
   tensor_view.h
+  tree_map.h
   thread.h
   thread.cc
   threaded_queue.h

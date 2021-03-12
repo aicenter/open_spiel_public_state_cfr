@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "open_spiel/spiel.h"
+#include "open_spiel/utils/tree_map.h"
 
 // This file contains data structures used in imperfect information games.
 // Specifically, we implement an infostate tree, a representation of a game
@@ -257,11 +258,15 @@ class Range {
 // Forward declaration.
 class InfostateNode;
 
+constexpr int kDefaultMoveAheadLimit = 1000;
+constexpr bool kDefaultSaveHistories = false;
+
 // Creates an infostate tree for a player based on the initial state
 // of the game, up to some move limit.
-std::shared_ptr<InfostateTree> MakeInfostateTree(const Game& game,
-                                                 Player acting_player,
-                                                 int max_move_limit = 1000);
+std::shared_ptr<InfostateTree> MakeInfostateTree(
+    const Game& game, Player acting_player,
+    int max_move_ahead_limit = kDefaultMoveAheadLimit,
+    bool store_history_mapping = kDefaultSaveHistories);
 
 // Creates an infostate tree for a player based on some start states,
 // up to some move limit from the deepest start state.
@@ -269,21 +274,24 @@ std::shared_ptr<InfostateTree> MakeInfostateTree(
     const std::vector<const State*>& start_states,
     const std::vector<double>& chance_reach_probs,
     std::shared_ptr<Observer> infostate_observer, Player acting_player,
-    int max_move_ahead_limit = 1000);
+    int max_move_ahead_limit = kDefaultMoveAheadLimit,
+    bool store_history_mapping = kDefaultSaveHistories);
 
 // Creates an infostate tree based on some leaf infostate nodes coming from
 // another infostate tree, up to some move limit.
 // This is useful for easily constructing (depth-limited) tree continuations.
 std::shared_ptr<InfostateTree> MakeInfostateTree(
     const std::vector<const InfostateNode*>& start_nodes,
-    int max_move_ahead_limit = 1000);
+    int max_move_ahead_limit = kDefaultMoveAheadLimit,
+    bool store_history_mapping = kDefaultSaveHistories);
 
 // C++17 does not allow implicit conversion of non-const pointers to const
 // pointers within a vector - explanation: https://stackoverflow.com/a/2102415
 // This just adds const to the pointers and calls the other MakeInfostateTree.
 std::shared_ptr<InfostateTree> MakeInfostateTree(
     const std::vector<InfostateNode*>& start_nodes,
-    int max_move_ahead_limit = 1000);
+    int max_move_ahead_limit = kDefaultMoveAheadLimit,
+    bool store_history_mapping = kDefaultSaveHistories);
 
 class InfostateTree final {
   // Note that only MakeInfostateTree is allowed to call the constructor
@@ -294,15 +302,16 @@ class InfostateTree final {
   InfostateTree(const std::vector<const State*>& start_states,
                 const std::vector<double>& chance_reach_probs,
                 std::shared_ptr<Observer> infostate_observer,
-                Player acting_player, int max_move_ahead_limit);
+                Player acting_player, int max_move_ahead_limit,
+                bool store_history_mapping);
   // Friend factories.
   friend std::shared_ptr<InfostateTree> MakeInfostateTree(const Game&, Player,
-                                                          int);
+                                                          int, bool);
   friend std::shared_ptr<InfostateTree> MakeInfostateTree(
       const std::vector<const State*>&, const std::vector<double>&,
-      std::shared_ptr<Observer>, Player, int);
+      std::shared_ptr<Observer>, Player, int, bool);
   friend std::shared_ptr<InfostateTree> MakeInfostateTree(
-      const std::vector<const InfostateNode*>&, int);
+      const std::vector<const InfostateNode*>&, int, bool);
 
  public:
   // -- Root accessors ---------------------------------------------------------
@@ -392,6 +401,11 @@ class InfostateTree final {
   // This consumes the gradient vector, as it is used to compute the value.
   double BestResponseValue(LeafVector<double>&& gradient) const;
 
+  // Lookup infostate node by a given state. Returns null if state is not found.
+  // The tree must be constructed with the flag store_history_mapping enabled.
+  // (Not a default behaviour!)
+  InfostateNode* GetNodeByState(const State& state) const;
+
   // -- For debugging ----------------------------------------------------------
   std::ostream& operator<<(std::ostream& os) const;
 
@@ -406,6 +420,9 @@ class InfostateTree final {
   std::vector<InfostateNode*> sequences_;
   // The last vector corresponds to the leaf nodes.
   std::vector<std::vector<InfostateNode*>> nodes_at_depths_;
+  // If enabled by the flag store_history_mapping, store the mapping of
+  // state histories -> infostate nodes. The history consists of flat actions.
+  TreeMap<Action, InfostateNode*> history_mapping_;
 
   // Utility functions whenever we create a new node for the tree.
   std::unique_ptr<InfostateNode> MakeNode(InfostateNode* parent,
@@ -424,19 +441,23 @@ class InfostateTree final {
 
   void UpdateLeafNode(InfostateNode* node, const State& state,
                       size_t leaf_depth, double chance_reach_probs);
+  void UpdateHistoryMapping(InfostateNode* node, const State& state);
 
   // Build the tree.
   void RecursivelyBuildTree(InfostateNode* parent, size_t depth,
                             const State& state, int move_limit,
-                            double chance_reach_prob);
+                            double chance_reach_prob,
+                            bool store_history_mapping);
   void BuildTerminalNode(InfostateNode* parent, size_t depth,
                          const State& state, double chance_reach_prob);
   void BuildDecisionNode(InfostateNode* parent, size_t depth,
                          const State& state, int move_limit,
-                         double chance_reach_prob);
+                         double chance_reach_prob,
+                         bool store_history_mapping);
   void BuildObservationNode(InfostateNode* parent, size_t depth,
                             const State& state, int move_limit,
-                            double chance_reach_prob);
+                            double chance_reach_prob,
+                            bool store_history_mapping);
 
   void CollectNodesAtDepth(InfostateNode* node, size_t depth);
   void LabelNodesWithIds();
