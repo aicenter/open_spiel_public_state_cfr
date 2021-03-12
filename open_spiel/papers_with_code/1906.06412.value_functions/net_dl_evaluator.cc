@@ -52,21 +52,21 @@ void ParticleNetEvaluator::EvaluatePublicState(
   auto net_context = open_spiel::down_cast<NetContext*>(context);
   torch::NoGradGuard no_grad_guard;  // We run only inference.
 
-  ParticlesInContext point = batch_->point_at(0, *dims_);
+  ParticleDataPoint point = batch_->point_at(0, *dims_);
   // !! Do not shuffle, so that we can get back the values in an ordered way !!
-  WriteParticles(*state, *net_context, *dims_, &point,
-                 /*rnd_gen=*/nullptr, /*shuffle_input_output=*/false);
+  WriteParticleDataPoint(*state, *net_context, *dims_, &point,
+                         /*rnd_gen=*/nullptr, /*shuffle_input_output=*/false);
 
   // Input must be batched.
   torch::Tensor input = point.data.to(*device_).unsqueeze(/*dim=*/0);
   // The output must be "unbatched".
   torch::Tensor output = model_->forward(input).squeeze(/*dim=*/0);
   SPIEL_DCHECK_EQ(output.sizes().size(), 1);
-  SPIEL_DCHECK_EQ(output.size(/*dim=*/0), point.num_particles());
-  point.target.index_put_({Slice(0, point.num_particles())}, output);
+  SPIEL_DCHECK_EQ(output.size(/*dim=*/0), point.num_parviews());
+  point.target.index_put_({Slice(0, point.num_parviews())}, output);
 
   // !! This does not work with shuffling !!
-  CopyValuesNetToTree(point, *state, *dims_);
+  CopyValuesFromNetToTree(point, *state, *dims_);
 }
 
 void PositionalNetEvaluator::EvaluatePublicState(
@@ -79,7 +79,7 @@ void PositionalNetEvaluator::EvaluatePublicState(
   torch::NoGradGuard no_grad_guard;  // We run only inference.
 
   PositionalData point = batch_->point_at(0, *dims_);
-  WritePositional(*state, *net_context, *dims_, &point);
+  WritePositionalDataPoint(*state, *net_context, *dims_, &point);
 
   torch::Tensor input = point.data.to(*device_);
   torch::Tensor output = model_->forward(input);

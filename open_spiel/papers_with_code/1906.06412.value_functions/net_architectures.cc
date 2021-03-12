@@ -92,8 +92,8 @@ ParticleValueNet::ParticleValueNet(ParticleDims* particle_dims,
   int num_layers_kernel = 4;
 
   MakeLayers(fc_basis, num_layers_kernel,
-             dims->particle_size() - 1,
-             dims->particle_size() * 3,
+             dims->parview_size() - 1,
+             dims->parview_size() * 3,
              pooled_size());
   MakeLayers(fc_regression, num_layers_regression,
              context_size(),
@@ -144,59 +144,61 @@ torch::Tensor ParticleValueNet::forward(torch::Tensor xss) {
   for (int i = 0; i < batch_size; ++i) {
     torch::Tensor xs = xss[i];                                                  CHECK_SHAPE(xs, {dims->point_input_size()});
     // Convert fp32 to int -- for our small numbers < 1e7 this is ok.
-    int num_particles = xs[0].item<float_net>();                                SPIEL_CHECK_GT(num_particles, 0);
-                                                                                SPIEL_CHECK_LT(num_particles, 1e7);
+    int num_parviews = xs[0].item<float_net>();                                 SPIEL_CHECK_GT(num_parviews, 0);
+                                                                                SPIEL_CHECK_LT(num_parviews, 1e7);
     // Take only an ordered subset of particles, as specified by the amount.
-    if (is_training() && limit_particle_count > 0) {
-      num_particles = std::min(num_particles, limit_particle_count);
+    if (is_training() && limit_parview_count > 0) {
+      num_parviews = std::min(num_parviews, limit_parview_count);
     }
     // FIXME: nice offsets!
     const int pub_features_offset = 1;
     torch::Tensor public_features = xs
-        // Skip the num_particles item.
+        // Skip the num_parviews item.
         .index({
           Slice(pub_features_offset,
                 pub_features_offset + dims->public_features_size)
         })
         .reshape({1, dims->public_features_size});                              CHECK_SHAPE(public_features, {1, dims->public_features_size});
 
-    const int num_particles_offset = 1 + dims->public_features_size;
-    torch::Tensor particles = xs
-        // Skip the num_particles + public features item.
+    const int num_parviews_offset = 1 + dims->public_features_size;
+    torch::Tensor parviews = xs
+        // Skip the num_parviews + public features item.
         .index({
-          Slice(num_particles_offset,
-                num_particles_offset + num_particles * dims->particle_size())
+          Slice(num_parviews_offset,
+                num_parviews_offset + num_parviews * dims->parview_size())
         })
-        // Rearrange into particles.
-        .reshape({num_particles, dims->particle_size()});                       CHECK_SHAPE(particles, {num_particles, dims->particle_size()});
+        // Rearrange into parviews.
+        .reshape({num_parviews, dims->parview_size()});                         CHECK_SHAPE(parviews, {num_parviews,
+                                                                                                       dims->parview_size()});
 
-    torch::Tensor fs = particles  // Skip the range input (as the last value).
-        .index({Slice(), Slice(0, dims->features_size())});                     CHECK_SHAPE(fs, {num_particles, dims->features_size()});
-    torch::Tensor ranges = particles  // Skip all features.
-        .index({Slice(), Slice(dims->features_size(), dims->particle_size())}); CHECK_SHAPE(ranges, {num_particles, 1});
+    torch::Tensor fs = parviews  // Skip the range input (as the last value).
+        .index({Slice(), Slice(0, dims->features_size())});                     CHECK_SHAPE(fs, {num_parviews, dims->features_size()});
+    torch::Tensor ranges = parviews  // Skip all features.
+        .index({Slice(), Slice(dims->features_size(),
+                               dims->parview_size())}); CHECK_SHAPE(ranges, {num_parviews, 1});
 
-    torch::Tensor bs = change_of_basis(fs);                                     CHECK_SHAPE(bs, {num_particles, pooled_size()});
-    torch::Tensor cs = base_coordinates(bs, ranges);                            CHECK_SHAPE(cs, {num_particles, pooled_size()});
+    torch::Tensor bs = change_of_basis(fs);                                     CHECK_SHAPE(bs, {num_parviews, pooled_size()});
+    torch::Tensor cs = base_coordinates(bs, ranges);                            CHECK_SHAPE(cs, {num_parviews, pooled_size()});
     torch::Tensor pooled = pool(cs).unsqueeze(/*dim=*/0);                       CHECK_SHAPE(pooled, {1, pooled_size()});
     torch::Tensor context = torch::cat({pooled, public_features}, /*dim=*/1);   CHECK_SHAPE(context, {1, context_size()});
-    torch::Tensor ys = regression(context).expand({num_particles, -1});         CHECK_SHAPE(ys, {num_particles, regression_size()});
-    torch::Tensor proj = (ys * bs).sum(/*dim=*/1).unsqueeze(0);                 CHECK_SHAPE(proj, {1, num_particles});
+    torch::Tensor ys = regression(context).expand({num_parviews, -1});          CHECK_SHAPE(ys, {num_parviews, regression_size()});
+    torch::Tensor proj = (ys * bs).sum(/*dim=*/1).unsqueeze(0);                 CHECK_SHAPE(proj, {1, num_parviews});
     out.push_back(proj);
   }
   return torch::cat(out, /*dim=*/1);
 }
 
 torch::Tensor ParticleValueNet::PrepareTarget(BatchData* batch) {
-  torch::Tensor particles_data = batch->data.index({Slice(), 0});
+  torch::Tensor parviews_counts = batch->data.index({Slice(), 0});
 
   std::vector<torch::Tensor> target_slices;
   target_slices.reserve(batch->size());
   for (int i = 0; i < batch->size(); ++i) {
-    int num_particles = particles_data[i].item<int>();
-    if (limit_particle_count > 0) {
-      num_particles = std::min(num_particles, limit_particle_count);
+    int num_parviews = parviews_counts[i].item<int>();
+    if (limit_parview_count > 0) {
+      num_parviews = std::min(num_parviews, limit_parview_count);
     }
-    target_slices.push_back(batch->target.index({i, Slice(0, num_particles)}));
+    target_slices.push_back(batch->target.index({i, Slice(0, num_parviews)}));
   }
   return torch::cat(target_slices).unsqueeze(/*dim=*/0);
 }

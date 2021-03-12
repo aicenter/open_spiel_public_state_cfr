@@ -61,15 +61,15 @@ struct BasicDims {
 };
 
 struct ParticleDims final : public BasicDims {
-  int max_particles = 1000;
-  const int range_size = 1;
+  // Should be the same as max particles to handle a worst-case scenario.
+  int max_parviews = 1000;
 
   int point_input_size() const override {
-    return 1  // Store the number of particles in the given point.
+    return 1  // Store the number of parviews in the given point.
          + public_features_size  // Public features.
-         + max_particles * particle_size();  // Particle contents.
+         + max_parviews * parview_size();  // Parview contents.
   }
-  int point_output_size() const override { return max_particles; }
+  int point_output_size() const override { return max_parviews; }
 
   bool write_hand_features_positionally() const override { return false; }
 
@@ -78,8 +78,9 @@ struct ParticleDims final : public BasicDims {
          + hand_features_size
          + player_features_size;
   }
-  int particle_size() const {
-    return features_size() + range_size;
+  int parview_size() const {
+    return features_size()
+         + 1;  // Range size.
   }
 };
 
@@ -107,7 +108,10 @@ struct PositionalDims final : public BasicDims {
   bool write_hand_features_positionally() const override { return true; }
 };
 
-// A single particle.
+// A single "particles view". Wwe call these "parview" consistently in the code.
+// These are different from particles: particles are histories, but parviews are
+// a particle aggregation of player's beliefs over those particles, from the
+// perspective of the player (i.e. its Action-PrivateObservation history).
 //
 // The data is arranged as:
 // - public_features
@@ -116,10 +120,10 @@ struct PositionalDims final : public BasicDims {
 // - range
 //
 // The target is a single float: value.
-struct ParticleData final : DataPoint {
+struct ParviewDataPoint final : DataPoint {
   const ParticleDims& dims;
-  ParticleData(const ParticleDims& particle_dims,
-               torch::Tensor data, torch::Tensor target);
+  ParviewDataPoint(const ParticleDims& particle_dims,
+                   torch::Tensor data, torch::Tensor target);
   // Individual accessors.
   absl::Span<float_net> public_features();
   absl::Span<float_net> hand_features();
@@ -127,7 +131,7 @@ struct ParticleData final : DataPoint {
   float& range();
   float& value();
  private:
-  // Offsets within the particle.
+  // Offsets within the parview.
   int public_features_offset() const {
     return 0;
   }
@@ -145,19 +149,19 @@ struct ParticleData final : DataPoint {
   }
 };
 
-// Particles for one public state, collected into a single data point.
-struct ParticlesInContext final : DataPoint {
+// Parviews for one public state, collected into a single data point.
+struct ParticleDataPoint final : DataPoint {
   const ParticleDims& dims;
-  ParticlesInContext(const ParticleDims& particle_dims,
-                     torch::Tensor data, torch::Tensor target);
-  float_net& num_particles();
+  ParticleDataPoint(const ParticleDims& particle_dims,
+                    torch::Tensor data, torch::Tensor target);
   absl::Span<float_net> public_features();
-  ParticleData particle_at(int particle_index);
+  float_net& num_parviews();
+  ParviewDataPoint parview_at(int parview_index);
  private:
-  // Offsets for number of particles and the storage.
-  int num_particles_offset() const { return 0; }
+  // Offsets for number of parviews and the storage.
+  int num_parviews_offset() const { return 0; }
   int public_features_offset() const { return 1; }
-  int particle_storage_offset() const { return dims.public_features_size + 1; }
+  int parviews_storage_offset() const { return dims.public_features_size + 1; }
 };
 
 struct PositionalData final : DataPoint {
@@ -188,7 +192,7 @@ struct BatchData {
   int size() const;
 
   // Views for individual data points.
-  ParticlesInContext point_at(int index, const ParticleDims& particle_dims);
+  ParticleDataPoint point_at(int index, const ParticleDims& particle_dims);
   PositionalData point_at(int index, const PositionalDims& positional_dims);
 };
 

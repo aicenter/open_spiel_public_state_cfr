@@ -51,19 +51,19 @@ std::unique_ptr<Trunk> MakeTrunk(const std::string& game_name, int trunk_depth,
 std::unique_ptr<BasicDims> DeduceDims(const Trunk& trunk, NetArchitecture arch);
 
 
-void WriteParticles(
+void WriteParticleDataPoint(
     const algorithms::dlcfr::LeafPublicState& state,
     const NetContext& net_context,
-    const ParticleDims& dims, ParticlesInContext* point,
+    const ParticleDims& dims, ParticleDataPoint* point,
     std::mt19937* rnd_gen, bool shuffle_input_output);
 
-void CopyValuesNetToTree(ParticlesInContext data_point,
-                         algorithms::dlcfr::LeafPublicState& state,
-                         const ParticleDims& dims);
+void CopyValuesFromNetToTree(ParticleDataPoint data_point,
+                             algorithms::dlcfr::LeafPublicState& state,
+                             const ParticleDims& dims);
 
-void WritePositional(const algorithms::dlcfr::LeafPublicState& state,
-                     const NetContext& net_context,
-                     const PositionalDims& dims, PositionalData* point);
+void WritePositionalDataPoint(const algorithms::dlcfr::LeafPublicState& state,
+                              const NetContext& net_context,
+                              const PositionalDims& dims, PositionalData* point);
 
 void CopyValuesNetToTree(PositionalData* point,
                          algorithms::dlcfr::LeafPublicState& state,

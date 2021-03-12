@@ -31,7 +31,7 @@ ABSL_FLAG(int, depth, 3, "Depth of the trunk.");
 ABSL_FLAG(double, prob_pure_strat, 0.1, "Params for random generation.");
 ABSL_FLAG(double, prob_fully_mixed, 0.05, "Params for random generation.");
 ABSL_FLAG(bool, shuffle_input_output, false,
-          "Should experience replay particle data input/output be shuffled?");
+          "Should parview inputs/outputs be shuffled?");
 ABSL_FLAG(int, num_trunks, 100, "Size of experience replay in terms of trunks");
 ABSL_FLAG(int, cfr_oracle_iterations, 100, "Number of oracle iterations.");
 

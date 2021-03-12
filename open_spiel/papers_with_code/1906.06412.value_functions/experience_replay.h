@@ -33,7 +33,7 @@ class ExperienceReplay : public BatchData {
   ExperienceReplay(int buffer_size, int input_size, int output_size)
     : BatchData(buffer_size, input_size, output_size) {}
   // Return a data point that can be written to.
-  ParticlesInContext AddExperience(const ParticleDims& dims);
+  ParticleDataPoint AddExperience(const ParticleDims& dims);
   PositionalData AddExperience(const PositionalDims& dims);
 
   // Fill batch with randomly sampled data points.

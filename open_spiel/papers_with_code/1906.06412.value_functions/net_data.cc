@@ -34,60 +34,59 @@ bool DataPoint::is_valid_view() const {
       && target.dim() == 1;
 }
 
-ParticleData ParticlesInContext::particle_at(int particle_index) {
-  SPIEL_CHECK_LT(particle_index, dims.max_particles);
-  const int offset = particle_storage_offset();
-  return ParticleData(
+ParviewDataPoint ParticleDataPoint::parview_at(int parview_index) {
+  SPIEL_CHECK_LT(parview_index, dims.max_parviews);
+  const int offset = parviews_storage_offset();
+  return ParviewDataPoint(
       dims,
       data.slice(
           /*dim=*/0,
-          /*start=*/offset + dims.particle_size() * particle_index,
-          /*end=*/offset + dims.particle_size() * (particle_index + 1),
+          /*start=*/offset + dims.parview_size() * parview_index,
+          /*end=*/offset + dims.parview_size() * (parview_index + 1),
           /*step=*/1),
       // Technically, this is just one float, but let's pass a slice,
       // so that it is a proper view with # of dimensions = 1
       // (and not 0 for scalar). This makes it easy to reuse the code.
-      target.slice(/*dim=*/0, /*start=*/particle_index,
-                   /*end=*/particle_index + 1, /*step=*/1));
+      target.slice(/*dim=*/0, /*start=*/parview_index,
+                   /*end=*/parview_index + 1, /*step=*/1));
 }
 
 
-absl::Span<float_net> ParticleData::public_features() {
+absl::Span<float_net> ParviewDataPoint::public_features() {
   return absl::MakeSpan(&data_ptr()[public_features_offset()],
                         dims.public_features_size);
 }
-absl::Span<float_net> ParticleData::hand_features() {
+absl::Span<float_net> ParviewDataPoint::hand_features() {
   return absl::MakeSpan(&data_ptr()[hand_features_offset()],
                         dims.hand_features_size);
 }
-absl::Span<float_net> ParticleData::player_features() {
+absl::Span<float_net> ParviewDataPoint::player_features() {
   return absl::MakeSpan(&data_ptr()[player_offset()],
                         dims.player_features_size);
 }
-float& ParticleData::range() {
-  SPIEL_DCHECK_EQ(dims.range_size, 1);
+float& ParviewDataPoint::range() {
   return data_ptr()[range_offset()];
 }
-float& ParticleData::value() {
+float& ParviewDataPoint::value() {
   return target_ptr()[0];
 }
 
-ParticleData::ParticleData(const ParticleDims& particle_dims,
-                           torch::Tensor data, torch::Tensor target)
+ParviewDataPoint::ParviewDataPoint(const ParticleDims& particle_dims,
+                                   torch::Tensor data, torch::Tensor target)
     : DataPoint(data, target), dims(particle_dims) {
-  SPIEL_DCHECK_EQ(data.size(0), dims.particle_size());
+  SPIEL_DCHECK_EQ(data.size(0), dims.parview_size());
   SPIEL_DCHECK_EQ(target.size(0), 1);
 }
 
-ParticlesInContext::ParticlesInContext(const ParticleDims& particle_dims,
-                                       torch::Tensor data, torch::Tensor target)
+ParticleDataPoint::ParticleDataPoint(const ParticleDims& particle_dims,
+                                     torch::Tensor data, torch::Tensor target)
     : DataPoint(data, target), dims(particle_dims) {}
 
-float_net& ParticlesInContext::num_particles() {
-  return data_ptr()[num_particles_offset()];
+float_net& ParticleDataPoint::num_parviews() {
+  return data_ptr()[num_parviews_offset()];
 }
 
-absl::Span<float_net> ParticlesInContext::public_features() {
+absl::Span<float_net> ParticleDataPoint::public_features() {
   return absl::MakeSpan(&data_ptr()[public_features_offset()],
                         dims.public_features_size);
 }
@@ -118,9 +117,9 @@ BatchData::BatchData(int batch_size, int input_size, int output_size)
   SPIEL_CHECK_GT(output_size, 0);
 }
 
-ParticlesInContext BatchData::point_at(int index,
-                                       const ParticleDims& particle_dims) {
-  return ParticlesInContext(particle_dims, data[index], target[index]);
+ParticleDataPoint BatchData::point_at(int index,
+                                      const ParticleDims& particle_dims) {
+  return ParticleDataPoint(particle_dims, data[index], target[index]);
 }
 
 PositionalData BatchData::point_at(int index,

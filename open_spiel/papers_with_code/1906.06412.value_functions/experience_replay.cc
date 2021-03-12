@@ -18,8 +18,8 @@
 namespace open_spiel {
 namespace papers_with_code {
 
-ParticlesInContext ExperienceReplay::AddExperience(const ParticleDims& dims) {
-  ParticlesInContext point = point_at(head_, dims);
+ParticleDataPoint ExperienceReplay::AddExperience(const ParticleDims& dims) {
+  ParticleDataPoint point = point_at(head_, dims);
   AdvanceHead();
   return point;
 }
@@ -126,15 +126,15 @@ void AddExperiencesFromTrunk(
     switch(arch) {
       case NetArchitecture::kParticle: {
         auto particle_dims = open_spiel::down_cast<const ParticleDims&>(dims);
-        ParticlesInContext data_point = replay->AddExperience(particle_dims);
-        WriteParticles(leaf, net_context, particle_dims, &data_point,
-                       &rnd_gen, shuffle_input_output);
+        ParticleDataPoint data_point = replay->AddExperience(particle_dims);
+        WriteParticleDataPoint(leaf, net_context, particle_dims, &data_point,
+                               &rnd_gen, shuffle_input_output);
         break;
       }
       case NetArchitecture::kPositional: {
         auto pos_dims = open_spiel::down_cast<const PositionalDims&>(dims);
         PositionalData data_point = replay->AddExperience(pos_dims);
-        WritePositional(leaf, net_context, pos_dims, &data_point);
+        WritePositionalDataPoint(leaf, net_context, pos_dims, &data_point);
         break;
       }
     }

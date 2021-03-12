@@ -66,7 +66,7 @@ struct ParticleValueNet final : public ValueNet {
   ActivationFunction activation_fn;
   std::vector<torch::nn::Linear> fc_regression;
   std::vector<torch::nn::Linear> fc_basis;
-  int limit_particle_count = -1;
+  int limit_parview_count = -1;
 
   ParticleValueNet(ParticleDims* particle_dims,
                    size_t num_layers_regression, size_t num_width_regression,
@@ -83,8 +83,8 @@ struct ParticleValueNet final : public ValueNet {
   torch::Tensor regression(torch::Tensor xs);
 
   int context_size() { return pooled_size() + dims->public_features_size; }
-  int pooled_size() { return dims->max_particles; }
-  int regression_size() { return dims->max_particles; }
+  int pooled_size() { return dims->max_parviews; }
+  int regression_size() { return dims->max_parviews; }
 };
 
 
