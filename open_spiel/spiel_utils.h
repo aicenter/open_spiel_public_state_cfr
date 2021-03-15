@@ -328,6 +328,7 @@ bool AllNear(const std::vector<T>& vector1, const std::vector<T>& vector2,
   SPIEL_CHECK_FLOAT_NEAR(x, y, epsilon)
 #define SPIEL_DCHECK_TRUE(x) SPIEL_CHECK_TRUE(x)
 #define SPIEL_DCHECK_FALSE(x) SPIEL_CHECK_FALSE(x)
+#define SPIEL_DCHECK(x) (x)
 
 #else  // defined(NDEBUG)
 
@@ -346,6 +347,7 @@ bool AllNear(const std::vector<T>& vector1, const std::vector<T>& vector2,
 #define SPIEL_DCHECK_FLOAT_NEAR(x, y, epsilon)
 #define SPIEL_DCHECK_TRUE(x)
 #define SPIEL_DCHECK_FALSE(x)
+#define SPIEL_DCHECK(x)
 
 #endif  // !defined(NDEBUG)
 
