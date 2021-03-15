@@ -342,5 +342,8 @@ std::shared_ptr<Observer> ObserverRegisterer::CreateByName(
   return it->second(game, iig_obs_type, params);
 }
 
+std::ostream& operator<<(std::ostream& os, const TensorInfo& tensor_info) {
+  return os << tensor_info.DebugString();
+}
 
 }  // namespace open_spiel

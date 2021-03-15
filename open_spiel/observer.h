@@ -140,6 +140,7 @@ struct TensorInfo {
     return prod;
   }
 };
+std::ostream& operator<<(std::ostream& os, const TensorInfo& tensor_info);
 
 // Allocates new memory for each allocation request and keeps track
 // of tensor names and shapes. This is intended to use when it's not yet
