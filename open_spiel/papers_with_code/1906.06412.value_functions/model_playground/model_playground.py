@@ -334,7 +334,7 @@ def particle_model_experiment(num_particles):
 if __name__ == '__main__':
   import argparse
   parser = argparse.ArgumentParser()
-  parser.add_argument("--num_particles", type=int)
+  parser.add_argument("--num_parviews", type=int)
   args = parser.parse_args()
 
   print("steps,train_loss,test_loss")

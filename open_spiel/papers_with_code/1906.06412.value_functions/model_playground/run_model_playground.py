@@ -7,7 +7,7 @@ experiment_name = "model_playground"
 
 
 def param_fn(param, context):
-  if param == "num_particles":
+  if param == "num_parviews":
     return list(range(1, 21))
 
 
@@ -17,6 +17,6 @@ sweep.run_sweep(backend,
                 base_output_dir=f"{home}/experiments/{experiment_name}",
                 base_params=dict(),
                 comb_params=[
-                  "num_particles",
+                  "num_parviews",
                 ],
                 comb_param_fn=param_fn)
