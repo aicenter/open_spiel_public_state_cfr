@@ -23,10 +23,10 @@ std::unique_ptr<State> Particle::MakeState(const Game& game) const {
   return  s;
 }
 
-std::array<std::vector<float>, 2> ParticleSet::ComputeBeliefs() const {
-  std::array<std::vector<float>, 2> out = {
-      std::vector<float>(partition[0].size(), 0.),
-      std::vector<float>(partition[1].size(), 0.),
+std::array<std::vector<double>, 2> ParticleSet::ComputeBeliefs() const {
+  std::array<std::vector<double>, 2> out = {
+      std::vector<double>(partition[0].size(), 0.),
+      std::vector<double>(partition[1].size(), 0.),
   };
 
   for (int pl = 0; pl < 2; ++pl) {
@@ -85,7 +85,7 @@ void CheckParticleSetConsistency(const Game& game,
 
 void CheckParticleSetConsistency(const Game& game,
                                  std::shared_ptr<Observer> infostate_observer,
-                                 std::array<std::vector<const algorithms::InfostateNode*>, 2> infostate_nodes,
+                                 std::vector<std::vector<algorithms::InfostateNode*>> infostate_nodes,
                                  const ParticleSet& set) {
   SPIEL_CHECK_FALSE(set.particles.empty());
   SPIEL_CHECK_FALSE(set.partition.empty());

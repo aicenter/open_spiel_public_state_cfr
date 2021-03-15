@@ -44,7 +44,7 @@ struct ParticleSet {
 
   // Aggregate player reach probs over individual particles to compute
   // player beliefs over the infostate partition.
-  std::array<std::vector<float>, 2> ComputeBeliefs() const;
+  std::array<std::vector<double>, 2> ComputeBeliefs() const;
 };
 
 // Check internal observation consistency of the particle set.
@@ -55,7 +55,7 @@ void CheckParticleSetConsistency(const Game& game,
 // Check consistency with infostate nodes -- the roots of the infostate tree.
 void CheckParticleSetConsistency(const Game& game,
                                  std::shared_ptr<Observer> infostate_observer,
-                                 std::array<std::vector<const algorithms::InfostateNode*>, 2> infostate_nodes,
+                                 std::vector<std::vector<algorithms::InfostateNode*>> infostate_nodes,
                                  const ParticleSet& set);
 
 } // namespace papers_with_code
