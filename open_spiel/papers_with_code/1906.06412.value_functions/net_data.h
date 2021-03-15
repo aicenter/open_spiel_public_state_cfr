@@ -74,9 +74,12 @@ struct ParticleDims final : public BasicDims {
   bool write_hand_features_positionally() const override { return false; }
 
   int features_size() const {
-    return public_features_size
-         + hand_features_size
+    return hand_features_size
          + player_features_size;
+  }
+  int full_features_size() const {
+    return public_features_size
+         + features_size();
   }
   int parview_size() const {
     return features_size()
@@ -125,26 +128,20 @@ struct ParviewDataPoint final : DataPoint {
   ParviewDataPoint(const ParticleDims& particle_dims,
                    torch::Tensor data, torch::Tensor target);
   // Individual accessors.
-  absl::Span<float_net> public_features();
   absl::Span<float_net> hand_features();
   absl::Span<float_net> player_features();
   float_net& range();
   float_net& value();
  private:
   // Offsets within the parview.
-  int public_features_offset() const {
+  int hand_features_offset() const {
     return 0;
   }
-  int hand_features_offset() const {
-    return dims.public_features_size;
-  }
   int player_offset() const {
-    return dims.public_features_size
-         + dims.hand_features_size;
+    return dims.hand_features_size;
   }
   int range_offset() const {
-    return dims.public_features_size
-         + dims.hand_features_size
+    return dims.hand_features_size
          + dims.player_features_size;
   }
 };

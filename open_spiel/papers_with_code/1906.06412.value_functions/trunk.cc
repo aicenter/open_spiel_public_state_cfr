@@ -136,7 +136,6 @@ void WriteParticleDataPoint(const algorithms::dlcfr::LeafPublicState& state,
     for (int j = 0; j < state.leaf_nodes[pl].size(); j++) {
       ParviewDataPoint parview = point->parview_at(shuffle_input_output
                                                     ? parview_placement[i] : i);
-      Copy(state.public_tensor.Tensor(), parview.public_features());
       // Hand features.
       if(dims.write_hand_features_positionally()) {
         WritePositionalHand(net_context.net_index(pl, j),

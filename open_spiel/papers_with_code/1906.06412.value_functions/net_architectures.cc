@@ -92,8 +92,8 @@ ParticleValueNet::ParticleValueNet(ParticleDims* particle_dims,
   int num_layers_kernel = 4;
 
   MakeLayers(fc_basis, num_layers_kernel,
-             dims->parview_size() - 1,
-             dims->parview_size() * 3,
+             dims->full_features_size(),
+             (dims->full_features_size() + 1) * 3,
              pooled_size());
   MakeLayers(fc_regression, num_layers_regression,
              context_size(),
@@ -103,7 +103,7 @@ ParticleValueNet::ParticleValueNet(ParticleDims* particle_dims,
   RegisterLayers(fc_regression, "fc_regression_");
 }
 
-torch::Tensor ParticleValueNet::change_of_basis(torch::Tensor fs) {             CHECK_SHAPE(fs, {_, dims->features_size()});
+torch::Tensor ParticleValueNet::change_of_basis(torch::Tensor fs) {             CHECK_SHAPE(fs, {_, dims->full_features_size()});
   for (int i = 0; i < fc_basis.size() - 1; ++i) {
     fs = fc_basis[i]->forward(fs);
     fs = Activation(activation_fn, fs);
@@ -171,11 +171,13 @@ torch::Tensor ParticleValueNet::forward(torch::Tensor xss) {
         .reshape({num_parviews, dims->parview_size()});                         CHECK_SHAPE(parviews, {num_parviews,
                                                                                                        dims->parview_size()});
 
-    torch::Tensor fs = parviews  // Skip the range input (as the last value).
-        .index({Slice(), Slice(0, dims->features_size())});                     CHECK_SHAPE(fs, {num_parviews, dims->features_size()});
+    torch::Tensor hand_fs = parviews  // Skip the range input (as the last value).
+        .index({Slice(), Slice(0, dims->features_size())});                     CHECK_SHAPE(hand_fs, {num_parviews, dims->features_size()});
+    torch::Tensor fs = torch::cat({
+        public_features.expand({num_parviews, -1}), hand_fs}, /*dim=*/1);       CHECK_SHAPE(fs, {num_parviews, dims->full_features_size()});
     torch::Tensor ranges = parviews  // Skip all features.
         .index({Slice(), Slice(dims->features_size(),
-                               dims->parview_size())}); CHECK_SHAPE(ranges, {num_parviews, 1});
+                               dims->parview_size())});                         CHECK_SHAPE(ranges, {num_parviews, 1});
 
     torch::Tensor bs = change_of_basis(fs);                                     CHECK_SHAPE(bs, {num_parviews, pooled_size()});
     torch::Tensor cs = base_coordinates(bs, ranges);                            CHECK_SHAPE(cs, {num_parviews, pooled_size()});

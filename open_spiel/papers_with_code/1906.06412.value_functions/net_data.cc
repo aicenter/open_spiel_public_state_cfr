@@ -51,11 +51,6 @@ ParviewDataPoint ParticleDataPoint::parview_at(int parview_index) {
                    /*end=*/parview_index + 1, /*step=*/1));
 }
 
-
-absl::Span<float_net> ParviewDataPoint::public_features() {
-  return absl::MakeSpan(&data_ptr()[public_features_offset()],
-                        dims.public_features_size);
-}
 absl::Span<float_net> ParviewDataPoint::hand_features() {
   return absl::MakeSpan(&data_ptr()[hand_features_offset()],
                         dims.hand_features_size);
