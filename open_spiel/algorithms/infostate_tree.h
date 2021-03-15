@@ -589,6 +589,7 @@ class InfostateNode final {
   VecWithUniquePtrsIterator<InfostateNode> child_iterator() const {
     return VecWithUniquePtrsIterator<InfostateNode>(children_);
   }
+  std::vector<InfostateNode*> children() const;
 
   // -- Sequence operations. ---------------------------------------------------
   const SequenceId sequence_id() const {

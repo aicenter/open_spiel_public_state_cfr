@@ -70,6 +70,15 @@ InfostateNode* InfostateNode::GetChild(
   return nullptr;
 }
 
+std::vector<InfostateNode*> InfostateNode::children() const {
+  std::vector<InfostateNode*> out;
+  out.reserve(children_.size());
+  for (const std::unique_ptr<InfostateNode>& child : children_) {
+    out.push_back(child.get());
+  }
+  return out;
+}
+
 std::ostream& InfostateNode::operator<<(std::ostream& os) const {
   if (!parent_) return os << 'x';
   return os << parent_ << ',' << incoming_index_;
