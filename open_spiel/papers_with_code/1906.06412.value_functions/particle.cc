@@ -23,6 +23,24 @@ std::unique_ptr<State> Particle::MakeState(const Game& game) const {
   return  s;
 }
 
+std::array<std::vector<float>, 2> ParticleSet::ComputeBeliefs() const {
+  std::array<std::vector<float>, 2> out = {
+      std::vector<float>(partition[0].size(), 0.),
+      std::vector<float>(partition[1].size(), 0.),
+  };
+
+  for (int pl = 0; pl < 2; ++pl) {
+    for (int i = 0; i < partition[pl].size(); ++i) {
+      for (int j = 0; j < partition[pl][i].size(); ++j) {
+        int k = partition[pl][i][j];
+        out[pl][i] += particles[k].player_reach[pl];
+      }
+    }
+  }
+
+  return out;
+}
+
 void CheckObservation(const Observation& actual, const Observation& expected) {
   SPIEL_CHECK_EQ(actual.Tensor(), expected.Tensor());
   SPIEL_CHECK_EQ(actual.tensor_info(), expected.tensor_info());
@@ -64,6 +82,38 @@ void CheckParticleSetConsistency(const Game& game,
     }
   }
 }
+
+void CheckParticleSetConsistency(const Game& game,
+                                 std::shared_ptr<Observer> infostate_observer,
+                                 std::array<std::vector<const algorithms::InfostateNode*>, 2> infostate_nodes,
+                                 const ParticleSet& set) {
+  SPIEL_CHECK_FALSE(set.particles.empty());
+  SPIEL_CHECK_FALSE(set.partition.empty());
+
+  std::vector<std::unique_ptr<State>> histories;
+  for (const Particle& particle : set.particles) {
+    histories.push_back(particle.MakeState(game));
+  }
+
+  for (int pl = 0; pl < 2; ++pl) {
+    SPIEL_CHECK_FALSE(set.partition[pl].empty());
+    SPIEL_CHECK_FALSE(infostate_nodes[pl].empty());
+    SPIEL_CHECK_EQ(set.partition[pl].size(), infostate_nodes[pl].size());
+
+    for (int i = 0; i < set.partition[pl].size(); ++i) {
+      SPIEL_CHECK_FALSE(set.partition[pl][i].empty());
+      for (int particle_idx : set.partition[pl][i]) {
+        const algorithms::InfostateNode* node = infostate_nodes[pl][i];
+        const State& h = *histories[particle_idx];
+        SPIEL_CHECK_TRUE(node);
+        SPIEL_CHECK_EQ(infostate_observer->StringFrom(h, pl),
+                       node->infostate_string());
+      }
+    }
+  }
+
+}
+
 
 }  // papers_with_code
 }  // open_spiel

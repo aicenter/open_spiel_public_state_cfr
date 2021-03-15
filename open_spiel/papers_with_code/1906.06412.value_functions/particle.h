@@ -16,6 +16,7 @@
 #ifndef OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_PARTICLE_
 #define OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_PARTICLE_
 
+#include "open_spiel/algorithms/infostate_tree.h"
 #include "open_spiel/spiel.h"
 
 namespace open_spiel {
@@ -40,11 +41,21 @@ struct ParticleSet {
   // Partitions the set of particles to their corresponding infostates for each
   // player. Stored numbers are indices within the particles vector.
   std::array<std::vector<std::vector<int>>, 2> partition;
+
+  // Aggregate player reach probs over individual particles to compute
+  // player beliefs over the infostate partition.
+  std::array<std::vector<float>, 2> ComputeBeliefs() const;
 };
 
+// Check internal observation consistency of the particle set.
 void CheckParticleSetConsistency(const Game& game,
                                  std::shared_ptr<Observer> public_observer,
                                  std::shared_ptr<Observer> hand_observer,
+                                 const ParticleSet& set);
+// Check consistency with infostate nodes -- the roots of the infostate tree.
+void CheckParticleSetConsistency(const Game& game,
+                                 std::shared_ptr<Observer> infostate_observer,
+                                 std::array<std::vector<const algorithms::InfostateNode*>, 2> infostate_nodes,
                                  const ParticleSet& set);
 
 } // namespace papers_with_code
