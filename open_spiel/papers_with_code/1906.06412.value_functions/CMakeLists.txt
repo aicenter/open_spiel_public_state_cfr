@@ -11,8 +11,12 @@ add_library(paper_value_functions OBJECT
   particle.cc
   hand_table.h
   hand_table.cc
+  solve_queue.h
+  solve_queue.cc
   sparse_trunk.cc
   sparse_trunk.h
+  subgame.h
+  subgame.cc
   torch_utils.cc
   torch_utils.h
   metrics.h
