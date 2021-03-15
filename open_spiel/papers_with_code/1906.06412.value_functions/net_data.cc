@@ -64,10 +64,10 @@ absl::Span<float_net> ParviewDataPoint::player_features() {
   return absl::MakeSpan(&data_ptr()[player_offset()],
                         dims.player_features_size);
 }
-float& ParviewDataPoint::range() {
+float_net& ParviewDataPoint::range() {
   return data_ptr()[range_offset()];
 }
-float& ParviewDataPoint::value() {
+float_net& ParviewDataPoint::value() {
   return target_ptr()[0];
 }
 

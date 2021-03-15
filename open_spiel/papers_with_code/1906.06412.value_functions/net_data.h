@@ -128,8 +128,8 @@ struct ParviewDataPoint final : DataPoint {
   absl::Span<float_net> public_features();
   absl::Span<float_net> hand_features();
   absl::Span<float_net> player_features();
-  float& range();
-  float& value();
+  float_net& range();
+  float_net& value();
  private:
   // Offsets within the parview.
   int public_features_offset() const {
