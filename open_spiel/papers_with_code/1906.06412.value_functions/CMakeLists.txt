@@ -7,6 +7,8 @@ add_library(paper_value_functions OBJECT
   net_data.cc
   net_dl_evaluator.cc
   net_dl_evaluator.h
+  particle.h
+  particle.cc
   hand_table.h
   hand_table.cc
   sparse_trunk.cc
