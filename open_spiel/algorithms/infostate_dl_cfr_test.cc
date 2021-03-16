@@ -58,9 +58,9 @@ void TestTerminalEvaluatorHasSameIterations(const std::string& game_name) {
   InfostateCFR vec_solver(*game);
 
   // We use only the terminal evaluator.
-  std::shared_ptr<LeafEvaluator> terminal_evaluator = MakeTerminalEvaluator();
+  std::shared_ptr<PublicStateEvaluator> terminal_evaluator = MakeTerminalEvaluator();
   DepthLimitedCFR dl_solver(game, /*depth_limit=*/100,
-      /*leaf_evaluator=*/nullptr, terminal_evaluator);
+      /*non_terminal_evaluator=*/nullptr, terminal_evaluator);
 
   std::shared_ptr<Policy> vec_avg = vec_solver.AveragePolicy();
   std::shared_ptr<Policy> dl_avg = dl_solver.AveragePolicy();
@@ -80,7 +80,7 @@ void TestTerminalEvaluatorHasSameIterations(const std::string& game_name) {
 std::unique_ptr<DepthLimitedCFR> MakeRecursiveDepthLimitedCFR(
     std::shared_ptr<const Game> game, int trunk_depth_limit,
     int subgame_depth_limit) {
-  std::shared_ptr<const LeafEvaluator> terminal_evaluator =
+  std::shared_ptr<const PublicStateEvaluator> terminal_evaluator =
       MakeTerminalEvaluator();
   std::shared_ptr<Observer> public_observer =
       game->MakeObserver(kPublicStateObsType, {});
@@ -93,7 +93,7 @@ std::unique_ptr<DepthLimitedCFR> MakeRecursiveDepthLimitedCFR(
       terminal_evaluator, public_observer, infostate_observer);
   leaf_evaluator->reset_subgames_on_evaluation = false;  // Needed for test !
   leaf_evaluator->bandit_name = "RegretMatching";
-  leaf_evaluator->leaf_evaluator = leaf_evaluator;
+  leaf_evaluator->nonterminal_evaluator = leaf_evaluator;
   leaf_evaluator->num_cfr_iterations = 1;
 
   // Builds the root leaf public states so that we can call the recursive

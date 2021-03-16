@@ -23,11 +23,11 @@ using namespace algorithms::dlcfr;
 
 // Note these are shared between players, that's why we loop only
 // over one player.
-std::vector<const State*> CollectStates(const LeafPublicState& public_state) {
+std::vector<const State*> CollectStates(const PublicState& public_state) {
   std::vector<const State*> states;
   // Just some estimate.
-  states.reserve(8 * public_state.leaf_nodes[0].size());
-  for (const InfostateNode* node : public_state.leaf_nodes[0]) {
+  states.reserve(8 * public_state.infostate_nodes[0].size());
+  for (const InfostateNode* node : public_state.infostate_nodes[0]) {
     for (int i = 0; i < node->corresponding_states_size(); ++i) {
       states.push_back(node->corresponding_states()[i].get());
     }
@@ -35,11 +35,11 @@ std::vector<const State*> CollectStates(const LeafPublicState& public_state) {
   return states;
 }
 
-std::vector<double> CollectChances(const LeafPublicState& public_state) {
+std::vector<double> CollectChances(const PublicState& public_state) {
   std::vector<double> chances;
   // Just some estimate.
-  chances.reserve(8 * public_state.leaf_nodes[0].size());
-  for (const InfostateNode* node : public_state.leaf_nodes[0]) {
+  chances.reserve(8 * public_state.infostate_nodes[0].size());
+  for (const InfostateNode* node : public_state.infostate_nodes[0]) {
     for (int i = 0; i < node->corresponding_states_size(); ++i) {
       chances.push_back(node->corresponding_chance_reach_probs()[i]);
     }
@@ -95,8 +95,8 @@ std::vector<std::unique_ptr<SparseTrunk>> MakeSparseTrunks(
     std::shared_ptr<Observer> infostate_observer,
     std::shared_ptr<Observer> public_observer,
     int roots_depth, int trunk_depth,
-    std::shared_ptr<const LeafEvaluator> net_evaluator,
-    std::shared_ptr<const LeafEvaluator> terminal_evaluator,
+    std::shared_ptr<const PublicStateEvaluator> net_evaluator,
+    std::shared_ptr<const PublicStateEvaluator> terminal_evaluator,
     int limit_initial_states,
     const std::string& bandits_for_cfr, std::mt19937& rnd_gen) {
   // Must have a defined start.
@@ -108,18 +108,18 @@ std::vector<std::unique_ptr<SparseTrunk>> MakeSparseTrunks(
 
   // 1. First of all, build a temporary full trunk, so we can identify all
   //    public states, infostates and associated histories.
-  std::shared_ptr<LeafEvaluator> dummy_eval = MakeDummyEvaluator();
+  std::shared_ptr<PublicStateEvaluator> dummy_eval = MakeDummyEvaluator();
   DepthLimitedCFR temp_trunk(game, roots_depth, dummy_eval, terminal_evaluator);
 //  std::cout << "# Temp trunk public states stats: \n";
-//  PrintPublicStatesStats(temp_trunk.public_leaves());
+//  PrintPublicStatesStats(temp_trunk.public_states());
 
   // 2. For each decision infostate, make a random subset of histories
   //    within the public state + 1 special history that surely belongs
   //    to that infostate.
   int num_sparse_trunks = 0;
-  for (const LeafPublicState& public_state: temp_trunk.public_leaves()) {
+  for (const PublicState& public_state: temp_trunk.public_states()) {
     for (int pl = 0; pl < 2; ++pl) {
-      for (const InfostateNode* node : public_state.leaf_nodes[pl]) {
+      for (const InfostateNode* node : public_state.infostate_nodes[pl]) {
         // We are interested only in sparsification for decision infostates.
         if (node->type() != kDecisionInfostateNode) continue;
         num_sparse_trunks++;
@@ -130,7 +130,7 @@ std::vector<std::unique_ptr<SparseTrunk>> MakeSparseTrunks(
   std::vector<std::unique_ptr<SparseTrunk>> sparse_trunks;
   sparse_trunks.reserve(num_sparse_trunks);
 
-  for (const LeafPublicState& public_state: temp_trunk.public_leaves()) {
+  for (const PublicState& public_state: temp_trunk.public_states()) {
     std::vector<const State*> states = CollectStates(public_state);
     std::vector<double> chances = CollectChances(public_state);
     SPIEL_CHECK_EQ(states.size(), chances.size());
@@ -139,7 +139,7 @@ std::vector<std::unique_ptr<SparseTrunk>> MakeSparseTrunks(
     std::iota(public_state_perm.begin(), public_state_perm.end(), 0);
 
     for (int pl = 0; pl < 2; ++pl) {
-      for (const InfostateNode* node : public_state.leaf_nodes[pl]) {
+      for (const InfostateNode* node : public_state.infostate_nodes[pl]) {
         // We are interested only in sparsification for decision infostates.
         if (node->type() != kDecisionInfostateNode) continue;
 
@@ -277,8 +277,8 @@ std::unique_ptr<SparseTrunk> MakeSparseTrunkWithEqSupport(
     std::shared_ptr<Observer> infostate_observer,
     std::shared_ptr<Observer> public_observer,
     int roots_depth, int trunk_depth,
-    std::shared_ptr<const algorithms::dlcfr::LeafEvaluator> leaf_evaluator,
-    std::shared_ptr<const algorithms::dlcfr::LeafEvaluator> terminal_evaluator,
+    std::shared_ptr<const algorithms::dlcfr::PublicStateEvaluator> leaf_evaluator,
+    std::shared_ptr<const algorithms::dlcfr::PublicStateEvaluator> terminal_evaluator,
     const std::string& bandits_for_cfr,
     double support_threshold,
     bool prune_chance_histories) {

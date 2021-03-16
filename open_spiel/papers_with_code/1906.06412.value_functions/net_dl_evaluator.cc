@@ -22,16 +22,16 @@ using namespace open_spiel::algorithms;
 using namespace torch::indexing;  // Load all of the Slice, Ellipsis, etc.
 
 std::unique_ptr<PublicStateContext> NetEvaluator::CreateContext(
-    const LeafPublicState& leaf_state) const {
+    const PublicState& state) const {
 
-  SPIEL_DCHECK_FALSE(leaf_state.IsTerminal());
+  SPIEL_DCHECK_FALSE(state.IsTerminal());
   auto net_context = std::make_unique<NetContext>(hand_info_);
   Observation& hand = hand_info_->hand_buffer;
 
   for (int pl = 0; pl < 2; ++pl) {
     for (int tree_idx = 0;
-         tree_idx < leaf_state.leaf_nodes[pl].size(); ++tree_idx) {
-      const InfostateNode* node = leaf_state.leaf_nodes[pl][tree_idx];
+         tree_idx < state.infostate_nodes[pl].size(); ++tree_idx) {
+      const InfostateNode* node = state.infostate_nodes[pl][tree_idx];
       const State& some_state = *node->corresponding_states().at(0);
       hand.SetFrom(some_state, pl);
 
@@ -44,8 +44,7 @@ std::unique_ptr<PublicStateContext> NetEvaluator::CreateContext(
 
 // TODO: evaluate all public states with a batch.
 void ParticleNetEvaluator::EvaluatePublicState(
-    algorithms::dlcfr::LeafPublicState* state,
-    algorithms::dlcfr::PublicStateContext* context) const {
+    PublicState* state, PublicStateContext* context) const {
   SPIEL_DCHECK_FALSE(state->IsTerminal());  // Only non-terminal leafs.
   SPIEL_DCHECK_FALSE(model_->is_training());
   SPIEL_DCHECK_TRUE(context);
@@ -70,8 +69,7 @@ void ParticleNetEvaluator::EvaluatePublicState(
 }
 
 void PositionalNetEvaluator::EvaluatePublicState(
-    algorithms::dlcfr::LeafPublicState* state,
-    algorithms::dlcfr::PublicStateContext* context) const {
+    PublicState* state, PublicStateContext* context) const {
   SPIEL_DCHECK_FALSE(state->IsTerminal());  // Only non-terminal leafs.
   SPIEL_DCHECK_FALSE(model_->is_training());
   SPIEL_DCHECK_TRUE(context);

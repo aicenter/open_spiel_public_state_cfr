@@ -56,18 +56,18 @@ Trunk::Trunk(const std::string& game_name, int depth,
 
   // 3. Make a Batch of data that encompasses all leaf public states.
   hand_info = CreateHandInfo(*game, hand_observer,
-                             fixable_trunk_with_oracle->public_leaves());
+                             fixable_trunk_with_oracle->public_states());
 
-  num_leaves = fixable_trunk_with_oracle->public_leaves().size();
+  num_leaves = fixable_trunk_with_oracle->public_states().size();
   num_non_terminal_leaves = 0;
-  for (auto& leaf: fixable_trunk_with_oracle->public_leaves()) {
+  for (auto& leaf: fixable_trunk_with_oracle->public_states()) {
     if (!leaf.IsTerminal()) num_non_terminal_leaves++;
   }
 }
 
 std::unique_ptr<BasicDims> DeduceDims(const Trunk& trunk, NetArchitecture arch) {
-  const dlcfr::LeafPublicState& some_leaf =
-      trunk.fixable_trunk_with_oracle->public_leaves().at(0);
+  const dlcfr::PublicState& some_leaf =
+      trunk.fixable_trunk_with_oracle->public_states().at(0);
   const HandInfo& hand_info = *trunk.hand_info;
 
   std::unique_ptr<BasicDims> dims;
@@ -112,7 +112,7 @@ void WritePositionalHand(int net_id, absl::Span<float_net> write_to) {
   write_to[net_id] = 1.;
 }
 
-void WriteParticleDataPoint(const algorithms::dlcfr::LeafPublicState& state,
+void WriteParticleDataPoint(const algorithms::dlcfr::PublicState& state,
                             const NetContext& net_context,
                             const ParticleDims& dims, ParticleDataPoint* point,
                             std::mt19937* rnd_gen, bool shuffle_input_output) {
@@ -120,7 +120,7 @@ void WriteParticleDataPoint(const algorithms::dlcfr::LeafPublicState& state,
   point->Reset();
 
   // Find out how many parviews we will write.
-  int num_parviews = state.leaf_nodes[0].size() + state.leaf_nodes[1].size();
+  int num_parviews = state.infostate_nodes[0].size() + state.infostate_nodes[1].size();
   // Make a random permutation if something should be shuffled.
   std::vector<int> parview_placement(num_parviews);
   if (shuffle_input_output) {
@@ -133,7 +133,7 @@ void WriteParticleDataPoint(const algorithms::dlcfr::LeafPublicState& state,
   // Write inputs
   int i = 0;
   for (int pl = 0; pl < 2; ++pl) {
-    for (int j = 0; j < state.leaf_nodes[pl].size(); j++) {
+    for (int j = 0; j < state.infostate_nodes[pl].size(); j++) {
       ParviewDataPoint parview = point->parview_at(shuffle_input_output
                                                     ? parview_placement[i] : i);
       // Hand features.
@@ -156,7 +156,7 @@ void WriteParticleDataPoint(const algorithms::dlcfr::LeafPublicState& state,
   // Write outputs
   i = 0;
   for (int pl = 0; pl < 2; ++pl) {
-    for (int j = 0; j < state.leaf_nodes[pl].size(); j++) {
+    for (int j = 0; j < state.infostate_nodes[pl].size(); j++) {
       ParviewDataPoint parview = point->parview_at(shuffle_input_output
                                                    ? parview_placement[i] : i);
       parview.value() = state.values[pl][j];
@@ -168,11 +168,11 @@ void WriteParticleDataPoint(const algorithms::dlcfr::LeafPublicState& state,
 }
 
 void CopyValuesFromNetToTree(ParticleDataPoint data_point,
-                             algorithms::dlcfr::LeafPublicState& state,
+                             algorithms::dlcfr::PublicState& state,
                              const ParticleDims& dims) {
   int parview_index = 0;
   for (int pl = 0; pl < 2; ++pl) {
-    for (int j = 0; j < state.leaf_nodes[pl].size(); j++) {
+    for (int j = 0; j < state.infostate_nodes[pl].size(); j++) {
       ParviewDataPoint parview = data_point.parview_at(parview_index);
       state.values[pl][j] = parview.value();
       parview_index++;
@@ -181,7 +181,7 @@ void CopyValuesFromNetToTree(ParticleDataPoint data_point,
   SPIEL_CHECK_EQ(data_point.num_parviews(), parview_index);
 }
 
-void WritePositionalDataPoint(const algorithms::dlcfr::LeafPublicState& state,
+void WritePositionalDataPoint(const algorithms::dlcfr::PublicState& state,
                               const NetContext& net_context,
                               const PositionalDims& dims, PositionalData* point) {
   // Important !!
@@ -190,23 +190,23 @@ void WritePositionalDataPoint(const algorithms::dlcfr::LeafPublicState& state,
   // Write inputs
   Copy(state.public_tensor.Tensor(), point->public_features());
   for (int pl = 0; pl < 2; ++pl) {
-    for (int j = 0; j < state.leaf_nodes[pl].size(); j++) {
+    for (int j = 0; j < state.infostate_nodes[pl].size(); j++) {
       point->range_at(pl, net_context.net_index(pl, j)) = state.ranges[pl][j];
     }
   }
   // Write outputs
   for (int pl = 0; pl < 2; ++pl) {
-    for (int j = 0; j < state.leaf_nodes[pl].size(); j++) {
+    for (int j = 0; j < state.infostate_nodes[pl].size(); j++) {
       point->value_at(pl, net_context.net_index(pl, j)) = state.values[pl][j];
     }
   }
 }
 
 void CopyValuesNetToTree(PositionalData* point,
-                         algorithms::dlcfr::LeafPublicState& state,
+                         algorithms::dlcfr::PublicState& state,
                          const NetContext& net_context) {
   for (int pl = 0; pl < 2; ++pl) {
-    for (int j = 0; j < state.leaf_nodes[pl].size(); j++) {
+    for (int j = 0; j < state.infostate_nodes[pl].size(); j++) {
       state.values[pl][j] = point->value_at(pl, net_context.net_index(pl, j));
     }
   }

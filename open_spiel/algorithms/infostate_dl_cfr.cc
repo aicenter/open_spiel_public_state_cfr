@@ -26,15 +26,15 @@ namespace dlcfr {
 DepthLimitedCFR::DepthLimitedCFR(
     std::shared_ptr<const Game> game,
     std::vector<std::shared_ptr<InfostateTree>> depth_lim_trees,
-    std::shared_ptr<const LeafEvaluator> leaf_evaluator,
-    std::shared_ptr<const LeafEvaluator> terminal_evaluator,
+    std::shared_ptr<const PublicStateEvaluator> nonterminal_evaluator,
+    std::shared_ptr<const PublicStateEvaluator> terminal_evaluator,
     std::shared_ptr<Observer> public_observer,
     std::vector<BanditVector> bandits
 ) :
     game_(std::move(game)),
     trees_(std::move(depth_lim_trees)),
     public_observer_(std::move(public_observer)),
-    leaf_evaluator_(std::move(leaf_evaluator)),
+    nonterminal_evaluator_(std::move(nonterminal_evaluator)),
     terminal_evaluator_(std::move(terminal_evaluator)),
     player_ranges_({
       std::vector<double>(trees_[0]->root_branching_factor(), 1.),
@@ -50,80 +50,94 @@ DepthLimitedCFR::DepthLimitedCFR(
                }),
     bandits_(std::move(bandits)) {
   SPIEL_CHECK_TRUE(public_observer_->HasTensor());
-  PrepareLeafNodesForPublicStates();
+  PrepareInfostateNodesForPublicStates();
   PrepareRangesAndValuesForPublicStates();
   CreateContexts();
 }
 
 DepthLimitedCFR::DepthLimitedCFR(
     std::shared_ptr<const Game> game, int max_depth_limit,
-    std::shared_ptr<const LeafEvaluator> leaf_evaluator,
-    std::shared_ptr<const LeafEvaluator> terminal_evaluator
+    std::shared_ptr<const PublicStateEvaluator> nonterminal_evaluator,
+    std::shared_ptr<const PublicStateEvaluator> terminal_evaluator
 ) {
   auto trees = {MakeInfostateTree(*game, 0, max_depth_limit),
                 MakeInfostateTree(*game, 1, max_depth_limit)};
-  // TODO: fix.
+  // FIXME: fix.
   new(this) DepthLimitedCFR(game, trees,
-                            std::move(leaf_evaluator),
+                            std::move(nonterminal_evaluator),
                             std::move(terminal_evaluator),
                             game->MakeObserver(kPublicStateObsType, {}),
                             MakeBanditVectors(trees));
 }
 
-void DepthLimitedCFR::PrepareLeafNodesForPublicStates() {
+void DepthLimitedCFR::PrepareInfostateNodesForPublicStates() {
   Observation public_observation(*game_, public_observer_);
-
+  // FIXME: add initial state
+//  // Save node positions for initial (root) public state.
+//  for (int pl = 0; pl < 2; ++pl) {
+//    for (int node_position = 0; node_position < trees_[pl]->root_branching_factor();
+//         ++node_position) {
+//      InfostateNode* root_node = trees_[pl]->root().child_at(node_position);
+//      PublicState* init_state = GetPublicState(root_node, public_observation);
+//      SPIEL_CHECK_TRUE(init_state->IsInitial());
+//      init_state->infostate_nodes[pl].push_back(root_node);
+//      node_positions_[root_node] = node_position;
+//    }
+//  }
+  // Save node positions for leaf public states.
   for (int pl = 0; pl < 2; ++pl) {
-    int leaf_position = 0;
-    for (InfostateNode* leaf_node : trees_[pl]->leaf_nodes()) {
-      SPIEL_CHECK_FALSE(leaf_node->corresponding_states().empty());
-      const std::unique_ptr<State>& some_state =
-          leaf_node->corresponding_states()[0];
-      public_observation.SetFrom(*some_state, kDefaultPlayerId);
-      SPIEL_DCHECK_TRUE(DoStatesProduceEqualPublicObservations(
-          *leaf_node, public_observation.Tensor()));
-      LeafPublicState* leaf_state = GetPublicLeaf(public_observation);
-      leaf_state->leaf_nodes[pl].push_back(leaf_node);
-      leaf_positions_[leaf_node] = leaf_position;
-      leaf_position++;
+    for (int node_position = 0; node_position < trees_[pl]->num_leaves();
+         ++node_position) {
+      InfostateNode* leaf_node = trees_[pl]->leaf_nodes()[node_position];
+      PublicState* leaf_state = GetPublicState(leaf_node, public_observation);
+      SPIEL_CHECK_FALSE(leaf_state->IsInitial());
+      leaf_state->infostate_nodes[pl].push_back(leaf_node);
+      node_positions_[leaf_node] = node_position;
     }
-
-    SPIEL_CHECK_EQ(leaf_position, trees_[pl]->num_leaves());
   }
 }
 
 void DepthLimitedCFR::PrepareRangesAndValuesForPublicStates() {
-  for (LeafPublicState& s : public_leaves_) {
+  for (PublicState& state : public_states_) {
     for (int pl = 0; pl < 2; ++pl) {
-      const int num_leaves = s.leaf_nodes[pl].size();
-      s.ranges[pl] = std::vector<double>(num_leaves, 0.);
-      s.values[pl] = std::vector<double>(num_leaves, 0.);
+      const int num_nodes = state.infostate_nodes[pl].size();
+      state.ranges[pl] = std::vector<double>(num_nodes, 0.);
+      state.values[pl] = std::vector<double>(num_nodes, 0.);
     }
   }
 }
 
 void DepthLimitedCFR::CreateContexts() {
-  for (const LeafPublicState& public_leaf : public_leaves_) {
-    SPIEL_DCHECK_TRUE(public_leaf.IsConsistent());
-    if (public_leaf.IsTerminal()) {
-      contexts_.push_back(terminal_evaluator_->CreateContext(public_leaf));
+  for (const PublicState& state : public_states_) {
+    SPIEL_DCHECK_TRUE(state.IsConsistent());
+    if (state.IsTerminal()) {
+      contexts_.push_back(terminal_evaluator_->CreateContext(state));
     } else {
-      SPIEL_CHECK_TRUE(leaf_evaluator_);
-      contexts_.push_back(leaf_evaluator_->CreateContext(public_leaf));
+      SPIEL_CHECK_TRUE(nonterminal_evaluator_);
+      contexts_.push_back(nonterminal_evaluator_->CreateContext(state));
     }
   }
 }
 
-LeafPublicState* DepthLimitedCFR::GetPublicLeaf(
+PublicState* DepthLimitedCFR::GetPublicState(InfostateNode* node,
+                                             Observation& public_observation) {
+  SPIEL_CHECK_FALSE(node->corresponding_states().empty());
+  const std::unique_ptr<State>& some_state = node->corresponding_states()[0];
+  public_observation.SetFrom(*some_state, kDefaultPlayerId);
+  SPIEL_DCHECK_TRUE(
+      DoStatesProduceEqualPublicObservations(*node, public_observation.Tensor()));
+  PublicState* state = GetPublicState(public_observation);
+  return state;
+}
+
+PublicState* DepthLimitedCFR::GetPublicState(
     const Observation& public_observation) {
-  for (LeafPublicState& state : public_leaves_) {
+  for (PublicState& state : public_states_) {
     if (state.public_tensor == public_observation) return &state;
   }
   // None found: create and return the pointer.
-  public_leaves_.emplace_back(public_observation);
-  LeafPublicState* state = &public_leaves_.back();
-  state->public_id = public_leaves_.size() - 1;
-  return state;
+  public_states_.emplace_back(public_observation, public_states_.size());
+  return &public_states_.back();
 }
 
 bool DepthLimitedCFR::DoStatesProduceEqualPublicObservations(
@@ -145,17 +159,18 @@ std::shared_ptr<Policy> DepthLimitedCFR::CurrentPolicy() {
   return std::make_shared<BanditsCurrentPolicy>(trees_, bandits_);
 }
 
-std::shared_ptr<LeafEvaluator> MakeTerminalEvaluator() {
+std::shared_ptr<PublicStateEvaluator> MakeTerminalEvaluator() {
   return std::make_shared<TerminalEvaluator>();
 }
 
-std::shared_ptr<LeafEvaluator> MakeDummyEvaluator() {
+std::shared_ptr<PublicStateEvaluator> MakeDummyEvaluator() {
   return std::make_shared<DummyEvaluator>();
 }
 
 TerminalPublicStateContext::TerminalPublicStateContext(
-    const LeafPublicState& state) {
-  auto& leaf_nodes = state.leaf_nodes;
+    const PublicState& state) {
+  SPIEL_CHECK_TRUE(state.IsTerminal());
+  auto& leaf_nodes = state.infostate_nodes;
   SPIEL_CHECK_EQ(leaf_nodes[0].size(), leaf_nodes[1].size());
   const int num_terminals = leaf_nodes[0].size();
   utilities.reserve(num_terminals);
@@ -190,12 +205,12 @@ TerminalPublicStateContext::TerminalPublicStateContext(
 }
 
 std::unique_ptr<PublicStateContext> TerminalEvaluator::CreateContext(
-    const LeafPublicState& state) const {
+    const PublicState& state) const {
   return std::make_unique<TerminalPublicStateContext>(state);
 }
 
 void TerminalEvaluator::EvaluatePublicState(
-    LeafPublicState* state, PublicStateContext* context) const {
+    PublicState* state, PublicStateContext* context) const {
   auto* terminal = open_spiel::down_cast<TerminalPublicStateContext*>(context);
   for (int i = 0; i < terminal->utilities.size(); ++i) {
     const int j = terminal->permutation[i];
@@ -236,17 +251,17 @@ void DepthLimitedCFR::PrepareRootReachProbs() {
 }
 
 void DepthLimitedCFR::EvaluateLeaves() {
-  SPIEL_CHECK_EQ(public_leaves_.size(), contexts_.size());
-  for (int i = 0; i < public_leaves_.size(); ++i) {
-    LeafPublicState& state = public_leaves_[i];
+  SPIEL_CHECK_EQ(public_states_.size(), contexts_.size());
+  for (int i = 0; i < public_states_.size(); ++i) {
+    PublicState& state = public_states_[i];
     PublicStateContext* context = contexts_[i].get();
 
     // 1. Prepare ranges
     for (int pl = 0; pl < 2; pl++) {
-      const int num_leaves = state.leaf_nodes[pl].size();
+      const int num_leaves = state.infostate_nodes[pl].size();
       for (int j = 0; j < num_leaves; ++j) {
-        const InfostateNode* leaf_node = state.leaf_nodes[pl][j];
-        const int trunk_position = leaf_positions_.at(leaf_node);
+        const InfostateNode* leaf_node = state.infostate_nodes[pl][j];
+        const int trunk_position = node_positions_.at(leaf_node);
         SPIEL_DCHECK_GE(trunk_position, 0);
         SPIEL_DCHECK_LT(trunk_position, trees_[pl]->num_leaves());
         // Copy range from the trunk to the leaf public state.
@@ -259,16 +274,16 @@ void DepthLimitedCFR::EvaluateLeaves() {
       SPIEL_CHECK_TRUE(terminal_evaluator_);
       terminal_evaluator_->EvaluatePublicState(&state, context);
     } else {
-      SPIEL_CHECK_TRUE(leaf_evaluator_);
-      leaf_evaluator_->EvaluatePublicState(&state, context);
+      SPIEL_CHECK_TRUE(nonterminal_evaluator_);
+      nonterminal_evaluator_->EvaluatePublicState(&state, context);
     }
 
     // 3. Update cfvs for propagators.
     for (int pl = 0; pl < 2; pl++) {
-      const int num_leaves = state.leaf_nodes[pl].size();
+      const int num_leaves = state.infostate_nodes[pl].size();
       for (int j = 0; j < num_leaves; ++j) {
-        const InfostateNode* leaf_node = state.leaf_nodes[pl][j];
-        const int trunk_position = leaf_positions_.at(leaf_node);
+        const InfostateNode* leaf_node = state.infostate_nodes[pl][j];
+        const int trunk_position = node_positions_.at(leaf_node);
         SPIEL_DCHECK_GE(trunk_position, 0);
         SPIEL_DCHECK_LT(trunk_position, trees_[pl]->num_leaves());
         // Copy value from the leaf public state to the trunk.
@@ -304,20 +319,22 @@ void DepthLimitedCFR::Reset() {
     }
   }
   // Reset subgames
-  for (int i = 0; i < public_leaves_.size(); ++i) {
-    LeafPublicState& state = public_leaves_[i];
+  for (int i = 0; i < public_states_.size(); ++i) {
+    PublicState& state = public_states_[i];
     for (int pl = 0; pl < 2; ++pl) {
       std::fill(state.ranges[pl].begin(), state.ranges[pl].end(), 0.);
       std::fill(state.values[pl].begin(), state.values[pl].end(), 0.);
     }
-    std::unique_ptr<PublicStateContext>& context = contexts_[i];
-    if (!state.IsTerminal() && context && leaf_evaluator_) {
-      leaf_evaluator_->ResetContext(context.get());
+    if (nonterminal_evaluator_.get()) {
+      std::unique_ptr<PublicStateContext>& context = contexts_[i];
+      if (!state.IsTerminal() && context.get()) {
+        nonterminal_evaluator_->ResetContext(context.get());
+      }
     }
   }
 }
 
-bool LeafPublicState::IsConsistent() const {
+bool PublicState::IsConsistent() const {
   // All leaf nodes must be indeed leaf nodes and belong to correct players.
   // They should all be terminal or non-terminal.
   // The set of corresponding states must be the same across players.
@@ -326,8 +343,8 @@ bool LeafPublicState::IsConsistent() const {
   using History = std::vector<Action>;
   std::unordered_set<History, absl::Hash<History>> state_histories;
   for (int pl = 0; pl < 2; ++pl) {
-    for (const InfostateNode* node : leaf_nodes[pl]) {
-      if (!node->is_leaf_node()) return false;
+    for (const InfostateNode* node : infostate_nodes[pl]) {
+      if (IsLeaf() && !node->is_leaf_node()) return false;
       if (node->tree().acting_player() != pl) return false;
       if (node->type() == kTerminalInfostateNode) num_terminals++;
       else num_nonterminals++;
@@ -351,11 +368,11 @@ bool LeafPublicState::IsConsistent() const {
   if (num_terminals % 2 != 0 && num_nonterminals % 2 != 0) return false;
   return true;
 }
-bool LeafPublicState::IsTerminal() const {
-  return leaf_nodes[0][0]->type() == kTerminalInfostateNode;
+bool PublicState::IsTerminal() const {
+  return infostate_nodes[0][0]->type() == kTerminalInfostateNode;
 }
 
-void DebugPrintPublicFeatures(const std::vector<LeafPublicState>& states) {
+void DebugPrintPublicFeatures(const std::vector<PublicState>& states) {
   std::cout << "# Public features:\n";
   for (int i = 0; i < states.size(); ++i) {
     std::cout << "#   states[" << i << "].public_tensor\n#     "
@@ -365,14 +382,15 @@ void DebugPrintPublicFeatures(const std::vector<LeafPublicState>& states) {
 }
 
 bool CheckChildPublicStateConsistency(
-    const CFRContext& cfr_public_state, const LeafPublicState& leaf_state) {
+    const CFRContext& cfr_public_state, const PublicState& leaf_state) {
+  SPIEL_CHECK_TRUE(leaf_state.IsLeaf());
   auto trees = cfr_public_state.dlcfr->trees();
   for (int pl = 0; pl < 2; ++pl) {
     const InfostateNode& root = trees[pl]->root();
-    SPIEL_CHECK_EQ(leaf_state.leaf_nodes[pl].size(), root.num_children());
+    SPIEL_CHECK_EQ(leaf_state.infostate_nodes[pl].size(), root.num_children());
     for (int i = 0; i < root.num_children(); ++i) {
       const InfostateNode& actual = *root.child_at(i);
-      const InfostateNode& expected = *leaf_state.leaf_nodes[pl][i];
+      const InfostateNode& expected = *leaf_state.infostate_nodes[pl][i];
       SPIEL_CHECK_EQ(actual.infostate_string(), expected.infostate_string());
     }
   }
@@ -382,12 +400,12 @@ bool CheckChildPublicStateConsistency(
 // -- CFR evaluator ------------------------------------------------------------
 
 CFREvaluator::CFREvaluator(std::shared_ptr<const Game> game, int depth_limit,
-                           std::shared_ptr<const LeafEvaluator> leaf_evaluator,
-                           std::shared_ptr<const LeafEvaluator> terminal_evaluator,
+                           std::shared_ptr<const PublicStateEvaluator> leaf_evaluator,
+                           std::shared_ptr<const PublicStateEvaluator> terminal_evaluator,
                            std::shared_ptr<Observer> public_observer,
                            std::shared_ptr<Observer> infostate_observer)
     : game(std::move(game)), depth_limit(depth_limit),
-      leaf_evaluator(std::move(leaf_evaluator)),
+      nonterminal_evaluator(std::move(leaf_evaluator)),
       terminal_evaluator(std::move(terminal_evaluator)),
       public_observer(std::move(public_observer)),
       infostate_observer(std::move(infostate_observer)) {
@@ -395,15 +413,18 @@ CFREvaluator::CFREvaluator(std::shared_ptr<const Game> game, int depth_limit,
 }
 
 std::unique_ptr<PublicStateContext> CFREvaluator::CreateContext(
-    const LeafPublicState& state) const {
+    const PublicState& state) const {
+  if (state.IsInitial()) return nullptr;
+  SPIEL_CHECK_TRUE(state.IsLeaf());
+
   auto subgame_trees = std::vector{
-      MakeInfostateTree(state.leaf_nodes[0], depth_limit),
-      MakeInfostateTree(state.leaf_nodes[1], depth_limit)
+      MakeInfostateTree(state.infostate_nodes[0], depth_limit),
+      MakeInfostateTree(state.infostate_nodes[1], depth_limit)
   };
   auto subgame_bandits = MakeBanditVectors(subgame_trees, bandit_name);
   auto dlcfr = std::make_unique<DepthLimitedCFR>(
-      game, subgame_trees, leaf_evaluator, terminal_evaluator, public_observer,
-      std::move(subgame_bandits));
+      game, subgame_trees, nonterminal_evaluator, terminal_evaluator,
+      public_observer, std::move(subgame_bandits));
   auto cfr_public_state = std::make_unique<CFRContext>(std::move(dlcfr));
   SPIEL_DCHECK_TRUE(CheckChildPublicStateConsistency(*cfr_public_state, state));
   return cfr_public_state;
@@ -414,22 +435,22 @@ void CFREvaluator::ResetContext(PublicStateContext* context) const {
   cfr_state->dlcfr->Reset();
 }
 
-void CFREvaluator::EvaluatePublicState(LeafPublicState* public_state,
+void CFREvaluator::EvaluatePublicState(PublicState* state,
                                        PublicStateContext* context) const {
+  SPIEL_CHECK_TRUE(state->IsLeaf());
   auto* cfr_state = open_spiel::down_cast<CFRContext*>(context);
   DepthLimitedCFR* dlcfr = cfr_state->dlcfr.get();
   if (reset_subgames_on_evaluation) {
     dlcfr->Reset();
   }
-  dlcfr->SetPlayerRanges(public_state->ranges);
+  dlcfr->SetPlayerRanges(state->ranges);
   dlcfr->RunSimultaneousIterations(num_cfr_iterations);
   std::array<absl::Span<const double>, 2> resulting_values =
       dlcfr->RootChildrenCfValues();
   // Copy the results.
   for (int pl = 0; pl < 2; ++pl) {
-    std::copy(resulting_values[pl].begin(),
-              resulting_values[pl].end(),
-              public_state->values[pl].begin());
+    std::copy(resulting_values[pl].begin(), resulting_values[pl].end(),
+              state->values[pl].begin());
   }
 }
 
@@ -441,16 +462,16 @@ double DepthLimitedCFR::RootValue(Player pl) const {
 }
 
 
-void PrintPublicStatesStats(const std::vector<LeafPublicState>& public_leaves) {
-  for (const LeafPublicState& state : public_leaves) {
+void PrintPublicStatesStats(const std::vector<PublicState>& public_leaves) {
+  for (const PublicState& state : public_leaves) {
     std::array<int, 2>
-        num_nodes = { (int) state.leaf_nodes[0].size(),
-                      (int) state.leaf_nodes[1].size() },
+        num_nodes = { (int) state.infostate_nodes[0].size(),
+                      (int) state.infostate_nodes[1].size() },
         largest_infostates = {-1, -1},
         smallest_infostates = {1000000, 1000000};
     int num_states = 0;
     for (int pl = 0; pl < 2; ++pl) {
-      for (const InfostateNode* node : state.leaf_nodes[pl]) {
+      for (const InfostateNode* node : state.infostate_nodes[pl]) {
         int size = node->corresponding_states_size();
         if (pl == 0) num_states += size;
         largest_infostates[pl] = std::max(largest_infostates[pl], size);

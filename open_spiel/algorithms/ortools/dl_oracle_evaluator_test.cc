@@ -109,7 +109,7 @@ void TestOptimalValuesKuhn() {
   std::shared_ptr<const Game> game = LoadGame("kuhn_poker");
   std::shared_ptr<Observer> infostate_observer =
       game->MakeObserver(kInfoStateObsType, {});
-  std::shared_ptr<const dlcfr::LeafEvaluator> terminal_evaluator =
+  std::shared_ptr<const dlcfr::PublicStateEvaluator> terminal_evaluator =
       dlcfr::MakeTerminalEvaluator();
   auto oracle_evaluator =
       std::make_shared<OracleEvaluator>(game, infostate_observer);
@@ -183,8 +183,8 @@ void TestOptimalValuesKuhn() {
     }
     dl_solver.EvaluateLeaves();
 
-    auto& state_p = dl_solver.public_leaves()[0];
-    auto& state_b = dl_solver.public_leaves()[1];
+    auto& state_p = dl_solver.public_states()[0];
+    auto& state_b = dl_solver.public_states()[1];
 
     SPIEL_CHECK_FLOAT_EQ(
         state_p.values[1][0] + state_p.values[1][1] + state_p.values[1][2],
@@ -202,7 +202,7 @@ void TestValueOracle(const std::string& game_name) {
        ++trunk_depth_limit) {
     std::cout << "Value oracle for depth limit "
               << trunk_depth_limit << " " << std::flush;;
-    std::shared_ptr<const dlcfr::LeafEvaluator> terminal_evaluator =
+    std::shared_ptr<const dlcfr::PublicStateEvaluator> terminal_evaluator =
         dlcfr::MakeTerminalEvaluator();
     std::shared_ptr<Observer> public_observer =
         game->MakeObserver(kPublicStateObsType, {});
@@ -250,7 +250,7 @@ void TestOneSidedFixedStrategyExploitability(const std::string& game_name) {
 
 void TestConvergeWithCfrEvaluator(int trunk_depth) {
   std::shared_ptr<const Game> game = LoadGame("kuhn_poker");
-  std::shared_ptr<const dlcfr::LeafEvaluator> terminal_evaluator =
+  std::shared_ptr<const dlcfr::PublicStateEvaluator> terminal_evaluator =
       dlcfr::MakeTerminalEvaluator();
   std::shared_ptr<Observer> public_observer =
       game->MakeObserver(kPublicStateObsType, {});

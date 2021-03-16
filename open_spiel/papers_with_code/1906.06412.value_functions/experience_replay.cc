@@ -71,7 +71,7 @@ void GenerateDataRandomRanges(
   trunk->fixable_trunk_with_oracle->EvaluateLeaves();
   // Copy the leaves values to the experience replay.
   AddExperiencesFromTrunk(
-      trunk->fixable_trunk_with_oracle->public_leaves(),
+      trunk->fixable_trunk_with_oracle->public_states(),
       contexts, dims, arch, replay, rnd_gen, shuffle_input_output);
 
 //  if (verbose) {
@@ -98,7 +98,7 @@ void GenerateDataDLCfrIterations(
     trunk->iterable_trunk_with_oracle->UpdateReachProbs();
     trunk->iterable_trunk_with_oracle->EvaluateLeaves();
 
-    AddExperiencesFromTrunk(trunk->iterable_trunk_with_oracle->public_leaves(),
+    AddExperiencesFromTrunk(trunk->iterable_trunk_with_oracle->public_states(),
                             contexts, dims, arch, replay,
                             rnd_gen, shuffle_input_output);
     monitor_fn(iter);
@@ -114,12 +114,12 @@ ExpReplayInitPolicy GetInitPolicy(const std::string& s) {
 }
 
 void AddExperiencesFromTrunk(
-    const std::vector<algorithms::dlcfr::LeafPublicState>& public_leaves,
+    const std::vector<algorithms::dlcfr::PublicState>& public_leaves,
     const std::vector<NetContext*>& net_contexts,
     const BasicDims& dims, NetArchitecture arch, ExperienceReplay* replay,
     std::mt19937& rnd_gen, bool shuffle_input_output) {
   for (int i = 0; i < public_leaves.size(); ++i) {
-    const algorithms::dlcfr::LeafPublicState& leaf = public_leaves[i];
+    const algorithms::dlcfr::PublicState& leaf = public_leaves[i];
     if (leaf.IsTerminal()) continue;  // Add experiences only for non-terminals.
     const NetContext& net_context = *net_contexts[i];
 

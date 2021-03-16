@@ -49,7 +49,7 @@ enum ExpReplayInitPolicy {
 ExpReplayInitPolicy GetInitPolicy(const std::string& s);  // Enum from string.
 
 void AddExperiencesFromTrunk(
-    const std::vector<algorithms::dlcfr::LeafPublicState>& public_leaves,
+    const std::vector<algorithms::dlcfr::PublicState>& public_leaves,
     const std::vector<NetContext*>& net_contexts,
     const BasicDims& dims, NetArchitecture arch, ExperienceReplay* replay,
     std::mt19937& rnd_gen, bool shuffle_input_output);

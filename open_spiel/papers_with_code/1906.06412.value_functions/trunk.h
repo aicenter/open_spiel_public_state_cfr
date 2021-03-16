@@ -33,7 +33,7 @@ struct Trunk {
   std::shared_ptr<Observer> public_observer;
   std::shared_ptr<Observer> hand_observer;
   std::vector<std::shared_ptr<algorithms::InfostateTree>> trunk_trees;
-  std::shared_ptr<const algorithms::dlcfr::LeafEvaluator> terminal_evaluator;
+  std::shared_ptr<const algorithms::dlcfr::PublicStateEvaluator> terminal_evaluator;
   std::shared_ptr<algorithms::dlcfr::CFREvaluator> oracle_evaluator;
   std::unique_ptr<algorithms::dlcfr::DepthLimitedCFR> fixable_trunk_with_oracle;
   std::unique_ptr<algorithms::dlcfr::DepthLimitedCFR> iterable_trunk_with_oracle;
@@ -52,21 +52,21 @@ std::unique_ptr<BasicDims> DeduceDims(const Trunk& trunk, NetArchitecture arch);
 
 
 void WriteParticleDataPoint(
-    const algorithms::dlcfr::LeafPublicState& state,
+    const algorithms::dlcfr::PublicState& state,
     const NetContext& net_context,
     const ParticleDims& dims, ParticleDataPoint* point,
     std::mt19937* rnd_gen, bool shuffle_input_output);
 
 void CopyValuesFromNetToTree(ParticleDataPoint data_point,
-                             algorithms::dlcfr::LeafPublicState& state,
+                             algorithms::dlcfr::PublicState& state,
                              const ParticleDims& dims);
 
-void WritePositionalDataPoint(const algorithms::dlcfr::LeafPublicState& state,
+void WritePositionalDataPoint(const algorithms::dlcfr::PublicState& state,
                               const NetContext& net_context,
                               const PositionalDims& dims, PositionalData* point);
 
 void CopyValuesNetToTree(PositionalData* point,
-                         algorithms::dlcfr::LeafPublicState& state,
+                         algorithms::dlcfr::PublicState& state,
                          const NetContext& net_context);
 
 void inline Copy(absl::Span<const float> source, absl::Span<float> target) {

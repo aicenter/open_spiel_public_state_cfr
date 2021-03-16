@@ -28,7 +28,7 @@ void TestCreateHandTable() {
   algorithms::dlcfr::DepthLimitedCFR dl_cfr(game, 3, leaf_evaluator, nullptr);
 
   std::unique_ptr<HandInfo> hand_info = CreateHandInfo(*game, hand_observer,
-                                                       dl_cfr.public_leaves());
+                                                       dl_cfr.public_states());
   SPIEL_CHECK_EQ(hand_info->tables.size(), game->NumPlayers());
   for (const HandTable& player_table : hand_info->tables) {
     SPIEL_CHECK_EQ(player_table.private_hands.size(), 3);

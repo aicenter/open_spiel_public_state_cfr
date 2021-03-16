@@ -238,7 +238,7 @@ void TrainEvalLoop() {
   std::cout << "# Number of non-terminal public states: "
             << t->num_non_terminal_leaves << "\n";
   std::cout << "# Public states stats: \n";
-  dlcfr::PrintPublicStatesStats(t->fixable_trunk_with_oracle->public_leaves());
+  dlcfr::PrintPublicStatesStats(t->fixable_trunk_with_oracle->public_states());
   SPIEL_CHECK_GT(t->num_non_terminal_leaves, 0);  // The trunk is too deep?
 
   const std::unique_ptr<BasicDims> dims = DeduceDims(*t, arch);

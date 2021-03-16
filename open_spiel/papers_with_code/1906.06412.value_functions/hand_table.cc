@@ -57,8 +57,8 @@ size_t HandInfo::hand_tensor_size() const {
 
 bool AllInfoStatesHaveDistinctHands(
     const Game& game, const std::shared_ptr<Observer>& hand_observer,
-    Player pl, const dlcfr::LeafPublicState& state) {
-  const std::vector<const InfostateNode*>& info_states = state.leaf_nodes[pl];
+    Player pl, const dlcfr::PublicState& state) {
+  const std::vector<const InfostateNode*>& info_states = state.infostate_nodes[pl];
   std::unordered_map<Observation, const InfostateNode*> hands_for_infostates;
 
   Observation hand(game, hand_observer);
@@ -104,12 +104,12 @@ bool AllStatesHaveSameHands(const Observation& expected_hand, Player player,
 
 std::unique_ptr<HandInfo> CreateHandInfo(
     const Game& game, const std::shared_ptr<Observer>& hand_observer,
-    const std::vector<dlcfr::LeafPublicState>& public_leaves) {
+    const std::vector<dlcfr::PublicState>& public_leaves) {
   auto hand_info = std::make_unique<HandInfo>(game, hand_observer);
   Observation& hand = hand_info->hand_buffer;
 
   for (int state_idx = 0; state_idx < public_leaves.size(); ++state_idx) {
-    const dlcfr::LeafPublicState& state = public_leaves[state_idx];
+    const dlcfr::PublicState& state = public_leaves[state_idx];
     // Terminal states are not handled by non-terminal leaf evaluators,
     // so we don't need to create hand table for them.
     if (state.IsTerminal()) {
@@ -121,8 +121,8 @@ std::unique_ptr<HandInfo> CreateHandInfo(
           AllInfoStatesHaveDistinctHands(game, hand_observer, pl, state));
 
       for (int tree_idx = 0;
-           tree_idx < state.leaf_nodes[pl].size(); ++tree_idx) {
-        const InfostateNode* node = state.leaf_nodes[pl][tree_idx];
+           tree_idx < state.infostate_nodes[pl].size(); ++tree_idx) {
+        const InfostateNode* node = state.infostate_nodes[pl][tree_idx];
         const State& some_state = *node->corresponding_states().at(0);
         hand.SetFrom(some_state, pl);
 

@@ -42,14 +42,14 @@ struct OraclePublicStateContext : public dlcfr::PublicStateContext {
         specifications(std::move(specifications)) {}
 };
 
-struct OracleEvaluator : public dlcfr::LeafEvaluator {
+struct OracleEvaluator : public dlcfr::PublicStateEvaluator {
   std::shared_ptr<const Game> game;
   std::shared_ptr<Observer> infostate_observer;
   OracleEvaluator(std::shared_ptr<const Game> game,
                   std::shared_ptr<Observer> infostate_observer);
   std::unique_ptr<dlcfr::PublicStateContext> CreateContext(
-      const dlcfr::LeafPublicState& leaf_state) const override;
-  void EvaluatePublicState(dlcfr::LeafPublicState* s,
+      const dlcfr::PublicState& state) const override;
+  void EvaluatePublicState(dlcfr::PublicState* s,
                            dlcfr::PublicStateContext* context) const override;
 };
 

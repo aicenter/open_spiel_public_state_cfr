@@ -32,7 +32,7 @@ void CheckSparseTrunksKuhnDepth2(
     const std::string& eval_infostate = sparse_trunks[i]->fixate_infostates[0];
     // One char, i.e. card 0/1/2
     SPIEL_CHECK_EQ(eval_infostate.size(), 1);
-    SPIEL_CHECK_EQ(sparse_trunks[i]->dlcfr->public_leaves().size(), 5);
+    SPIEL_CHECK_EQ(sparse_trunks[i]->dlcfr->public_states().size(), 5);
 
     for (int pl = 0; pl < 2; ++pl) {
       SPIEL_CHECK_EQ(sparse_trunks[i]->dlcfr->trees()[pl]
@@ -56,12 +56,12 @@ void CheckSparseTrunksKuhnDepth3(
         // Pass infostate
         SPIEL_CHECK_EQ(sparse_trunks[i]->dlcfr->trees()[pl]
                        ->leaf_nodes().size(), num_states * 3);
-        SPIEL_CHECK_EQ(sparse_trunks[i]->dlcfr->public_leaves().size(), 3);
+        SPIEL_CHECK_EQ(sparse_trunks[i]->dlcfr->public_states().size(), 3);
       } else if (eval_infostate[1] == 'b') {
         // Bet infostate
         SPIEL_CHECK_EQ(sparse_trunks[i]->dlcfr->trees()[pl]
                        ->leaf_nodes().size(), num_states * 2);
-        SPIEL_CHECK_EQ(sparse_trunks[i]->dlcfr->public_leaves().size(), 2);
+        SPIEL_CHECK_EQ(sparse_trunks[i]->dlcfr->public_states().size(), 2);
       } else {
         SpielFatalError("Exhausted pattern match!");
       }
@@ -78,7 +78,7 @@ void CheckSparseTrunksKuhnDepth4(
     const std::string& eval_infostate = sparse_trunks[i]->fixate_infostates[0];
     // Three chars, i.e. card 0/1/2 followed by pb
     SPIEL_CHECK_EQ(eval_infostate.size(), 3);
-    SPIEL_CHECK_EQ(sparse_trunks[i]->dlcfr->public_leaves().size(), 2);
+    SPIEL_CHECK_EQ(sparse_trunks[i]->dlcfr->public_states().size(), 2);
 
     for (int pl = 0; pl < 2; ++pl) {
       SPIEL_CHECK_EQ(sparse_trunks[i]->dlcfr->trees()[pl]
@@ -94,9 +94,9 @@ void TestMakeSparseTrunks() {
       game->MakeObserver(kInfoStateObsType, {});
   std::shared_ptr<Observer> public_observer =
       game->MakeObserver(kPublicStateObsType, {});
-  std::shared_ptr<dlcfr::LeafEvaluator> terminal_evaluator =
+  std::shared_ptr<dlcfr::PublicStateEvaluator> terminal_evaluator =
       dlcfr::MakeTerminalEvaluator();
-  std::shared_ptr<dlcfr::LeafEvaluator> dummy_eval =
+  std::shared_ptr<dlcfr::PublicStateEvaluator> dummy_eval =
       dlcfr::MakeDummyEvaluator();
   std::string bandits_for_cfr = "RegretMatchingPlus";
   std::mt19937 rnd_gen(0);
@@ -134,7 +134,7 @@ void TestMakeSparseTrunkWithEqSupport() {
       game->MakeObserver(kInfoStateObsType, {});
   std::shared_ptr<Observer> public_observer =
       game->MakeObserver(kPublicStateObsType, {});
-  std::shared_ptr<dlcfr::LeafEvaluator> terminal_evaluator =
+  std::shared_ptr<dlcfr::PublicStateEvaluator> terminal_evaluator =
       dlcfr::MakeTerminalEvaluator();
   auto cfr_eval = std::make_shared<dlcfr::CFREvaluator>(
       game, no_move_limit, /*leaf_evaluator=*/nullptr,

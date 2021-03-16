@@ -53,8 +53,8 @@ struct SubgameFactory {
   ParticleDims dims;
   TreeMap<Action, std::unique_ptr<State>> history_cache;
 
-  std::shared_ptr<const algorithms::dlcfr::LeafEvaluator> terminal_evaluator;
-  std::shared_ptr<algorithms::dlcfr::LeafEvaluator> leaf_evaluator;
+  std::shared_ptr<const algorithms::dlcfr::PublicStateEvaluator> terminal_evaluator;
+  std::shared_ptr<algorithms::dlcfr::PublicStateEvaluator> leaf_evaluator;
 
   std::unique_ptr<Subgame> MakeSubgame(const ParticleSet& set,
                                        ParticleDataPoint write_solution_to);

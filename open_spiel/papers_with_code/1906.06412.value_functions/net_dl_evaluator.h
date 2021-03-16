@@ -24,12 +24,12 @@
 namespace open_spiel {
 namespace papers_with_code {
 
+using PublicState = algorithms::dlcfr::PublicState;
 using PublicStateContext = algorithms::dlcfr::PublicStateContext;
-using LeafPublicState = algorithms::dlcfr::LeafPublicState;
-using LeafEvaluator = algorithms::dlcfr::LeafEvaluator;
+using PublicStateEvaluator = algorithms::dlcfr::PublicStateEvaluator;
 
 // A bijection within the scope of a public state. This is a mapping between
-// LeafPublicState::ranges coming from the tree (x) and the input position
+// PublicState::ranges coming from the tree (x) and the input position
 // of the neural network (y) which is assigned according to player's private
 // hands across all public states of the trunk.
 // This is used for encoding NN inputs (resp. outputs).
@@ -56,12 +56,12 @@ struct NetContext : public PublicStateContext {
   }
 };
 
-class NetEvaluator : public LeafEvaluator {
+class NetEvaluator : public PublicStateEvaluator {
   HandInfo* hand_info_;
  public:
   NetEvaluator(HandInfo* hand_info) : hand_info_(hand_info) {};
   std::unique_ptr<PublicStateContext> CreateContext(
-      const LeafPublicState& leaf_state) const override;
+      const PublicState& state) const override;
 };
 
 class ParticleNetEvaluator final : public NetEvaluator {
@@ -76,7 +76,7 @@ class ParticleNetEvaluator final : public NetEvaluator {
       : NetEvaluator(hand_info),
         model_(model), device_(device), batch_(batch), dims_(dims) {}
 
-  void EvaluatePublicState(LeafPublicState* state,
+  void EvaluatePublicState(PublicState* state,
                            PublicStateContext* context) const override;
 };
 
@@ -92,7 +92,7 @@ class PositionalNetEvaluator final : public NetEvaluator {
       : NetEvaluator(hand_info),
         model_(model), device_(device), batch_(batch), dims_(dims) {}
 
-  void EvaluatePublicState(LeafPublicState* state,
+  void EvaluatePublicState(PublicState* state,
                            PublicStateContext* context) const override;
 };
 

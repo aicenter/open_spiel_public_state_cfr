@@ -41,7 +41,7 @@ namespace {
 
 void RunTrunkIterationsWithValueOracle(
     std::shared_ptr<const open_spiel::Game> game, int depth) {
-  std::shared_ptr<const dlcfr::LeafEvaluator> terminal_evaluator =
+  std::shared_ptr<const dlcfr::PublicStateEvaluator> terminal_evaluator =
       dlcfr::MakeTerminalEvaluator();
   std::shared_ptr<Observer> public_observer =
       game->MakeObserver(kPublicStateObsType, {});
@@ -73,7 +73,7 @@ void RunTrunkIterationsWithValueOracle(
 void RunTrunkIterationsWithCfrEvaluator(
     std::shared_ptr<const open_spiel::Game> game,
     const std::string& bandit_name, int depth, int subgame_cfr_iterations) {
-  std::shared_ptr<const dlcfr::LeafEvaluator> terminal_evaluator =
+  std::shared_ptr<const dlcfr::PublicStateEvaluator> terminal_evaluator =
       dlcfr::MakeTerminalEvaluator();
   std::shared_ptr<Observer> public_observer =
       game->MakeObserver(kPublicStateObsType, {});
