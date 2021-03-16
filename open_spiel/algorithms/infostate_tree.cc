@@ -172,39 +172,6 @@ void InfostateNode::SwapParent(std::unique_ptr<InfostateNode> self,
   this->incoming_index_ = at_index;
 }
 
-InfostateTree::InfostateTree(const std::vector<const State*>& start_states,
-                             const std::vector<double>& chance_reach_probs,
-                             std::shared_ptr<Observer> infostate_observer,
-                             Player acting_player, int max_move_ahead_limit,
-                             bool store_history_mapping)
-    : acting_player_(acting_player),
-      infostate_observer_(std::move(infostate_observer)),
-      root_(MakeRootNode()) {
-  SPIEL_CHECK_FALSE(start_states.empty());
-  SPIEL_CHECK_EQ(start_states.size(), chance_reach_probs.size());
-  SPIEL_CHECK_GE(acting_player_, 0);
-  SPIEL_CHECK_LT(acting_player_, start_states[0]->GetGame()->NumPlayers());
-  SPIEL_CHECK_TRUE(infostate_observer_->HasString());
-
-  int start_max_move_number = 0;
-  for (const State* start_state : start_states) {
-    start_max_move_number =
-        std::max(start_max_move_number, start_state->MoveNumber());
-  }
-
-  for (int i = 0; i < start_states.size(); ++i) {
-    RecursivelyBuildTree(root_.get(), /*depth=*/1, *start_states[i],
-                         start_max_move_number + max_move_ahead_limit,
-                         chance_reach_probs[i], store_history_mapping);
-  }
-
-  // Operations to make after building the tree.
-  RebalanceTree();
-  nodes_at_depths_.resize(tree_height() + 1);
-  CollectNodesAtDepth(mutable_root(), 0);
-  LabelNodesWithIds();
-}
-
 void InfostateTree::RebalanceTree() {
   root_->RebalanceSubtree(tree_height(), 0);
 }
@@ -453,8 +420,9 @@ std::shared_ptr<InfostateTree> MakeInfostateTree(const Game& game,
                                                  bool store_history_mapping) {
   // Uses new instead of make_shared, because shared_ptr is not a friend and
   // can't call private constructors.
+  std::unique_ptr<State> s = game.NewInitialState();
   return std::shared_ptr<InfostateTree>(new InfostateTree(
-      {game.NewInitialState().get()}, /*chance_reach_probs=*/{1.},
+      std::vector<const State*>{s.get()}, /*chance_reach_probs=*/{1.},
       game.MakeObserver(kInfoStateObsType, {}), acting_player,
       max_move_limit, store_history_mapping));
 }
@@ -508,6 +476,17 @@ std::shared_ptr<InfostateTree> MakeInfostateTree(
 
 std::shared_ptr<InfostateTree> MakeInfostateTree(
     const std::vector<const State*>& start_states,
+    const std::vector<double>& chance_reach_probs,
+    std::shared_ptr<Observer> infostate_observer, Player acting_player,
+    int max_move_ahead_limit, bool store_history_mapping) {
+  return std::shared_ptr<InfostateTree>(
+      new InfostateTree(start_states, chance_reach_probs, infostate_observer,
+                        acting_player, max_move_ahead_limit,
+                        store_history_mapping));
+}
+
+std::shared_ptr<InfostateTree> MakeInfostateTree(
+    const std::vector<std::unique_ptr<State>>& start_states,
     const std::vector<double>& chance_reach_probs,
     std::shared_ptr<Observer> infostate_observer, Player acting_player,
     int max_move_ahead_limit, bool store_history_mapping) {

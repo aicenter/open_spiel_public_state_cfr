@@ -277,6 +277,15 @@ std::shared_ptr<InfostateTree> MakeInfostateTree(
     int max_move_ahead_limit = kDefaultMoveAheadLimit,
     bool store_history_mapping = kDefaultSaveHistories);
 
+// Creates an infostate tree for a player based on some start states,
+// up to some move limit from the deepest start state.
+std::shared_ptr<InfostateTree> MakeInfostateTree(
+    const std::vector<std::unique_ptr<State>>& start_states,
+    const std::vector<double>& chance_reach_probs,
+    std::shared_ptr<Observer> infostate_observer, Player acting_player,
+    int max_move_ahead_limit = kDefaultMoveAheadLimit,
+    bool store_history_mapping = kDefaultSaveHistories);
+
 // Creates an infostate tree based on some leaf infostate nodes coming from
 // another infostate tree, up to some move limit.
 // This is useful for easily constructing (depth-limited) tree continuations.
@@ -299,16 +308,49 @@ class InfostateTree final {
   // the collected pointers are valid throughout the tree's lifetime even if
   // they are moved around.
  private:
-  InfostateTree(const std::vector<const State*>& start_states,
+  // Allow any "pointer-like" State to be passed as argument within
+  // std::vector<pointer-like-State>
+  template<typename S>
+  InfostateTree(const std::vector<S>& start_states,
                 const std::vector<double>& chance_reach_probs,
                 std::shared_ptr<Observer> infostate_observer,
                 Player acting_player, int max_move_ahead_limit,
-                bool store_history_mapping);
+                bool store_history_mapping)
+    : acting_player_(acting_player),
+        infostate_observer_(std::move(infostate_observer)),
+        root_(MakeRootNode()) {
+      SPIEL_CHECK_FALSE(start_states.empty());
+      SPIEL_CHECK_EQ(start_states.size(), chance_reach_probs.size());
+      SPIEL_CHECK_GE(acting_player_, 0);
+      SPIEL_CHECK_LT(acting_player_, start_states[0]->GetGame()->NumPlayers());
+      SPIEL_CHECK_TRUE(infostate_observer_->HasString());
+
+      int start_max_move_number = 0;
+      for (const auto& start_state : start_states) {
+        start_max_move_number =
+            std::max(start_max_move_number, start_state->MoveNumber());
+      }
+
+      for (int i = 0; i < start_states.size(); ++i) {
+        RecursivelyBuildTree(root_.get(), /*depth=*/1, *start_states[i],
+                             start_max_move_number + max_move_ahead_limit,
+                             chance_reach_probs[i], store_history_mapping);
+      }
+
+      // Operations to make after building the tree.
+      RebalanceTree();
+      nodes_at_depths_.resize(tree_height() + 1);
+      CollectNodesAtDepth(mutable_root(), 0);
+      LabelNodesWithIds();
+  }
   // Friend factories.
   friend std::shared_ptr<InfostateTree> MakeInfostateTree(const Game&, Player,
                                                           int, bool);
   friend std::shared_ptr<InfostateTree> MakeInfostateTree(
       const std::vector<const State*>&, const std::vector<double>&,
+      std::shared_ptr<Observer>, Player, int, bool);
+  friend std::shared_ptr<InfostateTree> MakeInfostateTree(
+      const std::vector<std::unique_ptr<State>>&, const std::vector<double>&,
       std::shared_ptr<Observer>, Player, int, bool);
   friend std::shared_ptr<InfostateTree> MakeInfostateTree(
       const std::vector<const InfostateNode*>&, int, bool);
@@ -464,6 +506,16 @@ class InfostateTree final {
   std::pair<size_t, size_t> CollectStartEndSequenceIds(
       InfostateNode* node, const SequenceId parent_sequence);
 };
+// Explicit instantiation of the infostate tree constructors.
+template InfostateTree::InfostateTree(
+    const std::vector<State*>&, const std::vector<double>&,
+    std::shared_ptr<Observer>, Player, int, bool);
+template InfostateTree::InfostateTree(
+    const std::vector<const State*>&, const std::vector<double>&,
+    std::shared_ptr<Observer>, Player, int, bool);
+template InfostateTree::InfostateTree(
+    const std::vector<std::unique_ptr<State>>&, const std::vector<double>&,
+    std::shared_ptr<Observer>, Player, int, bool);
 
 // Iterate over a vector of unique pointers, but expose only the raw pointers.
 template <class T>
