@@ -130,7 +130,10 @@ void WriteParticleDataPoint(const algorithms::dlcfr::PublicState& state,
   point->Reset();
 
   // Find out how many parviews we will write.
-  int num_parviews = state.bottom_nodes[0].size() + state.bottom_nodes[1].size();
+  int num_parviews = state.bottom_nodes[0].size()
+                   + state.bottom_nodes[1].size();
+  SPIEL_CHECK_GE(num_parviews, 2);
+
   // Make a random permutation if something should be shuffled.
   std::vector<int> parview_placement(num_parviews);
   if (shuffle_input_output) {

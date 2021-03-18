@@ -63,7 +63,7 @@ Trunk::Trunk(const std::string& game_name, int depth,
   num_leaves = fixable_trunk_with_oracle->public_states().size();
   num_non_terminal_leaves = 0;
   for (auto& leaf: fixable_trunk_with_oracle->public_states()) {
-    if (!leaf.IsTerminal()) num_non_terminal_leaves++;
+    if (!leaf.IsTerminal() && leaf.IsLeaf()) num_non_terminal_leaves++;
   }
 }
 

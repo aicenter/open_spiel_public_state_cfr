@@ -120,7 +120,8 @@ void AddExperiencesFromTrunk(
     std::mt19937& rnd_gen, bool shuffle_input_output) {
   for (int i = 0; i < public_leaves.size(); ++i) {
     const algorithms::dlcfr::PublicState& leaf = public_leaves[i];
-    if (leaf.IsTerminal()) continue;  // Add experiences only for non-terminals.
+    // Add experiences only for non-terminals leaves.
+    if (leaf.IsTerminal() || !leaf.IsLeaf()) continue;
     const NetContext& net_context = *net_contexts[i];
 
     switch(arch) {
