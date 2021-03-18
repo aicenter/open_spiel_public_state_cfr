@@ -59,8 +59,9 @@ void TestTerminalEvaluatorHasSameIterations(const std::string& game_name) {
 
   // We use only the terminal evaluator.
   std::shared_ptr<PublicStateEvaluator> terminal_evaluator = MakeTerminalEvaluator();
+  std::shared_ptr<PublicStateEvaluator> nonterminal_evaluator = MakeDummyEvaluator();
   DepthLimitedCFR dl_solver(game, /*depth_limit=*/100,
-      /*non_terminal_evaluator=*/nullptr, terminal_evaluator);
+                            nonterminal_evaluator, terminal_evaluator);
 
   std::shared_ptr<Policy> vec_avg = vec_solver.AveragePolicy();
   std::shared_ptr<Policy> dl_avg = dl_solver.AveragePolicy();
@@ -82,14 +83,17 @@ std::unique_ptr<DepthLimitedCFR> MakeRecursiveDepthLimitedCFR(
     int subgame_depth_limit) {
   std::shared_ptr<const PublicStateEvaluator> terminal_evaluator =
       MakeTerminalEvaluator();
+  std::shared_ptr<PublicStateEvaluator> nonterminal_evaluator =
+      MakeDummyEvaluator();
   std::shared_ptr<Observer> public_observer =
       game->MakeObserver(kPublicStateObsType, {});
   std::shared_ptr<Observer> infostate_observer =
       game->MakeObserver(kInfoStateObsType, {});
 
   // Recursive leaf evaluator.
+
   auto leaf_evaluator = std::make_shared<CFREvaluator>(
-      game, subgame_depth_limit, /*leaf_evaluator=*/nullptr,
+      game, subgame_depth_limit, nonterminal_evaluator,
       terminal_evaluator, public_observer, infostate_observer);
   leaf_evaluator->reset_subgames_on_evaluation = false;  // Needed for test !
   leaf_evaluator->bandit_name = "RegretMatching";

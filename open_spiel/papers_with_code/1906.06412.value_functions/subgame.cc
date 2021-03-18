@@ -94,7 +94,7 @@ std::unique_ptr<Subgame> SubgameFactory::MakeSubgame(
   auto solver = std::make_unique<dlcfr::DepthLimitedCFR>(
       game, trees, leaf_evaluator, terminal_evaluator,
       public_observer, MakeBanditVectors(trees, use_bandits_for_cfr));
-  solver->SetPlayerRanges(beliefs);
+  solver->SetBeliefs(beliefs);
   return std::make_unique<Subgame>(std::move(solver), write_solution_to);
 }
 

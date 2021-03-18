@@ -58,7 +58,7 @@ size_t HandInfo::hand_tensor_size() const {
 bool AllInfoStatesHaveDistinctHands(
     const Game& game, const std::shared_ptr<Observer>& hand_observer,
     Player pl, const dlcfr::PublicState& state) {
-  const std::vector<const InfostateNode*>& info_states = state.infostate_nodes[pl];
+  const std::vector<const InfostateNode*>& info_states = state.bottom_nodes[pl];
   std::unordered_map<Observation, const InfostateNode*> hands_for_infostates;
 
   Observation hand(game, hand_observer);
@@ -121,8 +121,8 @@ std::unique_ptr<HandInfo> CreateHandInfo(
           AllInfoStatesHaveDistinctHands(game, hand_observer, pl, state));
 
       for (int tree_idx = 0;
-           tree_idx < state.infostate_nodes[pl].size(); ++tree_idx) {
-        const InfostateNode* node = state.infostate_nodes[pl][tree_idx];
+           tree_idx < state.bottom_nodes[pl].size(); ++tree_idx) {
+        const InfostateNode* node = state.bottom_nodes[pl][tree_idx];
         const State& some_state = *node->corresponding_states().at(0);
         hand.SetFrom(some_state, pl);
 

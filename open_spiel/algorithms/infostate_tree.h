@@ -259,14 +259,22 @@ class Range {
 class InfostateNode;
 
 constexpr int kDefaultMoveAheadLimit = 1000;
-constexpr bool kDefaultSaveHistories = false;
+
+// Which infostate nodes should store the perfect-information states?
+// Uses bitwise & to determine the policy (and you can use | to set custom spec)
+constexpr int kNoStateStorage         = 0x0;
+constexpr int kStoreStatesInTerminals = 0x1;
+constexpr int kStoreStatesInLeaves    = 0x2;
+constexpr int kStoreStatesInRoots     = 0x4;
+constexpr int kStoreStatesInBody      = 0x8;
+constexpr int kDefaultStoragePolicy = kStoreStatesInTerminals;
 
 // Creates an infostate tree for a player based on the initial state
 // of the game, up to some move limit.
 std::shared_ptr<InfostateTree> MakeInfostateTree(
     const Game& game, Player acting_player,
     int max_move_ahead_limit = kDefaultMoveAheadLimit,
-    bool store_history_mapping = kDefaultSaveHistories);
+    int storage_policy = kDefaultStoragePolicy);
 
 // Creates an infostate tree for a player based on some start states,
 // up to some move limit from the deepest start state.
@@ -275,7 +283,7 @@ std::shared_ptr<InfostateTree> MakeInfostateTree(
     const std::vector<double>& chance_reach_probs,
     std::shared_ptr<Observer> infostate_observer, Player acting_player,
     int max_move_ahead_limit = kDefaultMoveAheadLimit,
-    bool store_history_mapping = kDefaultSaveHistories);
+    int storage_policy = kDefaultStoragePolicy);
 
 // Creates an infostate tree for a player based on some start states,
 // up to some move limit from the deepest start state.
@@ -284,7 +292,7 @@ std::shared_ptr<InfostateTree> MakeInfostateTree(
     const std::vector<double>& chance_reach_probs,
     std::shared_ptr<Observer> infostate_observer, Player acting_player,
     int max_move_ahead_limit = kDefaultMoveAheadLimit,
-    bool store_history_mapping = kDefaultSaveHistories);
+    int storage_policy = kDefaultStoragePolicy);
 
 // Creates an infostate tree based on some leaf infostate nodes coming from
 // another infostate tree, up to some move limit.
@@ -292,7 +300,7 @@ std::shared_ptr<InfostateTree> MakeInfostateTree(
 std::shared_ptr<InfostateTree> MakeInfostateTree(
     const std::vector<const InfostateNode*>& start_nodes,
     int max_move_ahead_limit = kDefaultMoveAheadLimit,
-    bool store_history_mapping = kDefaultSaveHistories);
+    int storage_policy = kDefaultStoragePolicy);
 
 // C++17 does not allow implicit conversion of non-const pointers to const
 // pointers within a vector - explanation: https://stackoverflow.com/a/2102415
@@ -300,7 +308,7 @@ std::shared_ptr<InfostateTree> MakeInfostateTree(
 std::shared_ptr<InfostateTree> MakeInfostateTree(
     const std::vector<InfostateNode*>& start_nodes,
     int max_move_ahead_limit = kDefaultMoveAheadLimit,
-    bool store_history_mapping = kDefaultSaveHistories);
+    int storage_policy = kDefaultStoragePolicy);
 
 class InfostateTree final {
  public:
@@ -314,6 +322,7 @@ class InfostateTree final {
   // Zero-based height.
   // (the height of a tree that contains only root node is zero.)
   size_t tree_height() const { return tree_height_; }
+  int storage_policy() const { return storage_policy_; }
 
   // -- General statistics -----------------------------------------------------
   size_t num_decisions() const { return decision_infostates_.size(); }
@@ -391,11 +400,6 @@ class InfostateTree final {
   // This consumes the gradient vector, as it is used to compute the value.
   double BestResponseValue(LeafVector<double>&& gradient) const;
 
-  // Lookup infostate node by a given state. Returns null if state is not found.
-  // The tree must be constructed with the flag store_history_mapping enabled.
-  // (Not a default behaviour!)
-  InfostateNode* GetNodeByState(const State& state) const;
-
   // -- For debugging ----------------------------------------------------------
   std::ostream& operator<<(std::ostream& os) const;
 
@@ -407,10 +411,11 @@ class InfostateTree final {
                 const std::vector<double>& chance_reach_probs,
                 std::shared_ptr<Observer> infostate_observer,
                 Player acting_player, int max_move_ahead_limit,
-                bool store_history_mapping)
+                int storage_policy)
       : acting_player_(acting_player),
         infostate_observer_(std::move(infostate_observer)),
-        root_(MakeRootNode()) {
+        root_(MakeRootNode()),
+        storage_policy_(storage_policy) {
     SPIEL_CHECK_FALSE(start_states.empty());
     SPIEL_CHECK_EQ(start_states.size(), chance_reach_probs.size());
     SPIEL_CHECK_GE(acting_player_, 0);
@@ -422,11 +427,11 @@ class InfostateTree final {
       start_max_move_number =
           std::max(start_max_move_number, start_state->MoveNumber());
     }
+    move_limit_ = start_max_move_number + max_move_ahead_limit;
 
     for (int i = 0; i < start_states.size(); ++i) {
-      RecursivelyBuildTree(root_.get(), /*depth=*/1, *start_states[i],
-                           start_max_move_number + max_move_ahead_limit,
-                           chance_reach_probs[i], store_history_mapping);
+      RecursivelyBuildTree(root_.get(), /*depth=*/1,
+                           *start_states[i], chance_reach_probs[i]);
     }
 
     // Operations to make after building the tree.
@@ -440,20 +445,22 @@ class InfostateTree final {
   // to ensure the trees are always allocated on heap. We do this so that all
   // the collected pointers are valid throughout the tree's lifetime even if
   // they are moved around.
-  friend std::shared_ptr<InfostateTree> MakeInfostateTree(const Game&, Player,
-                                                          int, bool);
+  friend std::shared_ptr<InfostateTree> MakeInfostateTree(
+      const Game&, Player, int, int);
   friend std::shared_ptr<InfostateTree> MakeInfostateTree(
       const std::vector<const State*>&, const std::vector<double>&,
-      std::shared_ptr<Observer>, Player, int, bool);
+      std::shared_ptr<Observer>, Player, int, int);
   friend std::shared_ptr<InfostateTree> MakeInfostateTree(
       const std::vector<std::unique_ptr<State>>&, const std::vector<double>&,
-      std::shared_ptr<Observer>, Player, int, bool);
+      std::shared_ptr<Observer>, Player, int, int);
   friend std::shared_ptr<InfostateTree> MakeInfostateTree(
-      const std::vector<const InfostateNode*>&, int, bool);
+      const std::vector<const InfostateNode*>&, int, int);
 
   const Player acting_player_;
   const std::shared_ptr<Observer> infostate_observer_;
   const std::unique_ptr<InfostateNode> root_;
+  const int storage_policy_;
+  /*const*/ int move_limit_;
   /*const*/ size_t tree_height_ = 0;
 
   // Tree structure collections that index the respective NodeIds.
@@ -461,9 +468,6 @@ class InfostateTree final {
   std::vector<InfostateNode*> sequences_;
   // The last vector corresponds to the leaf nodes.
   std::vector<std::vector<InfostateNode*>> nodes_at_depths_;
-  // If enabled by the flag store_history_mapping, store the mapping of
-  // state histories -> infostate nodes. The history consists of flat actions.
-  TreeMap<Action, InfostateNode*> history_mapping_;
 
   // Utility functions whenever we create a new node for the tree.
   std::unique_ptr<InfostateNode> MakeNode(InfostateNode* parent,
@@ -480,25 +484,19 @@ class InfostateTree final {
   // to balance all the leaves.
   void RebalanceTree();
 
-  void UpdateLeafNode(InfostateNode* node, const State& state,
-                      size_t leaf_depth, double chance_reach_probs);
-  void UpdateHistoryMapping(InfostateNode* node, const State& state);
+  void UpdateLeafNode(size_t leaf_depth);
+  void AddCorrespondingState(InfostateNode* node, const State& state,
+                             double chance_reach_probs);
 
   // Build the tree.
   void RecursivelyBuildTree(InfostateNode* parent, size_t depth,
-                            const State& state, int move_limit,
-                            double chance_reach_prob,
-                            bool store_history_mapping);
+                            const State& state, double chance_reach_prob);
   void BuildTerminalNode(InfostateNode* parent, size_t depth,
                          const State& state, double chance_reach_prob);
   void BuildDecisionNode(InfostateNode* parent, size_t depth,
-                         const State& state, int move_limit,
-                         double chance_reach_prob,
-                         bool store_history_mapping);
+                         const State& state, double chance_reach_prob);
   void BuildObservationNode(InfostateNode* parent, size_t depth,
-                            const State& state, int move_limit,
-                            double chance_reach_prob,
-                            bool store_history_mapping);
+                            const State& state, double chance_reach_prob);
 
   void CollectNodesAtDepth(InfostateNode* node, size_t depth);
   void LabelNodesWithIds();
@@ -508,13 +506,13 @@ class InfostateTree final {
 // Explicit instantiation of the infostate tree constructors.
 template InfostateTree::InfostateTree(
     const std::vector<State*>&, const std::vector<double>&,
-    std::shared_ptr<Observer>, Player, int, bool);
+    std::shared_ptr<Observer>, Player, int, int);
 template InfostateTree::InfostateTree(
     const std::vector<const State*>&, const std::vector<double>&,
-    std::shared_ptr<Observer>, Player, int, bool);
+    std::shared_ptr<Observer>, Player, int, int);
 template InfostateTree::InfostateTree(
     const std::vector<std::unique_ptr<State>>&, const std::vector<double>&,
-    std::shared_ptr<Observer>, Player, int, bool);
+    std::shared_ptr<Observer>, Player, int, int);
 
 // Iterate over a vector of unique pointers, but expose only the raw pointers.
 template <class T>
@@ -624,6 +622,7 @@ class InfostateNode final {
   const InfostateNodeType& type() const { return type_; }
   size_t depth() const { return depth_; }
   bool is_root_node() const { return !parent_; }
+  bool is_root_child() const { return parent_ && parent_->is_root_node(); }
   bool has_infostate_string() const {
     return infostate_string_ != kFillerInfostate &&
            infostate_string_ != kDummyRootNodeInfostate;
@@ -685,11 +684,9 @@ class InfostateNode final {
     return corresponding_states_.size();
   }
   const std::vector<std::unique_ptr<State>>& corresponding_states() const {
-    SPIEL_CHECK_TRUE(is_leaf_node());
     return corresponding_states_;
   }
   const std::vector<double>& corresponding_chance_reach_probs() const {
-    SPIEL_CHECK_TRUE(is_leaf_node());
     return corresponding_ch_reaches_;
   }
   // TODO: rename

@@ -120,7 +120,7 @@ void WriteParticleDataPoint(const algorithms::dlcfr::PublicState& state,
   point->Reset();
 
   // Find out how many parviews we will write.
-  int num_parviews = state.infostate_nodes[0].size() + state.infostate_nodes[1].size();
+  int num_parviews = state.bottom_nodes[0].size() + state.bottom_nodes[1].size();
   // Make a random permutation if something should be shuffled.
   std::vector<int> parview_placement(num_parviews);
   if (shuffle_input_output) {
@@ -133,7 +133,7 @@ void WriteParticleDataPoint(const algorithms::dlcfr::PublicState& state,
   // Write inputs
   int i = 0;
   for (int pl = 0; pl < 2; ++pl) {
-    for (int j = 0; j < state.infostate_nodes[pl].size(); j++) {
+    for (int j = 0; j < state.bottom_nodes[pl].size(); j++) {
       ParviewDataPoint parview = point->parview_at(shuffle_input_output
                                                     ? parview_placement[i] : i);
       // Hand features.
@@ -145,7 +145,7 @@ void WriteParticleDataPoint(const algorithms::dlcfr::PublicState& state,
         Copy(hand_observation.Tensor(), parview.hand_features());
       }
       parview.player_features()[pl] = 1.;
-      parview.range() = state.ranges[pl][j];
+      parview.range() = state.beliefs[pl][j];
       i++;
     }
   }
@@ -156,7 +156,7 @@ void WriteParticleDataPoint(const algorithms::dlcfr::PublicState& state,
   // Write outputs
   i = 0;
   for (int pl = 0; pl < 2; ++pl) {
-    for (int j = 0; j < state.infostate_nodes[pl].size(); j++) {
+    for (int j = 0; j < state.bottom_nodes[pl].size(); j++) {
       ParviewDataPoint parview = point->parview_at(shuffle_input_output
                                                    ? parview_placement[i] : i);
       parview.value() = state.values[pl][j];
@@ -172,7 +172,7 @@ void CopyValuesFromNetToTree(ParticleDataPoint data_point,
                              const ParticleDims& dims) {
   int parview_index = 0;
   for (int pl = 0; pl < 2; ++pl) {
-    for (int j = 0; j < state.infostate_nodes[pl].size(); j++) {
+    for (int j = 0; j < state.bottom_nodes[pl].size(); j++) {
       ParviewDataPoint parview = data_point.parview_at(parview_index);
       state.values[pl][j] = parview.value();
       parview_index++;
@@ -190,13 +190,13 @@ void WritePositionalDataPoint(const algorithms::dlcfr::PublicState& state,
   // Write inputs
   Copy(state.public_tensor.Tensor(), point->public_features());
   for (int pl = 0; pl < 2; ++pl) {
-    for (int j = 0; j < state.infostate_nodes[pl].size(); j++) {
-      point->range_at(pl, net_context.net_index(pl, j)) = state.ranges[pl][j];
+    for (int j = 0; j < state.bottom_nodes[pl].size(); j++) {
+      point->range_at(pl, net_context.net_index(pl, j)) = state.beliefs[pl][j];
     }
   }
   // Write outputs
   for (int pl = 0; pl < 2; ++pl) {
-    for (int j = 0; j < state.infostate_nodes[pl].size(); j++) {
+    for (int j = 0; j < state.bottom_nodes[pl].size(); j++) {
       point->value_at(pl, net_context.net_index(pl, j)) = state.values[pl][j];
     }
   }
@@ -206,7 +206,7 @@ void CopyValuesNetToTree(PositionalData* point,
                          algorithms::dlcfr::PublicState& state,
                          const NetContext& net_context) {
   for (int pl = 0; pl < 2; ++pl) {
-    for (int j = 0; j < state.infostate_nodes[pl].size(); j++) {
+    for (int j = 0; j < state.bottom_nodes[pl].size(); j++) {
       state.values[pl][j] = point->value_at(pl, net_context.net_index(pl, j));
     }
   }

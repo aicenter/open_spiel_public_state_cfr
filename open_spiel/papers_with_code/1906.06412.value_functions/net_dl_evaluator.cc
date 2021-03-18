@@ -30,8 +30,8 @@ std::unique_ptr<PublicStateContext> NetEvaluator::CreateContext(
 
   for (int pl = 0; pl < 2; ++pl) {
     for (int tree_idx = 0;
-         tree_idx < state.infostate_nodes[pl].size(); ++tree_idx) {
-      const InfostateNode* node = state.infostate_nodes[pl][tree_idx];
+         tree_idx < state.bottom_nodes[pl].size(); ++tree_idx) {
+      const InfostateNode* node = state.bottom_nodes[pl][tree_idx];
       const State& some_state = *node->corresponding_states().at(0);
       hand.SetFrom(some_state, pl);
 

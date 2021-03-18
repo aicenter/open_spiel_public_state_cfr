@@ -51,24 +51,33 @@ namespace open_spiel {
 namespace algorithms {
 namespace dlcfr {
 
-// Public state in which the depth-limited subgame is rooted.
-constexpr size_t kInitialPublicState = 0;
 
-struct PublicState final {
+struct PublicState {
   // An identification of the public state: a tensor of perfect recall
   // public observation.
   const Observation public_tensor;
   // Position in the vector of DepthLimitedCFR::public_leaves_
   const size_t public_id;
+  // Flags that indicate what type of node within a public tree
+  // this public state is. It can be both initial and a leaf, if the public
+  // tree is a singleton.
+  /*const*/ bool is_initial = false;
+  /*const*/ bool is_leaf = false;
   // For each player, store a pointer to the infostate nodes for this public
   // state, within the depth-limited infostate tree. If needed, you can get
   // access to underlying perfect-information `State`s
   // via `InfostateNode::corresponding_states()`.
   // These are assigned once, and no subsequent change should be made.
-  /*const*/ std::array<std::vector<const InfostateNode*>, 2> infostate_nodes;
-  // For each player, store beliefs for the top-most infostate nodes.
-  std::array<std::vector<double>, 2> ranges;  // FIXME: rename to beliefs.
-  // For each player, store counterfactual values for the top-most infostates.
+  // The top nodes are saved for initial states and bottom nodes are saved for
+  // leaf states. Both are listed for the special case if the public tree is
+  // a singleton.
+  /*const*/ std::array<std::vector<const InfostateNode*>, 2> top_nodes;
+  /*const*/ std::array<std::vector<const InfostateNode*>, 2> bottom_nodes;
+  // For each player, store beliefs for the top-most infostate nodes, which
+  // correspond to bottom_nodes of the DL infostate tree.
+  std::array<std::vector<double>, 2> beliefs;
+  // For each player, store counterfactual values for the top-most infostate
+  // nodes, which correspond to bottom_nodes of the DL infostate tree.
   std::array<std::vector<double>, 2> values;
 
   explicit PublicState(const Observation& public_observation,
@@ -77,14 +86,12 @@ struct PublicState final {
 
   // Check if the public state if initial, i.e. the depth-limited subgame
   // is rooted in this public state.
-  bool IsInitial() const { return false; /*FIXME public_id == kInitialPublicState;*/ }
+  bool IsInitial() const { return is_initial; }
   // Check if the public state if a leaf within the depth-limited subgame.
-  bool IsLeaf() const { return true; /*FIXME public_id != kInitialPublicState;*/ }
+  bool IsLeaf() const { return is_leaf; }
   // Check if the public state is terminal, i.e. it contains only states
   // that satisfy `State::IsTerminal()`.
   bool IsTerminal() const;
-  // Debugging check: makes sure that the call to IsTerminal() is correct.
-  bool IsConsistent() const;
 };
 
 void DebugPrintPublicFeatures(const std::vector<PublicState>& states);
@@ -158,10 +165,11 @@ class DepthLimitedCFR {
   void RunSimultaneousIterations(int iterations);
   void PrepareRootReachProbs();
   void EvaluateLeaves();
+  void EvaluateLeaf(PublicState* state, PublicStateContext* context);
   void UpdateReachProbs();
   void UpdateTrunk();
 
-  void SetPlayerRanges(const std::array<std::vector<double>, 2>& ranges);
+  void SetBeliefs(const std::array<std::vector<double>, 2>& beliefs);
   double RootValue(Player pl = 0) const;
   std::array<absl::Span<const double>, 2> RootChildrenCfValues() const;
   void Reset();
@@ -210,19 +218,20 @@ class DepthLimitedCFR {
   // If no information should be saved, a nullptr is used.
   /*const*/ std::vector<std::unique_ptr<PublicStateContext>> contexts_;
   // Store the position of a node within the reach_probs_ resp. cf_values_
-  /*const*/ std::map<const InfostateNode*, int> node_positions_;
+  /*const*/ std::map<const InfostateNode*, int> leaf_node_positions_;
+  /*const*/ std::map<const InfostateNode*, int> root_node_positions_;
 
   // -- Mutable values to keep track of. --
-
   // These have the size at largest depth of the tree, i.e. the size of the
   // leaf infostate nodes.
-  std::array<std::vector<double>, 2> player_ranges_;
+  std::array<std::vector<double>, 2> beliefs_;
   std::vector<std::vector<double>> reach_probs_;
   std::vector<std::vector<double>> cf_values_;
+
   std::vector<BanditVector> bandits_;
 
   void PrepareInfostateNodesForPublicStates();
-  void PrepareRangesAndValuesForPublicStates();
+  void PrepareReachesAndValuesForPublicStates();
   void CreateContexts();
   PublicState* GetPublicState(const Observation& public_observation);
   PublicState* GetPublicState(InfostateNode* node,

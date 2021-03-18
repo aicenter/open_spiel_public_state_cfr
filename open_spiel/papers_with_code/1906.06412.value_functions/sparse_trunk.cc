@@ -26,8 +26,8 @@ using namespace algorithms::dlcfr;
 std::vector<const State*> CollectStates(const PublicState& public_state) {
   std::vector<const State*> states;
   // Just some estimate.
-  states.reserve(8 * public_state.infostate_nodes[0].size());
-  for (const InfostateNode* node : public_state.infostate_nodes[0]) {
+  states.reserve(8 * public_state.bottom_nodes[0].size());
+  for (const InfostateNode* node : public_state.bottom_nodes[0]) {
     for (int i = 0; i < node->corresponding_states_size(); ++i) {
       states.push_back(node->corresponding_states()[i].get());
     }
@@ -38,8 +38,8 @@ std::vector<const State*> CollectStates(const PublicState& public_state) {
 std::vector<double> CollectChances(const PublicState& public_state) {
   std::vector<double> chances;
   // Just some estimate.
-  chances.reserve(8 * public_state.infostate_nodes[0].size());
-  for (const InfostateNode* node : public_state.infostate_nodes[0]) {
+  chances.reserve(8 * public_state.bottom_nodes[0].size());
+  for (const InfostateNode* node : public_state.bottom_nodes[0]) {
     for (int i = 0; i < node->corresponding_states_size(); ++i) {
       chances.push_back(node->corresponding_chance_reach_probs()[i]);
     }
@@ -119,7 +119,7 @@ std::vector<std::unique_ptr<SparseTrunk>> MakeSparseTrunks(
   int num_sparse_trunks = 0;
   for (const PublicState& public_state: temp_trunk.public_states()) {
     for (int pl = 0; pl < 2; ++pl) {
-      for (const InfostateNode* node : public_state.infostate_nodes[pl]) {
+      for (const InfostateNode* node : public_state.bottom_nodes[pl]) {
         // We are interested only in sparsification for decision infostates.
         if (node->type() != kDecisionInfostateNode) continue;
         num_sparse_trunks++;
@@ -139,7 +139,7 @@ std::vector<std::unique_ptr<SparseTrunk>> MakeSparseTrunks(
     std::iota(public_state_perm.begin(), public_state_perm.end(), 0);
 
     for (int pl = 0; pl < 2; ++pl) {
-      for (const InfostateNode* node : public_state.infostate_nodes[pl]) {
+      for (const InfostateNode* node : public_state.bottom_nodes[pl]) {
         // We are interested only in sparsification for decision infostates.
         if (node->type() != kDecisionInfostateNode) continue;
 

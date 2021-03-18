@@ -284,10 +284,10 @@ void OracleEvaluator::EvaluatePublicState(
 
   // Step 0. Construct the value-solving subgame for each player and solve it.
   for (int pl = 0; pl < 2; ++pl) {
-    SPIEL_CHECK_EQ(s->infostate_nodes[pl].size(), s->ranges[pl].size());
+    SPIEL_CHECK_EQ(s->bottom_nodes[pl].size(), s->beliefs[pl].size());
     RefineSpecToValueSolvingSubgame(
         /*opponent_root=*/trees[1 - pl]->mutable_root(),
-        /*opponent_range=*/s->ranges[1 - pl],
+        /*opponent_range=*/s->beliefs[1 - pl],
         /*opponent_terminal_map=*/terminal_bijection.association(1 - pl),
         /*player_spec=*/specs[pl].node_spec());
     // Run the solver!
@@ -335,8 +335,8 @@ void OracleEvaluator::EvaluatePublicState(
 
   // Step 5. Compute final counterfactually optimal values.
   for (int pl = 0; pl < 2; ++pl) {
-    for (int i = 0; i < s->infostate_nodes[pl].size(); ++i) {
-      const InfostateNode* player_node = s->infostate_nodes[pl][i];
+    for (int i = 0; i < s->bottom_nodes[pl].size(); ++i) {
+      const InfostateNode* player_node = s->bottom_nodes[pl][i];
       s->values[pl][i] = 0.;
       for (int k = 0; k < player_node->corresponding_states_size(); ++k) {
         const std::unique_ptr<State>& state =
@@ -344,7 +344,7 @@ void OracleEvaluator::EvaluatePublicState(
         const std::string history_str = state->HistoryString();
         const size_t j =
             oracle_context->subgame_range_indexing.at(history_str)[1 - pl];
-        const double opponent_range = s->ranges[1 - pl][j];
+        const double opponent_range = s->beliefs[1 - pl][j];
         const double chance_reach =
             player_node->corresponding_chance_reach_probs()[k];
         // We must change the sign appropriately because expected_utilities
@@ -372,8 +372,8 @@ std::unique_ptr<dlcfr::PublicStateContext> OracleEvaluator::CreateContext(
   }
 
   std::vector<std::shared_ptr<InfostateTree>> trees = {
-      MakeInfostateTree(state.infostate_nodes[0]),
-      MakeInfostateTree(state.infostate_nodes[1])
+      MakeInfostateTree(state.bottom_nodes[0]),
+      MakeInfostateTree(state.bottom_nodes[1])
   };
   std::array<SequenceFormLpSpecification, 2> specifications = {
       SequenceFormLpSpecification(trees),
@@ -386,9 +386,9 @@ std::unique_ptr<dlcfr::PublicStateContext> OracleEvaluator::CreateContext(
   std::vector<HistoryTree> subgame_histories;
   std::map<std::string, std::array<size_t, 2>> subgame_ranges;
   // This is just an estimate of the typical size. Probably bigger.
-  subgame_histories.reserve(state.infostate_nodes[0].size() * 8);
-  for (int i = 0; i < state.infostate_nodes[0].size(); ++i) {
-    const InfostateNode* leaf_node = state.infostate_nodes[0][i];
+  subgame_histories.reserve(state.bottom_nodes[0].size() * 8);
+  for (int i = 0; i < state.bottom_nodes[0].size(); ++i) {
+    const InfostateNode* leaf_node = state.bottom_nodes[0][i];
     for (const std::unique_ptr<State>& s : leaf_node->corresponding_states()) {
       SPIEL_CHECK_FALSE(s->IsTerminal());
       subgame_histories.emplace_back(s->Clone());
@@ -396,8 +396,8 @@ std::unique_ptr<dlcfr::PublicStateContext> OracleEvaluator::CreateContext(
     }
   }
   size_t num_histories = subgame_ranges.size();
-  for (int j = 0; j < state.infostate_nodes[1].size(); ++j) {
-    const InfostateNode* leaf_node = state.infostate_nodes[1][j];
+  for (int j = 0; j < state.bottom_nodes[1].size(); ++j) {
+    const InfostateNode* leaf_node = state.bottom_nodes[1][j];
     for (const std::unique_ptr<State>& s : leaf_node->corresponding_states()) {
       subgame_ranges[s->HistoryString()][1] = j;
       --num_histories;
