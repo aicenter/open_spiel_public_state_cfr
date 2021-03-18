@@ -25,20 +25,9 @@
 namespace open_spiel {
 namespace papers_with_code {
 
-struct Subgame {
-  std::unique_ptr<algorithms::dlcfr::DepthLimitedCFR> solver;
-
-  // A pointer to experience replay where the solution should be written.
-  // All of the inputs are prepared by the SubgameFactory; only outputs should
-  // be written by using the CopySolution() method.
-  ParticleDataPoint solution;
-
-  Subgame(std::unique_ptr<algorithms::dlcfr::DepthLimitedCFR> solver,
-          const ParticleDataPoint& solution)
-      : solver(std::move(solver)), solution(solution) {}
-
-  void CopySolution();
-};
+// A (depth-limited) subgame rooted at some perfect-information histories,
+// that have belief distribution over the infostates induced by those histories.
+using Subgame = algorithms::dlcfr::DepthLimitedCFR;
 
 // Produce a subgame given a particle set.
 struct SubgameFactory {
@@ -50,16 +39,17 @@ struct SubgameFactory {
   std::string use_bandits_for_cfr;
   int max_move_ahead_limit;
   int max_particles;
-  ParticleDims dims;
   TreeMap<Action, std::unique_ptr<State>> history_cache;
 
   std::shared_ptr<const algorithms::dlcfr::PublicStateEvaluator> terminal_evaluator;
   std::shared_ptr<algorithms::dlcfr::PublicStateEvaluator> leaf_evaluator;
 
-  std::unique_ptr<Subgame> MakeSubgame(const ParticleSet& set,
-                                       ParticleDataPoint write_solution_to);
-  std::unique_ptr<ParticleSet> SampleParticleSet(const Subgame& subgame,
-                                                 std::mt19937& rnd_gen);
+  std::unique_ptr<Subgame> MakeSubgame(const ParticleSet& set);
+  std::vector<std::shared_ptr<algorithms::InfostateTree>>
+    MakeSubgameInfostateTrees(const ParticleSet& set);
+
+  std::unique_ptr<ParticleSet> SampleNextParticleSet(const Subgame& subgame,
+                                                     std::mt19937& rnd_gen);
 };
 
 
