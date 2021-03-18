@@ -36,8 +36,10 @@ Trunk::Trunk(const std::string& game_name, int depth,
   infostate_observer = game->MakeObserver(kInfoStateObsType, {});
   public_observer = game->MakeObserver(kPublicStateObsType, {});
   hand_observer = game->MakeObserver(kHandHistoryObsType, {});
-  trunk_trees = {MakeInfostateTree(*game, 0, trunk_depth),
-                 MakeInfostateTree(*game, 1, trunk_depth)};
+  trunk_trees = {MakeInfostateTree(*game, 0, trunk_depth,
+                                   dlcfr::kDlCfrInfostateTreeStorage),
+                 MakeInfostateTree(*game, 1, trunk_depth,
+                                   dlcfr::kDlCfrInfostateTreeStorage)};
 
   // 2. Create value oracle for the trunk.
   terminal_evaluator = dlcfr::MakeTerminalEvaluator();
