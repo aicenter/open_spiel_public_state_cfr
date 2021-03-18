@@ -100,6 +100,25 @@ std::shared_ptr<NetEvaluator> MakeNetEvaluator(
     BasicDims* dims, HandInfo* hand_info, ValueNet* model,
     BatchData* eval_batch, torch::Device* device);
 
+
+void WriteParticleDataPoint(
+    const algorithms::dlcfr::PublicState& state,
+    const NetContext& net_context,
+    const ParticleDims& dims, ParticleDataPoint* point,
+    std::mt19937* rnd_gen, bool shuffle_input_output);
+
+void CopyValuesFromNetToTree(ParticleDataPoint data_point,
+                             algorithms::dlcfr::PublicState& state,
+                             const ParticleDims& dims);
+
+void WritePositionalDataPoint(const algorithms::dlcfr::PublicState& state,
+                              const NetContext& net_context,
+                              const PositionalDims& dims, PositionalData* point);
+
+void CopyValuesNetToTree(PositionalData* point,
+                         algorithms::dlcfr::PublicState& state,
+                         const NetContext& net_context);
+
 }  // namespace papers_with_code
 }  // namespace open_spiel
 

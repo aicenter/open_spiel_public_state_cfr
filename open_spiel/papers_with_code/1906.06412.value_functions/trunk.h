@@ -50,30 +50,6 @@ std::unique_ptr<Trunk> MakeTrunk(const std::string& game_name, int trunk_depth,
 
 std::unique_ptr<BasicDims> DeduceDims(const Trunk& trunk, NetArchitecture arch);
 
-
-void WriteParticleDataPoint(
-    const algorithms::dlcfr::PublicState& state,
-    const NetContext& net_context,
-    const ParticleDims& dims, ParticleDataPoint* point,
-    std::mt19937* rnd_gen, bool shuffle_input_output);
-
-void CopyValuesFromNetToTree(ParticleDataPoint data_point,
-                             algorithms::dlcfr::PublicState& state,
-                             const ParticleDims& dims);
-
-void WritePositionalDataPoint(const algorithms::dlcfr::PublicState& state,
-                              const NetContext& net_context,
-                              const PositionalDims& dims, PositionalData* point);
-
-void CopyValuesNetToTree(PositionalData* point,
-                         algorithms::dlcfr::PublicState& state,
-                         const NetContext& net_context);
-
-void inline Copy(absl::Span<const float> source, absl::Span<float> target) {
-  SPIEL_CHECK_LE(source.size(), target.size());
-  std::copy(source.begin(), source.end(), target.begin());
-}
-
 void PrintTrunkStrategies(algorithms::dlcfr::DepthLimitedCFR* trunk_with_net);
 
 
