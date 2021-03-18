@@ -147,6 +147,11 @@ std::shared_ptr<PublicStateEvaluator> MakeDummyEvaluator();
 
 // -- DL CFR -------------------------------------------------------------------
 
+// Depth-limited CFR requires storage of perfect-information states both
+// in the roots and in the leaves of the infostate trees.
+constexpr int kDlCfrInfostateTreeStorage = kStoreStatesInRoots
+                                         | kStoreStatesInLeaves;
+
 // At least one evaluator must be specified: nonterminal_evaluator
 // or terminal_evaluator.
 class DepthLimitedCFR {

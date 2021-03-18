@@ -58,11 +58,6 @@ void CheckConsistency(const PublicState& s) {
   // All OK! Yay!
 }
 
-// Depth-limited CFR requires storage of perfect-information states both
-// in the roots and in the leaves of the infostate trees.
-constexpr int kInfostateTreeStorage = kStoreStatesInRoots
-                                    | kStoreStatesInLeaves;
-
 DepthLimitedCFR::DepthLimitedCFR(
     std::shared_ptr<const Game> game,
     std::vector<std::shared_ptr<InfostateTree>> depth_lim_trees,
@@ -90,10 +85,10 @@ DepthLimitedCFR::DepthLimitedCFR(
                }),
     bandits_(std::move(bandits)) {
   SPIEL_CHECK_TRUE(public_observer_->HasTensor());
-  SPIEL_CHECK_EQ(trees_[0]->storage_policy() & kInfostateTreeStorage,
-                 kInfostateTreeStorage);
-  SPIEL_CHECK_EQ(trees_[1]->storage_policy() & kInfostateTreeStorage,
-                 kInfostateTreeStorage);
+  SPIEL_CHECK_EQ(trees_[0]->storage_policy() & kDlCfrInfostateTreeStorage,
+                 kDlCfrInfostateTreeStorage);
+  SPIEL_CHECK_EQ(trees_[1]->storage_policy() & kDlCfrInfostateTreeStorage,
+                 kDlCfrInfostateTreeStorage);
   PrepareInfostateNodesForPublicStates();
   PrepareReachesAndValuesForPublicStates();
   CreateContexts();
@@ -104,8 +99,8 @@ DepthLimitedCFR::DepthLimitedCFR(
     std::shared_ptr<const PublicStateEvaluator> nonterminal_evaluator,
     std::shared_ptr<const PublicStateEvaluator> terminal_evaluator
 ) {
-  auto trees = {MakeInfostateTree(*game, 0, max_depth_limit, kInfostateTreeStorage),
-                MakeInfostateTree(*game, 1, max_depth_limit, kInfostateTreeStorage)};
+  auto trees = {MakeInfostateTree(*game, 0, max_depth_limit, kDlCfrInfostateTreeStorage),
+                MakeInfostateTree(*game, 1, max_depth_limit, kDlCfrInfostateTreeStorage)};
   // FIXME: fix.
   new(this) DepthLimitedCFR(game, trees,
                             std::move(nonterminal_evaluator),
@@ -157,8 +152,9 @@ void DepthLimitedCFR::CreateContexts() {
     if (state.IsTerminal()) {
       contexts_.push_back(terminal_evaluator_->CreateContext(state));
     } else {
-      SPIEL_CHECK_TRUE(nonterminal_evaluator_);
-      contexts_.push_back(nonterminal_evaluator_->CreateContext(state));
+      contexts_.push_back(nonterminal_evaluator_
+                          ? nonterminal_evaluator_->CreateContext(state)
+                          : nullptr);
     }
   }
 }
@@ -443,9 +439,9 @@ std::unique_ptr<PublicStateContext> CFREvaluator::CreateContext(
 
   auto subgame_trees = std::vector{
       MakeInfostateTree(state.bottom_nodes[0],
-                        depth_limit, kInfostateTreeStorage),
+                        depth_limit, kDlCfrInfostateTreeStorage),
       MakeInfostateTree(state.bottom_nodes[1],
-                        depth_limit, kInfostateTreeStorage)
+                        depth_limit, kDlCfrInfostateTreeStorage)
   };
   auto subgame_bandits = MakeBanditVectors(subgame_trees, bandit_name);
   auto dlcfr = std::make_unique<DepthLimitedCFR>(
