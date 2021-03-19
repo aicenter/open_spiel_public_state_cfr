@@ -33,7 +33,7 @@ _BASE_ARGS = dict(
     num_trunks=10,
     seed=0,
     use_bandits_for_cfr="RegretMatchingPlus",
-    data_generation="random",
+    exp_init="trunk_random",
     prob_pure_strat=0.1,
     prob_fully_mixed=0.05,
 )
@@ -46,9 +46,9 @@ _TEST_GAMES = [
                  "points_order=descending)", depth=1),
 ]
 
-_DATA_GENERATION = [
-  dict(data_generation="dl_cfr"),
-  dict(data_generation="random")
+_EXP_INIT = [
+  dict(exp_init="trunk_dlcfr"),
+  dict(exp_init="trunk_random")
 ]
 
 _VALUE_NETS = [
@@ -192,7 +192,7 @@ class VFTest(parameterized.TestCase, absltest.TestCase):
   @parameterized.parameters(_VALUE_NETS)
   def test_kuhn_eval_iters_dlcfr_regression(self, **arch_spec):
     args = {**_BASE_ARGS, **arch_spec,
-            **dict(num_loops=10, num_trunks=100, data_generation="dl_cfr",
+            **dict(num_loops=10, num_trunks=100, exp_init="trunk_dlcfr",
                    num_layers=3, num_width=3, trunk_expl_iterations="1,5,10")}
     actual_eval, actual_expl = read_experiment_results_from_shell(
         args, metric_avg_loss, metric_ref_expls)
@@ -210,7 +210,7 @@ class VFTest(parameterized.TestCase, absltest.TestCase):
   def test_kuhn_eval_iters_random_regression(self, **arch_spec):
     args = {**_BASE_ARGS, **arch_spec,
             **dict(num_loops=10, num_trunks=100, num_layers=3, num_width=3,
-                   data_generation="random", trunk_expl_iterations="1,5,10")}
+                   exp_init="trunk_random", trunk_expl_iterations="1,5,10")}
     actual_eval, = read_experiment_results_from_shell(args, metric_avg_loss)
     arch = arch_spec["arch"]
     expected_eval = df_from_lines(_REFERENCE_KUHN_RANDOM_EVAL[arch])
@@ -220,7 +220,7 @@ class VFTest(parameterized.TestCase, absltest.TestCase):
   @parameterized.parameters(dict_prod(_TEST_GAMES, _VALUE_NETS))
   def test_fit_one_sample(self, **game_spec):
     args = {**_BASE_ARGS, **game_spec,
-            **dict(num_loops=20, batch_size=-1, data_generation="random",
+            **dict(num_loops=20, batch_size=-1, exp_init="trunk_random",
                    num_trunks=1, trunk_expl_iterations="")}
     actual_eval, = read_experiment_results_from_shell(args, metric_avg_loss)
     actual_loss = actual_eval["avg_loss"].values.min()
@@ -229,7 +229,7 @@ class VFTest(parameterized.TestCase, absltest.TestCase):
   @parameterized.parameters(dict_prod(_TEST_GAMES, _VALUE_NETS))
   def test_fit_two_samples(self, **game_spec):
     args = {**_BASE_ARGS, **game_spec,
-            **dict(num_loops=60, batch_size=-1, data_generation="random",
+            **dict(num_loops=60, batch_size=-1, exp_init="trunk_random",
                    learning_rate=0.01, lr_decay=0.99,
                    num_trunks=2, trunk_expl_iterations=0)}
     actual_eval, = read_experiment_results_from_shell(args, metric_avg_loss)
@@ -248,7 +248,7 @@ class VFTest(parameterized.TestCase, absltest.TestCase):
     args = {**_BASE_ARGS, **game_spec,
             # Run just 1 loop, as per-loop evals are the most expensive part.
             **dict(num_loops=10, train_batches=100,
-                   batch_size=-1, data_generation="dl_cfr",
+                   batch_size=-1, exp_init="trunk_dlcfr",
                    num_trunks=num_iters,
                    trunk_expl_iterations=",".join(str(i) for i in range(1, num_iters + 1))
                    )}

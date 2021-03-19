@@ -28,7 +28,7 @@ def vf_comparison():
       train_batches=64,
       num_trunks=1000,
       batch_size=64,
-      data_generation="random",
+      exp_init="trunk_random",
       prob_pure_strat=0.1,
       num_layers=5,
       num_width=5,
@@ -66,7 +66,7 @@ def sparse_roots():
       num_trunks=1000,
       batch_size=64,
       shuffle_input_output="true",
-      data_generation="random",
+      exp_init="trunk_random",
       prob_pure_strat=0.1,
   )
 

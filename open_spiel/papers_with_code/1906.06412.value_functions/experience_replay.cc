@@ -55,63 +55,12 @@ void ExperienceReplay::SampleBatch(BatchData* batch,
   }
 }
 
-void GenerateDataRandomRanges(
-    Trunk* trunk, const std::vector<NetContext*>& contexts,
-    const BasicDims& dims, NetArchitecture arch, ExperienceReplay* replay,
-    double prob_pure_strat, double prob_fully_mixed,
-    std::mt19937& rnd_gen, bool shuffle_input_output) {
-  trunk->fixable_trunk_with_oracle->Reset();
-
-  // Randomize strategy in the trunk.
-  RandomizeStrategy(trunk->fixable_trunk_with_oracle->bandits(),
-                    prob_pure_strat, prob_fully_mixed, rnd_gen);
-  // Compute the reach probs from the trunk.
-  trunk->fixable_trunk_with_oracle->UpdateReachProbs();
-  // Do not call bottom-up, just evaluate leaves.
-  trunk->fixable_trunk_with_oracle->EvaluateLeaves();
-  // Copy the leaves values to the experience replay.
-  AddExperiencesFromTrunk(
-      trunk->fixable_trunk_with_oracle->public_states(),
-      contexts, dims, arch, replay, rnd_gen, shuffle_input_output);
-
-//  if (verbose) {
-//    for (int i = 0; i < batch->batch_size; ++i) {
-//      std::cout << "# Public state " << i << std::endl;
-//      std::cout << "#   Inputs:  " << batch->data_at(i) << std::endl;
-//      std::cout << "#   Outputs: " << batch->targets_at(i) << std::endl;
-//    }
-//    std::cout << "\n# ";
-//  }
+ExpReplayInitialization GetExpReplayInitialization(const std::string& s) {
+  if (s == "trunk_dlcfr")  return kInitTrunkDlcfr;
+  if (s == "trunk_random") return kInitTrunkRandom;
+  SpielFatalError("Exhausted pattern match: exp_init");
 }
 
-// The network should imitate DL-CFR at each iteration
-// when we use this generation method.
-void GenerateDataDLCfrIterations(
-    Trunk* trunk, const std::vector<NetContext*>& contexts,
-    const BasicDims& dims, NetArchitecture arch, ExperienceReplay* replay,
-    int trunk_iters,
-    std::function<void(/*trunk_iter=*/int)> monitor_fn,
-    std::mt19937& rnd_gen, bool shuffle_input_output) {
-  trunk->iterable_trunk_with_oracle->Reset();
-  for (int iter = 1; iter <= trunk_iters; ++iter) {
-    ++trunk->iterable_trunk_with_oracle->num_iterations_;
-    trunk->iterable_trunk_with_oracle->UpdateReachProbs();
-    trunk->iterable_trunk_with_oracle->EvaluateLeaves();
-
-    AddExperiencesFromTrunk(trunk->iterable_trunk_with_oracle->public_states(),
-                            contexts, dims, arch, replay,
-                            rnd_gen, shuffle_input_output);
-    monitor_fn(iter);
-
-    trunk->iterable_trunk_with_oracle->UpdateTrunk();
-  }
-}
-
-ExpReplayInitPolicy GetInitPolicy(const std::string& s) {
-  if (s == "dl_cfr") return kGenerateDlcfrIterations;
-  if (s == "random") return kGenerateRandomRangesAndSubgameValues;
-  SpielFatalError("Exhausted pattern match: data_generation");
-}
 
 void AddExperiencesFromTrunk(
     const std::vector<algorithms::dlcfr::PublicState>& states,
@@ -143,6 +92,59 @@ void AddExperiencesFromTrunk(
 
   }
 }
+
+void InitTrunkRandomBeliefs(
+    Trunk* trunk, const std::vector<NetContext*>& contexts,
+    const BasicDims& dims, NetArchitecture arch, ExperienceReplay* replay,
+    double prob_pure_strat, double prob_fully_mixed,
+    std::mt19937& rnd_gen, bool shuffle_input_output) {
+  trunk->fixable_trunk_with_oracle->Reset();
+
+  // Randomize strategy in the trunk.
+  RandomizeStrategy(trunk->fixable_trunk_with_oracle->bandits(),
+                    prob_pure_strat, prob_fully_mixed, rnd_gen);
+  // Compute the reach probs from the trunk.
+  trunk->fixable_trunk_with_oracle->UpdateReachProbs();
+  // Do not call bottom-up, just evaluate leaves.
+  trunk->fixable_trunk_with_oracle->EvaluateLeaves();
+  // Copy the leaves values to the experience replay.
+  AddExperiencesFromTrunk(
+      trunk->fixable_trunk_with_oracle->public_states(),
+      contexts, dims, arch, replay, rnd_gen, shuffle_input_output);
+
+//  if (verbose) {
+//    for (int i = 0; i < batch->batch_size; ++i) {
+//      std::cout << "# Public state " << i << std::endl;
+//      std::cout << "#   Inputs:  " << batch->data_at(i) << std::endl;
+//      std::cout << "#   Outputs: " << batch->targets_at(i) << std::endl;
+//    }
+//    std::cout << "\n# ";
+//  }
+}
+
+// The network should imitate DL-CFR at each iteration
+// when we use this generation method.
+void InitTrunkDlCfrIterations(
+    Trunk* trunk, const std::vector<NetContext*>& contexts,
+    const BasicDims& dims, NetArchitecture arch, ExperienceReplay* replay,
+    int trunk_iters,
+    std::function<void(/*trunk_iter=*/int)> monitor_fn,
+    std::mt19937& rnd_gen, bool shuffle_input_output) {
+  trunk->iterable_trunk_with_oracle->Reset();
+  for (int iter = 1; iter <= trunk_iters; ++iter) {
+    ++trunk->iterable_trunk_with_oracle->num_iterations_;
+    trunk->iterable_trunk_with_oracle->UpdateReachProbs();
+    trunk->iterable_trunk_with_oracle->EvaluateLeaves();
+
+    AddExperiencesFromTrunk(trunk->iterable_trunk_with_oracle->public_states(),
+                            contexts, dims, arch, replay,
+                            rnd_gen, shuffle_input_output);
+    monitor_fn(iter);
+
+    trunk->iterable_trunk_with_oracle->UpdateTrunk();
+  }
+}
+
 
 
 }  // papers_with_code

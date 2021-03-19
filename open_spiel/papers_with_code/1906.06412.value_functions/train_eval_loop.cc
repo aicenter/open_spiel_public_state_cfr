@@ -26,7 +26,7 @@ ABSL_FLAG(std::string, use_bandits_for_cfr, "RegretMatchingPlus",
           "Which bandit should be used in the trunk.");
 
 // -- Data generation --
-ABSL_FLAG(std::string, data_generation, "random", "One of random,dl_cfr");
+ABSL_FLAG(std::string, exp_init, "trunk_random", "One of trunk_random,trunk_dlcfr");
 ABSL_FLAG(int, depth, 3, "Depth of the trunk.");
 ABSL_FLAG(double, prob_pure_strat, 0.1, "Params for random generation.");
 ABSL_FLAG(double, prob_fully_mixed, 0.05, "Params for random generation.");
@@ -94,7 +94,7 @@ std::vector<int> ItersFromString(const std::string& s) {
   return out;
 }
 
-void FillExperienceReplay(ExpReplayInitPolicy init,
+void FillExperienceReplay(ExpReplayInitialization init,
                           const BasicDims& dims,
                           NetArchitecture arch,
                           ExperienceReplay* experience_replay,
@@ -106,48 +106,49 @@ void FillExperienceReplay(ExpReplayInitPolicy init,
   std::cout << "# Filling experience replay buffer." << std::endl;
 
   switch (init) {
-    case kGenerateDlcfrIterations: {
+    case kInitTrunkDlcfr: {
       std::cout << "# Computing reference expls for given trunk iterations.\n";
       std::cout << "# <ref_expl>\n";
       std::cout << "# trunk_iter,expl\n";
       const std::vector<int> eval_iters =
           ItersFromString(absl::GetFlag(FLAGS_trunk_expl_iterations));
-      GenerateDataDLCfrIterations(
-        trunk, net_contexts, dims, arch, experience_replay,
-        absl::GetFlag(FLAGS_num_trunks),
-        /*monitor_fn*/[&](int trunk_iter) {
-          bool should_evaluate =
-              std::find(eval_iters.begin(), eval_iters.end(), trunk_iter)
-                  != eval_iters.end();
+      InitTrunkDlCfrIterations(
+          trunk, net_contexts, dims, arch, experience_replay,
+          absl::GetFlag(FLAGS_num_trunks),
+          /*monitor_fn*/[&](int trunk_iter) {
+              bool should_evaluate =
+                  std::find(eval_iters.begin(), eval_iters.end(), trunk_iter)
+                      != eval_iters.end();
 
-          if (should_evaluate) {
-            double expl = ortools::TrunkExploitability(
-                whole_game,
-                *trunk->iterable_trunk_with_oracle->AveragePolicy());
-            std::cout << "# " << trunk_iter << "," << expl << std::endl;
-          }
-        },
-        rnd_gen, absl::GetFlag(FLAGS_shuffle_input_output));
+              if (should_evaluate) {
+                double expl = ortools::TrunkExploitability(
+                    whole_game,
+                    *trunk->iterable_trunk_with_oracle->AveragePolicy());
+                std::cout << "# " << trunk_iter << "," << expl << std::endl;
+              }
+          },
+          rnd_gen, absl::GetFlag(FLAGS_shuffle_input_output));
       std::cout << "# </ref_expl>\n";
       break;
     }
 
-    case kGenerateRandomRangesAndSubgameValues: {
+    case kInitTrunkRandom: {
       std::cout << "# Generating random trunks to fill experience replay.\n# ";
       for (int i = 0; i < absl::GetFlag(FLAGS_num_trunks); ++i) {
         if (i % 10 == 0) std::cout << '.' << std::flush;
-        GenerateDataRandomRanges(trunk, net_contexts, dims, arch, experience_replay,
-                                 absl::GetFlag(FLAGS_prob_pure_strat),
-                                 absl::GetFlag(FLAGS_prob_fully_mixed),
-                                 rnd_gen,
-                                 absl::GetFlag(FLAGS_shuffle_input_output));
+        InitTrunkRandomBeliefs(trunk, net_contexts, dims, arch,
+                               experience_replay,
+                               absl::GetFlag(FLAGS_prob_pure_strat),
+                               absl::GetFlag(FLAGS_prob_fully_mixed),
+                               rnd_gen,
+                               absl::GetFlag(FLAGS_shuffle_input_output));
       }
       std::cout << std::endl;
       break;
     }
 
     default:
-      SpielFatalError("Exhausted pattern match: data_generation");
+      SpielFatalError("Exhausted pattern match: exp_init");
   }
 }
 
@@ -221,8 +222,8 @@ void TrainEvalLoop() {
   const std::unique_ptr<Trunk> t = MakeTrunk(
       absl::GetFlag(FLAGS_game_name), absl::GetFlag(FLAGS_depth),
       use_bandits_for_cfr);
-  const ExpReplayInitPolicy init_policy =
-      GetInitPolicy(absl::GetFlag(FLAGS_data_generation));
+  const ExpReplayInitialization init_policy =
+      GetExpReplayInitialization(absl::GetFlag(FLAGS_exp_init));
   const int num_trunks = absl::GetFlag(FLAGS_num_trunks);
   const int experience_replay_buffer_size =
       t->num_non_terminal_leaves * num_trunks;
