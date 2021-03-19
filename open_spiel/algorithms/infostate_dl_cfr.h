@@ -52,17 +52,32 @@ namespace algorithms {
 namespace dlcfr {
 
 
+enum PublicStateType {
+  // Initial public state of the depth-limited lookahed tree. There might be
+  // multiple initial states (i.e. the lookahead tree is more precisely a forest
+  // of trees).
+  kInitialPublicState,
+  // Leaf public state of the depth-limited lookahed tree. All such public
+  // states are at the end of the lookahead. Some of them might be terminal,
+  // i.e. they contain only States that are terminal.
+  kLeafPublicState,
+};
+
 struct PublicState {
   // An identification of the public state: a tensor of perfect recall
   // public observation.
   const Observation public_tensor;
-  // Position in the vector of DepthLimitedCFR::public_leaves_
+  // Public state type. Note that only the pair of (public_tensor, state_type)
+  // uniquely identifies public_id: this is for technical reasons so that we can
+  // build 1-step lookaheads. There would be a single public state that is both
+  // initial and leaf. We need to distinguish between the two, so we save them
+  // redundantly as two different public states. The distinction is needed
+  // because while the public observations are the same, the infostate node
+  // pointers are not, and so are not all the other members derived from the
+  // infostate nodes (beliefs and values).
+  const PublicStateType state_type;
+  // Position in the vector of DepthLimitedCFR::public_states()
   const size_t public_id;
-  // Flags that indicate what type of node within a public tree
-  // this public state is. It can be both initial and a leaf, if the public
-  // tree is a singleton.
-  /*const*/ bool is_initial = false;
-  /*const*/ bool is_leaf = false;
   // For each player, store a pointer to the infostate nodes for this public
   // state, within the depth-limited infostate tree. If needed, you can get
   // access to underlying perfect-information `State`s
@@ -71,8 +86,7 @@ struct PublicState {
   // The top nodes are saved for initial states and bottom nodes are saved for
   // leaf states. Both are listed for the special case if the public tree is
   // a singleton.
-  /*const*/ std::array<std::vector<const InfostateNode*>, 2> top_nodes;
-  /*const*/ std::array<std::vector<const InfostateNode*>, 2> bottom_nodes;
+  /*const*/ std::array<std::vector<const InfostateNode*>, 2> nodes;
   // For each player, store beliefs for the top-most infostate nodes, which
   // correspond to bottom_nodes of the DL infostate tree.
   std::array<std::vector<double>, 2> beliefs;
@@ -81,14 +95,15 @@ struct PublicState {
   std::array<std::vector<double>, 2> values;
 
   explicit PublicState(const Observation& public_observation,
-                       const size_t public_id)
-      : public_tensor(public_observation), public_id(public_id) {}
+                       const PublicStateType state_type, const size_t public_id)
+      : public_tensor(public_observation), state_type(state_type),
+        public_id(public_id) {}
 
   // Check if the public state if initial, i.e. the depth-limited subgame
   // is rooted in this public state.
-  bool IsInitial() const { return is_initial; }
+  bool IsInitial() const { return state_type == kInitialPublicState; }
   // Check if the public state if a leaf within the depth-limited subgame.
-  bool IsLeaf() const { return is_leaf; }
+  bool IsLeaf() const { return state_type == kLeafPublicState; }
   // Check if the public state is terminal, i.e. it contains only states
   // that satisfy `State::IsTerminal()`.
   bool IsTerminal() const;
@@ -238,9 +253,11 @@ class DepthLimitedCFR {
   void PrepareInfostateNodesForPublicStates();
   void PrepareReachesAndValuesForPublicStates();
   void CreateContexts();
-  PublicState* GetPublicState(const Observation& public_observation);
-  PublicState* GetPublicState(InfostateNode* node,
-                              Observation& public_observation);
+  PublicState* GetPublicState(const Observation& public_observation,
+                              PublicStateType state_type);
+  PublicState* GetPublicState(Observation& public_observation,
+                              PublicStateType state_type,
+                              InfostateNode* node);
 
   // Internal checks.
   bool DoStatesProduceEqualPublicObservations(

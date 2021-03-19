@@ -32,7 +32,7 @@ void CheckConsistency(const PublicState& s) {
   using History = std::vector<Action>;
   std::unordered_set<History, absl::Hash<History>> state_histories;
   for (int pl = 0; pl < 2; ++pl) {
-    for (const InfostateNode* node : s.bottom_nodes[pl]) {
+    for (const InfostateNode* node : s.nodes[pl]) {
       SPIEL_CHECK_TRUE(!s.IsLeaf() || node->is_leaf_node());
       SPIEL_CHECK_EQ(node->tree().acting_player(), pl);
       if (node->type() == kTerminalInfostateNode) num_terminals++;
@@ -116,9 +116,9 @@ void DepthLimitedCFR::PrepareInfostateNodesForPublicStates() {
     for (int i = 0; i < trees_[pl]->root_branching_factor(); ++i) {
       InfostateNode* root_node = trees_[pl]->root().child_at(i);
       SPIEL_CHECK_TRUE(root_node->is_root_child());
-      PublicState* init_state = GetPublicState(root_node, public_observation);
-      init_state->is_initial = true;
-      init_state->top_nodes[pl].push_back(root_node);  // TODO: do we need this?
+      PublicState* init_state = GetPublicState(public_observation,
+                                               kInitialPublicState, root_node);
+      init_state->nodes[pl].push_back(root_node);
       root_node_positions_[root_node] = i;  // TODO: do we need this?
     }
   }
@@ -127,10 +127,9 @@ void DepthLimitedCFR::PrepareInfostateNodesForPublicStates() {
     for (int i = 0; i < trees_[pl]->num_leaves(); ++i) {
       InfostateNode* leaf_node = trees_[pl]->leaf_nodes()[i];
       SPIEL_CHECK_TRUE(leaf_node->is_leaf_node());
-      PublicState* leaf_state = GetPublicState(leaf_node, public_observation);
-      leaf_state->is_leaf = true;
-      // The nodes might have been added for base case "initial == leaf"
-      leaf_state->bottom_nodes[pl].push_back(leaf_node);
+      PublicState* leaf_state = GetPublicState(public_observation,
+                                               kLeafPublicState, leaf_node);
+      leaf_state->nodes[pl].push_back(leaf_node);
       leaf_node_positions_[leaf_node] = i;
     }
   }
@@ -139,7 +138,7 @@ void DepthLimitedCFR::PrepareInfostateNodesForPublicStates() {
 void DepthLimitedCFR::PrepareReachesAndValuesForPublicStates() {
   for (PublicState& state : public_states_) {
     for (int pl = 0; pl < 2; ++pl) {
-      const int num_nodes = state.bottom_nodes[pl].size();
+      const int num_nodes = state.nodes[pl].size();
       state.beliefs[pl] = std::vector<double>(num_nodes, 0.);
       state.values[pl] = std::vector<double>(num_nodes, 0.);
     }
@@ -159,24 +158,28 @@ void DepthLimitedCFR::CreateContexts() {
   }
 }
 
-PublicState* DepthLimitedCFR::GetPublicState(InfostateNode* node,
-                                             Observation& public_observation) {
+PublicState* DepthLimitedCFR::GetPublicState(Observation& public_observation,
+                                             PublicStateType state_type,
+                                             InfostateNode* node) {
   SPIEL_CHECK_FALSE(node->corresponding_states().empty());
   const std::unique_ptr<State>& some_state = node->corresponding_states()[0];
   public_observation.SetFrom(*some_state, kDefaultPlayerId);
   SPIEL_DCHECK_TRUE(
       DoStatesProduceEqualPublicObservations(*node, public_observation.Tensor()));
-  PublicState* state = GetPublicState(public_observation);
+  PublicState* state = GetPublicState(public_observation, state_type);
   return state;
 }
 
 PublicState* DepthLimitedCFR::GetPublicState(
-    const Observation& public_observation) {
+    const Observation& public_observation,
+    PublicStateType state_type) {
   for (PublicState& state : public_states_) {
-    if (state.public_tensor == public_observation) return &state;
+    if (state.public_tensor == public_observation
+        && state.state_type == state_type) return &state;
   }
   // None found: create and return the pointer.
-  public_states_.emplace_back(public_observation, public_states_.size());
+  public_states_.emplace_back(public_observation,
+                              state_type, public_states_.size());
   return &public_states_.back();
 }
 
@@ -210,7 +213,7 @@ std::shared_ptr<PublicStateEvaluator> MakeDummyEvaluator() {
 TerminalPublicStateContext::TerminalPublicStateContext(
     const PublicState& state) {
   SPIEL_CHECK_TRUE(state.IsTerminal());
-  auto& leaf_nodes = state.bottom_nodes;
+  auto& leaf_nodes = state.nodes;
   SPIEL_CHECK_EQ(leaf_nodes[0].size(), leaf_nodes[1].size());
   const int num_terminals = leaf_nodes[0].size();
   utilities.reserve(num_terminals);
@@ -307,9 +310,9 @@ void DepthLimitedCFR::EvaluateLeaf(PublicState* state,
 
   // 1. Prepare beliefs
   for (int pl = 0; pl < 2; pl++) {
-    const int num_leaves = state->bottom_nodes[pl].size();
+    const int num_leaves = state->nodes[pl].size();
     for (int j = 0; j < num_leaves; ++j) {
-      const InfostateNode* leaf_node = state->bottom_nodes[pl][j];
+      const InfostateNode* leaf_node = state->nodes[pl][j];
       const int trunk_position = leaf_node_positions_.at(leaf_node);
       SPIEL_DCHECK_GE(trunk_position, 0);
       SPIEL_DCHECK_LT(trunk_position, trees_[pl]->num_leaves());
@@ -330,9 +333,9 @@ void DepthLimitedCFR::EvaluateLeaf(PublicState* state,
 
   // 3. Update cfvs for propagators.
   for (int pl = 0; pl < 2; pl++) {
-    const int num_leaves = state->bottom_nodes[pl].size();
+    const int num_leaves = state->nodes[pl].size();
     for (int j = 0; j < num_leaves; ++j) {
-      const InfostateNode* leaf_node = state->bottom_nodes[pl][j];
+      const InfostateNode* leaf_node = state->nodes[pl][j];
       const int trunk_position = leaf_node_positions_.at(leaf_node);
       SPIEL_DCHECK_GE(trunk_position, 0);
       SPIEL_DCHECK_LT(trunk_position, trees_[pl]->num_leaves());
@@ -384,12 +387,12 @@ void DepthLimitedCFR::Reset() {
 }
 
 bool PublicState::IsTerminal() const {
-  if (!is_leaf) return false;
+  if (!IsLeaf()) return false;
   // A quick shortcut for checking if the state is terminal: we ensure
   // this indeed holds by calling CheckConsistency() in debug mode.
-  SPIEL_DCHECK_FALSE(bottom_nodes[0].empty());
-  SPIEL_DCHECK_TRUE(bottom_nodes[0][0]);
-  return bottom_nodes[0][0]->type() == kTerminalInfostateNode;
+  SPIEL_DCHECK_FALSE(nodes[0].empty());
+  SPIEL_DCHECK_TRUE(nodes[0][0]);
+  return nodes[0][0]->type() == kTerminalInfostateNode;
 }
 
 void DebugPrintPublicFeatures(const std::vector<PublicState>& states) {
@@ -407,10 +410,10 @@ void CheckChildPublicStateConsistency(
   auto trees = cfr_public_state.dlcfr->trees();
   for (int pl = 0; pl < 2; ++pl) {
     const InfostateNode& root = trees[pl]->root();
-    SPIEL_CHECK_EQ(leaf_state.bottom_nodes[pl].size(), root.num_children());
+    SPIEL_CHECK_EQ(leaf_state.nodes[pl].size(), root.num_children());
     for (int i = 0; i < root.num_children(); ++i) {
       const InfostateNode& actual = *root.child_at(i);
-      const InfostateNode& expected = *leaf_state.bottom_nodes[pl][i];
+      const InfostateNode& expected = *leaf_state.nodes[pl][i];
       SPIEL_CHECK_EQ(actual.infostate_string(), expected.infostate_string());
     }
   }
@@ -438,9 +441,9 @@ std::unique_ptr<PublicStateContext> CFREvaluator::CreateContext(
   SPIEL_CHECK_TRUE(state.IsLeaf());
 
   auto subgame_trees = std::vector{
-      MakeInfostateTree(state.bottom_nodes[0],
+      MakeInfostateTree(state.nodes[0],
                         depth_limit, kDlCfrInfostateTreeStorage),
-      MakeInfostateTree(state.bottom_nodes[1],
+      MakeInfostateTree(state.nodes[1],
                         depth_limit, kDlCfrInfostateTreeStorage)
   };
   auto subgame_bandits = MakeBanditVectors(subgame_trees, bandit_name);
@@ -487,13 +490,13 @@ double DepthLimitedCFR::RootValue(Player pl) const {
 void PrintPublicStatesStats(const std::vector<PublicState>& public_leaves) {
   for (const PublicState& state : public_leaves) {
     std::array<int, 2>
-        num_nodes = { (int) state.bottom_nodes[0].size(),
-                      (int) state.bottom_nodes[1].size() },
+        num_nodes = { (int) state.nodes[0].size(),
+                      (int) state.nodes[1].size() },
         largest_infostates = {-1, -1},
         smallest_infostates = {1000000, 1000000};
     int num_states = 0;
     for (int pl = 0; pl < 2; ++pl) {
-      for (const InfostateNode* node : state.bottom_nodes[pl]) {
+      for (const InfostateNode* node : state.nodes[pl]) {
         int size = node->corresponding_states_size();
         if (pl == 0) num_states += size;
         largest_infostates[pl] = std::max(largest_infostates[pl], size);
