@@ -73,6 +73,16 @@ bool DoStatesProduceEqualPublicObservations(
   return true;
 }
 
+void MakeReachesAndValuesForPublicStates(std::vector<PublicState>& states) {
+  for (PublicState& state : states) {
+    for (int pl = 0; pl < 2; ++pl) {
+      const int num_nodes = state.nodes[pl].size();
+      state.beliefs[pl] = std::vector<double>(num_nodes, 0.);
+      state.values[pl] = std::vector<double>(num_nodes, 0.);
+    }
+  }
+}
+
 }  // namespace
 
 DepthLimitedCFR::DepthLimitedCFR(
@@ -153,13 +163,7 @@ void DepthLimitedCFR::PrepareInfostateNodesForPublicStates() {
 }
 
 void DepthLimitedCFR::PrepareReachesAndValuesForPublicStates() {
-  for (PublicState& state : public_states_) {
-    for (int pl = 0; pl < 2; ++pl) {
-      const int num_nodes = state.nodes[pl].size();
-      state.beliefs[pl] = std::vector<double>(num_nodes, 0.);
-      state.values[pl] = std::vector<double>(num_nodes, 0.);
-    }
-  }
+  MakeReachesAndValuesForPublicStates(public_states_);
 }
 
 void DepthLimitedCFR::CreateContexts() {
@@ -548,13 +552,14 @@ std::unique_ptr<PublicStatesInGame> MakeAllPublicStates(const Game& game) {
             game, public_observer, *node, public_observation.Tensor()));
         PublicState* state = all->GetPublicState(public_observation);
 
-        // Store only top-most infostate nodes from the public states.
-        if (!contains(state->nodes[pl], node->parent())) {
-          state->nodes[pl].push_back(node);
-        }
+        SPIEL_DCHECK_FALSE(contains(state->nodes[pl], node->parent()));
+        state->nodes[pl].push_back(node);
       }
     }
   }
+  // Init.
+  MakeReachesAndValuesForPublicStates(all->public_states);
+
   return all;
 }
 
