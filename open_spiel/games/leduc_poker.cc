@@ -140,6 +140,15 @@ class LeducObserver : public Observer {
     }
   }
 
+  // Dealing initial card; shape [num_players].
+  static void WriteDealingInitialCard(const LeducState& state,
+                                   Allocator* allocator) {
+    auto out = allocator->Get("dealing", {state.num_players_});
+    for (int i = 0; i < state.history_.size() && i < state.num_players_; ++i) {
+      out.at(i) = 1;
+    }
+  }
+
   // Betting sequence; shape [num_rounds, bets_per_round, num_actions].
   static void WriteBettingSequence(const LeducState& state,
                                    Allocator* allocator) {
@@ -170,6 +179,15 @@ class LeducObserver : public Observer {
     }
   }
 
+  // Write whether the game finished by folding  shape=[num_players].
+  static void WriteFolding(const LeducState& state,
+                                   Allocator* allocator) {
+    auto out = allocator->Get("folding", {state.num_players_});
+    for (auto p = Player{0}; p < state.num_players_; p++) {
+      out.at(p) = state.folded_[p] ? 1. : 0.;
+    }
+  }
+
   // Writes the complete observation in tensor form.
   // The supplied allocator is responsible for providing memory to write the
   // observation into.
@@ -192,8 +210,13 @@ class LeducObserver : public Observer {
     // Public information.
     if (iig_obs_type_.public_info) {
       WriteCommunityCard(state, allocator);
-      iig_obs_type_.perfect_recall ? WriteBettingSequence(state, allocator)
-                                   : WritePotContribution(state, allocator);
+      if(iig_obs_type_.perfect_recall) {
+        WriteDealingInitialCard(state, allocator);
+        WriteBettingSequence(state, allocator);
+      } else {
+        WritePotContribution(state, allocator);
+      }
+      WriteFolding(state, allocator);
     }
   }
 

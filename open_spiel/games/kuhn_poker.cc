@@ -92,9 +92,17 @@ class KuhnObserver : public Observer {
     // Betting sequence.
     if (iig_obs_type_.public_info) {
       if (iig_obs_type_.perfect_recall) {
-        auto out = allocator->Get("betting", {2 * num_players - 1, 2});
-        for (int i = num_players; i < state.history_.size(); ++i) {
-          out.at(i - num_players, state.history_[i].action) = 1;
+        {
+          auto out = allocator->Get("dealing", {num_players});
+          for (int i = 0; i < state.history_.size() && i < num_players; ++i) {
+            out.at(i) = 1;
+          }
+        }
+        {
+          auto out = allocator->Get("betting", {2 * num_players - 1, 2});
+          for (int i = num_players; i < state.history_.size(); ++i) {
+            out.at(i - num_players, state.history_[i].action) = 1;
+          }
         }
       } else {
         auto out = allocator->Get("pot_contribution", {num_players});

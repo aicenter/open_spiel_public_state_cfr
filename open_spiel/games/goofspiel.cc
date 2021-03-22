@@ -113,6 +113,7 @@ class GoofspielObserver : public Observer {
     if (pub_info) WritePointsTotal(game, state, player, allocator);
     if (imp_info && priv_one) WritePlayerHand(game, state, player, allocator);
     if (imp_info && pub_info) WriteWinSequence(game, state, allocator);
+    if (imp_info && pub_info) WriteTieSequence(game, state, allocator);
     if (pub_info && perf_rec) WritePointCardSequence(game, state, allocator);
     if (imp_info && perf_rec && priv_one)
       WritePlayerActionSequence(game, state, player, allocator);
@@ -205,6 +206,15 @@ class GoofspielObserver : public Observer {
     for (int i = 0; i < state.win_sequence_.size(); ++i) {
       if (state.win_sequence_[i] != kInvalidPlayer)
         out.at(i, state.win_sequence_[i]) = 1.0;
+    }
+  }
+
+  // Sequence of when a tie was made for each trick.
+  void WriteTieSequence(const GoofspielGame& game, const GoofspielState& state,
+                        Allocator* allocator) const {
+    auto out = allocator->Get("tie_sequence", {game.NumRounds()});
+    for (int i = 0; i < state.win_sequence_.size(); ++i) {
+      if (state.win_sequence_[i] == kInvalidPlayer) out.at(i) = 1.0;
     }
   }
 
