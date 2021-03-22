@@ -23,6 +23,8 @@ namespace open_spiel {
 namespace algorithms {
 namespace dlcfr {
 
+namespace {
+
 void CheckConsistency(const PublicState& s) {
   // All leaf nodes must be indeed leaf nodes and belong to correct players.
   // They should all be terminal or non-terminal.
@@ -57,6 +59,21 @@ void CheckConsistency(const PublicState& s) {
   SPIEL_CHECK_FALSE(num_terminals % 2 != 0 && num_nonterminals % 2 != 0);
   // All OK! Yay!
 }
+
+bool DoStatesProduceEqualPublicObservations(
+    const Game& game, std::shared_ptr<Observer> public_observer,
+    const InfostateNode& node, absl::Span<float> expected_observation) {
+  Observation public_observation(game, public_observer);
+
+  // Check that indeed all states produce the same public observations.
+  for (const std::unique_ptr<State>& state : node.corresponding_states()) {
+    public_observation.SetFrom(*state, kDefaultPlayerId);
+    if (public_observation.Tensor() != expected_observation) return false;
+  }
+  return true;
+}
+
+}  // namespace
 
 DepthLimitedCFR::DepthLimitedCFR(
     std::shared_ptr<const Game> game,
@@ -164,8 +181,8 @@ PublicState* DepthLimitedCFR::GetPublicState(Observation& public_observation,
   SPIEL_CHECK_FALSE(node->corresponding_states().empty());
   const std::unique_ptr<State>& some_state = node->corresponding_states()[0];
   public_observation.SetFrom(*some_state, kDefaultPlayerId);
-  SPIEL_DCHECK_TRUE(
-      DoStatesProduceEqualPublicObservations(*node, public_observation.Tensor()));
+  SPIEL_DCHECK_TRUE(DoStatesProduceEqualPublicObservations(
+      *game_, public_observer_, *node, public_observation.Tensor()));
   PublicState* state = GetPublicState(public_observation, state_type);
   return state;
 }
@@ -181,18 +198,6 @@ PublicState* DepthLimitedCFR::GetPublicState(
   public_states_.emplace_back(public_observation,
                               state_type, public_states_.size());
   return &public_states_.back();
-}
-
-bool DepthLimitedCFR::DoStatesProduceEqualPublicObservations(
-    const InfostateNode& node, absl::Span<float> expected_observation) {
-  Observation public_observation(*game_, public_observer_);
-
-  // Check that indeed all states produce the same public observations.
-  for (const std::unique_ptr<State>& state : node.corresponding_states()) {
-    public_observation.SetFrom(*state, kDefaultPlayerId);
-    if (public_observation.Tensor() != expected_observation) return false;
-  }
-  return true;
 }
 
 std::shared_ptr<Policy> DepthLimitedCFR::AveragePolicy() {
@@ -387,7 +392,6 @@ void DepthLimitedCFR::Reset() {
 }
 
 bool PublicState::IsTerminal() const {
-  if (!IsLeaf()) return false;
   // A quick shortcut for checking if the state is terminal: we ensure
   // this indeed holds by calling CheckConsistency() in debug mode.
   SPIEL_DCHECK_FALSE(nodes[0].empty());
@@ -511,6 +515,64 @@ void PrintPublicStatesStats(const std::vector<PublicState>& public_leaves) {
               << "  smallest infostate: " << smallest_infostates << '\n';
   }
 }
+
+bool contains(std::vector<const InfostateNode*>& xs, const InfostateNode* x) {
+  return std::find(xs.begin(), xs.end(), x) != xs.end();
+}
+
+std::unique_ptr<PublicStatesInGame> MakeAllPublicStates(const Game& game) {
+  auto all = std::make_unique<PublicStatesInGame>();
+  constexpr int store_all_states = algorithms::kStoreStatesInLeaves
+                                 | algorithms::kStoreStatesInRoots
+                                 | algorithms::kStoreStatesInBody;
+  for (int pl = 0; pl < 2; ++pl) {
+    all->infostate_trees.push_back(algorithms::MakeInfostateTree(
+        game, pl, 1000, store_all_states));
+  }
+  std::shared_ptr<Observer> public_observer = game.MakeObserver(kPublicStateObsType, {});
+  Observation public_observation(game, public_observer);
+  for (int pl = 0; pl < 2; ++pl) {
+    const std::vector<std::vector<InfostateNode*>>& nodes_at_depths =
+        all->infostate_trees[pl]->nodes_at_depths();
+    for (int depth = 0; depth < nodes_at_depths.size(); ++depth) {
+      for (InfostateNode* node : nodes_at_depths[depth]) {
+        // Some nodes may not have corresponding states, even though we
+        // requested to save states at all the nodes (like root, or nodes added
+        // due to  rebalancing)
+        if (node->corresponding_states().empty()) continue;
+
+        const std::unique_ptr<State>& some_state =
+            node->corresponding_states()[0];
+        public_observation.SetFrom(*some_state, kDefaultPlayerId);
+        SPIEL_DCHECK_TRUE(DoStatesProduceEqualPublicObservations(
+            game, public_observer, *node, public_observation.Tensor()));
+        PublicState* state = all->GetPublicState(public_observation);
+
+        // Store only top-most infostate nodes from the public states.
+        if (!contains(state->nodes[pl], node->parent())) {
+          state->nodes[pl].push_back(node);
+        }
+      }
+    }
+  }
+  return all;
+}
+
+PublicState* PublicStatesInGame::GetPublicState(
+    const Observation& public_observation) {
+  for (PublicState& state : public_states) {
+    if (state.public_tensor == public_observation
+        && state.state_type == algorithms::dlcfr::kInitialPublicState) {
+      return &state;
+    }
+  }
+  // None found: create and return the pointer.
+  public_states.emplace_back(public_observation,
+                             algorithms::dlcfr::kInitialPublicState,
+                             public_states.size());
+  return &public_states.back();
+}
+
 
 }  // namespace dlcfr
 }  // namespace algorithms

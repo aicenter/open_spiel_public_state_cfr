@@ -111,6 +111,16 @@ struct PublicState {
 
 void DebugPrintPublicFeatures(const std::vector<PublicState>& states);
 
+// Store all public states in the game. This requires building the game tree
+// for the entire game. All the public states are marked as initial (even
+// the terminal ones).
+struct PublicStatesInGame {
+  std::vector<std::shared_ptr<InfostateTree>> infostate_trees;
+  std::vector<PublicState> public_states;
+  PublicState* GetPublicState(const Observation& public_observation);
+};
+std::unique_ptr<PublicStatesInGame> MakeAllPublicStates(const Game& game);
+
 // Derived classes specify members as they need for their specific
 // public state evaluators.
 //
@@ -259,10 +269,6 @@ class DepthLimitedCFR {
   PublicState* GetPublicState(Observation& public_observation,
                               PublicStateType state_type,
                               InfostateNode* node);
-
-  // Internal checks.
-  bool DoStatesProduceEqualPublicObservations(
-      const InfostateNode& node, absl::Span<float> expected_observation);
 };
 
 // -- Dummy evaluator ----------------------------------------------------------
