@@ -19,6 +19,23 @@ namespace papers_with_code {
 
 using namespace algorithms;
 
+std::unique_ptr<Subgame> SubgameFactory::MakeTrunk() {
+  std::vector<std::unique_ptr<State>> start_states { game->NewInitialState() };
+  std::vector<double> chance_reach_probs {1.};
+  std::vector<std::shared_ptr<InfostateTree>> trees;
+  for (int pl = 0; pl < 2; ++pl) {
+    trees.push_back(MakeInfostateTree(
+        start_states, chance_reach_probs,
+        infostate_observer, pl, max_move_ahead_limit,
+        algorithms::dlcfr::kDlCfrInfostateTreeStorage
+    ));
+  }
+  auto out = std::make_unique<Subgame>(
+      game, trees, leaf_evaluator, terminal_evaluator,
+      public_observer, MakeBanditVectors(trees, use_bandits_for_cfr));
+  return out;
+}
+
 std::unique_ptr<Subgame> SubgameFactory::MakeSubgame(const ParticleSet& set) {
   SPIEL_CHECK_LE(set.particles.size(), max_particles);
   auto trees = MakeSubgameInfostateTrees(set);

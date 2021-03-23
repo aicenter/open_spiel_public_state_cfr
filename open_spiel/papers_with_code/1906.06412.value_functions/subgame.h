@@ -32,6 +32,10 @@ using Subgame = algorithms::dlcfr::DepthLimitedCFR;
 using PublicState = algorithms::dlcfr::PublicState;
 using TerminalEvaluator = algorithms::dlcfr::TerminalEvaluator;
 
+constexpr char* kDefaultDlCfrBandit = "RegretMatchingPlus";
+constexpr int kDefaultMaxMoveAheadLimit = 2;
+constexpr int kDefaultMaxParticles = 1000;
+
 // Produce a subgame given a particle set.
 struct SubgameFactory {
   std::shared_ptr<const Game> game;
@@ -39,16 +43,14 @@ struct SubgameFactory {
   std::shared_ptr<Observer> public_observer;     // For public tensor.
   std::shared_ptr<Observer> hand_observer;       // For hand tensor.
 
-  std::string use_bandits_for_cfr;
-  int max_move_ahead_limit;
-  int max_particles;
-
-  TreeMap<Action, std::unique_ptr<State>> history_cache;
-//  std::shared_ptr<HandInfo> hand_info;
-
   std::shared_ptr<const TerminalEvaluator> terminal_evaluator;
   std::shared_ptr<const NetEvaluator> leaf_evaluator;
 
+  std::string use_bandits_for_cfr = kDefaultDlCfrBandit;
+  int max_move_ahead_limit = kDefaultMaxMoveAheadLimit;
+  int max_particles = kDefaultMaxParticles;
+
+  std::unique_ptr<Subgame> MakeTrunk();  // Subgame from game's initial state.
   std::unique_ptr<Subgame> MakeSubgame(const ParticleSet& set);
   std::unique_ptr<Subgame> MakeSubgame(const PublicState& state);
   std::vector<std::shared_ptr<algorithms::InfostateTree>>
