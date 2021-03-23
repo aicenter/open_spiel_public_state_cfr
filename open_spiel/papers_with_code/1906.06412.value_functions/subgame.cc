@@ -29,6 +29,21 @@ std::unique_ptr<Subgame> SubgameFactory::MakeSubgame(const ParticleSet& set) {
   return out;
 }
 
+std::unique_ptr<Subgame> SubgameFactory::MakeSubgame(const PublicState& state) {
+  std::vector<std::shared_ptr<InfostateTree>> trees;
+  for (int pl = 0; pl < 2; ++pl) {
+    trees.push_back(MakeInfostateTree(
+        state.nodes[pl], max_move_ahead_limit,
+        algorithms::dlcfr::kDlCfrInfostateTreeStorage
+    ));
+  }
+  auto out = std::make_unique<Subgame>(
+      game, trees, leaf_evaluator, terminal_evaluator,
+      public_observer, MakeBanditVectors(trees, use_bandits_for_cfr));
+  out->SetBeliefs(state.beliefs);
+  return out;
+}
+
 std::vector<std::shared_ptr<InfostateTree>>
 SubgameFactory::MakeSubgameInfostateTrees(const ParticleSet& set) {
   SPIEL_CHECK_LE(set.particles.size(), max_particles);
@@ -44,7 +59,8 @@ SubgameFactory::MakeSubgameInfostateTrees(const ParticleSet& set) {
   for (int pl = 0; pl < 2; ++pl) {
     trees.push_back(MakeInfostateTree(
         root_histories, chance_reach_probs,
-        infostate_observer, pl, max_move_ahead_limit
+        infostate_observer, pl, max_move_ahead_limit,
+        algorithms::dlcfr::kDlCfrInfostateTreeStorage
     ));
   }
   SPIEL_DCHECK(CheckParticleSetConsistency(*game, infostate_observer,

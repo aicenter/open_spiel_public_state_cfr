@@ -17,6 +17,7 @@
 #define OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_SUBGAME_
 
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_data.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/net_dl_evaluator.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/particle.h"
 #include "open_spiel/algorithms/infostate_tree.h"
 #include "open_spiel/algorithms/infostate_dl_cfr.h"
@@ -28,6 +29,8 @@ namespace papers_with_code {
 // A (depth-limited) subgame rooted at some perfect-information histories,
 // that have belief distribution over the infostates induced by those histories.
 using Subgame = algorithms::dlcfr::DepthLimitedCFR;
+using PublicState = algorithms::dlcfr::PublicState;
+using TerminalEvaluator = algorithms::dlcfr::TerminalEvaluator;
 
 // Produce a subgame given a particle set.
 struct SubgameFactory {
@@ -39,12 +42,15 @@ struct SubgameFactory {
   std::string use_bandits_for_cfr;
   int max_move_ahead_limit;
   int max_particles;
-  TreeMap<Action, std::unique_ptr<State>> history_cache;
 
-  std::shared_ptr<const algorithms::dlcfr::PublicStateEvaluator> terminal_evaluator;
-  std::shared_ptr<algorithms::dlcfr::PublicStateEvaluator> leaf_evaluator;
+  TreeMap<Action, std::unique_ptr<State>> history_cache;
+//  std::shared_ptr<HandInfo> hand_info;
+
+  std::shared_ptr<const TerminalEvaluator> terminal_evaluator;
+  std::shared_ptr<const NetEvaluator> leaf_evaluator;
 
   std::unique_ptr<Subgame> MakeSubgame(const ParticleSet& set);
+  std::unique_ptr<Subgame> MakeSubgame(const PublicState& state);
   std::vector<std::shared_ptr<algorithms::InfostateTree>>
     MakeSubgameInfostateTrees(const ParticleSet& set);
 
