@@ -62,6 +62,9 @@ void InitTrunkDlCfrIterations(
     int trunk_iters, std::function<void(/*trunk_iter=*/int)> monitor_fn,
     std::mt19937& rnd_gen, bool shuffle_input_output);
 
+void InitSubgamesRandomBeliefs(
+    SubgameFactory* factory, const BasicDims& dims, NetArchitecture arch,
+    ExperienceReplay* replay, std::mt19937& rnd_gen, bool shuffle_input_output);
 
 }  // papers_with_code
 }  // open_spiel

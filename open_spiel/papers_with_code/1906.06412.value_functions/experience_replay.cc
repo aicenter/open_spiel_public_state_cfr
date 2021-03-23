@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "open_spiel/algorithms/infostate_dl_cfr.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/experience_replay.h"
 
 
@@ -61,43 +62,64 @@ ExpReplayInitialization GetExpReplayInitialization(const std::string& s) {
   SpielFatalError("Exhausted pattern match: exp_init");
 }
 
+void AddExperience(
+    const algorithms::dlcfr::PublicState& leaf,
+    const NetContext& net_context,
+    const BasicDims& dims,
+    NetArchitecture arch,
+    ExperienceReplay* replay,
+    std::mt19937& rnd_gen,
+    bool shuffle_input_output
+) {
+  switch(arch) {
+    case NetArchitecture::kParticle: {
+      auto particle_dims = open_spiel::down_cast<const ParticleDims&>(dims);
+      ParticleDataPoint data_point = replay->AddExperience(particle_dims);
+      WriteParticleDataPoint(leaf, net_context, particle_dims, &data_point,
+                             &rnd_gen, shuffle_input_output);
+      break;
+    }
+    case NetArchitecture::kPositional: {
+      auto pos_dims = open_spiel::down_cast<const PositionalDims&>(dims);
+      PositionalData data_point = replay->AddExperience(pos_dims);
+      WritePositionalDataPoint(leaf, net_context, pos_dims, &data_point);
+      break;
+    }
+  }
+}
+
 
 void AddExperiencesFromTrunk(
     const std::vector<algorithms::dlcfr::PublicState>& states,
     const std::vector<NetContext*>& net_contexts,
-    const BasicDims& dims, NetArchitecture arch, ExperienceReplay* replay,
-    std::mt19937& rnd_gen, bool shuffle_input_output) {
+    const BasicDims& dims,
+    NetArchitecture arch,
+    ExperienceReplay* replay,
+    std::mt19937& rnd_gen,
+    bool shuffle_input_output
+) {
   for (int i = 0; i < states.size(); ++i) {
     const algorithms::dlcfr::PublicState& state = states[i];
     // Add experiences only for the non-terminal leaves.
     if (!state.IsLeaf() || state.IsTerminal()) continue;
     SPIEL_CHECK_TRUE(net_contexts[i]);
     const NetContext& net_context = *net_contexts[i];
-
-    switch(arch) {
-      case NetArchitecture::kParticle: {
-        auto particle_dims = open_spiel::down_cast<const ParticleDims&>(dims);
-        ParticleDataPoint data_point = replay->AddExperience(particle_dims);
-        WriteParticleDataPoint(state, net_context, particle_dims, &data_point,
-                               &rnd_gen, shuffle_input_output);
-        break;
-      }
-      case NetArchitecture::kPositional: {
-        auto pos_dims = open_spiel::down_cast<const PositionalDims&>(dims);
-        PositionalData data_point = replay->AddExperience(pos_dims);
-        WritePositionalDataPoint(state, net_context, pos_dims, &data_point);
-        break;
-      }
-    }
-
+    AddExperience(state, net_context, dims, arch, replay,
+                  rnd_gen, shuffle_input_output);
   }
 }
 
 void InitTrunkRandomBeliefs(
-    Trunk* trunk, const std::vector<NetContext*>& contexts,
-    const BasicDims& dims, NetArchitecture arch, ExperienceReplay* replay,
-    double prob_pure_strat, double prob_fully_mixed,
-    std::mt19937& rnd_gen, bool shuffle_input_output) {
+    Trunk* trunk,
+    const std::vector<NetContext*>& contexts,
+    const BasicDims& dims,
+    NetArchitecture arch,
+    ExperienceReplay* replay,
+    double prob_pure_strat,
+    double prob_fully_mixed,
+    std::mt19937& rnd_gen,
+    bool shuffle_input_output
+) {
   trunk->fixable_trunk_with_oracle->Reset();
 
   // Randomize strategy in the trunk.
@@ -125,11 +147,16 @@ void InitTrunkRandomBeliefs(
 // The network should imitate DL-CFR at each iteration
 // when we use this generation method.
 void InitTrunkDlCfrIterations(
-    Trunk* trunk, const std::vector<NetContext*>& contexts,
-    const BasicDims& dims, NetArchitecture arch, ExperienceReplay* replay,
+    Trunk* trunk,
+    const std::vector<NetContext*>& contexts,
+    const BasicDims& dims,
+    NetArchitecture arch,
+    ExperienceReplay* replay,
     int trunk_iters,
     std::function<void(/*trunk_iter=*/int)> monitor_fn,
-    std::mt19937& rnd_gen, bool shuffle_input_output) {
+    std::mt19937& rnd_gen,
+    bool shuffle_input_output
+) {
   trunk->iterable_trunk_with_oracle->Reset();
   for (int iter = 1; iter <= trunk_iters; ++iter) {
     ++trunk->iterable_trunk_with_oracle->num_iterations_;
@@ -145,6 +172,63 @@ void InitTrunkDlCfrIterations(
   }
 }
 
+double PlayerReachProb(const algorithms::InfostateNode* node,
+                       const algorithms::BanditVector& bandits, double prob) {
+  using Bandit = algorithms::bandits::Bandit;
+
+  if (node->is_root_node()) return prob;
+  if (node->parent()->is_root_node()) return prob;
+  if (node->parent()->type() == algorithms::kDecisionInfostateNode) {
+    Bandit* bandit = bandits[node->parent()->decision_id()].get();
+    prob *= bandit->current_strategy()[node->incoming_index()];
+  }
+  return PlayerReachProb(node->parent(), bandits, prob);
+}
+
+void UpdateBeliefs(PublicState& state,
+                   const std::vector<algorithms::BanditVector>& bandits) {
+  for (int pl = 0; pl < 2; ++pl) {
+    for (int i = 0; i < state.nodes[pl].size(); ++i) {
+      const algorithms::InfostateNode* node = state.nodes[pl][i];
+      state.beliefs[pl][i] = PlayerReachProb(node, bandits[pl], 1.);
+    }
+  }
+}
+
+void InitSubgamesRandomBeliefs(
+    SubgameFactory* factory,
+    const BasicDims& dims,
+    NetArchitecture arch,
+    ExperienceReplay* replay,
+    std::mt19937& rnd_gen,
+    double prob_pure_strat,
+    double prob_fully_mixed,
+    bool shuffle_input_output
+) {
+  auto all = algorithms::dlcfr::MakeAllPublicStates(*factory->game);
+  auto bandits = MakeBanditVectors(all->infostate_trees, "FixableStrategy");
+  const int num_trunks = replay->size();
+  const int num_states = all->public_states.size();
+  auto public_state_dist = std::uniform_int_distribution<>(0, num_states - 1);
+
+  for (int i = 0; i < num_trunks; ++i) {
+    // 1. Pick a public state and compute according beliefs.
+    RandomizeStrategy(bandits, prob_pure_strat, prob_fully_mixed, rnd_gen);
+    const int public_state_idx = public_state_dist(rnd_gen);
+    PublicState& state = all->public_states[public_state_idx];
+    UpdateBeliefs(state, bandits);
+
+    // 2. Build subgame and solve it.
+    std::unique_ptr<Subgame> subgame = factory->MakeSubgame(state);
+    subgame->RunSimultaneousIterations(100);
+
+    // 3. Add solution to the experiences.
+    auto context = factory->leaf_evaluator->CreateContext(state);
+    auto net_context = open_spiel::down_cast<NetContext&>(*context);
+    AddExperience(state, net_context, dims, arch, replay,
+                  rnd_gen, shuffle_input_output);
+  }
+}
 
 
 }  // papers_with_code
