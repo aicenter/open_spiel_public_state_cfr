@@ -20,7 +20,8 @@ namespace papers_with_code {
 using namespace algorithms;
 
 std::unique_ptr<Subgame> SubgameFactory::MakeTrunk() {
-  std::vector<std::unique_ptr<State>> start_states { game->NewInitialState() };
+  std::vector<std::unique_ptr<State>> start_states {};
+  start_states.push_back(game->NewInitialState());
   std::vector<double> chance_reach_probs {1.};
   std::vector<std::shared_ptr<InfostateTree>> trees;
   for (int pl = 0; pl < 2; ++pl) {
