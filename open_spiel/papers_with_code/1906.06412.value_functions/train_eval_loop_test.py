@@ -216,50 +216,50 @@ class VFTest(parameterized.TestCase, absltest.TestCase):
     expected_eval = df_from_lines(_REFERENCE_KUHN_RANDOM_EVAL[arch])
     np.testing.assert_allclose(actual_eval.values, expected_eval.values,
                                atol=1e-6)
-  #
-  # @parameterized.parameters(dict_prod(_TEST_GAMES, _VALUE_NETS))
-  # def test_fit_one_sample(self, **game_spec):
-  #   args = {**_BASE_ARGS, **game_spec,
-  #           **dict(num_loops=20, batch_size=-1, exp_init="trunk_random",
-  #                  num_trunks=1, trunk_expl_iterations="")}
-  #   actual_eval, = read_experiment_results_from_shell(args, metric_avg_loss)
-  #   actual_loss = actual_eval["avg_loss"].values.min()
-  #   self.assertLess(actual_loss, 1e-8)
-  #
-  # @parameterized.parameters(dict_prod(_TEST_GAMES, _VALUE_NETS))
-  # def test_fit_two_samples(self, **game_spec):
-  #   args = {**_BASE_ARGS, **game_spec,
-  #           **dict(num_loops=60, batch_size=-1, exp_init="trunk_random",
-  #                  learning_rate=0.01, lr_decay=0.99,
-  #                  num_trunks=2, trunk_expl_iterations=0)}
-  #   actual_eval, = read_experiment_results_from_shell(args, metric_avg_loss)
-  #   actual_loss = actual_eval["avg_loss"].values.min()
-  #   self.assertLess(actual_loss, 1e-6)
-  #
-  # @parameterized.parameters(dict_prod(_TEST_GAMES, _VALUE_NETS))
-  # def test_imitate_dlcfr_iterations(self, **game_spec):
-  #   if game_spec["game_name"] == "kuhn_poker" and game_spec["depth"] == 4:
-  #     # Skip this setting, as getting the precise DL-CFR iterations is
-  #     # difficult: the iterations are sensitive to the smallest changes in
-  #     # values.
-  #     return
-  #
-  #   num_iters = 3
-  #   args = {**_BASE_ARGS, **game_spec,
-  #           # Run just 1 loop, as per-loop evals are the most expensive part.
-  #           **dict(num_loops=10, train_batches=100,
-  #                  batch_size=-1, exp_init="trunk_dlcfr",
-  #                  num_trunks=num_iters,
-  #                  trunk_expl_iterations=",".join(str(i) for i in range(1, num_iters + 1))
-  #                  )}
-  #   expected_expl, actual_eval = read_experiment_results_from_shell(
-  #       args, metric_ref_expls, metric_avg_loss)
-  #   expl_cols = [f"expl[{i}]" for i in range(1, num_iters+1)]
-  #   actual_expl = actual_eval.tail(1)[expl_cols]
-  #
-  #   np.testing.assert_allclose(actual_expl.values.flatten(),
-  #                              expected_expl["expl"].values.flatten(),
-  #                              atol=5e-3)
+
+  @parameterized.parameters(dict_prod(_TEST_GAMES, _VALUE_NETS))
+  def test_fit_one_sample(self, **game_spec):
+    args = {**_BASE_ARGS, **game_spec,
+            **dict(num_loops=20, batch_size=-1, exp_init="trunk_random",
+                   num_trunks=1, trunk_expl_iterations="")}
+    actual_eval, = read_experiment_results_from_shell(args, metric_avg_loss)
+    actual_loss = actual_eval["avg_loss"].values.min()
+    self.assertLess(actual_loss, 1e-8)
+
+  @parameterized.parameters(dict_prod(_TEST_GAMES, _VALUE_NETS))
+  def test_fit_two_samples(self, **game_spec):
+    args = {**_BASE_ARGS, **game_spec,
+            **dict(num_loops=60, batch_size=-1, exp_init="trunk_random",
+                   learning_rate=0.01, lr_decay=0.99,
+                   num_trunks=2, trunk_expl_iterations=0)}
+    actual_eval, = read_experiment_results_from_shell(args, metric_avg_loss)
+    actual_loss = actual_eval["avg_loss"].values.min()
+    self.assertLess(actual_loss, 1e-6)
+
+  @parameterized.parameters(dict_prod(_TEST_GAMES, _VALUE_NETS))
+  def test_imitate_dlcfr_iterations(self, **game_spec):
+    if game_spec["game_name"] == "kuhn_poker" and game_spec["depth"] == 4:
+      # Skip this setting, as getting the precise DL-CFR iterations is
+      # difficult: the iterations are sensitive to the smallest changes in
+      # values.
+      return
+
+    num_iters = 3
+    args = {**_BASE_ARGS, **game_spec,
+            # Run just 1 loop, as per-loop evals are the most expensive part.
+            **dict(num_loops=10, train_batches=100,
+                   batch_size=-1, exp_init="trunk_dlcfr",
+                   num_trunks=num_iters,
+                   trunk_expl_iterations=",".join(str(i) for i in range(1, num_iters + 1))
+                   )}
+    expected_expl, actual_eval = read_experiment_results_from_shell(
+        args, metric_ref_expls, metric_avg_loss)
+    expl_cols = [f"expl[{i}]" for i in range(1, num_iters+1)]
+    actual_expl = actual_eval.tail(1)[expl_cols]
+
+    np.testing.assert_allclose(actual_expl.values.flatten(),
+                               expected_expl["expl"].values.flatten(),
+                               atol=5e-3)
 
 if __name__ == "__main__":
   absltest.main()
