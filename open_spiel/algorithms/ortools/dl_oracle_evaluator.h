@@ -23,36 +23,6 @@ namespace open_spiel {
 namespace algorithms {
 namespace ortools {
 
-struct OraclePublicStateContext : public dlcfr::PublicStateContext {
-  const std::vector<HistoryTree> subgame_root_histories;
-  const std::map<
-      /* history string */ std::string, // stringified std::vector<Action>
-      /* range index of player */std::array<size_t, 2>> subgame_range_indexing;
-
-  // Specifications are not const because they will be refined for the value
-  // computation, for each public state evaluation.
-  std::array<SequenceFormLpSpecification, 2> specifications;
-
-  OraclePublicStateContext(
-      std::array<SequenceFormLpSpecification, 2> specifications,
-      std::vector<HistoryTree> root_histories,
-      std::map<std::string, std::array<size_t, 2>> subgame_range_indexing)
-      : subgame_root_histories(std::move(root_histories)),
-        subgame_range_indexing(std::move(subgame_range_indexing)),
-        specifications(std::move(specifications)) {}
-};
-
-struct OracleEvaluator : public dlcfr::PublicStateEvaluator {
-  std::shared_ptr<const Game> game;
-  std::shared_ptr<Observer> infostate_observer;
-  OracleEvaluator(std::shared_ptr<const Game> game,
-                  std::shared_ptr<Observer> infostate_observer);
-  std::unique_ptr<dlcfr::PublicStateContext> CreateContext(
-      const dlcfr::PublicState& state) const override;
-  void EvaluatePublicState(dlcfr::PublicState* s,
-                           dlcfr::PublicStateContext* context) const override;
-};
-
 // Unfortunately sometimes the LP solver may end up with an infeasible problem
 // statement due to numerical rounding errors, especially in larger games: I had
 // issues in GoofSpiel 5. A workaround is to make an epsilon convex combination

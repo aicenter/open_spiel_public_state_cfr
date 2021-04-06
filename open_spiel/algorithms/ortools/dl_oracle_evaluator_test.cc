@@ -105,147 +105,147 @@ void TestTrunkExploitabilityInKuhn() {
   }
 }
 
-void TestOptimalValuesKuhn() {
-  std::shared_ptr<const Game> game = LoadGame("kuhn_poker");
-  std::shared_ptr<Observer> infostate_observer =
-      game->MakeObserver(kInfoStateObsType, {});
-  std::shared_ptr<const dlcfr::PublicStateEvaluator> terminal_evaluator =
-      dlcfr::MakeTerminalEvaluator();
-  auto oracle_evaluator =
-      std::make_shared<OracleEvaluator>(game, infostate_observer);
-  dlcfr::DepthLimitedCFR dl_solver(game, /*trunk_depth_limit=*/3,
-                                   oracle_evaluator, terminal_evaluator);
-
-  // Range of values that produce Nash.
-  for (double a : std::vector<double>{0., 1 / 6., 1 / 3.}) {
-    // Set player strategies.
-    // Nomenclature of variables: "action"_"infostate" where action=p/b (pass/bet)
-    const double
-      // Player 0
-      p_0   = 1. - a      , b_0   = a         ,
-      p_1   = 1.          , b_1   = 0.        ,
-      p_2   = 1. - 3. * a , b_2   = 3. * a    ,
-      p_0pb = 1.          , b_0pb = 0.        ,
-      p_1pb = 2 / 3. - a  , b_1pb = a + 1 / 3.,
-      p_2pb = 0.          , b_2pb = 1.        ,
-      // Player 1
-      p_0p = 2 / 3.       , b_0p = 1 / 3.     ,
-      p_0b = 1.           , b_0b = 0.         ,
-      p_1p = 1.           , b_1p = 0.         ,
-      p_1b = 2 / 3.       , b_1b = 1 / 3.     ,
-      p_2p = 0.           , b_2p = 1.         ,
-      p_2b = 0.           , b_2b = 1.;
-
-    // Counterfactual values of infostates under the specified profile.
-    // Nomenclature of variables: v"player"_"infostate"
-    const double
-     // Player 0, pass
-      v0_0p = p_1p * -1/6. + b_1p * (p_0pb * -1/6. + b_0pb * -2/6.)
-            + p_2p * -1/6. + b_2p * (p_0pb * -1/6. + b_0pb * -2/6.),
-      v0_1p = p_0p *  1/6. + b_0p * (p_1pb * -1/6. + b_1pb *  2/6.)
-            + p_2p * -1/6. + b_2p * (p_1pb * -1/6. + b_1pb * -2/6.),
-      v0_2p = p_0p *  1/6. + b_0p * (p_2pb * -1/6. + b_2pb *  2/6.)
-            + p_1p *  1/6. + b_1p * (p_2pb * -1/6. + b_2pb *  2/6.),
-      // Player 0, bet
-      v0_0b = p_1b *  1/6. + b_1b * -2/6.
-            + p_2b *  1/6. + b_2b * -2/6.,
-      v0_1b = p_0b *  1/6. + b_0b *  2/6.
-            + p_2b *  1/6. + b_2b * -2/6.,
-      v0_2b = p_0b *  1/6. + b_0b *  2/6.
-            + p_1b *  1/6. + b_1b *  2/6.,
-      // Player 1, pass:
-      v1_0p = p_1 * (p_0p * -1/6. + b_0p * (p_1pb * 1/6. + b_1pb * -2/6.))
-            + p_2 * (p_0p * -1/6. + b_0p * (p_2pb * 1/6. + b_2pb * -2/6.)),
-      v1_1p = p_0 * (p_1p *  1/6. + b_1p * (p_0pb * 1/6. + b_0pb *  2/6.))
-            + p_2 * (p_1p * -1/6. + b_1p * (p_2pb * 1/6. + b_2pb * -2/6.)),
-      v1_2p = p_0 * (p_2p *  1/6. + b_2p * (p_0pb * 1/6. + b_0pb *  2/6.))
-            + p_1 * (p_2p *  1/6. + b_2p * (p_1pb * 1/6. + b_1pb *  2/6.)),
-      // Player 1, bet:
-      v1_0b = b_1 * (p_0b * -1/6. + b_0b * -2/6.)
-            + b_2 * (p_0b * -1/6. + b_0b * -2/6.),
-      v1_1b = b_0 * (p_1b * -1/6. + b_1b *  2/6.)
-            + b_2 * (p_1b * -1/6. + b_1b * -2/6.),
-      v1_2b = b_0 * (p_2b * -1/6. + b_2b *  2/6.)
-            + b_1 * (p_2b * -1/6. + b_2b *  2/6.);
-
-    const double root_val0 = (p_0 * v0_0p + p_1 * v0_1p + p_2 * v0_2p) +
-                             (b_0 * v0_0b + b_1 * v0_1b + b_2 * v0_2b);
-    const double root_val1 = (v1_0p + v1_1p + v1_2p) + (v1_0b + v1_1b + v1_2b);
-    SPIEL_CHECK_FLOAT_EQ(root_val0, -root_val1);
-
-    std::vector<BanditVector> bandit_fixed_policy =
-        MakeKuhnParametricPolicy(dl_solver.trees(), a);
-
-    dl_solver.PrepareRootReachProbs();
-    for (int pl = 0; pl < 2; ++pl) {
-      TopDown(*dl_solver.trees()[pl], bandit_fixed_policy[pl],
-              absl::MakeSpan(dl_solver.reach_probs()[pl]), 0);
-    }
-    dl_solver.EvaluateLeaves();
-
-    auto& state_p = dl_solver.public_states()[0];
-    auto& state_b = dl_solver.public_states()[1];
-
-    SPIEL_CHECK_FLOAT_EQ(
-        state_p.values[1][0] + state_p.values[1][1] + state_p.values[1][2],
-        v1_1p + v1_2p + v1_0p);
-    SPIEL_CHECK_FLOAT_EQ(
-        state_b.values[1][0] + state_b.values[1][1] + state_b.values[1][2],
-        v1_1b + v1_2b + v1_0b);
-  }
-}
-
-void TestValueOracle(const std::string& game_name) {
-  std::shared_ptr<const Game> game = LoadGame(game_name);
-
-  for (int trunk_depth_limit = 1; trunk_depth_limit <= game->MaxMoveNumber();
-       ++trunk_depth_limit) {
-    std::cout << "Value oracle for depth limit "
-              << trunk_depth_limit << " " << std::flush;;
-    std::shared_ptr<const dlcfr::PublicStateEvaluator> terminal_evaluator =
-        dlcfr::MakeTerminalEvaluator();
-    std::shared_ptr<Observer> public_observer =
-        game->MakeObserver(kPublicStateObsType, {});
-    std::shared_ptr<Observer> infostate_observer =
-        game->MakeObserver(kInfoStateObsType, {});
-
-    auto leaf_evaluator =
-        std::make_shared<OracleEvaluator>(game, infostate_observer);
-
-    dlcfr::DepthLimitedCFR dl_solver(game, trunk_depth_limit,
-                                     leaf_evaluator, terminal_evaluator);
-    for (int i = 0; i < 10; ++i) {
-      dl_solver.RunSimultaneousIterations(100);
-      std::cout << '.' << std::flush;
-    }
-
-    SequenceFormLpSpecification whole_game(*game);
-    auto average_policy = dl_solver.AveragePolicy();
-    const double expl = TrunkExploitability(&whole_game, *average_policy);
-    std::cout << " expl=" << expl << "\n";
-    SPIEL_CHECK_LT(expl, 3e-2);
-  }
-}
-
-void TestOneSidedFixedStrategyExploitability(const std::string& game_name) {
-  std::cout << "One sided exploitability ... " << std::flush;;
-  std::shared_ptr<const Game> game = LoadGame(game_name);
-  SequenceFormLpSpecification whole_game(*game);
-
-  // Exploitability implementation does not support simultaneous move games.
-  if (game->GetType().dynamics == GameType::Dynamics::kSimultaneous) {
-    game = ConvertToTurnBased(*game);
-  }
-  UniformPolicy uniform_policy;
-  const double expected_expl = Exploitability(*game, uniform_policy);
-
-  auto bandit_policy = MakeBanditVectors(whole_game.trees(), "UniformStrategy");
-  BanditsCurrentPolicy uniform_bandit_policy(whole_game.trees(), bandit_policy);
-  const double actual_expl = TrunkExploitability(
-      &whole_game, uniform_bandit_policy);
-  SPIEL_CHECK_FLOAT_NEAR(expected_expl, actual_expl, 1e-10);
-  std::cout << "ok.\n";
-}
+//void TestOptimalValuesKuhn() {
+//  std::shared_ptr<const Game> game = LoadGame("kuhn_poker");
+//  std::shared_ptr<Observer> infostate_observer =
+//      game->MakeObserver(kInfoStateObsType, {});
+//  std::shared_ptr<const dlcfr::PublicStateEvaluator> terminal_evaluator =
+//      dlcfr::MakeTerminalEvaluator();
+//  auto oracle_evaluator =
+//      std::make_shared<OracleEvaluator>(game, infostate_observer);
+//  dlcfr::DepthLimitedCFR dl_solver(game, /*trunk_depth_limit=*/3,
+//                                   oracle_evaluator, terminal_evaluator);
+//
+//  // Range of values that produce Nash.
+//  for (double a : std::vector<double>{0., 1 / 6., 1 / 3.}) {
+//    // Set player strategies.
+//    // Nomenclature of variables: "action"_"infostate" where action=p/b (pass/bet)
+//    const double
+//      // Player 0
+//      p_0   = 1. - a      , b_0   = a         ,
+//      p_1   = 1.          , b_1   = 0.        ,
+//      p_2   = 1. - 3. * a , b_2   = 3. * a    ,
+//      p_0pb = 1.          , b_0pb = 0.        ,
+//      p_1pb = 2 / 3. - a  , b_1pb = a + 1 / 3.,
+//      p_2pb = 0.          , b_2pb = 1.        ,
+//      // Player 1
+//      p_0p = 2 / 3.       , b_0p = 1 / 3.     ,
+//      p_0b = 1.           , b_0b = 0.         ,
+//      p_1p = 1.           , b_1p = 0.         ,
+//      p_1b = 2 / 3.       , b_1b = 1 / 3.     ,
+//      p_2p = 0.           , b_2p = 1.         ,
+//      p_2b = 0.           , b_2b = 1.;
+//
+//    // Counterfactual values of infostates under the specified profile.
+//    // Nomenclature of variables: v"player"_"infostate"
+//    const double
+//     // Player 0, pass
+//      v0_0p = p_1p * -1/6. + b_1p * (p_0pb * -1/6. + b_0pb * -2/6.)
+//            + p_2p * -1/6. + b_2p * (p_0pb * -1/6. + b_0pb * -2/6.),
+//      v0_1p = p_0p *  1/6. + b_0p * (p_1pb * -1/6. + b_1pb *  2/6.)
+//            + p_2p * -1/6. + b_2p * (p_1pb * -1/6. + b_1pb * -2/6.),
+//      v0_2p = p_0p *  1/6. + b_0p * (p_2pb * -1/6. + b_2pb *  2/6.)
+//            + p_1p *  1/6. + b_1p * (p_2pb * -1/6. + b_2pb *  2/6.),
+//      // Player 0, bet
+//      v0_0b = p_1b *  1/6. + b_1b * -2/6.
+//            + p_2b *  1/6. + b_2b * -2/6.,
+//      v0_1b = p_0b *  1/6. + b_0b *  2/6.
+//            + p_2b *  1/6. + b_2b * -2/6.,
+//      v0_2b = p_0b *  1/6. + b_0b *  2/6.
+//            + p_1b *  1/6. + b_1b *  2/6.,
+//      // Player 1, pass:
+//      v1_0p = p_1 * (p_0p * -1/6. + b_0p * (p_1pb * 1/6. + b_1pb * -2/6.))
+//            + p_2 * (p_0p * -1/6. + b_0p * (p_2pb * 1/6. + b_2pb * -2/6.)),
+//      v1_1p = p_0 * (p_1p *  1/6. + b_1p * (p_0pb * 1/6. + b_0pb *  2/6.))
+//            + p_2 * (p_1p * -1/6. + b_1p * (p_2pb * 1/6. + b_2pb * -2/6.)),
+//      v1_2p = p_0 * (p_2p *  1/6. + b_2p * (p_0pb * 1/6. + b_0pb *  2/6.))
+//            + p_1 * (p_2p *  1/6. + b_2p * (p_1pb * 1/6. + b_1pb *  2/6.)),
+//      // Player 1, bet:
+//      v1_0b = b_1 * (p_0b * -1/6. + b_0b * -2/6.)
+//            + b_2 * (p_0b * -1/6. + b_0b * -2/6.),
+//      v1_1b = b_0 * (p_1b * -1/6. + b_1b *  2/6.)
+//            + b_2 * (p_1b * -1/6. + b_1b * -2/6.),
+//      v1_2b = b_0 * (p_2b * -1/6. + b_2b *  2/6.)
+//            + b_1 * (p_2b * -1/6. + b_2b *  2/6.);
+//
+//    const double root_val0 = (p_0 * v0_0p + p_1 * v0_1p + p_2 * v0_2p) +
+//                             (b_0 * v0_0b + b_1 * v0_1b + b_2 * v0_2b);
+//    const double root_val1 = (v1_0p + v1_1p + v1_2p) + (v1_0b + v1_1b + v1_2b);
+//    SPIEL_CHECK_FLOAT_EQ(root_val0, -root_val1);
+//
+//    std::vector<BanditVector> bandit_fixed_policy =
+//        MakeKuhnParametricPolicy(dl_solver.trees(), a);
+//
+//    dl_solver.PrepareRootReachProbs();
+//    for (int pl = 0; pl < 2; ++pl) {
+//      TopDown(*dl_solver.trees()[pl], bandit_fixed_policy[pl],
+//              absl::MakeSpan(dl_solver.reach_probs()[pl]), 0);
+//    }
+//    dl_solver.EvaluateLeaves();
+//
+//    auto& state_p = dl_solver.public_states()[0];
+//    auto& state_b = dl_solver.public_states()[1];
+//
+//    SPIEL_CHECK_FLOAT_EQ(
+//        state_p.values[1][0] + state_p.values[1][1] + state_p.values[1][2],
+//        v1_1p + v1_2p + v1_0p);
+//    SPIEL_CHECK_FLOAT_EQ(
+//        state_b.values[1][0] + state_b.values[1][1] + state_b.values[1][2],
+//        v1_1b + v1_2b + v1_0b);
+//  }
+//}
+//
+//void TestValueOracle(const std::string& game_name) {
+//  std::shared_ptr<const Game> game = LoadGame(game_name);
+//
+//  for (int trunk_depth_limit = 1; trunk_depth_limit <= game->MaxMoveNumber();
+//       ++trunk_depth_limit) {
+//    std::cout << "Value oracle for depth limit "
+//              << trunk_depth_limit << " " << std::flush;;
+//    std::shared_ptr<const dlcfr::PublicStateEvaluator> terminal_evaluator =
+//        dlcfr::MakeTerminalEvaluator();
+//    std::shared_ptr<Observer> public_observer =
+//        game->MakeObserver(kPublicStateObsType, {});
+//    std::shared_ptr<Observer> infostate_observer =
+//        game->MakeObserver(kInfoStateObsType, {});
+//
+//    auto leaf_evaluator =
+//        std::make_shared<OracleEvaluator>(game, infostate_observer);
+//
+//    dlcfr::DepthLimitedCFR dl_solver(game, trunk_depth_limit,
+//                                     leaf_evaluator, terminal_evaluator);
+//    for (int i = 0; i < 10; ++i) {
+//      dl_solver.RunSimultaneousIterations(100);
+//      std::cout << '.' << std::flush;
+//    }
+//
+//    SequenceFormLpSpecification whole_game(*game);
+//    auto average_policy = dl_solver.AveragePolicy();
+//    const double expl = TrunkExploitability(&whole_game, *average_policy);
+//    std::cout << " expl=" << expl << "\n";
+//    SPIEL_CHECK_LT(expl, 3e-2);
+//  }
+//}
+//
+//void TestOneSidedFixedStrategyExploitability(const std::string& game_name) {
+//  std::cout << "One sided exploitability ... " << std::flush;;
+//  std::shared_ptr<const Game> game = LoadGame(game_name);
+//  SequenceFormLpSpecification whole_game(*game);
+//
+//  // Exploitability implementation does not support simultaneous move games.
+//  if (game->GetType().dynamics == GameType::Dynamics::kSimultaneous) {
+//    game = ConvertToTurnBased(*game);
+//  }
+//  UniformPolicy uniform_policy;
+//  const double expected_expl = Exploitability(*game, uniform_policy);
+//
+//  auto bandit_policy = MakeBanditVectors(whole_game.trees(), "UniformStrategy");
+//  BanditsCurrentPolicy uniform_bandit_policy(whole_game.trees(), bandit_policy);
+//  const double actual_expl = TrunkExploitability(
+//      &whole_game, uniform_bandit_policy);
+//  SPIEL_CHECK_FLOAT_NEAR(expected_expl, actual_expl, 1e-10);
+//  std::cout << "ok.\n";
+//}
 
 
 void TestConvergeWithCfrEvaluator(int trunk_depth) {
@@ -287,7 +287,7 @@ namespace algorithms = open_spiel::algorithms::ortools;
 
 int main(int argc, char** argv) {
   algorithms::TestTrunkExploitabilityInKuhn();
-  algorithms::TestOptimalValuesKuhn();
+//  algorithms::TestOptimalValuesKuhn();
 //  std::vector<std::string> test_games = {
 //      "matrix_biased_mp",
 //      "kuhn_poker",
@@ -301,6 +301,6 @@ int main(int argc, char** argv) {
 //    algorithms::TestValueOracle(game_name);
 //  }
 //  for (int trunk_depth = 3; trunk_depth <= 5; ++trunk_depth) {
-    algorithms::TestConvergeWithCfrEvaluator(3);
+//    algorithms::TestConvergeWithCfrEvaluator(3);
 //  }
 }
