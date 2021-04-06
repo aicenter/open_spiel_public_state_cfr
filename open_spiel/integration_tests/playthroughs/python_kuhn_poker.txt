@@ -24,9 +24,9 @@ NumPlayers() = 2
 MinUtility() = -2.0
 MaxUtility() = 2.0
 UtilitySum() = 0.0
-InformationStateTensorShape() = player: [2], private_card: [3], betting: [3, 2]
+InformationStateTensorShape() = player: [2], private_card: [3], dealing: [2], betting: [3, 2]
 InformationStateTensorLayout() = TensorLayout.CHW
-InformationStateTensorSize() = 11
+InformationStateTensorSize() = 13
 ObservationTensorShape() = player: [2], private_card: [3], pot_contribution: [2]
 ObservationTensorLayout() = TensorLayout.CHW
 ObservationTensorSize() = 7
@@ -44,11 +44,13 @@ InformationStateString(0) = "p0"
 InformationStateString(1) = "p1"
 InformationStateTensor(0).player: ◉◯
 InformationStateTensor(0).private_card: ◯◯◯
+InformationStateTensor(0).dealing: ◯◯
 InformationStateTensor(0).betting: ◯◯
                                    ◯◯
                                    ◯◯
 InformationStateTensor(1).player: ◯◉
 InformationStateTensor(1).private_card: ◯◯◯
+InformationStateTensor(1).dealing: ◯◯
 InformationStateTensor(1).betting: ◯◯
                                    ◯◯
                                    ◯◯
@@ -82,11 +84,13 @@ InformationStateString(0) = "p0 card:1"
 InformationStateString(1) = "p1"
 InformationStateTensor(0).player: ◉◯
 InformationStateTensor(0).private_card: ◯◉◯
+InformationStateTensor(0).dealing: ◉◯
 InformationStateTensor(0).betting: ◯◯
                                    ◯◯
                                    ◯◯
 InformationStateTensor(1).player: ◯◉
 InformationStateTensor(1).private_card: ◯◯◯
+InformationStateTensor(1).dealing: ◉◯
 InformationStateTensor(1).betting: ◯◯
                                    ◯◯
                                    ◯◯
@@ -120,11 +124,13 @@ InformationStateString(0) = "p0 card:1"
 InformationStateString(1) = "p1 card:2"
 InformationStateTensor(0).player: ◉◯
 InformationStateTensor(0).private_card: ◯◉◯
+InformationStateTensor(0).dealing: ◉◉
 InformationStateTensor(0).betting: ◯◯
                                    ◯◯
                                    ◯◯
 InformationStateTensor(1).player: ◯◉
 InformationStateTensor(1).private_card: ◯◯◉
+InformationStateTensor(1).dealing: ◉◉
 InformationStateTensor(1).betting: ◯◯
                                    ◯◯
                                    ◯◯
@@ -159,11 +165,13 @@ InformationStateString(0) = "p0 card:1 p"
 InformationStateString(1) = "p1 card:2 p"
 InformationStateTensor(0).player: ◉◯
 InformationStateTensor(0).private_card: ◯◉◯
+InformationStateTensor(0).dealing: ◉◉
 InformationStateTensor(0).betting: ◉◯
                                    ◯◯
                                    ◯◯
 InformationStateTensor(1).player: ◯◉
 InformationStateTensor(1).private_card: ◯◯◉
+InformationStateTensor(1).dealing: ◉◉
 InformationStateTensor(1).betting: ◉◯
                                    ◯◯
                                    ◯◯
@@ -198,11 +206,13 @@ InformationStateString(0) = "p0 card:1 pp"
 InformationStateString(1) = "p1 card:2 pp"
 InformationStateTensor(0).player: ◉◯
 InformationStateTensor(0).private_card: ◯◉◯
+InformationStateTensor(0).dealing: ◉◉
 InformationStateTensor(0).betting: ◉◯
                                    ◉◯
                                    ◯◯
 InformationStateTensor(1).player: ◯◉
 InformationStateTensor(1).private_card: ◯◯◉
+InformationStateTensor(1).dealing: ◉◉
 InformationStateTensor(1).betting: ◉◯
                                    ◉◯
                                    ◯◯

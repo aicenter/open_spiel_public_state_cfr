@@ -24,9 +24,9 @@ NumPlayers() = 3
 MinUtility() = -2.0
 MaxUtility() = 4.0
 UtilitySum() = 0.0
-InformationStateTensorShape() = player: [3], private_card: [4], betting: [5, 2]
+InformationStateTensorShape() = player: [3], private_card: [4], dealing: [3], betting: [5, 2]
 InformationStateTensorLayout() = TensorLayout.CHW
-InformationStateTensorSize() = 17
+InformationStateTensorSize() = 20
 ObservationTensorShape() = player: [3], private_card: [4], pot_contribution: [3]
 ObservationTensorLayout() = TensorLayout.CHW
 ObservationTensorSize() = 10
@@ -45,6 +45,7 @@ InformationStateString(1) = ""
 InformationStateString(2) = ""
 InformationStateTensor(0).player: ◉◯◯
 InformationStateTensor(0).private_card: ◯◯◯◯
+InformationStateTensor(0).dealing: ◯◯◯
 InformationStateTensor(0).betting: ◯◯
                                    ◯◯
                                    ◯◯
@@ -52,6 +53,7 @@ InformationStateTensor(0).betting: ◯◯
                                    ◯◯
 InformationStateTensor(1).player: ◯◉◯
 InformationStateTensor(1).private_card: ◯◯◯◯
+InformationStateTensor(1).dealing: ◯◯◯
 InformationStateTensor(1).betting: ◯◯
                                    ◯◯
                                    ◯◯
@@ -59,6 +61,7 @@ InformationStateTensor(1).betting: ◯◯
                                    ◯◯
 InformationStateTensor(2).player: ◯◯◉
 InformationStateTensor(2).private_card: ◯◯◯◯
+InformationStateTensor(2).dealing: ◯◯◯
 InformationStateTensor(2).betting: ◯◯
                                    ◯◯
                                    ◯◯
@@ -100,6 +103,7 @@ InformationStateString(1) = ""
 InformationStateString(2) = ""
 InformationStateTensor(0).player: ◉◯◯
 InformationStateTensor(0).private_card: ◯◉◯◯
+InformationStateTensor(0).dealing: ◉◯◯
 InformationStateTensor(0).betting: ◯◯
                                    ◯◯
                                    ◯◯
@@ -107,6 +111,7 @@ InformationStateTensor(0).betting: ◯◯
                                    ◯◯
 InformationStateTensor(1).player: ◯◉◯
 InformationStateTensor(1).private_card: ◯◯◯◯
+InformationStateTensor(1).dealing: ◉◯◯
 InformationStateTensor(1).betting: ◯◯
                                    ◯◯
                                    ◯◯
@@ -114,6 +119,7 @@ InformationStateTensor(1).betting: ◯◯
                                    ◯◯
 InformationStateTensor(2).player: ◯◯◉
 InformationStateTensor(2).private_card: ◯◯◯◯
+InformationStateTensor(2).dealing: ◉◯◯
 InformationStateTensor(2).betting: ◯◯
                                    ◯◯
                                    ◯◯
@@ -155,6 +161,7 @@ InformationStateString(1) = "3"
 InformationStateString(2) = ""
 InformationStateTensor(0).player: ◉◯◯
 InformationStateTensor(0).private_card: ◯◉◯◯
+InformationStateTensor(0).dealing: ◉◉◯
 InformationStateTensor(0).betting: ◯◯
                                    ◯◯
                                    ◯◯
@@ -162,6 +169,7 @@ InformationStateTensor(0).betting: ◯◯
                                    ◯◯
 InformationStateTensor(1).player: ◯◉◯
 InformationStateTensor(1).private_card: ◯◯◯◉
+InformationStateTensor(1).dealing: ◉◉◯
 InformationStateTensor(1).betting: ◯◯
                                    ◯◯
                                    ◯◯
@@ -169,6 +177,7 @@ InformationStateTensor(1).betting: ◯◯
                                    ◯◯
 InformationStateTensor(2).player: ◯◯◉
 InformationStateTensor(2).private_card: ◯◯◯◯
+InformationStateTensor(2).dealing: ◉◉◯
 InformationStateTensor(2).betting: ◯◯
                                    ◯◯
                                    ◯◯
@@ -210,6 +219,7 @@ InformationStateString(1) = "3"
 InformationStateString(2) = "2"
 InformationStateTensor(0).player: ◉◯◯
 InformationStateTensor(0).private_card: ◯◉◯◯
+InformationStateTensor(0).dealing: ◉◉◉
 InformationStateTensor(0).betting: ◯◯
                                    ◯◯
                                    ◯◯
@@ -217,6 +227,7 @@ InformationStateTensor(0).betting: ◯◯
                                    ◯◯
 InformationStateTensor(1).player: ◯◉◯
 InformationStateTensor(1).private_card: ◯◯◯◉
+InformationStateTensor(1).dealing: ◉◉◉
 InformationStateTensor(1).betting: ◯◯
                                    ◯◯
                                    ◯◯
@@ -224,6 +235,7 @@ InformationStateTensor(1).betting: ◯◯
                                    ◯◯
 InformationStateTensor(2).player: ◯◯◉
 InformationStateTensor(2).private_card: ◯◯◉◯
+InformationStateTensor(2).dealing: ◉◉◉
 InformationStateTensor(2).betting: ◯◯
                                    ◯◯
                                    ◯◯
@@ -266,6 +278,7 @@ InformationStateString(1) = "3p"
 InformationStateString(2) = "2p"
 InformationStateTensor(0).player: ◉◯◯
 InformationStateTensor(0).private_card: ◯◉◯◯
+InformationStateTensor(0).dealing: ◉◉◉
 InformationStateTensor(0).betting: ◉◯
                                    ◯◯
                                    ◯◯
@@ -273,6 +286,7 @@ InformationStateTensor(0).betting: ◉◯
                                    ◯◯
 InformationStateTensor(1).player: ◯◉◯
 InformationStateTensor(1).private_card: ◯◯◯◉
+InformationStateTensor(1).dealing: ◉◉◉
 InformationStateTensor(1).betting: ◉◯
                                    ◯◯
                                    ◯◯
@@ -280,6 +294,7 @@ InformationStateTensor(1).betting: ◉◯
                                    ◯◯
 InformationStateTensor(2).player: ◯◯◉
 InformationStateTensor(2).private_card: ◯◯◉◯
+InformationStateTensor(2).dealing: ◉◉◉
 InformationStateTensor(2).betting: ◉◯
                                    ◯◯
                                    ◯◯
@@ -322,6 +337,7 @@ InformationStateString(1) = "3pp"
 InformationStateString(2) = "2pp"
 InformationStateTensor(0).player: ◉◯◯
 InformationStateTensor(0).private_card: ◯◉◯◯
+InformationStateTensor(0).dealing: ◉◉◉
 InformationStateTensor(0).betting: ◉◯
                                    ◉◯
                                    ◯◯
@@ -329,6 +345,7 @@ InformationStateTensor(0).betting: ◉◯
                                    ◯◯
 InformationStateTensor(1).player: ◯◉◯
 InformationStateTensor(1).private_card: ◯◯◯◉
+InformationStateTensor(1).dealing: ◉◉◉
 InformationStateTensor(1).betting: ◉◯
                                    ◉◯
                                    ◯◯
@@ -336,6 +353,7 @@ InformationStateTensor(1).betting: ◉◯
                                    ◯◯
 InformationStateTensor(2).player: ◯◯◉
 InformationStateTensor(2).private_card: ◯◯◉◯
+InformationStateTensor(2).dealing: ◉◉◉
 InformationStateTensor(2).betting: ◉◯
                                    ◉◯
                                    ◯◯
@@ -378,6 +396,7 @@ InformationStateString(1) = "3ppb"
 InformationStateString(2) = "2ppb"
 InformationStateTensor(0).player: ◉◯◯
 InformationStateTensor(0).private_card: ◯◉◯◯
+InformationStateTensor(0).dealing: ◉◉◉
 InformationStateTensor(0).betting: ◉◯
                                    ◉◯
                                    ◯◉
@@ -385,6 +404,7 @@ InformationStateTensor(0).betting: ◉◯
                                    ◯◯
 InformationStateTensor(1).player: ◯◉◯
 InformationStateTensor(1).private_card: ◯◯◯◉
+InformationStateTensor(1).dealing: ◉◉◉
 InformationStateTensor(1).betting: ◉◯
                                    ◉◯
                                    ◯◉
@@ -392,6 +412,7 @@ InformationStateTensor(1).betting: ◉◯
                                    ◯◯
 InformationStateTensor(2).player: ◯◯◉
 InformationStateTensor(2).private_card: ◯◯◉◯
+InformationStateTensor(2).dealing: ◉◉◉
 InformationStateTensor(2).betting: ◉◯
                                    ◉◯
                                    ◯◉
@@ -434,6 +455,7 @@ InformationStateString(1) = "3ppbb"
 InformationStateString(2) = "2ppbb"
 InformationStateTensor(0).player: ◉◯◯
 InformationStateTensor(0).private_card: ◯◉◯◯
+InformationStateTensor(0).dealing: ◉◉◉
 InformationStateTensor(0).betting: ◉◯
                                    ◉◯
                                    ◯◉
@@ -441,6 +463,7 @@ InformationStateTensor(0).betting: ◉◯
                                    ◯◯
 InformationStateTensor(1).player: ◯◉◯
 InformationStateTensor(1).private_card: ◯◯◯◉
+InformationStateTensor(1).dealing: ◉◉◉
 InformationStateTensor(1).betting: ◉◯
                                    ◉◯
                                    ◯◉
@@ -448,6 +471,7 @@ InformationStateTensor(1).betting: ◉◯
                                    ◯◯
 InformationStateTensor(2).player: ◯◯◉
 InformationStateTensor(2).private_card: ◯◯◉◯
+InformationStateTensor(2).dealing: ◉◉◉
 InformationStateTensor(2).betting: ◉◯
                                    ◉◯
                                    ◯◉
@@ -490,6 +514,7 @@ InformationStateString(1) = "3ppbbp"
 InformationStateString(2) = "2ppbbp"
 InformationStateTensor(0).player: ◉◯◯
 InformationStateTensor(0).private_card: ◯◉◯◯
+InformationStateTensor(0).dealing: ◉◉◉
 InformationStateTensor(0).betting: ◉◯
                                    ◉◯
                                    ◯◉
@@ -497,6 +522,7 @@ InformationStateTensor(0).betting: ◉◯
                                    ◉◯
 InformationStateTensor(1).player: ◯◉◯
 InformationStateTensor(1).private_card: ◯◯◯◉
+InformationStateTensor(1).dealing: ◉◉◉
 InformationStateTensor(1).betting: ◉◯
                                    ◉◯
                                    ◯◉
@@ -504,6 +530,7 @@ InformationStateTensor(1).betting: ◉◯
                                    ◉◯
 InformationStateTensor(2).player: ◯◯◉
 InformationStateTensor(2).private_card: ◯◯◉◯
+InformationStateTensor(2).dealing: ◉◉◉
 InformationStateTensor(2).betting: ◉◯
                                    ◉◯
                                    ◯◉

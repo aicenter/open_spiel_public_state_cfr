@@ -96,8 +96,7 @@ ObserverRegisterer single_tensor(
 // observation.
 
 class LeducObserver : public Observer {
- public:
-  LeducObserver(IIGObservationType iig_obs_type)
+ public:  LeducObserver(IIGObservationType iig_obs_type)
       : Observer(/*has_string=*/true, /*has_tensor=*/true),
         iig_obs_type_(iig_obs_type) {}
 
@@ -827,23 +826,25 @@ int LeducGame::MaxChanceOutcomes() const {
 
 std::vector<int> LeducGame::InformationStateTensorShape() const {
   // One-hot encoding for player number (who is to play).
+  // One slot for dealing cards.
   // 2 slots of cards (total_cards_ bits each): private card, public card
   // Followed by maximum game length * 2 bits each (call / raise)
   if (suit_isomorphism_) {
-    return {(num_players_) + (total_cards_) + (MaxGameLength() * 2)};
+    return {(num_players_) * 3 + (total_cards_) + (MaxGameLength() * 2)};
   } else {
-    return {(num_players_) + (total_cards_ * 2) + (MaxGameLength() * 2)};
+    return {(num_players_) * 3 + (total_cards_ * 2) + (MaxGameLength() * 2)};
   }
 }
 
 std::vector<int> LeducGame::ObservationTensorShape() const {
   // One-hot encoding for player number (who is to play).
+  // One slot for dealing cards.
   // 2 slots of cards (total_cards_ bits each): private card, public card
   // Followed by the contribution of each player to the pot
   if (suit_isomorphism_) {
-    return {(num_players_) + (total_cards_) + (num_players_)};
+    return {(num_players_) * 2 + (total_cards_) + (num_players_)};
   } else {
-    return {(num_players_) + (total_cards_ * 2) + (num_players_)};
+    return {(num_players_) * 2 + (total_cards_ * 2) + (num_players_)};
   }
 }
 

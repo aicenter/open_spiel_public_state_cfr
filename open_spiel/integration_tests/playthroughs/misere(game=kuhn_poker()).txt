@@ -24,9 +24,9 @@ NumPlayers() = 2
 MinUtility() = -2.0
 MaxUtility() = 2.0
 UtilitySum() = -0.0
-InformationStateTensorShape() = [11]
+InformationStateTensorShape() = [13]
 InformationStateTensorLayout() = TensorLayout.CHW
-InformationStateTensorSize() = 11
+InformationStateTensorSize() = 13
 ObservationTensorShape() = [7]
 ObservationTensorLayout() = TensorLayout.CHW
 ObservationTensorSize() = 7
@@ -42,8 +42,8 @@ IsSimultaneousNode() = False
 CurrentPlayer() = -1
 InformationStateString(0) = ""
 InformationStateString(1) = ""
-InformationStateTensor(0): ◉◯◯◯◯◯◯◯◯◯◯
-InformationStateTensor(1): ◯◉◯◯◯◯◯◯◯◯◯
+InformationStateTensor(0): ◉◯◯◯◯◯◯◯◯◯◯◯◯
+InformationStateTensor(1): ◯◉◯◯◯◯◯◯◯◯◯◯◯
 ObservationString(0) = ""
 ObservationString(1) = ""
 ObservationTensor(0): ◉◯◯◯◯◉◉
@@ -65,8 +65,8 @@ IsSimultaneousNode() = False
 CurrentPlayer() = -1
 InformationStateString(0) = "1"
 InformationStateString(1) = ""
-InformationStateTensor(0): ◉◯◯◉◯◯◯◯◯◯◯
-InformationStateTensor(1): ◯◉◯◯◯◯◯◯◯◯◯
+InformationStateTensor(0): ◉◯◯◉◯◉◯◯◯◯◯◯◯
+InformationStateTensor(1): ◯◉◯◯◯◉◯◯◯◯◯◯◯
 ObservationString(0) = "111"
 ObservationString(1) = ""
 ObservationTensor(0): ◉◯◯◉◯◉◉
@@ -88,8 +88,8 @@ IsSimultaneousNode() = False
 CurrentPlayer() = 0
 InformationStateString(0) = "1"
 InformationStateString(1) = "2"
-InformationStateTensor(0): ◉◯◯◉◯◯◯◯◯◯◯
-InformationStateTensor(1): ◯◉◯◯◉◯◯◯◯◯◯
+InformationStateTensor(0): ◉◯◯◉◯◉◉◯◯◯◯◯◯
+InformationStateTensor(1): ◯◉◯◯◉◉◉◯◯◯◯◯◯
 ObservationString(0) = "111"
 ObservationString(1) = "211"
 ObservationTensor(0): ◉◯◯◉◯◉◉
@@ -112,8 +112,8 @@ IsSimultaneousNode() = False
 CurrentPlayer() = 1
 InformationStateString(0) = "1p"
 InformationStateString(1) = "2p"
-InformationStateTensor(0): ◉◯◯◉◯◉◯◯◯◯◯
-InformationStateTensor(1): ◯◉◯◯◉◉◯◯◯◯◯
+InformationStateTensor(0): ◉◯◯◉◯◉◉◉◯◯◯◯◯
+InformationStateTensor(1): ◯◉◯◯◉◉◉◉◯◯◯◯◯
 ObservationString(0) = "111"
 ObservationString(1) = "211"
 ObservationTensor(0): ◉◯◯◉◯◉◉
@@ -136,8 +136,8 @@ IsSimultaneousNode() = False
 CurrentPlayer() = 0
 InformationStateString(0) = "1pb"
 InformationStateString(1) = "2pb"
-InformationStateTensor(0): ◉◯◯◉◯◉◯◯◉◯◯
-InformationStateTensor(1): ◯◉◯◯◉◉◯◯◉◯◯
+InformationStateTensor(0): ◉◯◯◉◯◉◉◉◯◯◉◯◯
+InformationStateTensor(1): ◯◉◯◯◉◉◉◉◯◯◉◯◯
 ObservationString(0) = "112"
 ObservationString(1) = "212"
 ObservationTensor(0) = [1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 2.0]
@@ -160,8 +160,8 @@ IsSimultaneousNode() = False
 CurrentPlayer() = -4
 InformationStateString(0) = "1pbb"
 InformationStateString(1) = "2pbb"
-InformationStateTensor(0): ◉◯◯◉◯◉◯◯◉◯◉
-InformationStateTensor(1): ◯◉◯◯◉◉◯◯◉◯◉
+InformationStateTensor(0): ◉◯◯◉◯◉◉◉◯◯◉◯◉
+InformationStateTensor(1): ◯◉◯◯◉◉◉◉◯◯◉◯◉
 ObservationString(0) = "122"
 ObservationString(1) = "222"
 ObservationTensor(0) = [1.0, 0.0, 0.0, 1.0, 0.0, 2.0, 2.0]

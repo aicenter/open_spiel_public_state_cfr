@@ -24,12 +24,12 @@ NumPlayers() = 2
 MinUtility() = -1.0
 MaxUtility() = 1.0
 UtilitySum() = 0.0
-InformationStateTensorShape() = point_totals: [2, 11], player_hand: [4], win_sequence: [4, 2], point_card_sequence: [4, 4], player_action_sequence: [4, 4]
+InformationStateTensorShape() = point_totals: [2, 11], player_hand: [4], win_sequence: [4, 2], tie_sequence: [4], point_card_sequence: [4, 4], player_action_sequence: [4, 4]
 InformationStateTensorLayout() = TensorLayout.CHW
-InformationStateTensorSize() = 66
-ObservationTensorShape() = current_point_card: [4], point_totals: [2, 11], player_hand: [4], win_sequence: [4, 2]
+InformationStateTensorSize() = 70
+ObservationTensorShape() = current_point_card: [4], point_totals: [2, 11], player_hand: [4], win_sequence: [4, 2], tie_sequence: [4]
 ObservationTensorLayout() = TensorLayout.CHW
-ObservationTensorSize() = 38
+ObservationTensorSize() = 42
 MaxGameLength() = 4
 ToString() = "goofspiel(imp_info=True,num_cards=4)"
 
@@ -55,6 +55,7 @@ InformationStateTensor(0).win_sequence: ◯◯
                                         ◯◯
                                         ◯◯
                                         ◯◯
+InformationStateTensor(0).tie_sequence: ◯◯◯◯
 InformationStateTensor(0).point_card_sequence: ◯◯◯◯
                                                ◯◯◯◯
                                                ◯◯◯◯
@@ -70,6 +71,7 @@ InformationStateTensor(1).win_sequence: ◯◯
                                         ◯◯
                                         ◯◯
                                         ◯◯
+InformationStateTensor(1).tie_sequence: ◯◯◯◯
 InformationStateTensor(1).point_card_sequence: ◯◯◯◯
                                                ◯◯◯◯
                                                ◯◯◯◯
@@ -91,6 +93,7 @@ ObservationTensor(0).win_sequence: ◯◯
                                    ◯◯
                                    ◯◯
                                    ◯◯
+ObservationTensor(0).tie_sequence: ◯◯◯◯
 ObservationTensor(1).current_point_card: ◯◯◯◯
 ObservationTensor(1).point_totals: ◉◯◯◯◯◯◯◯◯◯◯
                                    ◉◯◯◯◯◯◯◯◯◯◯
@@ -99,6 +102,7 @@ ObservationTensor(1).win_sequence: ◯◯
                                    ◯◯
                                    ◯◯
                                    ◯◯
+ObservationTensor(1).tie_sequence: ◯◯◯◯
 ChanceOutcomes() = [{0, 0.250000000000}, {1, 0.250000000000}, {2, 0.250000000000}, {3, 0.250000000000}]
 LegalActions() = [0, 1, 2, 3]
 StringLegalActions() = ["Deal 1", "Deal 2", "Deal 3", "Deal 4"]
@@ -128,6 +132,7 @@ InformationStateTensor(0).win_sequence: ◯◯
                                         ◯◯
                                         ◯◯
                                         ◯◯
+InformationStateTensor(0).tie_sequence: ◯◯◯◯
 InformationStateTensor(0).point_card_sequence: ◯◯◯◉
                                                ◯◯◯◯
                                                ◯◯◯◯
@@ -143,6 +148,7 @@ InformationStateTensor(1).win_sequence: ◯◯
                                         ◯◯
                                         ◯◯
                                         ◯◯
+InformationStateTensor(1).tie_sequence: ◯◯◯◯
 InformationStateTensor(1).point_card_sequence: ◯◯◯◉
                                                ◯◯◯◯
                                                ◯◯◯◯
@@ -164,6 +170,7 @@ ObservationTensor(0).win_sequence: ◯◯
                                    ◯◯
                                    ◯◯
                                    ◯◯
+ObservationTensor(0).tie_sequence: ◯◯◯◯
 ObservationTensor(1).current_point_card: ◯◯◯◉
 ObservationTensor(1).point_totals: ◉◯◯◯◯◯◯◯◯◯◯
                                    ◉◯◯◯◯◯◯◯◯◯◯
@@ -172,6 +179,7 @@ ObservationTensor(1).win_sequence: ◯◯
                                    ◯◯
                                    ◯◯
                                    ◯◯
+ObservationTensor(1).tie_sequence: ◯◯◯◯
 Rewards() = [0.0, 0.0]
 Returns() = [0.0, 0.0]
 LegalActions(0) = [0, 1, 2, 3]
@@ -204,6 +212,7 @@ InformationStateTensor(0).win_sequence: ◯◯
                                         ◯◯
                                         ◯◯
                                         ◯◯
+InformationStateTensor(0).tie_sequence: ◉◯◯◯
 InformationStateTensor(0).point_card_sequence: ◯◯◯◉
                                                ◯◯◯◯
                                                ◯◯◯◯
@@ -219,6 +228,7 @@ InformationStateTensor(1).win_sequence: ◯◯
                                         ◯◯
                                         ◯◯
                                         ◯◯
+InformationStateTensor(1).tie_sequence: ◉◯◯◯
 InformationStateTensor(1).point_card_sequence: ◯◯◯◉
                                                ◯◯◯◯
                                                ◯◯◯◯
@@ -240,6 +250,7 @@ ObservationTensor(0).win_sequence: ◯◯
                                    ◯◯
                                    ◯◯
                                    ◯◯
+ObservationTensor(0).tie_sequence: ◉◯◯◯
 ObservationTensor(1).current_point_card: ◯◯◯◉
 ObservationTensor(1).point_totals: ◉◯◯◯◯◯◯◯◯◯◯
                                    ◉◯◯◯◯◯◯◯◯◯◯
@@ -248,6 +259,7 @@ ObservationTensor(1).win_sequence: ◯◯
                                    ◯◯
                                    ◯◯
                                    ◯◯
+ObservationTensor(1).tie_sequence: ◉◯◯◯
 ChanceOutcomes() = [{0, 0.333333333333}, {1, 0.333333333333}, {2, 0.333333333333}]
 LegalActions() = [0, 1, 2]
 StringLegalActions() = ["Deal 1", "Deal 2", "Deal 3"]
@@ -277,6 +289,7 @@ InformationStateTensor(0).win_sequence: ◯◯
                                         ◯◯
                                         ◯◯
                                         ◯◯
+InformationStateTensor(0).tie_sequence: ◉◯◯◯
 InformationStateTensor(0).point_card_sequence: ◯◯◯◉
                                                ◯◉◯◯
                                                ◯◯◯◯
@@ -292,6 +305,7 @@ InformationStateTensor(1).win_sequence: ◯◯
                                         ◯◯
                                         ◯◯
                                         ◯◯
+InformationStateTensor(1).tie_sequence: ◉◯◯◯
 InformationStateTensor(1).point_card_sequence: ◯◯◯◉
                                                ◯◉◯◯
                                                ◯◯◯◯
@@ -313,6 +327,7 @@ ObservationTensor(0).win_sequence: ◯◯
                                    ◯◯
                                    ◯◯
                                    ◯◯
+ObservationTensor(0).tie_sequence: ◉◯◯◯
 ObservationTensor(1).current_point_card: ◯◉◯◯
 ObservationTensor(1).point_totals: ◉◯◯◯◯◯◯◯◯◯◯
                                    ◉◯◯◯◯◯◯◯◯◯◯
@@ -321,6 +336,7 @@ ObservationTensor(1).win_sequence: ◯◯
                                    ◯◯
                                    ◯◯
                                    ◯◯
+ObservationTensor(1).tie_sequence: ◉◯◯◯
 Rewards() = [0.0, 0.0]
 Returns() = [0.0, 0.0]
 LegalActions(0) = [1, 2, 3]
@@ -353,6 +369,7 @@ InformationStateTensor(0).win_sequence: ◯◯
                                         ◉◯
                                         ◯◯
                                         ◯◯
+InformationStateTensor(0).tie_sequence: ◉◯◯◯
 InformationStateTensor(0).point_card_sequence: ◯◯◯◉
                                                ◯◉◯◯
                                                ◯◯◯◯
@@ -368,6 +385,7 @@ InformationStateTensor(1).win_sequence: ◯◯
                                         ◉◯
                                         ◯◯
                                         ◯◯
+InformationStateTensor(1).tie_sequence: ◉◯◯◯
 InformationStateTensor(1).point_card_sequence: ◯◯◯◉
                                                ◯◉◯◯
                                                ◯◯◯◯
@@ -389,6 +407,7 @@ ObservationTensor(0).win_sequence: ◯◯
                                    ◉◯
                                    ◯◯
                                    ◯◯
+ObservationTensor(0).tie_sequence: ◉◯◯◯
 ObservationTensor(1).current_point_card: ◯◉◯◯
 ObservationTensor(1).point_totals: ◉◯◯◯◯◯◯◯◯◯◯
                                    ◯◯◉◯◯◯◯◯◯◯◯
@@ -397,6 +416,7 @@ ObservationTensor(1).win_sequence: ◯◯
                                    ◉◯
                                    ◯◯
                                    ◯◯
+ObservationTensor(1).tie_sequence: ◉◯◯◯
 ChanceOutcomes() = [{0, 0.500000000000}, {2, 0.500000000000}]
 LegalActions() = [0, 2]
 StringLegalActions() = ["Deal 1", "Deal 3"]
@@ -426,6 +446,7 @@ InformationStateTensor(0).win_sequence: ◯◯
                                         ◉◯
                                         ◯◯
                                         ◯◯
+InformationStateTensor(0).tie_sequence: ◉◯◯◯
 InformationStateTensor(0).point_card_sequence: ◯◯◯◉
                                                ◯◉◯◯
                                                ◉◯◯◯
@@ -441,6 +462,7 @@ InformationStateTensor(1).win_sequence: ◯◯
                                         ◉◯
                                         ◯◯
                                         ◯◯
+InformationStateTensor(1).tie_sequence: ◉◯◯◯
 InformationStateTensor(1).point_card_sequence: ◯◯◯◉
                                                ◯◉◯◯
                                                ◉◯◯◯
@@ -462,6 +484,7 @@ ObservationTensor(0).win_sequence: ◯◯
                                    ◉◯
                                    ◯◯
                                    ◯◯
+ObservationTensor(0).tie_sequence: ◉◯◯◯
 ObservationTensor(1).current_point_card: ◉◯◯◯
 ObservationTensor(1).point_totals: ◉◯◯◯◯◯◯◯◯◯◯
                                    ◯◯◉◯◯◯◯◯◯◯◯
@@ -470,6 +493,7 @@ ObservationTensor(1).win_sequence: ◯◯
                                    ◉◯
                                    ◯◯
                                    ◯◯
+ObservationTensor(1).tie_sequence: ◉◯◯◯
 Rewards() = [0.0, 0.0]
 Returns() = [0.0, 0.0]
 LegalActions(0) = [1, 3]
@@ -502,6 +526,7 @@ InformationStateTensor(0).win_sequence: ◯◯
                                         ◉◯
                                         ◉◯
                                         ◯◉
+InformationStateTensor(0).tie_sequence: ◉◯◯◯
 InformationStateTensor(0).point_card_sequence: ◯◯◯◉
                                                ◯◉◯◯
                                                ◉◯◯◯
@@ -517,6 +542,7 @@ InformationStateTensor(1).win_sequence: ◯◯
                                         ◉◯
                                         ◉◯
                                         ◯◉
+InformationStateTensor(1).tie_sequence: ◉◯◯◯
 InformationStateTensor(1).point_card_sequence: ◯◯◯◉
                                                ◯◉◯◯
                                                ◉◯◯◯
@@ -538,6 +564,7 @@ ObservationTensor(0).win_sequence: ◯◯
                                    ◉◯
                                    ◉◯
                                    ◯◉
+ObservationTensor(0).tie_sequence: ◉◯◯◯
 ObservationTensor(1).current_point_card: ◯◯◉◯
 ObservationTensor(1).point_totals: ◯◯◯◉◯◯◯◯◯◯◯
                                    ◯◯◯◉◯◯◯◯◯◯◯
@@ -546,5 +573,6 @@ ObservationTensor(1).win_sequence: ◯◯
                                    ◉◯
                                    ◉◯
                                    ◯◉
+ObservationTensor(1).tie_sequence: ◉◯◯◯
 Rewards() = [0.0, 0.0]
 Returns() = [0.0, 0.0]

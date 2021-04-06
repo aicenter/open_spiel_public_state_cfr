@@ -24,12 +24,12 @@ NumPlayers() = 3
 MinUtility() = -13.0
 MaxUtility() = 26.0
 UtilitySum() = 0.0
-InformationStateTensorShape() = player: [3], private_card: [8], community_card: [8], betting: [2, 7, 2]
+InformationStateTensorShape() = player: [3], private_card: [8], community_card: [8], dealing: [3], betting: [2, 7, 2], folding: [3]
 InformationStateTensorLayout() = TensorLayout.CHW
-InformationStateTensorSize() = 47
-ObservationTensorShape() = player: [3], private_card: [8], community_card: [8], pot_contribution: [3]
+InformationStateTensorSize() = 53
+ObservationTensorShape() = player: [3], private_card: [8], community_card: [8], pot_contribution: [3], folding: [3]
 ObservationTensorLayout() = TensorLayout.CHW
-ObservationTensorSize() = 22
+ObservationTensorSize() = 25
 MaxGameLength() = 14
 ToString() = "leduc_poker(players=3)"
 
@@ -53,6 +53,7 @@ InformationStateString(2) = "[Observer: 2][Private: -10000][Round 1][Player: -1]
 InformationStateTensor(0).player: ◉◯◯
 InformationStateTensor(0).private_card: ◯◯◯◯◯◯◯◯
 InformationStateTensor(0).community_card: ◯◯◯◯◯◯◯◯
+InformationStateTensor(0).dealing: ◯◯◯
 InformationStateTensor(0).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
@@ -61,9 +62,11 @@ InformationStateTensor(0).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
 ◯◯  ◯◯
+InformationStateTensor(0).folding: ◯◯◯
 InformationStateTensor(1).player: ◯◉◯
 InformationStateTensor(1).private_card: ◯◯◯◯◯◯◯◯
 InformationStateTensor(1).community_card: ◯◯◯◯◯◯◯◯
+InformationStateTensor(1).dealing: ◯◯◯
 InformationStateTensor(1).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
@@ -72,9 +75,11 @@ InformationStateTensor(1).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
 ◯◯  ◯◯
+InformationStateTensor(1).folding: ◯◯◯
 InformationStateTensor(2).player: ◯◯◉
 InformationStateTensor(2).private_card: ◯◯◯◯◯◯◯◯
 InformationStateTensor(2).community_card: ◯◯◯◯◯◯◯◯
+InformationStateTensor(2).dealing: ◯◯◯
 InformationStateTensor(2).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
@@ -83,6 +88,7 @@ InformationStateTensor(2).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
 ◯◯  ◯◯
+InformationStateTensor(2).folding: ◯◯◯
 ObservationString(0) = "[Observer: 0][Private: -10000][Round 1][Player: -1][Pot: 3][Money: 99 99 99][Ante: 1 1 1]"
 ObservationString(1) = "[Observer: 1][Private: -10000][Round 1][Player: -1][Pot: 3][Money: 99 99 99][Ante: 1 1 1]"
 ObservationString(2) = "[Observer: 2][Private: -10000][Round 1][Player: -1][Pot: 3][Money: 99 99 99][Ante: 1 1 1]"
@@ -94,14 +100,17 @@ ObservationTensor(0).player: ◉◯◯
 ObservationTensor(0).private_card: ◯◯◯◯◯◯◯◯
 ObservationTensor(0).community_card: ◯◯◯◯◯◯◯◯
 ObservationTensor(0).pot_contribution: ◉◉◉
+ObservationTensor(0).folding: ◯◯◯
 ObservationTensor(1).player: ◯◉◯
 ObservationTensor(1).private_card: ◯◯◯◯◯◯◯◯
 ObservationTensor(1).community_card: ◯◯◯◯◯◯◯◯
 ObservationTensor(1).pot_contribution: ◉◉◉
+ObservationTensor(1).folding: ◯◯◯
 ObservationTensor(2).player: ◯◯◉
 ObservationTensor(2).private_card: ◯◯◯◯◯◯◯◯
 ObservationTensor(2).community_card: ◯◯◯◯◯◯◯◯
 ObservationTensor(2).pot_contribution: ◉◉◉
+ObservationTensor(2).folding: ◯◯◯
 ChanceOutcomes() = [{0, 0.125000000000}, {1, 0.125000000000}, {2, 0.125000000000}, {3, 0.125000000000}, {4, 0.125000000000}, {5, 0.125000000000}, {6, 0.125000000000}, {7, 0.125000000000}]
 LegalActions() = [0, 1, 2, 3, 4, 5, 6, 7]
 StringLegalActions() = ["Chance outcome:0", "Chance outcome:1", "Chance outcome:2", "Chance outcome:3", "Chance outcome:4", "Chance outcome:5", "Chance outcome:6", "Chance outcome:7"]
@@ -129,6 +138,7 @@ InformationStateString(2) = "[Observer: 2][Private: -10000][Round 1][Player: -1]
 InformationStateTensor(0).player: ◉◯◯
 InformationStateTensor(0).private_card: ◯◯◯◯◉◯◯◯
 InformationStateTensor(0).community_card: ◯◯◯◯◯◯◯◯
+InformationStateTensor(0).dealing: ◉◯◯
 InformationStateTensor(0).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
@@ -137,9 +147,11 @@ InformationStateTensor(0).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
 ◯◯  ◯◯
+InformationStateTensor(0).folding: ◯◯◯
 InformationStateTensor(1).player: ◯◉◯
 InformationStateTensor(1).private_card: ◯◯◯◯◯◯◯◯
 InformationStateTensor(1).community_card: ◯◯◯◯◯◯◯◯
+InformationStateTensor(1).dealing: ◉◯◯
 InformationStateTensor(1).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
@@ -148,9 +160,11 @@ InformationStateTensor(1).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
 ◯◯  ◯◯
+InformationStateTensor(1).folding: ◯◯◯
 InformationStateTensor(2).player: ◯◯◉
 InformationStateTensor(2).private_card: ◯◯◯◯◯◯◯◯
 InformationStateTensor(2).community_card: ◯◯◯◯◯◯◯◯
+InformationStateTensor(2).dealing: ◉◯◯
 InformationStateTensor(2).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
@@ -159,6 +173,7 @@ InformationStateTensor(2).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
 ◯◯  ◯◯
+InformationStateTensor(2).folding: ◯◯◯
 ObservationString(0) = "[Observer: 0][Private: 4][Round 1][Player: -1][Pot: 3][Money: 99 99 99][Ante: 1 1 1]"
 ObservationString(1) = "[Observer: 1][Private: -10000][Round 1][Player: -1][Pot: 3][Money: 99 99 99][Ante: 1 1 1]"
 ObservationString(2) = "[Observer: 2][Private: -10000][Round 1][Player: -1][Pot: 3][Money: 99 99 99][Ante: 1 1 1]"
@@ -170,14 +185,17 @@ ObservationTensor(0).player: ◉◯◯
 ObservationTensor(0).private_card: ◯◯◯◯◉◯◯◯
 ObservationTensor(0).community_card: ◯◯◯◯◯◯◯◯
 ObservationTensor(0).pot_contribution: ◉◉◉
+ObservationTensor(0).folding: ◯◯◯
 ObservationTensor(1).player: ◯◉◯
 ObservationTensor(1).private_card: ◯◯◯◯◯◯◯◯
 ObservationTensor(1).community_card: ◯◯◯◯◯◯◯◯
 ObservationTensor(1).pot_contribution: ◉◉◉
+ObservationTensor(1).folding: ◯◯◯
 ObservationTensor(2).player: ◯◯◉
 ObservationTensor(2).private_card: ◯◯◯◯◯◯◯◯
 ObservationTensor(2).community_card: ◯◯◯◯◯◯◯◯
 ObservationTensor(2).pot_contribution: ◉◉◉
+ObservationTensor(2).folding: ◯◯◯
 ChanceOutcomes() = [{0, 0.142857142857}, {1, 0.142857142857}, {2, 0.142857142857}, {3, 0.142857142857}, {5, 0.142857142857}, {6, 0.142857142857}, {7, 0.142857142857}]
 LegalActions() = [0, 1, 2, 3, 5, 6, 7]
 StringLegalActions() = ["Chance outcome:0", "Chance outcome:1", "Chance outcome:2", "Chance outcome:3", "Chance outcome:5", "Chance outcome:6", "Chance outcome:7"]
@@ -205,6 +223,7 @@ InformationStateString(2) = "[Observer: 2][Private: -10000][Round 1][Player: -1]
 InformationStateTensor(0).player: ◉◯◯
 InformationStateTensor(0).private_card: ◯◯◯◯◉◯◯◯
 InformationStateTensor(0).community_card: ◯◯◯◯◯◯◯◯
+InformationStateTensor(0).dealing: ◉◉◯
 InformationStateTensor(0).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
@@ -213,9 +232,11 @@ InformationStateTensor(0).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
 ◯◯  ◯◯
+InformationStateTensor(0).folding: ◯◯◯
 InformationStateTensor(1).player: ◯◉◯
 InformationStateTensor(1).private_card: ◯◯◉◯◯◯◯◯
 InformationStateTensor(1).community_card: ◯◯◯◯◯◯◯◯
+InformationStateTensor(1).dealing: ◉◉◯
 InformationStateTensor(1).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
@@ -224,9 +245,11 @@ InformationStateTensor(1).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
 ◯◯  ◯◯
+InformationStateTensor(1).folding: ◯◯◯
 InformationStateTensor(2).player: ◯◯◉
 InformationStateTensor(2).private_card: ◯◯◯◯◯◯◯◯
 InformationStateTensor(2).community_card: ◯◯◯◯◯◯◯◯
+InformationStateTensor(2).dealing: ◉◉◯
 InformationStateTensor(2).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
@@ -235,6 +258,7 @@ InformationStateTensor(2).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
 ◯◯  ◯◯
+InformationStateTensor(2).folding: ◯◯◯
 ObservationString(0) = "[Observer: 0][Private: 4][Round 1][Player: -1][Pot: 3][Money: 99 99 99][Ante: 1 1 1]"
 ObservationString(1) = "[Observer: 1][Private: 2][Round 1][Player: -1][Pot: 3][Money: 99 99 99][Ante: 1 1 1]"
 ObservationString(2) = "[Observer: 2][Private: -10000][Round 1][Player: -1][Pot: 3][Money: 99 99 99][Ante: 1 1 1]"
@@ -246,14 +270,17 @@ ObservationTensor(0).player: ◉◯◯
 ObservationTensor(0).private_card: ◯◯◯◯◉◯◯◯
 ObservationTensor(0).community_card: ◯◯◯◯◯◯◯◯
 ObservationTensor(0).pot_contribution: ◉◉◉
+ObservationTensor(0).folding: ◯◯◯
 ObservationTensor(1).player: ◯◉◯
 ObservationTensor(1).private_card: ◯◯◉◯◯◯◯◯
 ObservationTensor(1).community_card: ◯◯◯◯◯◯◯◯
 ObservationTensor(1).pot_contribution: ◉◉◉
+ObservationTensor(1).folding: ◯◯◯
 ObservationTensor(2).player: ◯◯◉
 ObservationTensor(2).private_card: ◯◯◯◯◯◯◯◯
 ObservationTensor(2).community_card: ◯◯◯◯◯◯◯◯
 ObservationTensor(2).pot_contribution: ◉◉◉
+ObservationTensor(2).folding: ◯◯◯
 ChanceOutcomes() = [{0, 0.166666666667}, {1, 0.166666666667}, {3, 0.166666666667}, {5, 0.166666666667}, {6, 0.166666666667}, {7, 0.166666666667}]
 LegalActions() = [0, 1, 3, 5, 6, 7]
 StringLegalActions() = ["Chance outcome:0", "Chance outcome:1", "Chance outcome:3", "Chance outcome:5", "Chance outcome:6", "Chance outcome:7"]
@@ -281,6 +308,7 @@ InformationStateString(2) = "[Observer: 2][Private: 3][Round 1][Player: 0][Pot: 
 InformationStateTensor(0).player: ◉◯◯
 InformationStateTensor(0).private_card: ◯◯◯◯◉◯◯◯
 InformationStateTensor(0).community_card: ◯◯◯◯◯◯◯◯
+InformationStateTensor(0).dealing: ◉◉◉
 InformationStateTensor(0).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
@@ -289,9 +317,11 @@ InformationStateTensor(0).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
 ◯◯  ◯◯
+InformationStateTensor(0).folding: ◯◯◯
 InformationStateTensor(1).player: ◯◉◯
 InformationStateTensor(1).private_card: ◯◯◉◯◯◯◯◯
 InformationStateTensor(1).community_card: ◯◯◯◯◯◯◯◯
+InformationStateTensor(1).dealing: ◉◉◉
 InformationStateTensor(1).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
@@ -300,9 +330,11 @@ InformationStateTensor(1).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
 ◯◯  ◯◯
+InformationStateTensor(1).folding: ◯◯◯
 InformationStateTensor(2).player: ◯◯◉
 InformationStateTensor(2).private_card: ◯◯◯◉◯◯◯◯
 InformationStateTensor(2).community_card: ◯◯◯◯◯◯◯◯
+InformationStateTensor(2).dealing: ◉◉◉
 InformationStateTensor(2).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
@@ -311,6 +343,7 @@ InformationStateTensor(2).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
 ◯◯  ◯◯
+InformationStateTensor(2).folding: ◯◯◯
 ObservationString(0) = "[Observer: 0][Private: 4][Round 1][Player: 0][Pot: 3][Money: 99 99 99][Ante: 1 1 1]"
 ObservationString(1) = "[Observer: 1][Private: 2][Round 1][Player: 0][Pot: 3][Money: 99 99 99][Ante: 1 1 1]"
 ObservationString(2) = "[Observer: 2][Private: 3][Round 1][Player: 0][Pot: 3][Money: 99 99 99][Ante: 1 1 1]"
@@ -322,14 +355,17 @@ ObservationTensor(0).player: ◉◯◯
 ObservationTensor(0).private_card: ◯◯◯◯◉◯◯◯
 ObservationTensor(0).community_card: ◯◯◯◯◯◯◯◯
 ObservationTensor(0).pot_contribution: ◉◉◉
+ObservationTensor(0).folding: ◯◯◯
 ObservationTensor(1).player: ◯◉◯
 ObservationTensor(1).private_card: ◯◯◉◯◯◯◯◯
 ObservationTensor(1).community_card: ◯◯◯◯◯◯◯◯
 ObservationTensor(1).pot_contribution: ◉◉◉
+ObservationTensor(1).folding: ◯◯◯
 ObservationTensor(2).player: ◯◯◉
 ObservationTensor(2).private_card: ◯◯◯◉◯◯◯◯
 ObservationTensor(2).community_card: ◯◯◯◯◯◯◯◯
 ObservationTensor(2).pot_contribution: ◉◉◉
+ObservationTensor(2).folding: ◯◯◯
 Rewards() = [0.0, 0.0, 0.0]
 Returns() = [0.0, 0.0, 0.0]
 LegalActions() = [1, 2]
@@ -358,6 +394,7 @@ InformationStateString(2) = "[Observer: 2][Private: 3][Round 1][Player: 1][Pot: 
 InformationStateTensor(0).player: ◉◯◯
 InformationStateTensor(0).private_card: ◯◯◯◯◉◯◯◯
 InformationStateTensor(0).community_card: ◯◯◯◯◯◯◯◯
+InformationStateTensor(0).dealing: ◉◉◉
 InformationStateTensor(0).betting:
 ◉◯  ◯◯
 ◯◯  ◯◯
@@ -366,9 +403,11 @@ InformationStateTensor(0).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
 ◯◯  ◯◯
+InformationStateTensor(0).folding: ◯◯◯
 InformationStateTensor(1).player: ◯◉◯
 InformationStateTensor(1).private_card: ◯◯◉◯◯◯◯◯
 InformationStateTensor(1).community_card: ◯◯◯◯◯◯◯◯
+InformationStateTensor(1).dealing: ◉◉◉
 InformationStateTensor(1).betting:
 ◉◯  ◯◯
 ◯◯  ◯◯
@@ -377,9 +416,11 @@ InformationStateTensor(1).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
 ◯◯  ◯◯
+InformationStateTensor(1).folding: ◯◯◯
 InformationStateTensor(2).player: ◯◯◉
 InformationStateTensor(2).private_card: ◯◯◯◉◯◯◯◯
 InformationStateTensor(2).community_card: ◯◯◯◯◯◯◯◯
+InformationStateTensor(2).dealing: ◉◉◉
 InformationStateTensor(2).betting:
 ◉◯  ◯◯
 ◯◯  ◯◯
@@ -388,6 +429,7 @@ InformationStateTensor(2).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
 ◯◯  ◯◯
+InformationStateTensor(2).folding: ◯◯◯
 ObservationString(0) = "[Observer: 0][Private: 4][Round 1][Player: 1][Pot: 3][Money: 99 99 99][Ante: 1 1 1]"
 ObservationString(1) = "[Observer: 1][Private: 2][Round 1][Player: 1][Pot: 3][Money: 99 99 99][Ante: 1 1 1]"
 ObservationString(2) = "[Observer: 2][Private: 3][Round 1][Player: 1][Pot: 3][Money: 99 99 99][Ante: 1 1 1]"
@@ -399,14 +441,17 @@ ObservationTensor(0).player: ◉◯◯
 ObservationTensor(0).private_card: ◯◯◯◯◉◯◯◯
 ObservationTensor(0).community_card: ◯◯◯◯◯◯◯◯
 ObservationTensor(0).pot_contribution: ◉◉◉
+ObservationTensor(0).folding: ◯◯◯
 ObservationTensor(1).player: ◯◉◯
 ObservationTensor(1).private_card: ◯◯◉◯◯◯◯◯
 ObservationTensor(1).community_card: ◯◯◯◯◯◯◯◯
 ObservationTensor(1).pot_contribution: ◉◉◉
+ObservationTensor(1).folding: ◯◯◯
 ObservationTensor(2).player: ◯◯◉
 ObservationTensor(2).private_card: ◯◯◯◉◯◯◯◯
 ObservationTensor(2).community_card: ◯◯◯◯◯◯◯◯
 ObservationTensor(2).pot_contribution: ◉◉◉
+ObservationTensor(2).folding: ◯◯◯
 Rewards() = [0.0, 0.0, 0.0]
 Returns() = [0.0, 0.0, 0.0]
 LegalActions() = [1, 2]
@@ -435,6 +480,7 @@ InformationStateString(2) = "[Observer: 2][Private: 3][Round 1][Player: 2][Pot: 
 InformationStateTensor(0).player: ◉◯◯
 InformationStateTensor(0).private_card: ◯◯◯◯◉◯◯◯
 InformationStateTensor(0).community_card: ◯◯◯◯◯◯◯◯
+InformationStateTensor(0).dealing: ◉◉◉
 InformationStateTensor(0).betting:
 ◉◯  ◯◯
 ◯◉  ◯◯
@@ -443,9 +489,11 @@ InformationStateTensor(0).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
 ◯◯  ◯◯
+InformationStateTensor(0).folding: ◯◯◯
 InformationStateTensor(1).player: ◯◉◯
 InformationStateTensor(1).private_card: ◯◯◉◯◯◯◯◯
 InformationStateTensor(1).community_card: ◯◯◯◯◯◯◯◯
+InformationStateTensor(1).dealing: ◉◉◉
 InformationStateTensor(1).betting:
 ◉◯  ◯◯
 ◯◉  ◯◯
@@ -454,9 +502,11 @@ InformationStateTensor(1).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
 ◯◯  ◯◯
+InformationStateTensor(1).folding: ◯◯◯
 InformationStateTensor(2).player: ◯◯◉
 InformationStateTensor(2).private_card: ◯◯◯◉◯◯◯◯
 InformationStateTensor(2).community_card: ◯◯◯◯◯◯◯◯
+InformationStateTensor(2).dealing: ◉◉◉
 InformationStateTensor(2).betting:
 ◉◯  ◯◯
 ◯◉  ◯◯
@@ -465,6 +515,7 @@ InformationStateTensor(2).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
 ◯◯  ◯◯
+InformationStateTensor(2).folding: ◯◯◯
 ObservationString(0) = "[Observer: 0][Private: 4][Round 1][Player: 2][Pot: 5][Money: 99 97 99][Ante: 1 3 1]"
 ObservationString(1) = "[Observer: 1][Private: 2][Round 1][Player: 2][Pot: 5][Money: 99 97 99][Ante: 1 3 1]"
 ObservationString(2) = "[Observer: 2][Private: 3][Round 1][Player: 2][Pot: 5][Money: 99 97 99][Ante: 1 3 1]"
@@ -476,14 +527,17 @@ ObservationTensor(0).player: ◉◯◯
 ObservationTensor(0).private_card: ◯◯◯◯◉◯◯◯
 ObservationTensor(0).community_card: ◯◯◯◯◯◯◯◯
 ObservationTensor(0).pot_contribution = [1.0, 3.0, 1.0]
+ObservationTensor(0).folding: ◯◯◯
 ObservationTensor(1).player: ◯◉◯
 ObservationTensor(1).private_card: ◯◯◉◯◯◯◯◯
 ObservationTensor(1).community_card: ◯◯◯◯◯◯◯◯
 ObservationTensor(1).pot_contribution = [1.0, 3.0, 1.0]
+ObservationTensor(1).folding: ◯◯◯
 ObservationTensor(2).player: ◯◯◉
 ObservationTensor(2).private_card: ◯◯◯◉◯◯◯◯
 ObservationTensor(2).community_card: ◯◯◯◯◯◯◯◯
 ObservationTensor(2).pot_contribution = [1.0, 3.0, 1.0]
+ObservationTensor(2).folding: ◯◯◯
 Rewards() = [0.0, 0.0, 0.0]
 Returns() = [0.0, 0.0, 0.0]
 LegalActions() = [0, 1, 2]
@@ -512,6 +566,7 @@ InformationStateString(2) = "[Observer: 2][Private: 3][Round 1][Player: 0][Pot: 
 InformationStateTensor(0).player: ◉◯◯
 InformationStateTensor(0).private_card: ◯◯◯◯◉◯◯◯
 InformationStateTensor(0).community_card: ◯◯◯◯◯◯◯◯
+InformationStateTensor(0).dealing: ◉◉◉
 InformationStateTensor(0).betting:
 ◉◯  ◯◯
 ◯◉  ◯◯
@@ -520,9 +575,11 @@ InformationStateTensor(0).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
 ◯◯  ◯◯
+InformationStateTensor(0).folding: ◯◯◯
 InformationStateTensor(1).player: ◯◉◯
 InformationStateTensor(1).private_card: ◯◯◉◯◯◯◯◯
 InformationStateTensor(1).community_card: ◯◯◯◯◯◯◯◯
+InformationStateTensor(1).dealing: ◉◉◉
 InformationStateTensor(1).betting:
 ◉◯  ◯◯
 ◯◉  ◯◯
@@ -531,9 +588,11 @@ InformationStateTensor(1).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
 ◯◯  ◯◯
+InformationStateTensor(1).folding: ◯◯◯
 InformationStateTensor(2).player: ◯◯◉
 InformationStateTensor(2).private_card: ◯◯◯◉◯◯◯◯
 InformationStateTensor(2).community_card: ◯◯◯◯◯◯◯◯
+InformationStateTensor(2).dealing: ◉◉◉
 InformationStateTensor(2).betting:
 ◉◯  ◯◯
 ◯◉  ◯◯
@@ -542,6 +601,7 @@ InformationStateTensor(2).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
 ◯◯  ◯◯
+InformationStateTensor(2).folding: ◯◯◯
 ObservationString(0) = "[Observer: 0][Private: 4][Round 1][Player: 0][Pot: 7][Money: 99 97 97][Ante: 1 3 3]"
 ObservationString(1) = "[Observer: 1][Private: 2][Round 1][Player: 0][Pot: 7][Money: 99 97 97][Ante: 1 3 3]"
 ObservationString(2) = "[Observer: 2][Private: 3][Round 1][Player: 0][Pot: 7][Money: 99 97 97][Ante: 1 3 3]"
@@ -553,14 +613,17 @@ ObservationTensor(0).player: ◉◯◯
 ObservationTensor(0).private_card: ◯◯◯◯◉◯◯◯
 ObservationTensor(0).community_card: ◯◯◯◯◯◯◯◯
 ObservationTensor(0).pot_contribution = [1.0, 3.0, 3.0]
+ObservationTensor(0).folding: ◯◯◯
 ObservationTensor(1).player: ◯◉◯
 ObservationTensor(1).private_card: ◯◯◉◯◯◯◯◯
 ObservationTensor(1).community_card: ◯◯◯◯◯◯◯◯
 ObservationTensor(1).pot_contribution = [1.0, 3.0, 3.0]
+ObservationTensor(1).folding: ◯◯◯
 ObservationTensor(2).player: ◯◯◉
 ObservationTensor(2).private_card: ◯◯◯◉◯◯◯◯
 ObservationTensor(2).community_card: ◯◯◯◯◯◯◯◯
 ObservationTensor(2).pot_contribution = [1.0, 3.0, 3.0]
+ObservationTensor(2).folding: ◯◯◯
 Rewards() = [0.0, 0.0, 0.0]
 Returns() = [0.0, 0.0, 0.0]
 LegalActions() = [0, 1, 2]
@@ -589,6 +652,7 @@ InformationStateString(2) = "[Observer: 2][Private: 3][Round 2][Player: -1][Pot:
 InformationStateTensor(0).player: ◉◯◯
 InformationStateTensor(0).private_card: ◯◯◯◯◉◯◯◯
 InformationStateTensor(0).community_card: ◯◯◯◯◯◯◯◯
+InformationStateTensor(0).dealing: ◉◉◉
 InformationStateTensor(0).betting:
 ◉◯  ◯◯
 ◯◉  ◯◯
@@ -597,9 +661,11 @@ InformationStateTensor(0).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
 ◯◯  ◯◯
+InformationStateTensor(0).folding: ◉◯◯
 InformationStateTensor(1).player: ◯◉◯
 InformationStateTensor(1).private_card: ◯◯◉◯◯◯◯◯
 InformationStateTensor(1).community_card: ◯◯◯◯◯◯◯◯
+InformationStateTensor(1).dealing: ◉◉◉
 InformationStateTensor(1).betting:
 ◉◯  ◯◯
 ◯◉  ◯◯
@@ -608,9 +674,11 @@ InformationStateTensor(1).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
 ◯◯  ◯◯
+InformationStateTensor(1).folding: ◉◯◯
 InformationStateTensor(2).player: ◯◯◉
 InformationStateTensor(2).private_card: ◯◯◯◉◯◯◯◯
 InformationStateTensor(2).community_card: ◯◯◯◯◯◯◯◯
+InformationStateTensor(2).dealing: ◉◉◉
 InformationStateTensor(2).betting:
 ◉◯  ◯◯
 ◯◉  ◯◯
@@ -619,6 +687,7 @@ InformationStateTensor(2).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
 ◯◯  ◯◯
+InformationStateTensor(2).folding: ◉◯◯
 ObservationString(0) = "[Observer: 0][Private: 4][Round 2][Player: -1][Pot: 7][Money: 99 97 97][Ante: 1 3 3]"
 ObservationString(1) = "[Observer: 1][Private: 2][Round 2][Player: -1][Pot: 7][Money: 99 97 97][Ante: 1 3 3]"
 ObservationString(2) = "[Observer: 2][Private: 3][Round 2][Player: -1][Pot: 7][Money: 99 97 97][Ante: 1 3 3]"
@@ -630,14 +699,17 @@ ObservationTensor(0).player: ◉◯◯
 ObservationTensor(0).private_card: ◯◯◯◯◉◯◯◯
 ObservationTensor(0).community_card: ◯◯◯◯◯◯◯◯
 ObservationTensor(0).pot_contribution = [1.0, 3.0, 3.0]
+ObservationTensor(0).folding: ◉◯◯
 ObservationTensor(1).player: ◯◉◯
 ObservationTensor(1).private_card: ◯◯◉◯◯◯◯◯
 ObservationTensor(1).community_card: ◯◯◯◯◯◯◯◯
 ObservationTensor(1).pot_contribution = [1.0, 3.0, 3.0]
+ObservationTensor(1).folding: ◉◯◯
 ObservationTensor(2).player: ◯◯◉
 ObservationTensor(2).private_card: ◯◯◯◉◯◯◯◯
 ObservationTensor(2).community_card: ◯◯◯◯◯◯◯◯
 ObservationTensor(2).pot_contribution = [1.0, 3.0, 3.0]
+ObservationTensor(2).folding: ◉◯◯
 ChanceOutcomes() = [{0, 0.200000000000}, {1, 0.200000000000}, {5, 0.200000000000}, {6, 0.200000000000}, {7, 0.200000000000}]
 LegalActions() = [0, 1, 5, 6, 7]
 StringLegalActions() = ["Chance outcome:0", "Chance outcome:1", "Chance outcome:5", "Chance outcome:6", "Chance outcome:7"]
@@ -665,6 +737,7 @@ InformationStateString(2) = "[Observer: 2][Private: 3][Round 2][Player: 1][Pot: 
 InformationStateTensor(0).player: ◉◯◯
 InformationStateTensor(0).private_card: ◯◯◯◯◉◯◯◯
 InformationStateTensor(0).community_card: ◯◉◯◯◯◯◯◯
+InformationStateTensor(0).dealing: ◉◉◉
 InformationStateTensor(0).betting:
 ◉◯  ◯◯
 ◯◉  ◯◯
@@ -673,9 +746,11 @@ InformationStateTensor(0).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
 ◯◯  ◯◯
+InformationStateTensor(0).folding: ◉◯◯
 InformationStateTensor(1).player: ◯◉◯
 InformationStateTensor(1).private_card: ◯◯◉◯◯◯◯◯
 InformationStateTensor(1).community_card: ◯◉◯◯◯◯◯◯
+InformationStateTensor(1).dealing: ◉◉◉
 InformationStateTensor(1).betting:
 ◉◯  ◯◯
 ◯◉  ◯◯
@@ -684,9 +759,11 @@ InformationStateTensor(1).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
 ◯◯  ◯◯
+InformationStateTensor(1).folding: ◉◯◯
 InformationStateTensor(2).player: ◯◯◉
 InformationStateTensor(2).private_card: ◯◯◯◉◯◯◯◯
 InformationStateTensor(2).community_card: ◯◉◯◯◯◯◯◯
+InformationStateTensor(2).dealing: ◉◉◉
 InformationStateTensor(2).betting:
 ◉◯  ◯◯
 ◯◉  ◯◯
@@ -695,6 +772,7 @@ InformationStateTensor(2).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
 ◯◯  ◯◯
+InformationStateTensor(2).folding: ◉◯◯
 ObservationString(0) = "[Observer: 0][Private: 4][Round 2][Player: 1][Pot: 7][Money: 99 97 97][Public: 1][Ante: 1 3 3]"
 ObservationString(1) = "[Observer: 1][Private: 2][Round 2][Player: 1][Pot: 7][Money: 99 97 97][Public: 1][Ante: 1 3 3]"
 ObservationString(2) = "[Observer: 2][Private: 3][Round 2][Player: 1][Pot: 7][Money: 99 97 97][Public: 1][Ante: 1 3 3]"
@@ -706,14 +784,17 @@ ObservationTensor(0).player: ◉◯◯
 ObservationTensor(0).private_card: ◯◯◯◯◉◯◯◯
 ObservationTensor(0).community_card: ◯◉◯◯◯◯◯◯
 ObservationTensor(0).pot_contribution = [1.0, 3.0, 3.0]
+ObservationTensor(0).folding: ◉◯◯
 ObservationTensor(1).player: ◯◉◯
 ObservationTensor(1).private_card: ◯◯◉◯◯◯◯◯
 ObservationTensor(1).community_card: ◯◉◯◯◯◯◯◯
 ObservationTensor(1).pot_contribution = [1.0, 3.0, 3.0]
+ObservationTensor(1).folding: ◉◯◯
 ObservationTensor(2).player: ◯◯◉
 ObservationTensor(2).private_card: ◯◯◯◉◯◯◯◯
 ObservationTensor(2).community_card: ◯◉◯◯◯◯◯◯
 ObservationTensor(2).pot_contribution = [1.0, 3.0, 3.0]
+ObservationTensor(2).folding: ◉◯◯
 Rewards() = [0.0, 0.0, 0.0]
 Returns() = [0.0, 0.0, 0.0]
 LegalActions() = [1, 2]
@@ -742,6 +823,7 @@ InformationStateString(2) = "[Observer: 2][Private: 3][Round 2][Player: 2][Pot: 
 InformationStateTensor(0).player: ◉◯◯
 InformationStateTensor(0).private_card: ◯◯◯◯◉◯◯◯
 InformationStateTensor(0).community_card: ◯◉◯◯◯◯◯◯
+InformationStateTensor(0).dealing: ◉◉◉
 InformationStateTensor(0).betting:
 ◉◯  ◯◉
 ◯◉  ◯◯
@@ -750,9 +832,11 @@ InformationStateTensor(0).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
 ◯◯  ◯◯
+InformationStateTensor(0).folding: ◉◯◯
 InformationStateTensor(1).player: ◯◉◯
 InformationStateTensor(1).private_card: ◯◯◉◯◯◯◯◯
 InformationStateTensor(1).community_card: ◯◉◯◯◯◯◯◯
+InformationStateTensor(1).dealing: ◉◉◉
 InformationStateTensor(1).betting:
 ◉◯  ◯◉
 ◯◉  ◯◯
@@ -761,9 +845,11 @@ InformationStateTensor(1).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
 ◯◯  ◯◯
+InformationStateTensor(1).folding: ◉◯◯
 InformationStateTensor(2).player: ◯◯◉
 InformationStateTensor(2).private_card: ◯◯◯◉◯◯◯◯
 InformationStateTensor(2).community_card: ◯◉◯◯◯◯◯◯
+InformationStateTensor(2).dealing: ◉◉◉
 InformationStateTensor(2).betting:
 ◉◯  ◯◉
 ◯◉  ◯◯
@@ -772,6 +858,7 @@ InformationStateTensor(2).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
 ◯◯  ◯◯
+InformationStateTensor(2).folding: ◉◯◯
 ObservationString(0) = "[Observer: 0][Private: 4][Round 2][Player: 2][Pot: 11][Money: 99 93 97][Public: 1][Ante: 1 7 3]"
 ObservationString(1) = "[Observer: 1][Private: 2][Round 2][Player: 2][Pot: 11][Money: 99 93 97][Public: 1][Ante: 1 7 3]"
 ObservationString(2) = "[Observer: 2][Private: 3][Round 2][Player: 2][Pot: 11][Money: 99 93 97][Public: 1][Ante: 1 7 3]"
@@ -783,14 +870,17 @@ ObservationTensor(0).player: ◉◯◯
 ObservationTensor(0).private_card: ◯◯◯◯◉◯◯◯
 ObservationTensor(0).community_card: ◯◉◯◯◯◯◯◯
 ObservationTensor(0).pot_contribution = [1.0, 7.0, 3.0]
+ObservationTensor(0).folding: ◉◯◯
 ObservationTensor(1).player: ◯◉◯
 ObservationTensor(1).private_card: ◯◯◉◯◯◯◯◯
 ObservationTensor(1).community_card: ◯◉◯◯◯◯◯◯
 ObservationTensor(1).pot_contribution = [1.0, 7.0, 3.0]
+ObservationTensor(1).folding: ◉◯◯
 ObservationTensor(2).player: ◯◯◉
 ObservationTensor(2).private_card: ◯◯◯◉◯◯◯◯
 ObservationTensor(2).community_card: ◯◉◯◯◯◯◯◯
 ObservationTensor(2).pot_contribution = [1.0, 7.0, 3.0]
+ObservationTensor(2).folding: ◉◯◯
 Rewards() = [0.0, 0.0, 0.0]
 Returns() = [0.0, 0.0, 0.0]
 LegalActions() = [0, 1, 2]
@@ -819,6 +909,7 @@ InformationStateString(2) = "[Observer: 2][Private: 3][Round 2][Player: 2][Pot: 
 InformationStateTensor(0).player: ◉◯◯
 InformationStateTensor(0).private_card: ◯◯◯◯◉◯◯◯
 InformationStateTensor(0).community_card: ◯◉◯◯◯◯◯◯
+InformationStateTensor(0).dealing: ◉◉◉
 InformationStateTensor(0).betting:
 ◉◯  ◯◉
 ◯◉  ◉◯
@@ -827,9 +918,11 @@ InformationStateTensor(0).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
 ◯◯  ◯◯
+InformationStateTensor(0).folding: ◉◯◯
 InformationStateTensor(1).player: ◯◉◯
 InformationStateTensor(1).private_card: ◯◯◉◯◯◯◯◯
 InformationStateTensor(1).community_card: ◯◉◯◯◯◯◯◯
+InformationStateTensor(1).dealing: ◉◉◉
 InformationStateTensor(1).betting:
 ◉◯  ◯◉
 ◯◉  ◉◯
@@ -838,9 +931,11 @@ InformationStateTensor(1).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
 ◯◯  ◯◯
+InformationStateTensor(1).folding: ◉◯◯
 InformationStateTensor(2).player: ◯◯◉
 InformationStateTensor(2).private_card: ◯◯◯◉◯◯◯◯
 InformationStateTensor(2).community_card: ◯◉◯◯◯◯◯◯
+InformationStateTensor(2).dealing: ◉◉◉
 InformationStateTensor(2).betting:
 ◉◯  ◯◉
 ◯◉  ◉◯
@@ -849,6 +944,7 @@ InformationStateTensor(2).betting:
 ◯◯  ◯◯
 ◯◯  ◯◯
 ◯◯  ◯◯
+InformationStateTensor(2).folding: ◉◯◯
 ObservationString(0) = "[Observer: 0][Private: 4][Round 2][Player: 2][Pot: 0][Money: 99 100.5 100.5][Public: 1][Ante: 1 7 7]"
 ObservationString(1) = "[Observer: 1][Private: 2][Round 2][Player: 2][Pot: 0][Money: 99 100.5 100.5][Public: 1][Ante: 1 7 7]"
 ObservationString(2) = "[Observer: 2][Private: 3][Round 2][Player: 2][Pot: 0][Money: 99 100.5 100.5][Public: 1][Ante: 1 7 7]"
@@ -860,13 +956,16 @@ ObservationTensor(0).player: ◉◯◯
 ObservationTensor(0).private_card: ◯◯◯◯◉◯◯◯
 ObservationTensor(0).community_card: ◯◉◯◯◯◯◯◯
 ObservationTensor(0).pot_contribution = [1.0, 7.0, 7.0]
+ObservationTensor(0).folding: ◉◯◯
 ObservationTensor(1).player: ◯◉◯
 ObservationTensor(1).private_card: ◯◯◉◯◯◯◯◯
 ObservationTensor(1).community_card: ◯◉◯◯◯◯◯◯
 ObservationTensor(1).pot_contribution = [1.0, 7.0, 7.0]
+ObservationTensor(1).folding: ◉◯◯
 ObservationTensor(2).player: ◯◯◉
 ObservationTensor(2).private_card: ◯◯◯◉◯◯◯◯
 ObservationTensor(2).community_card: ◯◉◯◯◯◯◯◯
 ObservationTensor(2).pot_contribution = [1.0, 7.0, 7.0]
+ObservationTensor(2).folding: ◉◯◯
 Rewards() = [-1.0, 0.5, 0.5]
 Returns() = [-1.0, 0.5, 0.5]

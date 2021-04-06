@@ -27,6 +27,9 @@ UtilitySum() = 0.0
 InformationStateTensorShape() = [1]
 InformationStateTensorLayout() = TensorLayout.CHW
 InformationStateTensorSize() = 1
+ObservationTensorShape() = [1]
+ObservationTensorLayout() = TensorLayout.CHW
+ObservationTensorSize() = 1
 MaxGameLength() = 1
 ToString() = "blotto()"
 
@@ -40,8 +43,15 @@ IsSimultaneousNode() = True
 CurrentPlayer() = -2
 InformationStateString(0) = "Observing player: 0. Non-terminal"
 InformationStateString(1) = "Observing player: 1. Non-terminal"
-InformationStateTensor(0): ◯
-InformationStateTensor(1): ◯
+InformationStateTensor(0).is_terminal: ◯
+InformationStateTensor(1).is_terminal: ◯
+ObservationString(0) = "Observing player: 0. Non-terminal"
+ObservationString(1) = "Observing player: 1. Non-terminal"
+PublicObservationString() = "Observing player: 0. Non-terminal"
+PrivateObservationString(0) = "Observing player: 0. Non-terminal"
+PrivateObservationString(1) = "Observing player: 1. Non-terminal"
+ObservationTensor(0).is_terminal: ◯
+ObservationTensor(1).is_terminal: ◯
 Rewards() = [0.0, 0.0]
 Returns() = []
 LegalActions(0) = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65]
@@ -64,7 +74,14 @@ IsSimultaneousNode() = False
 CurrentPlayer() = -4
 InformationStateString(0) = "Observing player: 0. Terminal. History string: 54, 58"
 InformationStateString(1) = "Observing player: 1. Terminal. History string: 54, 58"
-InformationStateTensor(0): ◉
-InformationStateTensor(1): ◉
+InformationStateTensor(0).is_terminal: ◉
+InformationStateTensor(1).is_terminal: ◉
+ObservationString(0) = "Observing player: 0. Terminal. History string: 54, 58"
+ObservationString(1) = "Observing player: 1. Terminal. History string: 54, 58"
+PublicObservationString() = "Observing player: 0. Terminal. History string: 54, 58"
+PrivateObservationString(0) = "Observing player: 0. Terminal. History string: 54, 58"
+PrivateObservationString(1) = "Observing player: 1. Terminal. History string: 54, 58"
+ObservationTensor(0).is_terminal: ◉
+ObservationTensor(1).is_terminal: ◉
 Rewards() = [0.0, 0.0]
 Returns() = [0.0, 0.0]

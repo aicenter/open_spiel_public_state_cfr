@@ -401,10 +401,11 @@ std::unique_ptr<State> KuhnGame::NewInitialState() const {
 std::vector<int> KuhnGame::InformationStateTensorShape() const {
   // One-hot for whose turn it is.
   // One-hot encoding for the single private card. (n+1 cards = n+1 bits)
+  // Followed by dealing card indication.
   // Followed by 2 (n - 1 + n) bits for betting sequence (longest sequence:
   // everyone except one player can pass and then everyone can bet/pass).
-  // n + n + 1 + 2 (n-1 + n) = 6n - 1.
-  return {6 * num_players_ - 1};
+  // n + n + n + 1 + 2 (n-1 + n) + n = 7n - 1.
+  return {7 * num_players_ - 1};
 }
 
 std::vector<int> KuhnGame::ObservationTensorShape() const {

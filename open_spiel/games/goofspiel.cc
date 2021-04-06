@@ -696,6 +696,8 @@ std::vector<int> GoofspielGame::InformationStateTensorShape() const {
             // A sequence of 1-hot bit vectors encoding the player who won that
             // turn, where max number of turns is num_cards
             num_cards_ * num_players_ +
+            // Tie sequence.
+            num_cards_ +
             // A sequence of 1-hot bit vectors encoding the point card sequence
             num_cards_ * num_cards_ +
             // The observing player's own action sequence
