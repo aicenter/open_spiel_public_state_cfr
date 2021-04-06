@@ -38,7 +38,7 @@ struct Trunk {
   std::unique_ptr<algorithms::dlcfr::DepthLimitedCFR> fixable_trunk_with_oracle;
   std::unique_ptr<algorithms::dlcfr::DepthLimitedCFR> iterable_trunk_with_oracle;
   std::unique_ptr<HandInfo> hand_info;
-  int num_leaves;
+  int num_states;
   int num_non_terminal_leaves;
 
   Trunk(const std::string& game_name, int trunk_depth,

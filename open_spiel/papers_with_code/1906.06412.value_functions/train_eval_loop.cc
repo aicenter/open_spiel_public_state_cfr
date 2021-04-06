@@ -234,7 +234,7 @@ void TrainEvalLoop() {
   t->oracle_evaluator->num_cfr_iterations = cfr_oracle_iterations;
 
   // General info about the problem.
-  std::cout << "# Number of public states: " << t->num_leaves << "\n";
+  std::cout << "# Number of public states: " << t->num_states << "\n";
   std::cout << "# Number of non-terminal public states: "
             << t->num_non_terminal_leaves << "\n";
   std::cout << "# Public states stats: \n";

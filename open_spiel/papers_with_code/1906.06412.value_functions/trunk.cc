@@ -60,10 +60,10 @@ Trunk::Trunk(const std::string& game_name, int depth,
   hand_info = CreateHandInfo(*game, hand_observer,
                              fixable_trunk_with_oracle->public_states());
 
-  num_leaves = fixable_trunk_with_oracle->public_states().size();
+  num_states = fixable_trunk_with_oracle->public_states().size();
   num_non_terminal_leaves = 0;
-  for (auto& leaf: fixable_trunk_with_oracle->public_states()) {
-    if (!leaf.IsTerminal() && leaf.IsLeaf()) num_non_terminal_leaves++;
+  for (auto& state: fixable_trunk_with_oracle->public_states()) {
+    if (!state.IsTerminal() && state.IsLeaf()) num_non_terminal_leaves++;
   }
 }
 
