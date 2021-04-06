@@ -201,8 +201,10 @@ class VFTest(parameterized.TestCase, absltest.TestCase):
     expected_eval = df_from_lines(_REFERENCE_KUHN_DLCFR_EVAL[arch])
     expected_expl = df_from_lines(_REFERENCE_KUHN_DLCFR_EXPL)
 
-    np.testing.assert_array_equal(actual_eval.values, expected_eval.values)
-    np.testing.assert_array_equal(actual_expl.values, expected_expl.values)
+    np.testing.assert_allclose(actual_eval.values, expected_eval.values,
+                               atol=1e-6)
+    np.testing.assert_allclose(actual_expl.values, expected_expl.values,
+                               atol=1e-6)
 
   @parameterized.parameters(_VALUE_NETS)
   def test_kuhn_eval_iters_random_regression(self, **arch_spec):
@@ -212,7 +214,8 @@ class VFTest(parameterized.TestCase, absltest.TestCase):
     actual_eval, = read_experiment_results_from_shell(args, metric_avg_loss)
     arch = arch_spec["arch"]
     expected_eval = df_from_lines(_REFERENCE_KUHN_RANDOM_EVAL[arch])
-    np.testing.assert_array_equal(actual_eval.values, expected_eval.values)
+    np.testing.assert_allclose(actual_eval.values, expected_eval.values,
+                               atol=1e-6)
 
   @parameterized.parameters(dict_prod(_TEST_GAMES, _VALUE_NETS))
   def test_fit_one_sample(self, **game_spec):
