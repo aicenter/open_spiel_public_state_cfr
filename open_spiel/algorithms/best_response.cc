@@ -33,7 +33,7 @@ TabularBestResponse::TabularBestResponse(const Game& game,
     : best_responder_(best_responder),
       tabular_policy_container_(),
       policy_(policy),
-      tree_(HistoryTree(game.NewInitialState())),
+      tree_(HistoryTree(game.NewInitialState(), best_responder_)),
       num_players_(game.NumPlayers()),
       infosets_(GetAllInfoSets(game.NewInitialState(), best_responder, policy,
                                &tree_)),
@@ -50,7 +50,7 @@ TabularBestResponse::TabularBestResponse(
     : best_responder_(best_responder),
       tabular_policy_container_(policy_table),
       policy_(&tabular_policy_container_),
-      tree_(HistoryTree(game.NewInitialState())),
+      tree_(HistoryTree(game.NewInitialState(), best_responder_)),
       num_players_(game.NumPlayers()),
       infosets_(GetAllInfoSets(game.NewInitialState(), best_responder, policy_,
                                &tree_)),
@@ -62,7 +62,7 @@ TabularBestResponse::TabularBestResponse(
 }
 
 double TabularBestResponse::HandleTerminalCase(const HistoryNode& node) const {
-  return node.GetUtility(best_responder_);
+  return node.GetValue();
 }
 
 double TabularBestResponse::HandleDecisionCase(HistoryNode* node) {

@@ -18,12 +18,12 @@
 #include <map>
 #include <memory>
 #include <string>
-#include <unordered_map>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
-#include "open_spiel/action_view.h"
+#include "open_spiel/abseil-cpp/absl/container/btree_map.h"
+#include "open_spiel/abseil-cpp/absl/container/flat_hash_map.h"
+#include "open_spiel/abseil-cpp/absl/container/flat_hash_set.h"
 #include "open_spiel/policy.h"
 #include "open_spiel/spiel.h"
 #include "open_spiel/spiel_utils.h"
@@ -36,58 +36,44 @@ namespace algorithms {
 // history in the game.
 class HistoryNode {
  public:
-  HistoryNode(std::unique_ptr<State> game_state);
+  // Use specific infostate strings for chance and terminal nodes so that we
+  // don't rely on the game implementations defining them at those states.
+  static constexpr const char* kChanceNodeInfostateString = "Chance Node";
+  static constexpr const char* kTerminalNodeInfostateString = "Terminal node";
 
-  State* GetState() const { return state_.get(); }
+  HistoryNode(Player player_id, std::unique_ptr<State> game_state);
 
-  const std::string& GetInfoState() const {
-    SPIEL_CHECK_GE(state_->CurrentPlayer(), 0);
-    return infostates_[state_->CurrentPlayer()];
-  }
+  State* GetState() { return state_.get(); }
 
-  const std::string& GetInfoState(Player player) const {
-    SPIEL_CHECK_GE(player, 0);
-    SPIEL_CHECK_LT(player, state_->NumPlayers());
-    return infostates_[player];
-  }
+  const std::string& GetInfoState() { return infostate_; }
 
-  const std::string& GetHistory() const { return history_; }
+  const std::string& GetHistory() { return history_; }
 
-  const StateType& GetType() const { return type_; }
+  const StateType& GetType() { return type_; }
 
-//  double GetValue() const {
-//    SpielFatalError("Obsolete, please use GetUtility(Player)");
-//  }
-  double GetUtility(Player player) const {
-    SPIEL_CHECK_GE(player, 0);
-    SPIEL_CHECK_LT(player, state_->NumPlayers());
-    return terminal_utilities_[player];
-  }
+  double GetValue() const { return value_; }
 
-  Action NumChildren() const { return children_.size(); }
+  Action NumChildren() const { return child_info_.size(); }
 
-  void AddChild(Action outcome, std::pair<
-      /*chance_probability=*/double, std::unique_ptr<HistoryNode>> child);
+  void AddChild(Action outcome,
+                std::pair<double, std::unique_ptr<HistoryNode>> child);
 
   std::vector<Action> GetChildActions() const;
 
-  std::vector<Action> LegalActions() const;
-
-  std::pair<double, HistoryNode*> GetChild(Action action) const;
-
-  const ActionView& action_view() const { return action_view_; }
+  std::pair<double, HistoryNode*> GetChild(Action outcome);
 
  private:
   std::unique_ptr<State> state_;
-  std::vector<std::string> infostates_;
+  std::string infostate_;
   std::string history_;
   StateType type_;
-  std::vector<double> terminal_utilities_;
+  double value_;
 
-  ActionView action_view_;
-  std::vector<std::pair<
-    /*chance_probability=*/double,
-    std::unique_ptr<HistoryNode>>> children_;
+  // Map from legal actions to transition probabilities. Uses a map as we need
+  // to preserve the order of the actions.
+  absl::flat_hash_set<Action> legal_actions_;
+  absl::btree_map<Action, std::pair<double, std::unique_ptr<HistoryNode>>>
+      child_info_;
 };
 
 // History here refers to the fact that we're using histories- i.e.
@@ -98,14 +84,12 @@ class HistoryNode {
 // player as the base abstraction.
 class HistoryTree {
  public:
-  // Builds a tree of histories.
-  HistoryTree(std::unique_ptr<State> state);
-
-  HistoryTree(const Game& game)
-      : HistoryTree(game.NewInitialState()) {}
+  // Builds a tree of histories. player_id is needed here as we view all chance
+  // and terminal nodes from the viewpoint of player_id. Decision nodes are
+  // viewed from the perspective of the player making the decision.
+  HistoryTree(std::unique_ptr<State> state, Player player_id);
 
   HistoryNode* Root() { return root_.get(); }
-  const HistoryNode& Root() const { return *root_; }
 
   HistoryNode* GetByHistory(const std::string& history);
   HistoryNode* GetByHistory(const State& state) {
@@ -121,7 +105,7 @@ class HistoryTree {
   std::unique_ptr<HistoryNode> root_;
 
   // Maps histories to HistoryNodes.
-  std::unordered_map<std::string, HistoryNode*> state_to_node_;
+  absl::flat_hash_map<std::string, HistoryNode*> state_to_node_;
 };
 
 // Returns a map of infostate strings to a vector of history nodes with
@@ -131,7 +115,7 @@ class HistoryTree {
 // natural chance probabilty for all change actions. We return all infosets
 // (i.e. all sets of history nodes grouped by infostate) for the sub-game rooted
 // at state, from the perspective of the player with id best_responder.
-std::unordered_map<std::string, std::vector<std::pair<HistoryNode*, double>>>
+absl::flat_hash_map<std::string, std::vector<std::pair<HistoryNode*, double>>>
 GetAllInfoSets(std::unique_ptr<State> state, Player best_responder,
                const Policy* policy, HistoryTree* tree);
 

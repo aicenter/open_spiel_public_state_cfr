@@ -159,7 +159,7 @@ class TabularBestResponse {
   // definition of counter-factual probability. Finally, if the information
   // state is a decision node for a player other than best_responder, the
   // probabilities come from their policy (i.e. policy_).
-  std::unordered_map<std::string, std::vector<std::pair<HistoryNode*, double>>>
+  absl::flat_hash_map<std::string, std::vector<std::pair<HistoryNode*, double>>>
       infosets_;
 
   // Caches all best responses calculated so far (for each infostate).
