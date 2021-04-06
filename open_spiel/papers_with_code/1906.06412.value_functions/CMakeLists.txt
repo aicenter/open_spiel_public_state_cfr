@@ -38,6 +38,3 @@ endmacro()
 add_paper_executable(train_eval_loop train_eval_loop.cc)
 add_paper_executable(hand_table_test hand_table_test.cc)
 add_paper_executable(sparse_trunk_test sparse_trunk_test.cc)
-add_paper_executable(value_fn_convergence value_fn_convergence.cc)
-target_link_libraries(value_fn_convergence
-                      absl::flags_parse absl::flags ${ORTOOLS_LIBS})
