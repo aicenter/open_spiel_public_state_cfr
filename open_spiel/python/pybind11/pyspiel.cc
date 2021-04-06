@@ -107,7 +107,7 @@ py::object GameParameterToPython(const GameParameter& gp) {
     for (const auto& [k, v] : gp.game_value()) {
       dict[py::str(k)] = GameParameterToPython(v);
     }
-    return dict;
+    return std::move(dict);
   } else {
     return py::none();
   }
