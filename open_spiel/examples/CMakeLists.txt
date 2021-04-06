@@ -7,6 +7,9 @@ add_test(cfr_example_test cfr_example)
 add_executable(cfr_multi_equilibria_example cfr_multi_equilibria_example.cc
                ${OPEN_SPIEL_OBJECTS})
 
+add_executable(imperfect_recall_mccfr imperfect_recall_mccfr.cc
+               ${OPEN_SPIEL_OBJECTS})
+
 add_executable(example example.cc ${OPEN_SPIEL_OBJECTS})
 add_test(example_test example --game=tic_tac_toe --seed=0)
 
@@ -37,4 +40,11 @@ if (BUILD_WITH_TENSORFLOW_CC)
   add_executable(alpha_zero_example alpha_zero_example.cc ${OPEN_SPIEL_OBJECTS} $<TARGET_OBJECTS:alpha_zero>)
   add_test(alpha_zero_example_test alpha_zero_example)
   target_link_libraries(alpha_zero_example TensorflowCC::TensorflowCC)
+endif ()
+
+if (BUILD_WITH_LIBTORCH)
+  add_executable(alpha_zero_torch_example alpha_zero_torch_example.cc
+                ${OPEN_SPIEL_OBJECTS}
+                $<TARGET_OBJECTS:alpha_zero_torch>)
+  target_link_libraries (alpha_zero_torch_example ${TORCH_LIBRARIES})
 endif ()
