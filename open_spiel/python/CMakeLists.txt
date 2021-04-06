@@ -125,7 +125,7 @@ set(PYTHON_TESTS ${PYTHON_TESTS}
   algorithms/masked_softmax_test.py
   algorithms/mcts_test.py
   algorithms/minimax_test.py
-  algorithms/neurd_test.py
+#  algorithms/neurd_test.py # FIXME: disabled due to TF
   algorithms/nfsp_test.py
   algorithms/noisy_policy_test.py
   algorithms/outcome_sampling_mccfr_test.py
@@ -136,7 +136,7 @@ set(PYTHON_TESTS ${PYTHON_TESTS}
   algorithms/psro_v2/best_response_oracle_test.py
   algorithms/psro_v2/strategy_selectors_test.py
   algorithms/random_agent_test.py
-  algorithms/rcfr_test.py
+#  algorithms/rcfr_test.py # FIXME: disabled due to TF
   algorithms/sequence_form_lp_test.py
   algorithms/value_iteration_test.py
   bots/bluechip_bridge_test.py
@@ -167,10 +167,10 @@ set(PYTHON_TESTS ${PYTHON_TESTS}
   utils/file_logger_test.py
   utils/lru_cache_test.py
   utils/spawn_test.py
-  pytorch/rcfr_pytorch_test.py
+#  pytorch/rcfr_pytorch_test.py # FIXME disabled due to TF
   pytorch/dqn_pytorch_test.py
   pytorch/nfsp_pytorch_test.py
-  pytorch/deep_cfr_pytorch_test.py
+#  pytorch/deep_cfr_pytorch_test.py # FIXME disabled due to TF
   pytorch/eva_pytorch_test.py
   pytorch/losses/rl_losses_pytorch_test.py
   pytorch/policy_gradient_pytorch_test.py
