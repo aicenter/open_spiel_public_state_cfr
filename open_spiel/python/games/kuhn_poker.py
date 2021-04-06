@@ -186,6 +186,7 @@ class KuhnPokerObserver:
       pieces.append(("private_card", 3, (3,)))
     if iig_obs_type.public_info:
       if iig_obs_type.perfect_recall:
+        pieces.append(("dealing", 2, (2,)))
         pieces.append(("betting", 6, (3, 2)))
       else:
         pieces.append(("pot_contribution", 2, (2,)))
@@ -210,6 +211,9 @@ class KuhnPokerObserver:
       self.dict["private_card"][state.cards[player]] = 1
     if "pot_contribution" in self.dict:
       self.dict["pot_contribution"][:] = state.pot
+    if "dealing" in self.dict:
+      for i in range(len(state.cards)):
+        self.dict["dealing"][i] = 1
     if "betting" in self.dict:
       for turn, action in enumerate(state.bets):
         self.dict["betting"][turn, action] = 1
