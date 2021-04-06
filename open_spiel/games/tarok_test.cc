@@ -69,7 +69,7 @@ std::vector<Action> CardLongNamesToActions(
     const std::vector<std::string>& long_names) {
   std::vector<Action> actions;
   actions.reserve(long_names.size());
-  for (auto const long_name : long_names) {
+  for (const auto& long_name : long_names) {
     actions.push_back(CardLongNameToAction(long_name));
   }
   return actions;
