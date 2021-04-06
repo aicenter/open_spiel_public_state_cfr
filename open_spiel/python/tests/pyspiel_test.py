@@ -63,6 +63,7 @@ EXPECTED_GAMES = set([
     "liars_dice",
     "markov_soccer",
     "matching_pennies_3p",
+    "matrix_biased_mp",
     "matrix_cd",
     "matrix_coordination",
     "matrix_mp",
