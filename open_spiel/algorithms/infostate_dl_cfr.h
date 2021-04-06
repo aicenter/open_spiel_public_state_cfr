@@ -202,6 +202,7 @@ class DepthLimitedCFR {
   }
   template<class T>
   std::vector<T*> contexts_as() {
+    SPIEL_CHECK_EQ(contexts_.size(), public_states_.size());
     std::vector<T*> casted;
     casted.reserve(contexts_.size());
     for (int i = 0; i < contexts_.size(); ++i) {
