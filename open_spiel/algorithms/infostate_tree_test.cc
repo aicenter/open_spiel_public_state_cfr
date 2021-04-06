@@ -62,7 +62,8 @@ std::shared_ptr<InfostateTree> MakeTree(const std::string& game_name,
                                         Player player,
                                         int max_move_limit = 1000) {
   std::shared_ptr<InfostateTree> tree =
-      MakeInfostateTree(*LoadGame(game_name), player, max_move_limit);
+      MakeInfostateTree(*LoadGame(game_name), player, max_move_limit,
+                        kStoreStatesInTerminals | kStoreStatesInLeaves);
   SPIEL_CHECK_TRUE(RecomputeBalance(*tree));
   return tree;
 }
@@ -507,30 +508,6 @@ void TestBestResponse() {
   }
 }
 
-void TestHistoryLookup() {
-  std::shared_ptr<const Game> game = LoadGame("kuhn_poker");
-  std::shared_ptr<InfostateTree> tree = MakeInfostateTree(
-      *game, Player{0}, kDefaultMoveAheadLimit, /*store_history_mapping=*/true);
-
-  std::vector<std::pair<
-    /*history=*/std::vector<Action>,
-    /*infostate=*/std::string
-  >> test_cases = {
-    {{0,1,0}, "0p"}, {{0,2,0}, "0p"}, {{0,1,1}, "0b"}, {{0,2,1}, "0b"},
-    {{1,0,0}, "1p"}, {{1,2,0}, "1p"}, {{1,0,1}, "1b"}, {{1,2,1}, "1b"},
-    {{2,0,0}, "2p"}, {{2,1,0}, "2p"}, {{2,0,1}, "2b"}, {{2,1,1}, "2b"},
-  };
-
-  for (const auto&[test_history, expected_infostate] : test_cases) {
-    auto h = game->NewInitialState();
-    for (auto& a : test_history) h->ApplyAction(a);
-    InfostateNode* node = tree->GetNodeByState(*h);
-    SPIEL_CHECK_TRUE(node);
-    std::string actual_infostate = node->infostate_string();
-    SPIEL_CHECK_EQ(expected_infostate, actual_infostate);
-  }
-}
-
 }  // namespace
 }  // namespace algorithms
 }  // namespace open_spiel
@@ -542,5 +519,4 @@ int main(int argc, char** argv) {
   open_spiel::algorithms::TestDepthLimitedSubgames();
   open_spiel::algorithms::TestSequenceIdLabeling();
   open_spiel::algorithms::TestBestResponse();
-  open_spiel::algorithms::TestHistoryLookup();
 }
