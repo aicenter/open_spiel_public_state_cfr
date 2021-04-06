@@ -114,28 +114,28 @@ ExpReplayInitPolicy GetInitPolicy(const std::string& s) {
 }
 
 void AddExperiencesFromTrunk(
-    const std::vector<algorithms::dlcfr::PublicState>& public_leaves,
+    const std::vector<algorithms::dlcfr::PublicState>& states,
     const std::vector<NetContext*>& net_contexts,
     const BasicDims& dims, NetArchitecture arch, ExperienceReplay* replay,
     std::mt19937& rnd_gen, bool shuffle_input_output) {
-  for (int i = 0; i < public_leaves.size(); ++i) {
-    const algorithms::dlcfr::PublicState& leaf = public_leaves[i];
-    // Add experiences only for non-terminals leaves.
-    if (leaf.IsTerminal() || !leaf.IsLeaf()) continue;
+  for (int i = 0; i < states.size(); ++i) {
+    const algorithms::dlcfr::PublicState& state = states[i];
+    // Add experiences only for the leaves.
+    if (!state.IsLeaf()) continue;
     const NetContext& net_context = *net_contexts[i];
 
     switch(arch) {
       case NetArchitecture::kParticle: {
         auto particle_dims = open_spiel::down_cast<const ParticleDims&>(dims);
         ParticleDataPoint data_point = replay->AddExperience(particle_dims);
-        WriteParticleDataPoint(leaf, net_context, particle_dims, &data_point,
+        WriteParticleDataPoint(state, net_context, particle_dims, &data_point,
                                &rnd_gen, shuffle_input_output);
         break;
       }
       case NetArchitecture::kPositional: {
         auto pos_dims = open_spiel::down_cast<const PositionalDims&>(dims);
         PositionalData data_point = replay->AddExperience(pos_dims);
-        WritePositionalDataPoint(leaf, net_context, pos_dims, &data_point);
+        WritePositionalDataPoint(state, net_context, pos_dims, &data_point);
         break;
       }
     }
