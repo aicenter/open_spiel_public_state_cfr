@@ -30,7 +30,7 @@ _BASE_ARGS = dict(
     trunk_expl_iterations=100,
     num_layers=5,
     num_width=5,
-    num_trunks=10,
+    replay_size=20,
     seed=0,
     use_bandits_for_cfr="RegretMatchingPlus",
     exp_init="trunk_random",
@@ -39,11 +39,10 @@ _BASE_ARGS = dict(
 )
 
 _TEST_GAMES = [
-  dict(game_name="kuhn_poker", depth=3),
-  dict(game_name="kuhn_poker", depth=4),
-  # dict(game_name="leduc_poker", depth=5),
+  dict(game_name="kuhn_poker", depth=3, replay_size=2),
+  dict(game_name="kuhn_poker", depth=4, replay_size=1),
   dict(game_name="goofspiel(players=2,num_cards=3,imp_info=True,"
-                 "points_order=descending)", depth=1),
+                 "points_order=descending)", depth=1, replay_size=3),
 ]
 
 _EXP_INIT = [
@@ -192,7 +191,7 @@ class VFTest(parameterized.TestCase, absltest.TestCase):
   @parameterized.parameters(_VALUE_NETS)
   def test_kuhn_eval_iters_dlcfr_regression(self, **arch_spec):
     args = {**_BASE_ARGS, **arch_spec,
-            **dict(num_loops=10, num_trunks=100, exp_init="trunk_dlcfr",
+            **dict(num_loops=10, replay_size=200, exp_init="trunk_dlcfr",
                    num_layers=3, num_width=3, trunk_expl_iterations="1,5,10")}
     actual_eval, actual_expl = read_experiment_results_from_shell(
         args, metric_avg_loss, metric_ref_expls)
@@ -209,7 +208,7 @@ class VFTest(parameterized.TestCase, absltest.TestCase):
   @parameterized.parameters(_VALUE_NETS)
   def test_kuhn_eval_iters_random_regression(self, **arch_spec):
     args = {**_BASE_ARGS, **arch_spec,
-            **dict(num_loops=10, num_trunks=100, num_layers=3, num_width=3,
+            **dict(num_loops=10, replay_size=200, num_layers=3, num_width=3,
                    exp_init="trunk_random", trunk_expl_iterations="1,5,10")}
     actual_eval, = read_experiment_results_from_shell(args, metric_avg_loss)
     arch = arch_spec["arch"]
@@ -218,20 +217,28 @@ class VFTest(parameterized.TestCase, absltest.TestCase):
                                atol=1e-6)
 
   @parameterized.parameters(dict_prod(_TEST_GAMES, _VALUE_NETS))
-  def test_fit_one_sample(self, **game_spec):
+  def test_fit_one_trunk(self, **game_spec):
+    replay_size = game_spec["replay_size"]
+    num_trunks = 1
     args = {**_BASE_ARGS, **game_spec,
-            **dict(num_loops=20, batch_size=-1, exp_init="trunk_random",
-                   num_trunks=1, trunk_expl_iterations="")}
+            **dict(num_loops=20, batch_size=-1,
+                   exp_init="trunk_random",
+                   replay_size=replay_size * num_trunks,
+                   trunk_expl_iterations="")}
     actual_eval, = read_experiment_results_from_shell(args, metric_avg_loss)
     actual_loss = actual_eval["avg_loss"].values.min()
     self.assertLess(actual_loss, 1e-8)
 
   @parameterized.parameters(dict_prod(_TEST_GAMES, _VALUE_NETS))
-  def test_fit_two_samples(self, **game_spec):
+  def test_fit_two_trunks(self, **game_spec):
+    replay_size = game_spec["replay_size"]
+    num_trunks = 2
     args = {**_BASE_ARGS, **game_spec,
-            **dict(num_loops=60, batch_size=-1, exp_init="trunk_random",
+            **dict(num_loops=60, batch_size=-1,
                    learning_rate=0.01, lr_decay=0.99,
-                   num_trunks=2, trunk_expl_iterations=0)}
+                   exp_init="trunk_random",
+                   replay_size=replay_size * num_trunks,
+                   trunk_expl_iterations=0)}
     actual_eval, = read_experiment_results_from_shell(args, metric_avg_loss)
     actual_loss = actual_eval["avg_loss"].values.min()
     self.assertLess(actual_loss, 1e-6)
@@ -245,11 +252,12 @@ class VFTest(parameterized.TestCase, absltest.TestCase):
       return
 
     num_iters = 3
+    replay_size = game_spec["replay_size"]
     args = {**_BASE_ARGS, **game_spec,
             # Run just 1 loop, as per-loop evals are the most expensive part.
             **dict(num_loops=10, train_batches=100,
                    batch_size=-1, exp_init="trunk_dlcfr",
-                   num_trunks=num_iters,
+                   replay_size=replay_size * num_iters,
                    trunk_expl_iterations=",".join(str(i) for i in range(1, num_iters + 1))
                    )}
     expected_expl, actual_eval = read_experiment_results_from_shell(

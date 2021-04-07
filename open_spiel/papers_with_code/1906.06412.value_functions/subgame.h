@@ -32,7 +32,7 @@ using Subgame = algorithms::dlcfr::DepthLimitedCFR;
 using PublicState = algorithms::dlcfr::PublicState;
 using TerminalEvaluator = algorithms::dlcfr::TerminalEvaluator;
 
-constexpr char* kDefaultDlCfrBandit = "RegretMatchingPlus";
+constexpr const char* kDefaultDlCfrBandit = "RegretMatchingPlus";
 constexpr int kDefaultMaxMoveAheadLimit = 2;
 constexpr int kDefaultMaxParticles = 1000;
 

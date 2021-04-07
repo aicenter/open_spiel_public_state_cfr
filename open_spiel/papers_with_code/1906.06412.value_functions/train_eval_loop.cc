@@ -33,7 +33,8 @@ ABSL_FLAG(double, prob_pure_strat, 0.1, "Params for random generation.");
 ABSL_FLAG(double, prob_fully_mixed, 0.05, "Params for random generation.");
 ABSL_FLAG(bool, shuffle_input_output, false,
           "Should parview inputs/outputs be shuffled?");
-ABSL_FLAG(int, num_trunks, 100, "Size of experience replay in terms of trunks");
+ABSL_FLAG(int, replay_size, 100,
+          "Size of experience replay in terms of public states.");
 ABSL_FLAG(int, cfr_oracle_iterations, 100, "Number of oracle iterations.");
 
 // -- Training --
@@ -112,9 +113,11 @@ void FillExperienceReplay(ExpReplayInitialization init,
       std::cout << "# trunk_iter,expl\n";
       const std::vector<int> eval_iters =
           ItersFromString(absl::GetFlag(FLAGS_trunk_expl_iterations));
+      int num_trunks = experience_replay->size()
+                     / trunk->num_non_terminal_leaves;
       InitTrunkDlCfrIterations(
           trunk, net_contexts, dims, arch, experience_replay,
-          absl::GetFlag(FLAGS_num_trunks),
+          num_trunks,
           /*monitor_fn*/[&](int trunk_iter) {
               bool should_evaluate =
                   std::find(eval_iters.begin(), eval_iters.end(), trunk_iter)
@@ -134,7 +137,9 @@ void FillExperienceReplay(ExpReplayInitialization init,
 
     case kInitTrunkRandom: {
       std::cout << "# Generating random trunks to fill experience replay.\n# ";
-      for (int i = 0; i < absl::GetFlag(FLAGS_num_trunks); ++i) {
+      int num_trunks = experience_replay->size()
+                     / trunk->num_non_terminal_leaves;
+      for (int i = 0; i < num_trunks; ++i) {
         if (i % 10 == 0) std::cout << '.' << std::flush;
         InitTrunkRandomBeliefs(trunk, net_contexts, dims, arch,
                                experience_replay,
@@ -224,9 +229,7 @@ void TrainEvalLoop() {
       use_bandits_for_cfr);
   const ExpReplayInitialization init_policy =
       GetExpReplayInitialization(absl::GetFlag(FLAGS_exp_init));
-  const int num_trunks = absl::GetFlag(FLAGS_num_trunks);
-  const int experience_replay_buffer_size =
-      t->num_non_terminal_leaves * num_trunks;
+  const int experience_replay_buffer_size = absl::GetFlag(FLAGS_replay_size);
   const int batch_size = absl::GetFlag(FLAGS_batch_size) > 0
       ? std::min(absl::GetFlag(FLAGS_batch_size), experience_replay_buffer_size)
       : experience_replay_buffer_size;
