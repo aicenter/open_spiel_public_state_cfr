@@ -24,7 +24,6 @@
 
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_architectures.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_data.h"
-#include "open_spiel/papers_with_code/1906.06412.value_functions/torch_utils.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/sparse_trunk.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/trunk.h"
 

@@ -21,6 +21,7 @@
 
 // -- General --
 ABSL_FLAG(int, seed, 0, "Seed.");
+ABSL_FLAG(std::string, device, "cpu", "Device used for neural networks.");
 ABSL_FLAG(std::string, game_name, "kuhn_poker", "Game to run.");
 ABSL_FLAG(std::string, use_bandits_for_cfr, "RegretMatchingPlus",
           "Which bandit should be used in the trunk.");
@@ -76,7 +77,6 @@ ABSL_FLAG(bool, sparse_prune_chance_histories, false,
 #include "open_spiel/papers_with_code/1906.06412.value_functions/metrics.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_dl_evaluator.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/sparse_trunk.h"
-#include "open_spiel/papers_with_code/1906.06412.value_functions/torch_utils.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/trunk.h"
 
 
@@ -254,7 +254,8 @@ void TrainEvalLoop() {
   ortools::SequenceFormLpSpecification whole_game(*t->game, "CLP");
 
   // 2. Create network and optimizer.
-  torch::Device device = FindDevice();
+  std::cout << "# Using device: " << absl::GetFlag(FLAGS_device) << "\n";
+  torch::Device device(absl::GetFlag(FLAGS_device));
   std::unique_ptr<ValueNet> model = MakeModel(arch, dims.get(),
                                               absl::GetFlag(FLAGS_num_layers),
                                               absl::GetFlag(FLAGS_num_width));

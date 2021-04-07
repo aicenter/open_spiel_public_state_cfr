@@ -17,8 +17,6 @@ add_library(paper_value_functions OBJECT
   sparse_trunk.h
   subgame.h
   subgame.cc
-  torch_utils.cc
-  torch_utils.h
   metrics.h
   metrics.cc
   trunk.cc
