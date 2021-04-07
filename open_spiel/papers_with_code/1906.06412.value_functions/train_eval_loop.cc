@@ -280,7 +280,8 @@ void TrainEvalLoop() {
                        dims->point_output_size());
   // Use eval batch only for the net evaluator.
   std::shared_ptr<NetEvaluator> net_evaluator = MakeNetEvaluator(
-      dims.get(), t->hand_info.get(), model.get(), &eval_batch, &device);
+      dims.get(), model.get(), &eval_batch, &device,
+      t->hand_info.get(), t->hand_observer);
   auto trunk_with_net = std::make_unique<dlcfr::DepthLimitedCFR>(
       t->game, t->trunk_trees, net_evaluator, t->terminal_evaluator,
       t->public_observer,

@@ -24,7 +24,7 @@ namespace papers_with_code {
 using namespace open_spiel::algorithms;
 
 
-size_t HandTable::insert(const Observation& hand) {
+size_t HandTable::Upsert(const Observation& hand) {
   auto it = std::find(private_hands.begin(), private_hands.end(), hand);
   if (it == private_hands.end()) {
     private_hands.push_back(hand);
@@ -129,7 +129,7 @@ std::unique_ptr<HandInfo> CreateHandInfo(
         SPIEL_DCHECK_TRUE(  // Should hold for all states within an infostate.
             AllStatesHaveSameHands(hand, pl, node->corresponding_states()));
 
-        hand_info->tables[pl].insert(hand);
+        hand_info->tables[pl].Upsert(hand);
       }
     }
   }

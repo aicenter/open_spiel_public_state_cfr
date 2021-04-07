@@ -64,10 +64,11 @@ ExpReplayInitialization GetExpReplayInitialization(const std::string& s) {
 
 void AddExperience(
     const algorithms::dlcfr::PublicState& leaf,
-    const NetContext& net_context,
+    NetContext* net_context,
     const BasicDims& dims,
     NetArchitecture arch,
     ExperienceReplay* replay,
+    std::shared_ptr<Observer> hand_observer,
     std::mt19937& rnd_gen,
     bool shuffle_input_output
 ) {
@@ -75,14 +76,16 @@ void AddExperience(
     case NetArchitecture::kParticle: {
       auto particle_dims = open_spiel::down_cast<const ParticleDims&>(dims);
       ParticleDataPoint data_point = replay->AddExperience(particle_dims);
-      WriteParticleDataPoint(leaf, net_context, particle_dims, &data_point,
+      WriteParticleDataPoint(leaf, particle_dims, &data_point,
+                             hand_observer,
                              &rnd_gen, shuffle_input_output);
       break;
     }
     case NetArchitecture::kPositional: {
       auto pos_dims = open_spiel::down_cast<const PositionalDims&>(dims);
       PositionalData data_point = replay->AddExperience(pos_dims);
-      WritePositionalDataPoint(leaf, net_context, pos_dims, &data_point);
+      SPIEL_CHECK_TRUE(net_context);
+      WritePositionalDataPoint(leaf, *net_context, pos_dims, &data_point);
       break;
     }
   }
@@ -95,6 +98,7 @@ void AddExperiencesFromTrunk(
     const BasicDims& dims,
     NetArchitecture arch,
     ExperienceReplay* replay,
+    std::shared_ptr<Observer> hand_observer,
     std::mt19937& rnd_gen,
     bool shuffle_input_output
 ) {
@@ -102,10 +106,8 @@ void AddExperiencesFromTrunk(
     const algorithms::dlcfr::PublicState& state = states[i];
     // Add experiences only for the non-terminal leaves.
     if (!state.IsLeaf() || state.IsTerminal()) continue;
-    SPIEL_CHECK_TRUE(net_contexts[i]);
-    const NetContext& net_context = *net_contexts[i];
-    AddExperience(state, net_context, dims, arch, replay,
-                  rnd_gen, shuffle_input_output);
+    AddExperience(state, net_contexts[i], dims, arch, replay,
+                  hand_observer, rnd_gen, shuffle_input_output);
   }
 }
 
@@ -132,7 +134,8 @@ void InitTrunkRandomBeliefs(
   // Copy the leaves values to the experience replay.
   AddExperiencesFromTrunk(
       trunk->fixable_trunk_with_oracle->public_states(),
-      contexts, dims, arch, replay, rnd_gen, shuffle_input_output);
+      contexts, dims, arch, replay,
+      trunk->hand_observer, rnd_gen, shuffle_input_output);
 
 //  if (verbose) {
 //    for (int i = 0; i < batch->batch_size; ++i) {
@@ -164,7 +167,7 @@ void InitTrunkDlCfrIterations(
     trunk->iterable_trunk_with_oracle->EvaluateLeaves();
 
     AddExperiencesFromTrunk(trunk->iterable_trunk_with_oracle->public_states(),
-                            contexts, dims, arch, replay,
+                            contexts, dims, arch, replay, trunk->hand_observer,
                             rnd_gen, shuffle_input_output);
     monitor_fn(iter);
 
@@ -224,9 +227,9 @@ void InitSubgamesRandomBeliefs(
 
     // 3. Add solution to the experiences.
     auto context = factory->leaf_evaluator->CreateContext(state);
-    auto net_context = open_spiel::down_cast<NetContext&>(*context);
+    auto net_context = open_spiel::down_cast<NetContext*>(context.get());
     AddExperience(state, net_context, dims, arch, replay,
-                  rnd_gen, shuffle_input_output);
+                  factory->hand_observer, rnd_gen, shuffle_input_output);
   }
 }
 

@@ -56,31 +56,26 @@ struct NetContext : public PublicStateContext {
   }
 };
 
-class NetEvaluator : public PublicStateEvaluator {
-  HandInfo* hand_info_;
- public:
-  NetEvaluator(HandInfo* hand_info) : hand_info_(hand_info) {};
-  std::unique_ptr<PublicStateContext> CreateContext(
-      const PublicState& state) const override;
-};
+class NetEvaluator : public PublicStateEvaluator {};
 
 class ParticleNetEvaluator final : public NetEvaluator {
   ParticleValueNet* model_;
   torch::Device* device_;
   BatchData* batch_;
   ParticleDims* const dims_;
+  std::shared_ptr<Observer> hand_observer_;
  public:
-  ParticleNetEvaluator(HandInfo* hand_info,
-                       ParticleValueNet* model, ParticleDims* const dims,
-                       BatchData* batch, torch::Device* device)
-      : NetEvaluator(hand_info),
-        model_(model), device_(device), batch_(batch), dims_(dims) {}
-
+  ParticleNetEvaluator(ParticleValueNet* model, ParticleDims* const dims,
+                       BatchData* batch, torch::Device* device,
+                       std::shared_ptr<Observer> hand_observer)
+      : model_(model), device_(device), batch_(batch), dims_(dims),
+        hand_observer_(hand_observer) {}
   void EvaluatePublicState(PublicState* state,
                            PublicStateContext* context) const override;
 };
 
 class PositionalNetEvaluator final : public NetEvaluator {
+  HandInfo* hand_info_;
   PositionalValueNet* model_;
   torch::Device* device_;
   BatchData* batch_;
@@ -89,21 +84,27 @@ class PositionalNetEvaluator final : public NetEvaluator {
   PositionalNetEvaluator(HandInfo* hand_info,
                          PositionalValueNet* model, PositionalDims* const dims,
                          BatchData* batch, torch::Device* device)
-      : NetEvaluator(hand_info),
-        model_(model), device_(device), batch_(batch), dims_(dims) {}
-
+      : hand_info_(hand_info), model_(model), device_(device),
+        batch_(batch), dims_(dims) {}
   void EvaluatePublicState(PublicState* state,
                            PublicStateContext* context) const override;
+  std::unique_ptr<PublicStateContext> CreateContext(
+      const PublicState& state) const override;
 };
 
 std::shared_ptr<NetEvaluator> MakeNetEvaluator(
-    BasicDims* dims, HandInfo* hand_info, ValueNet* model,
-    BatchData* eval_batch, torch::Device* device);
+    BasicDims* dims,
+    ValueNet* model,
+    BatchData* eval_batch,
+    torch::Device* device,
+    // One of:
+    HandInfo* hand_info,
+    std::shared_ptr<Observer> hand_observer);
 
 
 void WriteParticleDataPoint(const algorithms::dlcfr::PublicState& state,
-                            const NetContext& net_context,
                             const ParticleDims& dims, ParticleDataPoint* point,
+                            std::shared_ptr<Observer> hand_observer,
                             std::mt19937* rnd_gen, bool shuffle_input_output);
 void CopyValuesFromNetToTree(ParticleDataPoint data_point,
                              algorithms::dlcfr::PublicState& state,

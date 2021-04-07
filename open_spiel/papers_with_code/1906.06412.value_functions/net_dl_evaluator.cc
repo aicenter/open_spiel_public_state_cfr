@@ -21,7 +21,7 @@ namespace papers_with_code {
 using namespace open_spiel::algorithms;
 using namespace torch::indexing;  // Load all of the Slice, Ellipsis, etc.
 
-std::unique_ptr<PublicStateContext> NetEvaluator::CreateContext(
+std::unique_ptr<PublicStateContext> PositionalNetEvaluator::CreateContext(
     const PublicState& state) const {
 
   SPIEL_DCHECK_FALSE(state.IsTerminal());
@@ -47,13 +47,11 @@ void ParticleNetEvaluator::EvaluatePublicState(
     PublicState* state, PublicStateContext* context) const {
   SPIEL_DCHECK_FALSE(state->IsTerminal());  // Only non-terminal leafs.
   SPIEL_DCHECK_FALSE(model_->is_training());
-  SPIEL_DCHECK_TRUE(context);
-  auto net_context = open_spiel::down_cast<NetContext*>(context);
   torch::NoGradGuard no_grad_guard;  // We run only inference.
 
   ParticleDataPoint point = batch_->point_at(0, *dims_);
   // !! Do not shuffle, so that we can get back the values in an ordered way !!
-  WriteParticleDataPoint(*state, *net_context, *dims_, &point,
+  WriteParticleDataPoint(*state, *dims_, &point, hand_observer_,
                          /*rnd_gen=*/nullptr, /*shuffle_input_output=*/false);
 
   // Input must be batched.
@@ -87,22 +85,20 @@ void PositionalNetEvaluator::EvaluatePublicState(
 }
 
 std::shared_ptr<NetEvaluator> MakeNetEvaluator(
-    BasicDims* dims, HandInfo* hand_info, ValueNet* model,
-    BatchData* eval_batch, torch::Device* device) {
+    BasicDims* dims, ValueNet* model,
+    BatchData* eval_batch, torch::Device* device,
+    // One of:
+    HandInfo* hand_info, std::shared_ptr<Observer> hand_observer) {
   switch (model->architecture()) {
     case NetArchitecture::kParticle: {
-      auto particle_model =
-          open_spiel::down_cast<ParticleValueNet*>(model);
-      auto particle_dims =
-          open_spiel::down_cast<ParticleDims*>(dims);
+      auto particle_model = open_spiel::down_cast<ParticleValueNet*>(model);
+      auto particle_dims = open_spiel::down_cast<ParticleDims*>(dims);
       return std::make_shared<ParticleNetEvaluator>(
-          hand_info, particle_model, particle_dims, eval_batch, device);
+          particle_model, particle_dims, eval_batch, device, hand_observer);
     }
     case NetArchitecture::kPositional: {
-      auto positional_model =
-          open_spiel::down_cast<PositionalValueNet*>(model);
-      auto positional_dims =
-          open_spiel::down_cast<PositionalDims*>(dims);
+      auto positional_model = open_spiel::down_cast<PositionalValueNet*>(model);
+      auto positional_dims = open_spiel::down_cast<PositionalDims*>(dims);
       return std::make_shared<PositionalNetEvaluator>(
           hand_info, positional_model, positional_dims, eval_batch, device);
     }
@@ -123,8 +119,8 @@ void WritePositionalHand(int net_id, absl::Span<float_net> write_to) {
 }
 
 void WriteParticleDataPoint(const algorithms::dlcfr::PublicState& state,
-                            const NetContext& net_context,
                             const ParticleDims& dims, ParticleDataPoint* point,
+                            std::shared_ptr<Observer> hand_observer,
                             std::mt19937* rnd_gen, bool shuffle_input_output) {
   // Important !!
   point->Reset();
@@ -150,13 +146,11 @@ void WriteParticleDataPoint(const algorithms::dlcfr::PublicState& state,
       ParviewDataPoint parview = point->parview_at(shuffle_input_output
                                                    ? parview_placement[i] : i);
       // Hand features.
-      if(dims.write_hand_features_positionally()) {
-        WritePositionalHand(net_context.net_index(pl, j),
-                            parview.hand_features());
-      } else {
-        const Observation& hand_observation = net_context.hand_at(pl, j);
-        Copy(hand_observation.Tensor(), parview.hand_features());
-      }
+      SPIEL_CHECK_GT(state.nodes[pl][j]->corresponding_states_size(), 0);
+      const State& repr_state = *state.nodes[pl][j]->corresponding_states()[0];
+      ContiguousAllocator allocator(parview.hand_features());
+      hand_observer->WriteTensor(repr_state, pl, &allocator);
+
       parview.player_features()[pl] = 1.;
       parview.range() = state.beliefs[pl][j];
       i++;

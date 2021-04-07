@@ -28,9 +28,11 @@ struct HandTable {
   std::vector<Observation> private_hands;
 
   // Lookup or uniquely insert the observation and return its hand index.
-  size_t insert(const Observation& hand);
+  size_t Upsert(const Observation& hand);
   // Lookup the observation and return its hand index. Fail if not found.
   size_t hand_index(const Observation& hand) const;
+
+  void Reset();
 };
 
 struct HandInfo {
