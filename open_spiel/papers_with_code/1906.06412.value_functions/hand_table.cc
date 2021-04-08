@@ -102,7 +102,7 @@ bool AllStatesHaveSameHands(const Observation& expected_hand, Player player,
   return true;
 }
 
-std::unique_ptr<HandInfo> CreateHandInfo(
+std::unique_ptr<HandInfo> MakeHandInfo(
     const Game& game, const std::shared_ptr<Observer>& hand_observer,
     const std::vector<dlcfr::PublicState>& public_leaves) {
   auto hand_info = std::make_unique<HandInfo>(game, hand_observer);

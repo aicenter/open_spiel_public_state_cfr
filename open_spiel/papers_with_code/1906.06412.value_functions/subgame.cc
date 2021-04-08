@@ -19,7 +19,9 @@ namespace papers_with_code {
 
 using namespace algorithms;
 
-std::unique_ptr<Subgame> SubgameFactory::MakeTrunk() {
+std::unique_ptr<Subgame> SubgameFactory::MakeTrunk(
+    std::shared_ptr<const LeafEvaluator> custom_leaf_evaluator,
+    std::string custom_bandits_for_cfr) const {
   std::vector<std::unique_ptr<State>> start_states {};
   start_states.push_back(game->NewInitialState());
   std::vector<double> chance_reach_probs {1.};
@@ -32,12 +34,13 @@ std::unique_ptr<Subgame> SubgameFactory::MakeTrunk() {
     ));
   }
   auto out = std::make_unique<Subgame>(
-      game, trees, leaf_evaluator, terminal_evaluator,
-      public_observer, MakeBanditVectors(trees, use_bandits_for_cfr));
+      game, trees, custom_leaf_evaluator, terminal_evaluator,
+      public_observer, MakeBanditVectors(trees, custom_bandits_for_cfr));
   return out;
 }
 
-std::unique_ptr<Subgame> SubgameFactory::MakeSubgame(const ParticleSet& set) {
+std::unique_ptr<Subgame> SubgameFactory::MakeSubgame(
+    const ParticleSet& set) const {
   SPIEL_CHECK_LE(set.particles.size(), max_particles);
   auto trees = MakeSubgameInfostateTrees(set);
   auto out = std::make_unique<Subgame>(
@@ -47,7 +50,8 @@ std::unique_ptr<Subgame> SubgameFactory::MakeSubgame(const ParticleSet& set) {
   return out;
 }
 
-std::unique_ptr<Subgame> SubgameFactory::MakeSubgame(const PublicState& state) {
+std::unique_ptr<Subgame> SubgameFactory::MakeSubgame(
+    const PublicState& state) const {
   std::vector<std::shared_ptr<InfostateTree>> trees;
   for (int pl = 0; pl < 2; ++pl) {
     trees.push_back(MakeInfostateTree(
@@ -63,7 +67,7 @@ std::unique_ptr<Subgame> SubgameFactory::MakeSubgame(const PublicState& state) {
 }
 
 std::vector<std::shared_ptr<InfostateTree>>
-SubgameFactory::MakeSubgameInfostateTrees(const ParticleSet& set) {
+SubgameFactory::MakeSubgameInfostateTrees(const ParticleSet& set) const {
   SPIEL_CHECK_LE(set.particles.size(), max_particles);
   SPIEL_DCHECK(CheckParticleSetConsistency(*game, public_observer,
                                            hand_observer, set));
@@ -88,7 +92,7 @@ SubgameFactory::MakeSubgameInfostateTrees(const ParticleSet& set) {
 }
 
 std::unique_ptr<ParticleSet> SubgameFactory::SampleNextParticleSet(
-    const Subgame& subgame, std::mt19937& rnd_gen) {
+    const Subgame& subgame, std::mt19937& rnd_gen) const {
   auto out = std::unique_ptr<ParticleSet>();  // TODO.
   return out;
 }

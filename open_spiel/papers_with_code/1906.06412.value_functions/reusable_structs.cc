@@ -1,0 +1,59 @@
+// Copybot 2019 DeepMind Technologies Ltd. All bots reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#include "open_spiel/papers_with_code/1906.06412.value_functions/reusable_structs.h"
+
+namespace open_spiel {
+namespace papers_with_code {
+
+Subgame* ReusableStructures::GetFixableTrunkWithOracle() {
+  if (!fixable_trunk_with_oracle) {
+    fixable_trunk_with_oracle =
+        factory.MakeTrunk(pbs_oracle, "FixableStrategy");
+  }
+  return fixable_trunk_with_oracle.get();
+}
+
+Subgame* ReusableStructures::GetIterableTrunkWithOracle() {
+  if (!iterable_trunk_with_oracle) {
+    iterable_trunk_with_oracle = factory.MakeTrunk(pbs_oracle,
+                                                   factory.use_bandits_for_cfr);
+  }
+  return iterable_trunk_with_oracle.get();
+}
+
+Subgame* ReusableStructures::GetTrunkWithNet() {
+  if (!trunk_with_net) {
+    trunk_with_net = factory.MakeTrunk(factory.leaf_evaluator,
+                                       factory.use_bandits_for_cfr);
+  }
+  return trunk_with_net.get();
+}
+
+SequenceFormLpSpecification* ReusableStructures::GetSfLp() {
+  if (!sf_lp) {
+    sf_lp = std::make_unique<SequenceFormLpSpecification>(*factory.game, "CLP");
+  }
+  return sf_lp.get();
+}
+
+PublicStatesInGame* ReusableStructures::GetAllPublicStates() {
+  if (!all_states) {
+    all_states = algorithms::dlcfr::MakeAllPublicStates(*factory.game);
+  }
+  return all_states.get();
+}
+
+}  // papers_with_code
+}  // open_spiel

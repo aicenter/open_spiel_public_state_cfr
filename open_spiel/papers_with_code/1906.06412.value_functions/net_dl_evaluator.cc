@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_dl_evaluator.h"
-#include "open_spiel/papers_with_code/1906.06412.value_functions/trunk.h"
 
 namespace open_spiel {
 namespace papers_with_code {
@@ -129,6 +128,7 @@ void WriteParticleDataPoint(const algorithms::dlcfr::PublicState& state,
   const int num_parviews = state.nodes[0].size()
                          + state.nodes[1].size();
   SPIEL_CHECK_GE(num_parviews, 2);
+  SPIEL_CHECK_LE(num_parviews, dims.max_parviews);
 
   // Make a random permutation if something should be shuffled.
   std::vector<int> parview_placement(num_parviews);

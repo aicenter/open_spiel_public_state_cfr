@@ -19,8 +19,8 @@
 
 
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_data.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/reusable_structs.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/subgame.h"
-#include "open_spiel/papers_with_code/1906.06412.value_functions/trunk.h"
 
 namespace open_spiel {
 namespace papers_with_code {
@@ -33,38 +33,61 @@ class ExperienceReplay : public BatchData {
  public:
   ExperienceReplay(int buffer_size, int input_size, int output_size)
     : BatchData(buffer_size, input_size, output_size) {}
+
   // Return a data point that can be written to.
   ParticleDataPoint AddExperience(const ParticleDims& dims);
   PositionalDataPoint AddExperience(const PositionalDims& dims);
 
   // Fill batch with randomly sampled data points.
   void SampleBatch(BatchData* batch, std::mt19937& rnd_gen) const;
+  bool IsFilled() const { return overflow_cnt_ > 0; }
+  bool IsAtBeginning() const { return head_ == 0; }
+
  protected:
   void AdvanceHead();
 };
 
-enum ExpReplayInitialization {
-  kInitTrunkDlcfr,
-  kInitTrunkRandom,
+enum ReplayFillerInit {
+  kTrunkDlcfr,
+  kTrunkRandom,
+  kPbsRandom,
 };
-// Enum from string.
-ExpReplayInitialization GetExpReplayInitialization(const std::string& s);
+ReplayFillerInit GetReplayInit(const std::string& s);  // Enum from string.
 
-void InitTrunkRandomBeliefs(
-    Trunk* trunk, const std::vector<NetContext*>& contexts,
-    const BasicDims& dims, NetArchitecture arch, ExperienceReplay* replay,
-    double prob_pure_strat, double prob_fully_mixed,
-    std::mt19937& rnd_gen, bool shuffle_input_output);
+// Helper struct so we don't need to pass so many parameters
+// for bandit randomization.
+struct StrategyRandomizer {
+  std::mt19937* rnd_gen;
+  double prob_pure_strat = 0.1;
+  double prob_fully_mixed = 0.05;
 
-void InitTrunkDlCfrIterations(
-    Trunk* trunk, const std::vector<NetContext*>& contexts,
-    const BasicDims& dims, NetArchitecture arch, ExperienceReplay* replay,
-    int trunk_iters, std::function<void(/*trunk_iter=*/int)> monitor_fn,
-    std::mt19937& rnd_gen, bool shuffle_input_output);
+  void Randomize(std::vector<algorithms::BanditVector>& bandits) {
+    SPIEL_CHECK_TRUE(rnd_gen);
+    RandomizeStrategy(bandits, prob_pure_strat, prob_fully_mixed, *rnd_gen);
+  }
+};
 
-void InitSubgamesRandomBeliefs(
-    SubgameFactory* factory, const BasicDims& dims, NetArchitecture arch,
-    ExperienceReplay* replay, std::mt19937& rnd_gen, bool shuffle_input_output);
+// Helper struct so we don't need to pass so many parameters
+// for adding replay experiences.
+struct ReplayFiller {
+  // All of these must be supplied.
+  ExperienceReplay* replay;
+  SubgameFactory* factory;
+  BasicDims* dims;
+  StrategyRandomizer* randomizer;
+  ReusableStructures* reuse;
+
+  NetArchitecture arch = NetArchitecture::kParticle;
+  bool shuffle_input_output = false;
+
+  void AddExperience(const PublicState& state,
+                     const NetContext* net_context);
+  void AddExperiencesFromPublicStates(const std::vector<PublicState>& states);
+
+  void FillReplayWithTrunkRandomPbsSolutions();
+  void FillReplayWithTrunkDlCfrPbsSolutions(const std::vector<int>& eval_iters);
+  void FillReplayWithRandomPbsSolutions();
+};
 
 }  // papers_with_code
 }  // open_spiel

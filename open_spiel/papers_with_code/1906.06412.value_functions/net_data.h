@@ -27,6 +27,12 @@ namespace papers_with_code {
 using float_net = float;    // Floats used in the neural network.
 using float_tree = double;  // Floats used in the cfr computation.
 
+enum class NetArchitecture {
+  kPositional,
+  kParticle
+};
+NetArchitecture GetArchitecture(const std::string& arch);  // Enum from string.
+
 // Our base class. Data points are always a view
 // to the underlying storage, placed within a batch of data.
 struct DataPoint : torch::data::Example<> {
@@ -50,15 +56,18 @@ struct DataPoint : torch::data::Example<> {
 struct BasicDims {
   int public_features_size;
   int hand_features_size;
-  std::array<int, 2> net_ranges_size;
   const int player_features_size = 2;
 
   // I/O sizes so we know how to construct batch data.
   virtual int point_input_size() const = 0;
   virtual int point_output_size() const = 0;
-  virtual bool write_hand_features_positionally() const = 0;
   virtual ~BasicDims() = default;
 };
+// Deduce basic dimensions based on the game and observers of that game.
+std::unique_ptr<BasicDims> DeduceBasicDims(
+    NetArchitecture arch, const Game& game,
+    const std::shared_ptr<Observer>& public_observer,
+    const std::shared_ptr<Observer>& hand_observer);
 
 struct ParticleDims final : public BasicDims {
   // Should be the same as max particles to handle a worst-case scenario.
@@ -70,8 +79,6 @@ struct ParticleDims final : public BasicDims {
          + max_parviews * parview_size();  // Parview contents.
   }
   int point_output_size() const override { return max_parviews; }
-
-  bool write_hand_features_positionally() const override { return false; }
 
   int features_size() const {
     return hand_features_size
@@ -102,13 +109,14 @@ struct ParticleDims final : public BasicDims {
 // The ranges and values are positionally encoded according
 // to HandTable::hand_index().
 struct PositionalDims final : public BasicDims {
+  std::array<int, 2> net_ranges_size;
+
   int point_input_size() const override {
     return public_features_size + net_ranges_size[0] +  net_ranges_size[1];
   }
   int point_output_size() const override {
     return net_ranges_size[0] +  net_ranges_size[1];
   }
-  bool write_hand_features_positionally() const override { return true; }
 };
 
 // A single "particles view". We call these "parview" consistently in the code.

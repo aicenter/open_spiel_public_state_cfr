@@ -524,6 +524,7 @@ bool contains(std::vector<const InfostateNode*>& xs, const InfostateNode* x) {
   return std::find(xs.begin(), xs.end(), x) != xs.end();
 }
 
+// TODO: optional plumbing of observers
 std::unique_ptr<PublicStatesInGame> MakeAllPublicStates(const Game& game) {
   auto all = std::make_unique<PublicStatesInGame>();
   constexpr int store_all_states = algorithms::kStoreStatesInLeaves

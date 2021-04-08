@@ -1,27 +1,27 @@
 add_library(paper_value_functions OBJECT
-  experience_replay.h
   experience_replay.cc
-  net_architectures.h
+  experience_replay.h
+  hand_table.cc
+  hand_table.h
+  metrics.cc
+  metrics.h
   net_architectures.cc
-  net_data.h
+  net_architectures.h
   net_data.cc
+  net_data.h
   net_dl_evaluator.cc
   net_dl_evaluator.h
-  particle.h
   particle.cc
-  hand_table.h
-  hand_table.cc
-  solve_queue.h
+  particle.h
+  reusable_structs.cc
+  reusable_structs.h
   solve_queue.cc
+  solve_queue.h
   sparse_trunk.cc
   sparse_trunk.h
-  subgame.h
   subgame.cc
-  metrics.h
-  metrics.cc
-  trunk.cc
-  trunk.h
-  )
+  subgame.h
+)
 
 # Delete -Wall -Werror in
 # - /home/michal/Code/open_spiel/open_spiel/libtorch/libtorch/share/cmake/Caffe2/Caffe2Targets.cmake torch_cpu

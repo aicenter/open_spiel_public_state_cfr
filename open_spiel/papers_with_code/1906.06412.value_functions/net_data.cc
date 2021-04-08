@@ -17,6 +17,30 @@
 namespace open_spiel {
 namespace papers_with_code {
 
+std::unique_ptr<BasicDims> DeduceBasicDims(
+    NetArchitecture arch,
+    const Game& game,
+    const std::shared_ptr<Observer>& public_observer,
+    const std::shared_ptr<Observer>& hand_observer
+) {
+
+  std::unique_ptr <BasicDims> dims;
+  switch (arch) {
+    case NetArchitecture::kParticle:
+      dims = std::make_unique<ParticleDims>();
+      break;
+    case NetArchitecture::kPositional:
+      dims = std::make_unique<PositionalDims>();
+      break;
+  }
+
+  Observation public_observation(game, public_observer);
+  Observation hand_observation(game, hand_observer);
+  dims->public_features_size = public_observation.Tensor().size();
+  dims->hand_features_size = hand_observation.Tensor().size();
+  return dims;
+}
+
 const torch::TensorOptions kDataPointOptions = torch::TensorOptions()
     .dtype<float_net>();
 

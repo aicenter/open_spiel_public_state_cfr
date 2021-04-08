@@ -21,20 +21,24 @@
 #include "open_spiel/papers_with_code/1906.06412.value_functions/particle.h"
 #include "open_spiel/algorithms/infostate_tree.h"
 #include "open_spiel/algorithms/infostate_dl_cfr.h"
+#include "open_spiel/algorithms/ortools/sequence_form_lp.h"
 
 
 namespace open_spiel {
 namespace papers_with_code {
+
+constexpr const char* kDefaultDlCfrBandit = "RegretMatchingPlus";
+constexpr int kDefaultMaxMoveAheadLimit = 2;
+constexpr int kDefaultMaxParticles = 1000;
 
 // A (depth-limited) subgame rooted at some perfect-information histories,
 // that have belief distribution over the infostates induced by those histories.
 using Subgame = algorithms::dlcfr::DepthLimitedCFR;
 using PublicState = algorithms::dlcfr::PublicState;
 using TerminalEvaluator = algorithms::dlcfr::TerminalEvaluator;
-
-constexpr const char* kDefaultDlCfrBandit = "RegretMatchingPlus";
-constexpr int kDefaultMaxMoveAheadLimit = 2;
-constexpr int kDefaultMaxParticles = 1000;
+using LeafEvaluator = algorithms::dlcfr::PublicStateEvaluator;
+using PublicStatesInGame = algorithms::dlcfr::PublicStatesInGame;
+using SequenceFormLpSpecification = algorithms::ortools::SequenceFormLpSpecification;
 
 // Produce a subgame given a particle set.
 struct SubgameFactory {
@@ -50,14 +54,17 @@ struct SubgameFactory {
   int max_move_ahead_limit = kDefaultMaxMoveAheadLimit;
   int max_particles = kDefaultMaxParticles;
 
-  std::unique_ptr<Subgame> MakeTrunk();  // Subgame from game's initial state.
-  std::unique_ptr<Subgame> MakeSubgame(const ParticleSet& set);
-  std::unique_ptr<Subgame> MakeSubgame(const PublicState& state);
+  // Subgame from game's initial state.
+  std::unique_ptr<Subgame> MakeTrunk(
+      std::shared_ptr<const LeafEvaluator> custom_leaf_evaluator,
+      std::string custom_bandits_for_cfr) const;
+  std::unique_ptr<Subgame> MakeSubgame(const ParticleSet& set) const;
+  std::unique_ptr<Subgame> MakeSubgame(const PublicState& state) const;
   std::vector<std::shared_ptr<algorithms::InfostateTree>>
-    MakeSubgameInfostateTrees(const ParticleSet& set);
+    MakeSubgameInfostateTrees(const ParticleSet& set) const;
 
   std::unique_ptr<ParticleSet> SampleNextParticleSet(const Subgame& subgame,
-                                                     std::mt19937& rnd_gen);
+                                                     std::mt19937& rnd_gen) const;
 };
 
 

@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "open_spiel/papers_with_code/1906.06412.value_functions/metrics.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/subgame.h"
 #include "open_spiel/algorithms/dispatch_policy.h"
 
 namespace open_spiel {
@@ -129,9 +130,8 @@ class SparseRootsExplMetric : public Metric {
  public:
   SparseRootsExplMetric(
       // Needed to construct proper evaluations.
-      Trunk* full_trunk,
+      SubgameFactory* factory,
       ortools::SequenceFormLpSpecification* whole_game,
-      std::shared_ptr<NetEvaluator> net_evaluator,
       // Settings.
       std::vector<int> evaluate_iters,
       int roots_depth, double support_threshold, bool prune_chance_histories)
@@ -142,20 +142,20 @@ class SparseRootsExplMetric : public Metric {
     
     auto[eq_policy, game_value] = ortools::MakeEquilibriumPolicy(whole_game);
     sparse_eq_trunk_with_net_ = MakeSparseTrunkWithEqSupport(
-        eq_policy, full_trunk->game, full_trunk->infostate_observer,
-        full_trunk->public_observer,
-        roots_depth, full_trunk->trunk_depth,
-        net_evaluator, full_trunk->terminal_evaluator, kUseBanditsForCfr,
+        eq_policy, factory->game, factory->infostate_observer,
+        factory->public_observer,
+        roots_depth, factory->max_move_ahead_limit,
+        factory->leaf_evaluator, factory->terminal_evaluator, kUseBanditsForCfr,
         support_threshold, prune_chance_histories);
 
     // The sparse trunk is constructed as replacing the players' equilibrium
     // policies as a chance in the upper game. By constructing the trunk with no
     // move limit, we make an evaluation trunk.
     eval_trunk_ = MakeSparseTrunkWithEqSupport(
-        eq_policy, full_trunk->game,
-        full_trunk->infostate_observer, full_trunk->public_observer,
+        eq_policy, factory->game,
+        factory->infostate_observer, factory->public_observer,
         roots_depth, kTrunkNoMoveLimit,
-        nullptr, full_trunk->terminal_evaluator,
+        nullptr, factory->terminal_evaluator,
         kUseBanditsForCfr, /*support_threshold=*/1e-5, 
         /*prune_chance_histories=*/false);
     eval_lp_ = std::make_unique<ortools::SequenceFormLpSpecification>(
@@ -228,14 +228,13 @@ std::unique_ptr<Metric> MakeFullTrunkExplMetric(
 }
 
 std::unique_ptr<Metric> MakeSparseRootsExplMetric(
-    Trunk* full_trunk,
+    SubgameFactory* factory,
     ortools::SequenceFormLpSpecification* whole_game,
-    std::shared_ptr<NetEvaluator> net_evaluator,
     std::vector<int> evaluate_iters,
     int roots_depth, double support_threshold, bool prune_chance_histories) {
   return std::make_unique<SparseRootsExplMetric>(
-      full_trunk, whole_game, net_evaluator, evaluate_iters,
-      roots_depth,  support_threshold, prune_chance_histories);
+      factory, whole_game, evaluate_iters,
+      roots_depth, support_threshold, prune_chance_histories);
 }
 
 void ComputeMetrics(std::vector<std::unique_ptr<Metric>>& metrics) {

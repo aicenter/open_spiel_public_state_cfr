@@ -51,8 +51,8 @@ _EXP_INIT = [
 ]
 
 _VALUE_NETS = [
+  dict(arch="positional_vf"),
   dict(arch="particle_vf"),
-  dict(arch="positional_vf")
 ]
 
 _REFERENCE_KUHN_DLCFR_EVAL = dict(

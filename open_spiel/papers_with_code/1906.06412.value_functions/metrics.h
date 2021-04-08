@@ -24,8 +24,8 @@
 
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_architectures.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_data.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/subgame.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/sparse_trunk.h"
-#include "open_spiel/papers_with_code/1906.06412.value_functions/trunk.h"
 
 namespace open_spiel {
 namespace papers_with_code {
@@ -45,11 +45,12 @@ std::unique_ptr<Metric> MakeFullTrunkExplMetric(
     algorithms::ortools::SequenceFormLpSpecification* whole_game);
 
 std::unique_ptr<Metric> MakeSparseRootsExplMetric(
-    Trunk* full_trunk,
+    SubgameFactory* factory,
     algorithms::ortools::SequenceFormLpSpecification* whole_game,
-    std::shared_ptr<NetEvaluator> net_evaluator,
     std::vector<int> evaluate_iters,
-    int roots_depth, double support_threshold, bool prune_chance_histories);
+    int roots_depth,
+    double support_threshold,
+    bool prune_chance_histories);
 
 void ComputeMetrics(std::vector<std::unique_ptr<Metric>>& metrics);
 void PrintHeaders(const std::vector<std::unique_ptr<Metric>>& metrics);

@@ -27,7 +27,8 @@ ABSL_FLAG(std::string, use_bandits_for_cfr, "RegretMatchingPlus",
           "Which bandit should be used in the trunk.");
 
 // -- Data generation --
-ABSL_FLAG(std::string, exp_init, "trunk_random", "One of trunk_random,trunk_dlcfr");
+ABSL_FLAG(std::string, exp_init, "trunk_random",
+          "One of trunk_random,trunk_dlcfr,pbs_random");
 ABSL_FLAG(int, depth, 3, "Depth of the trunk.");
 ABSL_FLAG(double, prob_pure_strat, 0.1, "Params for random generation.");
 ABSL_FLAG(double, prob_fully_mixed, 0.05, "Params for random generation.");
@@ -45,6 +46,8 @@ ABSL_FLAG(int, batch_size, 32,
 ABSL_FLAG(int, num_loops, 5000, "Number of train-eval loops.");
 ABSL_FLAG(double, learning_rate, 1e-3, "Optimizer (adam/sgd) learning rate.");
 ABSL_FLAG(double, lr_decay, 1., "Learning rate decay after each loop.");
+ABSL_FLAG(int, max_particles, -1,
+          "Max particles to use. Set -1 to find an upper bound automatically.");
 
 // -- Network --
 ABSL_FLAG(std::string, arch, "particle_vf",
@@ -78,7 +81,6 @@ ABSL_FLAG(bool, sparse_prune_chance_histories, false,
 #include "open_spiel/papers_with_code/1906.06412.value_functions/metrics.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_dl_evaluator.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/sparse_trunk.h"
-#include "open_spiel/papers_with_code/1906.06412.value_functions/trunk.h"
 
 
 namespace open_spiel {
@@ -91,100 +93,6 @@ std::vector<int> ItersFromString(const std::string& s) {
   std::vector<int> out;
   for (auto& x : xs) {
     if (!x.empty()) out.push_back(std::stoi(x));
-  }
-  return out;
-}
-
-void FillExperienceReplay(ExpReplayInitialization init,
-                          const BasicDims& dims,
-                          NetArchitecture arch,
-                          ExperienceReplay* experience_replay,
-                          Trunk* trunk,
-                          const std::vector<NetContext*>& net_contexts,
-                          ortools::SequenceFormLpSpecification* whole_game,
-                          std::mt19937& rnd_gen) {
-
-  std::cout << "# Filling experience replay buffer." << std::endl;
-
-  switch (init) {
-    case kInitTrunkDlcfr: {
-      std::cout << "# Computing reference expls for given trunk iterations.\n";
-      std::cout << "# <ref_expl>\n";
-      std::cout << "# trunk_iter,expl\n";
-      const std::vector<int> eval_iters =
-          ItersFromString(absl::GetFlag(FLAGS_trunk_expl_iterations));
-      int num_trunks = experience_replay->size()
-                     / trunk->num_non_terminal_leaves;
-      InitTrunkDlCfrIterations(
-          trunk, net_contexts, dims, arch, experience_replay,
-          num_trunks,
-          /*monitor_fn*/[&](int trunk_iter) {
-              bool should_evaluate =
-                  std::find(eval_iters.begin(), eval_iters.end(), trunk_iter)
-                      != eval_iters.end();
-
-              if (should_evaluate) {
-                double expl = ortools::TrunkExploitability(
-                    whole_game,
-                    *trunk->iterable_trunk_with_oracle->AveragePolicy());
-                std::cout << "# " << trunk_iter << "," << expl << std::endl;
-              }
-          },
-          rnd_gen, absl::GetFlag(FLAGS_shuffle_input_output));
-      std::cout << "# </ref_expl>\n";
-      break;
-    }
-
-    case kInitTrunkRandom: {
-      std::cout << "# Generating random trunks to fill experience replay.\n# ";
-      int num_trunks = experience_replay->size()
-                     / trunk->num_non_terminal_leaves;
-      for (int i = 0; i < num_trunks; ++i) {
-        if (i % 10 == 0) std::cout << '.' << std::flush;
-        InitTrunkRandomBeliefs(trunk, net_contexts, dims, arch,
-                               experience_replay,
-                               absl::GetFlag(FLAGS_prob_pure_strat),
-                               absl::GetFlag(FLAGS_prob_fully_mixed),
-                               rnd_gen,
-                               absl::GetFlag(FLAGS_shuffle_input_output));
-      }
-      std::cout << std::endl;
-      break;
-    }
-
-    default:
-      SpielFatalError("Exhausted pattern match: exp_init");
-  }
-}
-
-std::vector<std::unique_ptr<Metric>> MakeMetrics(
-    Trunk* full_trunk,
-    ortools::SequenceFormLpSpecification* whole_game,
-    std::shared_ptr<NetEvaluator> net_evaluator,
-    dlcfr::DepthLimitedCFR* trunk_with_net) {
-  std::vector<std::unique_ptr<Metric>> out;
-
-  {
-    const std::vector<int> trunk_expl_iterations = ItersFromString(
-        absl::GetFlag(FLAGS_trunk_expl_iterations));
-    if (!trunk_expl_iterations.empty()) {
-      out.push_back(MakeFullTrunkExplMetric(
-          trunk_expl_iterations, trunk_with_net, whole_game));
-    }
-  }
-
-  {
-    const std::vector<int> sparse_expl_iterations =
-        ItersFromString(absl::GetFlag(FLAGS_sparse_expl_iterations));
-    if (!sparse_expl_iterations.empty()) {
-      out.push_back(MakeSparseRootsExplMetric(
-        full_trunk, whole_game, net_evaluator,
-        // Settings.
-        sparse_expl_iterations,
-        absl::GetFlag(FLAGS_sparse_roots_depth),
-        absl::GetFlag(FLAGS_sparse_support_threshold),
-        absl::GetFlag(FLAGS_sparse_prune_chance_histories)));
-    }
   }
   return out;
 }
@@ -214,106 +122,196 @@ void DecayLearningRate(torch::optim::Optimizer& optimizer, double lr_decay) {
 }
 
 void TrainEvalLoop() {
+  // Create all the data structures needed for the training-evaluation loop.
+  // There is quite a lot of them.
+
   // Replicable experiments FTW!
+  std::cout << "# Seeding experiment ..." << std::endl;
   const int seed = absl::GetFlag(FLAGS_seed);
   torch::manual_seed(seed);
+  // All source of randomness need to plumb this through.
   std::mt19937 rnd_gen(seed);
-
-  const int train_batches = absl::GetFlag(FLAGS_train_batches);
-  const int num_loops = absl::GetFlag(FLAGS_num_loops);
-  const int cfr_oracle_iterations = absl::GetFlag(FLAGS_cfr_oracle_iterations);
-  const std::string use_bandits_for_cfr =
-      absl::GetFlag(FLAGS_use_bandits_for_cfr);
-  const std::unique_ptr<Trunk> t = MakeTrunk(
-      absl::GetFlag(FLAGS_game_name), absl::GetFlag(FLAGS_depth),
-      use_bandits_for_cfr);
-  const ExpReplayInitialization init_policy =
-      GetExpReplayInitialization(absl::GetFlag(FLAGS_exp_init));
-  const int experience_replay_buffer_size = absl::GetFlag(FLAGS_replay_size);
-  const int batch_size = absl::GetFlag(FLAGS_batch_size) > 0
-      ? std::min(absl::GetFlag(FLAGS_batch_size), experience_replay_buffer_size)
-      : experience_replay_buffer_size;
+  //
+  std::cout << "# Making strategy randomizer ..." << std::endl;
+  StrategyRandomizer randomizer;
+  randomizer.rnd_gen = &rnd_gen;
+  randomizer.prob_pure_strat = absl::GetFlag(FLAGS_prob_pure_strat);
+  randomizer.prob_fully_mixed = absl::GetFlag(FLAGS_prob_fully_mixed);
+  //
+  std::cout << "# Making subgame factory ..." << std::endl;
+  SubgameFactory factory;
+  auto game = factory.game     = LoadGame(absl::GetFlag(FLAGS_game_name));
+  factory.infostate_observer   = game->MakeObserver(kInfoStateObsType, {});
+  factory.public_observer      = game->MakeObserver(kPublicStateObsType, {});
+  factory.hand_observer        = game->MakeObserver(kHandHistoryObsType, {});
+  factory.use_bandits_for_cfr  = absl::GetFlag(FLAGS_use_bandits_for_cfr);
+  factory.max_move_ahead_limit = absl::GetFlag(FLAGS_depth);
+  factory.max_particles        = absl::GetFlag(FLAGS_max_particles);
+  factory.terminal_evaluator   = std::make_shared<dlcfr::TerminalEvaluator>();
+  /* factory.leaf_evaluator will be set later: it needs dims and neural net. */
+  //
+  std::cout << "# Making oracle evaluator ..." << std::endl;
+  auto oracle = std::make_shared<algorithms::dlcfr::CFREvaluator>(
+      factory.game, /*full_subgame_depth=*/1000,
+      /*no_leaf_evaluator=*/nullptr, factory.terminal_evaluator,
+      factory.public_observer, factory.infostate_observer);
+  oracle->bandit_name = kDefaultDlCfrBandit;
+  oracle->num_cfr_iterations = absl::GetFlag(FLAGS_cfr_oracle_iterations);
+  //
+  std::cout << "# Init empty reusable structures ..." << std::endl;
+  ReusableStructures reuse(factory, oracle);
+  //
   const NetArchitecture arch = GetArchitecture(absl::GetFlag(FLAGS_arch));
-  const double lr_decay = absl::GetFlag(FLAGS_lr_decay);
-  t->oracle_evaluator->num_cfr_iterations = cfr_oracle_iterations;
+  std::cout << "# Deducing dimensions ..." << std::endl;
+  std::unique_ptr<BasicDims> dims = DeduceBasicDims(arch, *game,
+                                                    factory.public_observer,
+                                                    factory.hand_observer);
+  std::cout << "# Public features: " << dims->public_features_size << std::endl;
+  std::cout << "# Hand features: " << dims->hand_features_size << std::endl;
+  //
+  std::cout << "# Deducing dimensions for specific VFs ..." << std::endl;
+  if (factory.max_particles >= 1) {  // Static setting.
+    auto particle_dims = open_spiel::down_cast<ParticleDims*>(dims.get());
+    particle_dims->max_parviews = factory.max_particles * 2;
+    std::cout << "# Particle VF: "
+                 "max_particles = " << factory.max_particles << ' ' <<
+                 "max_parviews = " << particle_dims->max_parviews << std::endl;
+  }
+  std::unique_ptr<HandInfo> hand_info;
+  if (arch == NetArchitecture::kPositional || factory.max_particles == -1) {
+    std::cout << "# Finding all hands in the game (may take a while) ..."
+              << std::endl;
+    // TODO: use all states in the game, not just trunk -- needs test recomputation.
+//    PublicStatesInGame* all_states = reuse.GetAllPublicStates();
+//    hand_info = MakeHandInfo(*game, factory.hand_observer,
+//                             all_states->public_states);
+    Subgame* trunk_states = reuse.GetFixableTrunkWithOracle();
+    hand_info = MakeHandInfo(*game, factory.hand_observer,
+                             trunk_states->public_states());
 
-  // General info about the problem.
-  std::cout << "# Number of public states: " << t->num_states << "\n";
-  std::cout << "# Number of non-terminal public states: "
-            << t->num_non_terminal_leaves << "\n";
-  std::cout << "# Public states stats: \n";
-  dlcfr::PrintPublicStatesStats(t->fixable_trunk_with_oracle->public_states());
-  SPIEL_CHECK_GT(t->num_non_terminal_leaves, 0);  // The trunk is too deep?
-
-  const std::unique_ptr<BasicDims> dims = DeduceDims(*t, arch);
-  std::cout << "# Public features: " << dims->public_features_size << "\n";
-  std::cout << "# Hand features: " << dims->hand_features_size << "\n";
-  std::cout << "# Ranges size: " << dims->net_ranges_size << "\n";
+    if (arch == NetArchitecture::kPositional) {
+      auto pos_dims = open_spiel::down_cast<PositionalDims*>(dims.get());
+      for (int pl = 0; pl < 2; ++pl) {
+        pos_dims->net_ranges_size[pl] = hand_info->tables[pl].private_hands.size();
+      }
+      std::cout << "# Positional VF: net_ranges_size = "
+                << pos_dims->net_ranges_size << std::endl;
+    }
+    if (arch == NetArchitecture::kParticle) {
+      auto particle_dims = open_spiel::down_cast<ParticleDims*>(dims.get());
+      factory.max_particles = hand_info->tables[0].private_hands.size()
+                            * hand_info->tables[1].private_hands.size();
+      // TODO: make model independent of max_parviews -- needs test recomputation.
+      particle_dims->max_parviews = hand_info->num_hands();
+      std::cout << "# Particle VF (derived automatically): "
+                   "max_particles = " << factory.max_particles << ' ' <<
+                   "max_parviews = " << particle_dims->max_parviews << "\n";
+    }
+  }
   std::cout << "# Point input size: " << dims->point_input_size() << "\n";
   std::cout << "# Point output size: " << dims->point_output_size() << "\n";
-//  std::cout << "# Max particles: " << t->dims->max_particles << "\n";
-
-  // 1. Create the LP spec for the whole game.
-  ortools::SequenceFormLpSpecification whole_game(*t->game, "CLP");
-
-  // 2. Create network and optimizer.
+  //
   std::cout << "# Using device: " << absl::GetFlag(FLAGS_device) << "\n";
   torch::Device device(absl::GetFlag(FLAGS_device));
+  //
+  std::cout << "# Creating model ..." << std::endl;
   std::unique_ptr<ValueNet> model = MakeModel(arch, dims.get(),
                                               absl::GetFlag(FLAGS_num_layers),
                                               absl::GetFlag(FLAGS_num_width));
   model->to(device);
-  const auto options = torch::optim::AdamOptions()
-      .lr(absl::GetFlag(FLAGS_learning_rate));
-  torch::optim::Adam optimizer(model->parameters(), options);
-
-  // 3. Create a value function associated to the trunk.
-  std::cout << "# Batch size: " << batch_size << "\n";
-  // Train on multiple public states at once.
+  //
+  std::cout << "# Creating optimizer ..." << std::endl;
+  torch::optim::Adam optimizer(
+      model->parameters(),
+      torch::optim::AdamOptions()
+        .lr(absl::GetFlag(FLAGS_learning_rate))
+  );
+  const double lr_decay = absl::GetFlag(FLAGS_lr_decay);
+  //
+  const float size_mb = absl::GetFlag(FLAGS_replay_size)
+      * (dims->point_input_size() + dims->point_output_size())
+      * 4 / 1024. / 1024.;
+  std::cout << "# Allocating experience replay (" << size_mb << " MB) ..."
+            << std::endl;
+  ExperienceReplay experience_replay(absl::GetFlag(FLAGS_replay_size),
+                                     dims->point_input_size(),
+                                     dims->point_output_size());
+  //
+  std::cout << "# Making batch train/eval data ..." << std::endl;
+  const int batch_size = absl::GetFlag(FLAGS_batch_size) > 0
+                       ? std::min(absl::GetFlag(FLAGS_batch_size),
+                                  experience_replay.size())
+                       : experience_replay.size();
   BatchData train_batch(batch_size,
                         dims->point_input_size(),
                         dims->point_output_size());
-  // Evaluate a single public state.
-  // TODO: Maybe extend this to parallel evaluation?
   BatchData eval_batch(1,
                        dims->point_input_size(),
                        dims->point_output_size());
-  // Use eval batch only for the net evaluator.
-  std::shared_ptr<NetEvaluator> net_evaluator = MakeNetEvaluator(
+  //
+  std::cout << "# Making net evaluator ..." << std::endl;
+  factory.leaf_evaluator = MakeNetEvaluator(
       dims.get(), model.get(), &eval_batch, &device,
-      t->hand_info.get(), t->hand_observer);
-  auto trunk_with_net = std::make_unique<dlcfr::DepthLimitedCFR>(
-      t->game, t->trunk_trees, net_evaluator, t->terminal_evaluator,
-      t->public_observer,
-      MakeBanditVectors(t->trunk_trees, use_bandits_for_cfr));
-  auto net_contexts = trunk_with_net->contexts_as<NetContext>();
-
-  // 4. Create training metrics.
-  std::vector<std::unique_ptr<Metric>> metrics = MakeMetrics(
-      t.get(), &whole_game, net_evaluator, trunk_with_net.get());
-  std::cout << "# Using evaluation metrics: ";
-  for(const std::unique_ptr<Metric>& metric : metrics) {
-    std::cout << metric->name() << " ";
+      hand_info.get(), factory.hand_observer);
+  //
+  std::cout << "# Making replay filler ..." << std::endl;
+  ReplayFiller filler;
+  filler.replay     = &experience_replay;
+  filler.factory    = &factory;
+  filler.dims       = dims.get();
+  filler.randomizer = &randomizer;
+  filler.reuse      = &reuse;
+  filler.arch       = arch;
+  filler.shuffle_input_output = absl::GetFlag(FLAGS_shuffle_input_output);
+  //
+  std::cout << "# Making evaluation metrics ..." << std::endl;
+  std::vector<std::unique_ptr<Metric>> metrics;
+  {
+    std::vector<int> trunk_expl_iterations =
+        ItersFromString(absl::GetFlag(FLAGS_trunk_expl_iterations));
+    if (!trunk_expl_iterations.empty()) {
+      std::cout << "# Making full trunk exploitability metric ..." << std::endl;
+      metrics.push_back(MakeFullTrunkExplMetric(
+          trunk_expl_iterations, reuse.GetTrunkWithNet(), reuse.GetSfLp()));
+    }
   }
-  std::cout << "\n";
+  {
+    std::vector<int> sparse_expl_iterations =
+        ItersFromString(absl::GetFlag(FLAGS_sparse_expl_iterations));
+    if (!sparse_expl_iterations.empty()) {
+      std::cout << "# Making sparse roots exploitability metric ..."
+                << std::endl;
+      metrics.push_back(MakeSparseRootsExplMetric(
+          &factory, reuse.GetSfLp(),
+          // Plumb through settings.
+          sparse_expl_iterations,
+          absl::GetFlag(FLAGS_sparse_roots_depth),
+          absl::GetFlag(FLAGS_sparse_support_threshold),
+          absl::GetFlag(FLAGS_sparse_prune_chance_histories)));
+    }
+  }
+  //
+  std::cout << "# Initializing experience replay (may take a while) ..."
+            << std::endl;
+  switch (GetReplayInit(absl::GetFlag(FLAGS_exp_init))) {
+    case kTrunkDlcfr:
+      filler.FillReplayWithTrunkDlCfrPbsSolutions(
+          ItersFromString(absl::GetFlag(FLAGS_trunk_expl_iterations)));
+      break;
+    case kTrunkRandom: filler.FillReplayWithTrunkRandomPbsSolutions(); break;
+    case kPbsRandom:   filler.FillReplayWithRandomPbsSolutions();      break;
+  }
 
-  // 5. Make experience replay buffer.
-  std::cout << "# Allocating experience replay buffer: "
-            << experience_replay_buffer_size << " sample points ("
-            << experience_replay_buffer_size
-               * (dims->point_input_size() + dims->point_output_size())
-            << " floats)" << std::endl;
-  ExperienceReplay experience_replay(experience_replay_buffer_size,
-                                     dims->point_input_size(),
-                                     dims->point_output_size());
-  FillExperienceReplay(init_policy, *dims, arch, &experience_replay, t.get(),
-                       net_contexts, &whole_game, rnd_gen);
-
-  // 6. The train-eval loop.
+  // ---------------------------------------------------------------------------
+  std::cout << "# Ready to run the train/eval loop!" << std::endl;
+  for (int i = 0; i < 80; ++i) std::cout << '#';
+  std::cout << std::endl;
   std::cout << "loop,avg_loss";
   PrintHeaders(metrics);
   std::cout << std::endl;
-
+  //
+  const int num_loops = absl::GetFlag(FLAGS_num_loops);
+  const int train_batches = absl::GetFlag(FLAGS_train_batches);
   for (int loop = 0; loop < num_loops; ++loop) {
     std::cout << "# Training  ";
     model->train();  // Train mode.
@@ -334,7 +332,6 @@ void TrainEvalLoop() {
     std::cout << std::endl;
 
     DecayLearningRate(optimizer, lr_decay);
-//    PrintTrunkStrategies(trunk_with_net.get());
   }
 }
 
