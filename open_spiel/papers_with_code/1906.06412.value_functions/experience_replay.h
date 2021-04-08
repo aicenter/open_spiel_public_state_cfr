@@ -35,7 +35,7 @@ class ExperienceReplay : public BatchData {
     : BatchData(buffer_size, input_size, output_size) {}
   // Return a data point that can be written to.
   ParticleDataPoint AddExperience(const ParticleDims& dims);
-  PositionalData AddExperience(const PositionalDims& dims);
+  PositionalDataPoint AddExperience(const PositionalDims& dims);
 
   // Fill batch with randomly sampled data points.
   void SampleBatch(BatchData* batch, std::mt19937& rnd_gen) const;

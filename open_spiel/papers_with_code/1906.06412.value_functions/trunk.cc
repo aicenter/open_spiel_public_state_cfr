@@ -125,7 +125,7 @@ std::unique_ptr<BasicDims> DeduceDims(const Trunk& trunk, NetArchitecture arch) 
 //}
 //
 //void CopyRangesTreeToNet(const dlcfr::LeafPublicState& leaf,
-//                         PositionalData data_point,
+//                         PositionalDataPoint data_point,
 //                         const std::vector<dlcfr::RangeTable>& tables) {
 //  for (int pl = 0; pl < 2; ++pl) {
 //    PlacementCopy<float_tree, float_net>(
@@ -136,7 +136,7 @@ std::unique_ptr<BasicDims> DeduceDims(const Trunk& trunk, NetArchitecture arch) 
 //}
 //
 //void CopyValuesTreeToNet(const dlcfr::LeafPublicState& leaf,
-//                         PositionalData data_point,
+//                         PositionalDataPoint data_point,
 //                         const std::vector<dlcfr::RangeTable>& tables) {
 //  for (int pl = 0; pl < 2; ++pl) {
 //    PlacementCopy<float_tree, float_net>(
@@ -146,7 +146,7 @@ std::unique_ptr<BasicDims> DeduceDims(const Trunk& trunk, NetArchitecture arch) 
 //  }
 //}
 //
-//void CopyValuesFromNetToTree(PositionalData data_point,
+//void CopyValuesFromNetToTree(PositionalDataPoint data_point,
 //                         dlcfr::LeafPublicState& leaf,
 //                         const std::vector<dlcfr::RangeTable>& tables) {
 //  for (int pl = 0; pl < 2; ++pl) {

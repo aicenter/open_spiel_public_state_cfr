@@ -113,8 +113,8 @@ void CopyValuesFromNetToTree(ParticleDataPoint data_point,
 void WritePositionalDataPoint(const algorithms::dlcfr::PublicState& state,
                               const NetContext& net_context,
                               const PositionalDims& dims,
-                              PositionalData* point);
-void CopyValuesNetToTree(PositionalData* point,
+                              PositionalDataPoint* point);
+void CopyValuesNetToTree(PositionalDataPoint* point,
                          algorithms::dlcfr::PublicState& state,
                          const NetContext& net_context);
 

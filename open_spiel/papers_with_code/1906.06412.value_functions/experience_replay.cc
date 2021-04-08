@@ -25,8 +25,8 @@ ParticleDataPoint ExperienceReplay::AddExperience(const ParticleDims& dims) {
   return point;
 }
 
-PositionalData ExperienceReplay::AddExperience(const PositionalDims& dims) {
-  PositionalData point = point_at(head_, dims);
+PositionalDataPoint ExperienceReplay::AddExperience(const PositionalDims& dims) {
+  PositionalDataPoint point = point_at(head_, dims);
   AdvanceHead();
   return point;
 }
@@ -83,7 +83,7 @@ void AddExperience(
     }
     case NetArchitecture::kPositional: {
       auto pos_dims = open_spiel::down_cast<const PositionalDims&>(dims);
-      PositionalData data_point = replay->AddExperience(pos_dims);
+      PositionalDataPoint data_point = replay->AddExperience(pos_dims);
       SPIEL_CHECK_TRUE(net_context);
       WritePositionalDataPoint(leaf, *net_context, pos_dims, &data_point);
       break;

@@ -111,7 +111,7 @@ struct PositionalDims final : public BasicDims {
   bool write_hand_features_positionally() const override { return true; }
 };
 
-// A single "particles view". Wwe call these "parview" consistently in the code.
+// A single "particles view". We call these "parview" consistently in the code.
 // These are different from particles: particles are histories, but parviews are
 // a particle aggregation of player's beliefs over those particles, from the
 // perspective of the player (i.e. its Action-PrivateObservation history).
@@ -161,10 +161,10 @@ struct ParticleDataPoint final : DataPoint {
   int parviews_storage_offset() const { return dims.public_features_size + 1; }
 };
 
-struct PositionalData final : DataPoint {
+struct PositionalDataPoint final : DataPoint {
   const PositionalDims& dims;
-  PositionalData(const PositionalDims& positional_dims,
-                 torch::Tensor data, torch::Tensor target);
+  PositionalDataPoint(const PositionalDims& positional_dims,
+                      torch::Tensor data, torch::Tensor target);
   // Individual accessors.
   absl::Span<float_net> public_features();
   float_net& range_at(Player pl, int index);
@@ -190,7 +190,7 @@ struct BatchData {
 
   // Views for individual data points.
   ParticleDataPoint point_at(int index, const ParticleDims& particle_dims);
-  PositionalData point_at(int index, const PositionalDims& positional_dims);
+  PositionalDataPoint point_at(int index, const PositionalDims& positional_dims);
 };
 
 

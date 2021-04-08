@@ -74,7 +74,7 @@ void PositionalNetEvaluator::EvaluatePublicState(
   auto net_context = open_spiel::down_cast<NetContext*>(context);
   torch::NoGradGuard no_grad_guard;  // We run only inference.
 
-  PositionalData point = batch_->point_at(0, *dims_);
+  PositionalDataPoint point = batch_->point_at(0, *dims_);
   WritePositionalDataPoint(*state, *net_context, *dims_, &point);
 
   torch::Tensor input = point.data.to(*device_);
@@ -190,7 +190,7 @@ void CopyValuesFromNetToTree(ParticleDataPoint data_point,
 
 void WritePositionalDataPoint(const algorithms::dlcfr::PublicState& state,
                               const NetContext& net_context,
-                              const PositionalDims& dims, PositionalData* point) {
+                              const PositionalDims& dims, PositionalDataPoint* point) {
   // Important !!
   point->Reset();
 
@@ -209,7 +209,7 @@ void WritePositionalDataPoint(const algorithms::dlcfr::PublicState& state,
   }
 }
 
-void CopyValuesNetToTree(PositionalData* point,
+void CopyValuesNetToTree(PositionalDataPoint* point,
                          algorithms::dlcfr::PublicState& state,
                          const NetContext& net_context) {
   for (int pl = 0; pl < 2; ++pl) {
