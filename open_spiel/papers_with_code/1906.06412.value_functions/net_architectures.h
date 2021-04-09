@@ -60,10 +60,13 @@ struct ParticleValueNet final : public ValueNet {
   ActivationFunction activation_fn;
   std::vector<torch::nn::Linear> fc_regression;
   std::vector<torch::nn::Linear> fc_basis;
+  size_t num_inputs_regression;
   int limit_parview_count = -1;
 
   ParticleValueNet(ParticleDims* particle_dims,
-                   size_t num_layers_regression, size_t num_width_regression,
+                   size_t num_layers_regression,
+                   size_t num_width_regression,
+                   size_t num_inputs_regression,
                    ActivationFunction activation = kRelu);
   torch::Tensor forward(torch::Tensor xss) override;
   torch::Tensor PrepareTarget(BatchData* batch) override;
@@ -77,14 +80,15 @@ struct ParticleValueNet final : public ValueNet {
   torch::Tensor regression(torch::Tensor xs);
 
   int context_size() { return pooled_size() + dims->public_features_size; }
-  int pooled_size() { return dims->max_parviews; }
-  int regression_size() { return dims->max_parviews; }
+  int pooled_size() { return num_inputs_regression; }
+  int regression_size() { return num_inputs_regression; }
 };
 
 
 std::unique_ptr<ValueNet> MakeModel(NetArchitecture arch, BasicDims* dims,
                                     int num_layers_regression,
-                                    int num_width_regression);
+                                    int num_width_regression,
+                                    int num_inputs_regression);
 
 
 }  // namespace papers_with_code

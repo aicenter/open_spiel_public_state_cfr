@@ -55,6 +55,8 @@ ABSL_FLAG(std::string, arch, "particle_vf",
 ABSL_FLAG(int, num_layers, 3, "Number of hidden layers.");
 ABSL_FLAG(int, num_width, 3, "Multiplicative constant of the number of neurons "
                              "per layer compared to the input size.");
+ABSL_FLAG(int, num_inputs_regression, 128,
+          "Size of the regression input for particle VF.");
 
 // -- Metrics --
 // FullTrunkExplMetric
@@ -203,7 +205,6 @@ void TrainEvalLoop() {
       auto particle_dims = open_spiel::down_cast<ParticleDims*>(dims.get());
       factory.max_particles = hand_info->tables[0].private_hands.size()
                             * hand_info->tables[1].private_hands.size();
-      // TODO: make model independent of max_parviews -- needs test recomputation.
       particle_dims->max_parviews = hand_info->num_hands();
       std::cout << "# Particle VF (derived automatically): "
                    "max_particles = " << factory.max_particles << ' ' <<
@@ -217,9 +218,11 @@ void TrainEvalLoop() {
   torch::Device device(absl::GetFlag(FLAGS_device));
   //
   std::cout << "# Creating model ..." << std::endl;
+  int num_inputs_regression = absl::GetFlag(FLAGS_num_inputs_regression);
   std::unique_ptr<ValueNet> model = MakeModel(arch, dims.get(),
                                               absl::GetFlag(FLAGS_num_layers),
-                                              absl::GetFlag(FLAGS_num_width));
+                                              absl::GetFlag(FLAGS_num_width),
+                                              num_inputs_regression);
   model->to(device);
   //
   std::cout << "# Creating optimizer ..." << std::endl;
@@ -254,7 +257,8 @@ void TrainEvalLoop() {
   std::cout << "# Making net evaluator ..." << std::endl;
   factory.leaf_evaluator = MakeNetEvaluator(
       dims.get(), model.get(), &eval_batch, &device,
-      hand_info.get(), factory.hand_observer);
+      hand_info.get(),  // May be nullptr for particle VF.
+      factory.hand_observer);
   //
   std::cout << "# Making replay filler ..." << std::endl;
   ReplayFiller filler;

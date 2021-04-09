@@ -87,8 +87,10 @@ torch::Tensor PositionalValueNet::forward(torch::Tensor x) {
 ParticleValueNet::ParticleValueNet(ParticleDims* particle_dims,
                                    size_t num_layers_regression,
                                    size_t num_width_regression,
+                                   size_t num_inputs_regression,
                                    ActivationFunction activation)
-    : dims(particle_dims), activation_fn(activation) {
+    : dims(particle_dims), activation_fn(activation),
+      num_inputs_regression(num_inputs_regression) {
   int num_layers_kernel = 4;
 
   MakeLayers(fc_basis, num_layers_kernel,
@@ -228,15 +230,20 @@ torch::Tensor Activation(ActivationFunction f, torch::Tensor x) {
   }
 }
 std::unique_ptr<ValueNet> MakeModel(
-    NetArchitecture arch, BasicDims* dims,
-    int num_layers_regression, int num_width_regression) {
+    NetArchitecture arch,
+    BasicDims* dims,
+    int num_layers_regression,
+    int num_width_regression,
+    int num_inputs_regression
+) {
   SPIEL_CHECK_GE(num_layers_regression, 1);
   SPIEL_CHECK_GE(num_width_regression, 1);
   switch (arch) {
     case NetArchitecture::kParticle: {
       auto particle_dims = open_spiel::down_cast<ParticleDims*>(dims);
       auto model = std::make_unique<ParticleValueNet>(
-          particle_dims, num_layers_regression, num_width_regression,
+          particle_dims,
+          num_layers_regression, num_width_regression, num_inputs_regression,
           ActivationFunction::kRelu);
       return model;
     }

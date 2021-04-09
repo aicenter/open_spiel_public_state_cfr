@@ -30,6 +30,7 @@ _BASE_ARGS = dict(
     trunk_expl_iterations=100,
     num_layers=5,
     num_width=5,
+    num_inputs_regression=8,
     replay_size=20,
     seed=0,
     use_bandits_for_cfr="RegretMatchingPlus",
@@ -42,7 +43,8 @@ _TEST_GAMES = [
   dict(game_name="kuhn_poker", depth=3, replay_size=2),
   dict(game_name="kuhn_poker", depth=4, replay_size=1),
   dict(game_name="goofspiel(players=2,num_cards=3,imp_info=True,"
-                 "points_order=descending)", depth=1, replay_size=3),
+                 "points_order=descending)", depth=1, replay_size=3,
+       num_inputs_regression=9),
 ]
 
 _EXP_INIT = [
