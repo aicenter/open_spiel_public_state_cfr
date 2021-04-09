@@ -37,6 +37,7 @@ _BASE_ARGS = dict(
     exp_init="trunk_random",
     prob_pure_strat=0.1,
     prob_fully_mixed=0.05,
+    max_particles=-1
 )
 
 _TEST_GAMES = [

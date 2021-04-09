@@ -56,7 +56,8 @@ ABSL_FLAG(int, num_layers, 3, "Number of hidden layers.");
 ABSL_FLAG(int, num_width, 3, "Multiplicative constant of the number of neurons "
                              "per layer compared to the input size.");
 ABSL_FLAG(int, num_inputs_regression, 128,
-          "Size of the regression input for particle VF.");
+          "Size of the regression input for particle VF. -1 means it will be"
+          "the same as max_parviews");
 
 // -- Metrics --
 // FullTrunkExplMetric
@@ -123,6 +124,19 @@ void DecayLearningRate(torch::optim::Optimizer& optimizer, double lr_decay) {
   }
 }
 
+int LargestPublicState(const std::vector<PublicState>& states) {
+  int max_size = 0;
+  for (const PublicState& state : states) {
+    int state_size = 0;
+    for (const InfostateNode* node : state.nodes[0]) {
+      state_size += node->corresponding_states_size();
+    }
+    max_size = std::max(max_size, state_size);
+  }
+  SPIEL_CHECK_GT(max_size, 0);
+  return max_size;
+}
+
 void TrainEvalLoop() {
   // Create all the data structures needed for the training-evaluation loop.
   // There is quite a lot of them.
@@ -175,7 +189,7 @@ void TrainEvalLoop() {
   if (factory.max_particles >= 1) {  // Static setting.
     auto particle_dims = open_spiel::down_cast<ParticleDims*>(dims.get());
     particle_dims->max_parviews = factory.max_particles * 2;
-    std::cout << "# Particle VF: "
+    std::cout << "# Particle VF (set statically): "
                  "max_particles = " << factory.max_particles << ' ' <<
                  "max_parviews = " << particle_dims->max_parviews << std::endl;
   }
@@ -184,12 +198,18 @@ void TrainEvalLoop() {
     std::cout << "# Finding all hands in the game (may take a while) ..."
               << std::endl;
     PublicStatesInGame* all_states = reuse.GetAllPublicStates();
-    hand_info = MakeHandInfo(*game, factory.hand_observer,
-                             all_states->public_states);
-//    // Hand info can be computed only based on the trunk, or can be provided
-//    // in a domain-dependent manner in games where it is possible thanks to
-//    // the structure of the game (Poker / Liar's dice)
+    const std::vector<PublicState>& public_states = all_states->public_states;
+    std::cout << "# Number of public states: "
+              << all_states->public_states.size() << std::endl;
+    hand_info = MakeHandInfo(*game, factory.hand_observer, public_states);
+    // Hand info can be computed only based on the trunk, or can be provided
+    // in a domain-dependent manner in games where it is possible thanks to
+    // the structure of the game (Poker / Liar's dice)
 //    Subgame* trunk_states = reuse.GetFixableTrunkWithOracle();
+//    const std::vector<PublicState>& public_states =
+//        trunk_states->public_states();
+//    std::cout << "# Number of public states: "
+//              << trunk_states->public_states().size() << std::endl;
 //    hand_info = MakeHandInfo(*game, factory.hand_observer,
 //                             trunk_states->public_states());
 
@@ -203,8 +223,7 @@ void TrainEvalLoop() {
     }
     if (arch == NetArchitecture::kParticle) {
       auto particle_dims = open_spiel::down_cast<ParticleDims*>(dims.get());
-      factory.max_particles = hand_info->tables[0].private_hands.size()
-                            * hand_info->tables[1].private_hands.size();
+      factory.max_particles = LargestPublicState(public_states);
       particle_dims->max_parviews = hand_info->num_hands();
       std::cout << "# Particle VF (derived automatically): "
                    "max_particles = " << factory.max_particles << ' ' <<
@@ -217,8 +236,17 @@ void TrainEvalLoop() {
   std::cout << "# Using device: " << absl::GetFlag(FLAGS_device) << "\n";
   torch::Device device(absl::GetFlag(FLAGS_device));
   //
+  int num_inputs_regression = absl::GetFlag(FLAGS_num_inputs_regression);;
+  if (arch == NetArchitecture::kParticle) {
+    if(num_inputs_regression == -1) {
+      auto particle_dims = open_spiel::down_cast <ParticleDims*>(dims.get());
+      num_inputs_regression = particle_dims->max_parviews;
+    }
+    std::cout << "# Size of the input for regression component: "
+              << num_inputs_regression << "\n";
+  }
+  //
   std::cout << "# Creating model ..." << std::endl;
-  int num_inputs_regression = absl::GetFlag(FLAGS_num_inputs_regression);
   std::unique_ptr<ValueNet> model = MakeModel(arch, dims.get(),
                                               absl::GetFlag(FLAGS_num_layers),
                                               absl::GetFlag(FLAGS_num_width),
@@ -302,10 +330,9 @@ void TrainEvalLoop() {
   switch (GetReplayInit(absl::GetFlag(FLAGS_exp_init))) {
     case kTrunkDlcfr:
       filler.FillReplayWithTrunkDlCfrPbsSolutions(
-          ItersFromString(absl::GetFlag(FLAGS_trunk_expl_iterations)));
-      break;
-    case kTrunkRandom: filler.FillReplayWithTrunkRandomPbsSolutions(); break;
-    case kPbsRandom:   filler.FillReplayWithRandomPbsSolutions();      break;
+          ItersFromString(absl::GetFlag(FLAGS_trunk_expl_iterations))); break;
+    case kTrunkRandom: filler.FillReplayWithTrunkRandomPbsSolutions();  break;
+    case kPbsRandom:   filler.FillReplayWithRandomPbsSolutions();       break;
   }
 
   // ---------------------------------------------------------------------------
