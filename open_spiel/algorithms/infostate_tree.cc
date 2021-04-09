@@ -438,8 +438,10 @@ std::shared_ptr<InfostateTree> MakeInfostateTree(
   const InfostateTree& originating_tree = some_node->tree();
   SPIEL_DCHECK_TRUE([&]() {
     for (const InfostateNode* node : start_nodes) {
-      if (!node) return false;
-      if (!node->is_leaf_node()) return false;
+      // The same-depth constraint may be removed in the future in needed.
+      // In fact, it is possible to make infostate trees also with non-sibling
+      // nodes (i.e. a node can be a descendant of another node in the list).
+      // But they should all probably belong to the same tree.
       if (node->depth() != some_node->depth()) return false;
       if (&node->tree() != &originating_tree) return false;
     }
@@ -454,6 +456,8 @@ std::shared_ptr<InfostateTree> MakeInfostateTree(
   chance_reach_probs.reserve(start_nodes.size() * 8);
 
   for (const InfostateNode* node : start_nodes) {
+    SPIEL_CHECK_TRUE(node);
+    SPIEL_CHECK_FALSE(node->corresponding_states().empty());
     for (int i = 0; i < node->corresponding_states_size(); ++i) {
       start_states.push_back(node->corresponding_states()[i].get());
       chance_reach_probs.push_back(node->corresponding_chance_reach_probs()[i]);

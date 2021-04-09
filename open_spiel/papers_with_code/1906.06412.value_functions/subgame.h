@@ -59,7 +59,10 @@ struct SubgameFactory {
       std::shared_ptr<const LeafEvaluator> custom_leaf_evaluator,
       std::string custom_bandits_for_cfr) const;
   std::unique_ptr<Subgame> MakeSubgame(const ParticleSet& set) const;
-  std::unique_ptr<Subgame> MakeSubgame(const PublicState& state) const;
+  std::unique_ptr<Subgame> MakeSubgame(
+      const PublicState& state,
+      int custom_move_ahead_limit = 0,
+      std::shared_ptr<const PublicStateEvaluator> custom_leaf_evaluator = nullptr) const;
   std::vector<std::shared_ptr<algorithms::InfostateTree>>
     MakeSubgameInfostateTrees(const ParticleSet& set) const;
 

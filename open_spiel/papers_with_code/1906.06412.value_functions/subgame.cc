@@ -51,16 +51,23 @@ std::unique_ptr<Subgame> SubgameFactory::MakeSubgame(
 }
 
 std::unique_ptr<Subgame> SubgameFactory::MakeSubgame(
-    const PublicState& state) const {
+    const PublicState& state,
+    int custom_move_ahead_limit,
+    std::shared_ptr<const PublicStateEvaluator> custom_leaf_evaluator
+) const {
   std::vector<std::shared_ptr<InfostateTree>> trees;
   for (int pl = 0; pl < 2; ++pl) {
     trees.push_back(MakeInfostateTree(
-        state.nodes[pl], max_move_ahead_limit,
+        state.nodes[pl],
+        custom_move_ahead_limit ? custom_move_ahead_limit
+                                : max_move_ahead_limit,
         algorithms::dlcfr::kDlCfrInfostateTreeStorage
     ));
   }
+  auto evaluator = custom_leaf_evaluator ? custom_leaf_evaluator
+                                         : leaf_evaluator;
   auto out = std::make_unique<Subgame>(
-      game, trees, leaf_evaluator, terminal_evaluator,
+      game, trees, evaluator, terminal_evaluator,
       public_observer, MakeBanditVectors(trees, use_bandits_for_cfr));
   out->SetBeliefs(state.beliefs);
   return out;

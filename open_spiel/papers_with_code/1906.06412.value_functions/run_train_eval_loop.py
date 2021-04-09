@@ -21,18 +21,23 @@ binary_path = f"{home}/experiments/train_eval_loop"
 
 def vf_comparison():
   vf_base_params = dict(
+      device="cpu",
       use_bandits_for_cfr="RegretMatchingPlus",
       cfr_oracle_iterations=100,
       num_loops=2048,
       trunk_expl_iterations="100",
       train_batches=64,
-      replay_size=50000,
+      replay_size=10000,
       batch_size=64,
       exp_init="trunk_random",
       prob_pure_strat=0.1,
+      prob_fully_mixed=0.05,
       num_layers=5,
       num_width=5,
       shuffle_input_output="true",
+      # Holds for both games by coincidence!
+      max_particles=-1,
+      num_inputs_regression=-1,
   )
 
   def param_fn(param, context):

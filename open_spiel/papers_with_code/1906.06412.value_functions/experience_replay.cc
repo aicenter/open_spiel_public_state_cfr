@@ -93,8 +93,7 @@ void ExperienceReplay::SampleBatch(BatchData* batch,
 ReplayFillerInit GetReplayInit(const std::string& s) {
   if (s == "trunk_dlcfr")  return kTrunkDlcfr;
   if (s == "trunk_random") return kTrunkRandom;
-  // TODO: not tested yet.
-//  if (s == "pbs_random")   return kPbsRandom;
+  if (s == "pbs_random")   return kPbsRandom;
   SpielFatalError("Exhausted pattern match: exp_init");
 }
 
@@ -173,6 +172,8 @@ void ReplayFiller::FillReplayWithTrunkDlCfrPbsSolutions(
   }
   SPIEL_CHECK_GT(num_non_terminal_leaves, 0);
   int num_trunks = replay->size() / num_non_terminal_leaves;
+  // Make sure that buffer fits exactly for DL-CFR iterations reconstruction.
+  SPIEL_CHECK_EQ(num_trunks * num_non_terminal_leaves, replay->size());
   int max_iters = *std::max_element(eval_iters.begin(), eval_iters.end());
 
   std::cout << "# <ref_expl>\n";
@@ -202,12 +203,16 @@ void ReplayFiller::FillReplayWithTrunkDlCfrPbsSolutions(
 void ReplayFiller::FillReplayWithRandomPbsSolutions() {
   PublicStatesInGame* all_states = reuse->GetAllPublicStates();
 
+  std::cout << "# Generating random PBS and finding their solutions ...\n";
   auto bandits = MakeBanditVectors(all_states->infostate_trees, "FixableStrategy");
   const int num_states = all_states->public_states.size();
+  std::cout << "# There are " << num_states << " public states.\n# ";
   auto public_state_dist = std::uniform_int_distribution<>(0, num_states - 1);
   SPIEL_CHECK_TRUE(randomizer->rnd_gen);
 
   for (int i = 0; i < replay->size(); ++i) {
+    if (i % 100 == 0) std::cout << '.' << std::flush;
+
     // 1. Pick a public state and compute according beliefs.
     const int pick_public_state = public_state_dist(*randomizer->rnd_gen);
     PublicState& state = all_states->public_states[pick_public_state];
@@ -215,14 +220,18 @@ void ReplayFiller::FillReplayWithRandomPbsSolutions() {
     UpdateBeliefs(state, bandits);
 
     // 2. Build subgame and solve it.
-    std::unique_ptr<Subgame> subgame = factory->MakeSubgame(state);
+    std::unique_ptr<Subgame> subgame =
+        factory->MakeSubgame(state, 1000, reuse->pbs_oracle);
     subgame->RunSimultaneousIterations(100);
+    PublicState& solved_state = subgame->public_states().at(0);
+    SPIEL_CHECK_TRUE(solved_state.IsInitial());
 
     // 3. Add solution to the experiences.
-    auto context = factory->leaf_evaluator->CreateContext(state);
+    auto context = factory->leaf_evaluator->CreateContext(solved_state);
     auto net_context = open_spiel::down_cast<NetContext*>(context.get());
-    AddExperience(state, net_context);
+    AddExperience(solved_state, net_context);
   }
+  std::cout << std::endl;
   SPIEL_CHECK_TRUE(replay->IsFilled() && replay->IsAtBeginning());
 }
 
