@@ -181,13 +181,15 @@ void TrainEvalLoop() {
   if (arch == NetArchitecture::kPositional || factory.max_particles == -1) {
     std::cout << "# Finding all hands in the game (may take a while) ..."
               << std::endl;
-    // TODO: use all states in the game, not just trunk -- needs test recomputation.
-//    PublicStatesInGame* all_states = reuse.GetAllPublicStates();
-//    hand_info = MakeHandInfo(*game, factory.hand_observer,
-//                             all_states->public_states);
-    Subgame* trunk_states = reuse.GetFixableTrunkWithOracle();
+    PublicStatesInGame* all_states = reuse.GetAllPublicStates();
     hand_info = MakeHandInfo(*game, factory.hand_observer,
-                             trunk_states->public_states());
+                             all_states->public_states);
+//    // Hand info can be computed only based on the trunk, or can be provided
+//    // in a domain-dependent manner in games where it is possible thanks to
+//    // the structure of the game (Poker / Liar's dice)
+//    Subgame* trunk_states = reuse.GetFixableTrunkWithOracle();
+//    hand_info = MakeHandInfo(*game, factory.hand_observer,
+//                             trunk_states->public_states());
 
     if (arch == NetArchitecture::kPositional) {
       auto pos_dims = open_spiel::down_cast<PositionalDims*>(dims.get());
