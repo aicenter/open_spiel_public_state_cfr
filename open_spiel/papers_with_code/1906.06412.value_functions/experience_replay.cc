@@ -73,6 +73,13 @@ void ExperienceReplay::SampleBatch(BatchData* batch,
   const int k = batch->size();
   SPIEL_CHECK_GE(n, k);
 
+  // Full gradient descent -- no batching.
+  if (batch->size() == size()) {
+    batch->data = data;
+    batch->target = target;
+    return;
+  }
+
   std::vector<int> perm(n);
   std::iota(perm.begin(), perm.end(), 0);
   std::shuffle(perm.begin(), perm.end(), rnd_gen);
