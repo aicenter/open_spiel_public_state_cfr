@@ -24,12 +24,11 @@ def vf_comparison():
       device="cpu",
       use_bandits_for_cfr="RegretMatchingPlus",
       cfr_oracle_iterations=100,
-      num_loops=2048,
+      num_loops=1024,
       trunk_expl_iterations="100",
       train_batches=64,
       replay_size=10000,
       batch_size=64,
-      exp_init="trunk_random",
       prob_pure_strat=0.1,
       prob_fully_mixed=0.05,
       num_layers=5,
@@ -43,6 +42,8 @@ def vf_comparison():
   def param_fn(param, context):
     if param == "arch":
       return ["positional_vf", "particle_vf"]
+    elif param == "exp_init":
+      return ["trunk_random", "pbs_random"]
     elif param == "game_name":
       return ["leduc_poker",
               "goofspiel(players=2,num_cards=5,imp_info=True,points_order=descending)"]
@@ -57,7 +58,7 @@ def vf_comparison():
   sweep.run_sweep(backend, backend_params, binary_path,
                   base_output_dir=f"{home}/experiments/vf_comparison",
                   base_params=vf_base_params,
-                  comb_params=["arch", "game_name", "depth", "seed"],
+                  comb_params=["arch", "exp_init", "game_name", "depth", "seed"],
                   comb_param_fn=param_fn)
 
 def sparse_roots():

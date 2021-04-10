@@ -155,7 +155,6 @@ void ReplayFiller::FillReplayWithTrunkRandomPbsSolutions() {
     AddExperiencesFromPublicStates(fixable_trunk_with_oracle->public_states());
   }
   std::cout << std::endl;
-  SPIEL_CHECK_TRUE(replay->IsFilled() && replay->IsAtBeginning());
 }
 
 // The network should imitate DL-CFR at each iteration
@@ -172,9 +171,6 @@ void ReplayFiller::FillReplayWithTrunkDlCfrPbsSolutions(
   }
   SPIEL_CHECK_GT(num_non_terminal_leaves, 0);
   int num_trunks = replay->size() / num_non_terminal_leaves;
-  // Make sure that buffer fits exactly for DL-CFR iterations reconstruction.
-  SPIEL_CHECK_EQ(num_trunks * num_non_terminal_leaves, replay->size());
-  int max_iters = *std::max_element(eval_iters.begin(), eval_iters.end());
 
   std::cout << "# <ref_expl>\n";
   std::cout << "# trunk_iter,expl\n";
@@ -197,7 +193,6 @@ void ReplayFiller::FillReplayWithTrunkDlCfrPbsSolutions(
     iterable_trunk_with_oracle->UpdateTrunk();
   }
   std::cout << "# </ref_expl>\n";
-  SPIEL_CHECK_TRUE(replay->IsFilled() && replay->IsAtBeginning());
 }
 
 void ReplayFiller::FillReplayWithRandomPbsSolutions() {
