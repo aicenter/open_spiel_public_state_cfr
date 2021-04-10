@@ -203,19 +203,18 @@ void ReplayFiller::FillReplayWithTrunkDlCfrPbsSolutions(
 void ReplayFiller::FillReplayWithRandomPbsSolutions() {
   PublicStatesInGame* all_states = reuse->GetAllPublicStates();
 
-  std::cout << "# Generating random PBS and finding their solutions ...\n";
+  std::cout << "# Generating random PBS and finding their solutions ...\n# ";
   auto bandits = MakeBanditVectors(all_states->infostate_trees, "FixableStrategy");
   const int num_states = all_states->public_states.size();
-  std::cout << "# There are " << num_states << " public states.\n# ";
   auto public_state_dist = std::uniform_int_distribution<>(0, num_states - 1);
   SPIEL_CHECK_TRUE(randomizer->rnd_gen);
 
-  for (int i = 0; i < replay->size(); ++i) {
-    if (i % 100 == 0) std::cout << '.' << std::flush;
-
+  int i = 0;
+  while(i < replay->size()) {
     // 1. Pick a public state and compute according beliefs.
     const int pick_public_state = public_state_dist(*randomizer->rnd_gen);
     PublicState& state = all_states->public_states[pick_public_state];
+    if (state.IsTerminal()) continue; // TODO: make sure we can also add terminals
     randomizer->Randomize(bandits);
     UpdateBeliefs(state, bandits);
 
@@ -223,13 +222,20 @@ void ReplayFiller::FillReplayWithRandomPbsSolutions() {
     std::unique_ptr<Subgame> subgame =
         factory->MakeSubgame(state, 1000, reuse->pbs_oracle);
     subgame->RunSimultaneousIterations(100);
-    PublicState& solved_state = subgame->public_states().at(0);
-    SPIEL_CHECK_TRUE(solved_state.IsInitial());
+    std::array<absl::Span<const double>, 2> root_values =
+        subgame->RootChildrenCfValues();
+    for (int pl = 0; pl < 2; ++pl) {
+      SPIEL_CHECK_EQ(state.values[pl].size(), root_values[pl].size());
+      std::copy(root_values[pl].begin(), root_values[pl].end(),
+                state.values[pl].begin());
+    }
 
     // 3. Add solution to the experiences.
-    auto context = factory->leaf_evaluator->CreateContext(solved_state);
+    auto context = factory->leaf_evaluator->CreateContext(state);
     auto net_context = open_spiel::down_cast<NetContext*>(context.get());
-    AddExperience(solved_state, net_context);
+    AddExperience(state, net_context);
+    if (i % 100 == 0) std::cout << '.' << std::flush;
+    i++;
   }
   std::cout << std::endl;
   SPIEL_CHECK_TRUE(replay->IsFilled() && replay->IsAtBeginning());
