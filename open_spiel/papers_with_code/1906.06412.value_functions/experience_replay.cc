@@ -94,6 +94,7 @@ ReplayFillerInit GetReplayInit(const std::string& s) {
   if (s == "trunk_dlcfr")  return kTrunkDlcfr;
   if (s == "trunk_random") return kTrunkRandom;
   if (s == "pbs_random")   return kPbsRandom;
+  if (s == "sparse_pbs_random")   return kSparsePbsRandom;
   SpielFatalError("Exhausted pattern match: exp_init");
 }
 
@@ -229,6 +230,57 @@ void ReplayFiller::FillReplayWithRandomPbsSolutions() {
     auto context = factory->leaf_evaluator->CreateContext(state);
     auto net_context = open_spiel::down_cast<NetContext*>(context.get());
     AddExperience(state, net_context);
+    if (i % 100 == 0) std::cout << '.' << std::flush;
+    i++;
+  }
+  std::cout << std::endl;
+  SPIEL_CHECK_TRUE(replay->IsFilled() && replay->IsAtBeginning());
+}
+
+void ReplayFiller::FillReplayWithRandomSparsePbsSolutions() {
+  PublicStatesInGame* all_states = reuse->GetAllPublicStates();
+
+  std::cout << "# Generating random sparse PBS and finding their solutions ...\n# ";
+  auto bandits = MakeBanditVectors(all_states->infostate_trees, "FixableStrategy");
+  const int num_states = all_states->public_states.size();
+  auto public_state_dist = std::uniform_int_distribution<>(0, num_states - 1);
+  SPIEL_CHECK_TRUE(randomizer->rnd_gen);
+  SPIEL_CHECK_GT(sparse_particles, 0);
+
+  int i = 0;
+  while(i < replay->size()) {
+    // 1. Pick a public state and compute according beliefs.
+    const int pick_public_state = public_state_dist(*randomizer->rnd_gen);
+    PublicState& state = all_states->public_states[pick_public_state];
+    if (state.IsTerminal()) continue; // TODO: make sure we can also add terminals
+    randomizer->Randomize(bandits);
+    UpdateBeliefs(state, bandits);
+    if (!state.IsReachable()) continue; // TODO: check this is correct wrt cfvs
+
+    // 2. Pick the most probable particles.
+    std::unique_ptr<ParticleSetPartition> particle_partition =
+        MakeParticleSetPartition(state, sparse_particles, sparse_epsilon,
+                                 /*save_secondary=*/false, *randomizer->rnd_gen);
+
+    // 3. Build subgame and solve it.
+    std::unique_ptr<Subgame> subgame =
+        factory->MakeSubgame(particle_partition->primary, 1000, reuse->pbs_oracle);
+    subgame->RunSimultaneousIterations(100);
+    PublicState& result = subgame->initial_state();
+
+    // 4. Copy the solution to state.
+    std::array<absl::Span<const double>, 2> root_values =
+        subgame->RootChildrenCfValues();
+    for (int pl = 0; pl < 2; ++pl) {
+      SPIEL_CHECK_EQ(result.values[pl].size(), root_values[pl].size());
+      std::copy(root_values[pl].begin(), root_values[pl].end(),
+                result.values[pl].begin());
+    }
+
+    // 5. Add solution to the experiences.
+    auto context = factory->leaf_evaluator->CreateContext(result);
+    auto net_context = open_spiel::down_cast<NetContext*>(context.get());
+    AddExperience(result, net_context);
     if (i % 100 == 0) std::cout << '.' << std::flush;
     i++;
   }

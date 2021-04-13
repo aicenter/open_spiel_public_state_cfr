@@ -107,6 +107,10 @@ struct PublicState {
   // Check if the public state is terminal, i.e. it contains only states
   // that satisfy `State::IsTerminal()`.
   bool IsTerminal() const;
+  // Compute the reach probability of this public state.
+  double ReachProbability() const;
+  // Chech the state has non-zero reach probability.
+  bool IsReachable() const { return ReachProbability() > 0; }
 };
 
 void DebugPrintPublicFeatures(const std::vector<PublicState>& states);
@@ -227,6 +231,11 @@ class DepthLimitedCFR {
     return casted;
   }
   std::vector<PublicState>& public_states() { return public_states_; }
+  PublicState& initial_state() {
+    SPIEL_CHECK_FALSE(public_states_.empty());
+    SPIEL_CHECK_TRUE(public_states_[0].IsInitial());
+    return public_states_[0];
+  }
   std::vector<std::vector<double>>& reach_probs() { return reach_probs_; }
   std::vector<std::vector<double>>& cf_values() { return cf_values_; }
 

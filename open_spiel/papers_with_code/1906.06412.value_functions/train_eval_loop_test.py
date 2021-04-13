@@ -272,5 +272,9 @@ class VFTest(parameterized.TestCase, absltest.TestCase):
                                expected_expl["expl"].values.flatten(),
                                atol=5e-3)
 
+  # TODO sparse random pbs == random pbs with enough particles.
+  #      sparse random pbs != random pbs without enough particles.
+  #      fit one,two  exp replays.
+
 if __name__ == "__main__":
   absltest.main()

@@ -5,17 +5,20 @@ import pandas as pd
 import os
 
 param_sweep = [
+  ("arch", ".*",),
+  ("exp_init",  ".*"),
   ("game_name", "goof.*"),
   ("depth", ".*"),
-  ("seed", ".*")
+  ("seed", "2")
 ]
 
 display_perm = [
-  ("game_name", "depth", ),
   ("seed", ),
+  ("arch", "exp_init", "game_name", "depth", ),
+
 ]
 
-base_dir = "./experiments/paper/paper_particles"
+base_dir = "./experiments/vf_comparison2"
 translation_map = {
   "goofspiel(players=2,num_cards=3,imp_info=True)": "GS 3 (rand)",
   "goofspiel(players=2,num_cards=3,imp_info=True,points_order=ascending)":

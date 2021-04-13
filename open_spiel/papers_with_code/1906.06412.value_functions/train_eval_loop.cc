@@ -28,7 +28,7 @@ ABSL_FLAG(std::string, use_bandits_for_cfr, "RegretMatchingPlus",
 
 // -- Data generation --
 ABSL_FLAG(std::string, exp_init, "trunk_random",
-          "One of trunk_random,trunk_dlcfr,pbs_random");
+          "One of trunk_random,trunk_dlcfr,pbs_random,sparse_pbs_random");
 ABSL_FLAG(int, depth, 3, "Depth of the trunk.");
 ABSL_FLAG(double, prob_pure_strat, 0.1, "Params for random generation.");
 ABSL_FLAG(double, prob_fully_mixed, 0.05, "Params for random generation.");
@@ -37,6 +37,10 @@ ABSL_FLAG(bool, shuffle_input_output, false,
 ABSL_FLAG(int, replay_size, 100,
           "Size of experience replay in terms of public states.");
 ABSL_FLAG(int, cfr_oracle_iterations, 100, "Number of oracle iterations.");
+ABSL_FLAG(int, sparse_particles, 1000,
+          "Number of particles to use for sparse pbs generation");
+ABSL_FLAG(double, sparse_epsilon, 0.,
+          "How uniformly should the particles be sampled? [0,1] interval");
 
 // -- Training --
 ABSL_FLAG(int, train_batches, 32,
@@ -297,6 +301,8 @@ void TrainEvalLoop() {
   filler.reuse      = &reuse;
   filler.arch       = arch;
   filler.shuffle_input_output = absl::GetFlag(FLAGS_shuffle_input_output);
+  filler.sparse_particles     = absl::GetFlag(FLAGS_sparse_particles);
+  filler.sparse_epsilon       = absl::GetFlag(FLAGS_sparse_epsilon);
   //
   std::cout << "# Making evaluation metrics ..." << std::endl;
   std::vector<std::unique_ptr<Metric>> metrics;
@@ -331,8 +337,12 @@ void TrainEvalLoop() {
     case kTrunkDlcfr:
       filler.FillReplayWithTrunkDlCfrPbsSolutions(
           ItersFromString(absl::GetFlag(FLAGS_trunk_expl_iterations))); break;
-    case kTrunkRandom: filler.FillReplayWithTrunkRandomPbsSolutions();  break;
-    case kPbsRandom:   filler.FillReplayWithRandomPbsSolutions();       break;
+    case kTrunkRandom:
+      filler.FillReplayWithTrunkRandomPbsSolutions(); break;
+    case kPbsRandom:
+      filler.FillReplayWithRandomPbsSolutions(); break;
+    case kSparsePbsRandom:
+      filler.FillReplayWithRandomSparsePbsSolutions(); break;
   }
 
   // ---------------------------------------------------------------------------

@@ -16,6 +16,7 @@
 #ifndef OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_PARTICLE_
 #define OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_PARTICLE_
 
+#include "open_spiel/algorithms/infostate_dl_cfr.h"
 #include "open_spiel/algorithms/infostate_tree.h"
 #include "open_spiel/spiel.h"
 
@@ -26,10 +27,15 @@ struct Particle {
   // Flat joint actions.
   std::vector<Action> history;
   // Cumulative chance reach prob.
-  float chance_reach;
+  float chance_reach = 0;
   // Individual player reach probs.
-  std::array<float, 2> player_reach;
+  std::array<float, 2> player_reach = {0., 0.};
+  Particle(std::vector<Action> history) : history(std::move(history)) {}
 
+  // Full reach prob.
+  float reach() const {
+    return chance_reach * player_reach[0] * player_reach[1];
+  }
   // Rollout a state based on particle history.
   std::unique_ptr<State> MakeState(const Game& game) const;
 };
@@ -38,14 +44,35 @@ struct Particle {
 // All of the particles must share the same public state!
 struct ParticleSet {
   std::vector<Particle> particles;
-  // Partitions the set of particles to their corresponding infostates for each
-  // player. Stored numbers are indices within the particles vector.
-  std::array<std::vector<std::vector<int>>, 2> partition;
 
-  // Aggregate player reach probs over individual particles to compute
-  // player beliefs over the infostate partition.
-  std::array<std::vector<double>, 2> ComputeBeliefs() const;
+  Particle& at(const std::vector<Action>& history);
+  const Particle& at(const std::vector<Action>& history) const;
+  Particle& add(const std::vector<Action>& history);
+
+  void AssignBeliefs(algorithms::dlcfr::PublicState& state) const;
 };
+
+// See explanation below.
+struct ParticleSetPartition {
+  ParticleSet primary;
+  ParticleSet secondary;
+};
+
+// `PublicState` maintains all of its corresponding `State`s. For a given
+// number, primary_max_particles, partition these states into two particle sets:
+// `primary`, of size `primary_max_particles`, and the complement in the
+// `secondary` particle set.
+//
+// The split is done according to the reach probability distribution induced by
+// the player beliefs and chance. It is possible to specify whether the
+// particles are taken uniformly (epsilon=1) or according to this reach prob
+// distribution only (epsilon=0).
+std::unique_ptr<ParticleSetPartition> MakeParticleSetPartition(
+    const algorithms::dlcfr::PublicState& state,
+    int primary_max_particles,
+    double epsilon,
+    bool save_secondary,
+    std::mt19937& rng_gen);
 
 // Check internal observation consistency of the particle set.
 void CheckParticleSetConsistency(const Game& game,

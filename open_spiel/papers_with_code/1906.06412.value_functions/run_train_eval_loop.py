@@ -43,7 +43,7 @@ def vf_comparison():
     if param == "arch":
       return ["positional_vf", "particle_vf"]
     elif param == "exp_init":
-      return ["trunk_random", "pbs_random"]
+      return ["trunk_random", "pbs_random", "sparse_pbs_random"]
     elif param == "game_name":
       return ["leduc_poker",
               "goofspiel(players=2,num_cards=5,imp_info=True,points_order=descending)"]
@@ -52,13 +52,22 @@ def vf_comparison():
         return [7]
       elif "num_cards=5" in context["game_name"]:
         return [2]
+    elif param == "sparse_particles":
+        if context["exp_init"] == "sparse_pbs_random":
+            if context["game_name"] == "leduc_poker":
+                return list(range(5, 31, 5))
+            if "num_cards=5" in context["game_name"]:
+                return list(range(20, 290, 25)) + [290]
+        else:
+            return [0]
     elif param == "seed":
       return list(range(10))
 
   sweep.run_sweep(backend, backend_params, binary_path,
                   base_output_dir=f"{home}/experiments/vf_comparison",
                   base_params=vf_base_params,
-                  comb_params=["arch", "exp_init", "game_name", "depth", "seed"],
+                  comb_params=["arch", "exp_init", "game_name", "depth",
+                               "sparse_particles", "seed"],
                   comb_param_fn=param_fn)
 
 def sparse_roots():

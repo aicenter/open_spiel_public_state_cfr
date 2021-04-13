@@ -19,26 +19,52 @@ namespace papers_with_code {
 
 std::unique_ptr<State> Particle::MakeState(const Game& game) const {
   std::unique_ptr<State> s = game.NewInitialState();
-  for (Action a : history) s->ApplyAction(a);
+  for (int i = 0; i < history.size(); ++i) {
+    if (s->IsSimultaneousNode()) {
+      s->ApplyActions({history[i], history.at(++i)});
+    } else {
+      s->ApplyAction(history[i]);
+    }
+  }
   return  s;
 }
 
-std::array<std::vector<double>, 2> ParticleSet::ComputeBeliefs() const {
-  std::array<std::vector<double>, 2> out = {
-      std::vector<double>(partition[0].size(), 0.),
-      std::vector<double>(partition[1].size(), 0.),
-  };
-
+void ParticleSet::AssignBeliefs(algorithms::dlcfr::PublicState& state) const {
   for (int pl = 0; pl < 2; ++pl) {
-    for (int i = 0; i < partition[pl].size(); ++i) {
-      for (int j = 0; j < partition[pl][i].size(); ++j) {
-        int k = partition[pl][i][j];
-        out[pl][i] += particles[k].player_reach[pl];
+    SPIEL_CHECK_EQ(state.beliefs[pl].size(), state.nodes[pl].size());
+    for (int i = 0; i < state.nodes[pl].size(); ++i) {
+      state.beliefs[pl][i] = 0.;
+      for(const std::unique_ptr<State>& s: state.nodes[pl][i]->corresponding_states()) {
+        const Particle& particle = at(s->History());
+        state.beliefs[pl][i] += particle.player_reach[pl];
       }
     }
   }
+}
 
-  return out;
+Particle& ParticleSet::at(const std::vector<Action>& history) {
+  for (Particle& particle : particles) {
+    // Maybe should be SPIEL_CHECK_EQ in most games.
+    if (particle.history.size() != history.size()) continue;
+    // Compare in reverse, as the endings are where they will not be equal.
+    if (std::equal(particle.history.rbegin(), particle.history.rend(),
+                   history.rbegin())) return particle;
+  }
+  SpielFatalError("Particle not found");
+}
+const Particle& ParticleSet::at(const std::vector<Action>& history) const {
+  for (const Particle& particle : particles) {
+    // Maybe should be SPIEL_CHECK_EQ in most games.
+    if (particle.history.size() != history.size()) continue;
+    // Compare in reverse, as the endings are where they will not be equal.
+    if (std::equal(particle.history.rbegin(), particle.history.rend(),
+                   history.rbegin())) return particle;
+  }
+  SpielFatalError("Particle not found");
+}
+Particle& ParticleSet::add(const std::vector <Action>& history) {
+  particles.emplace_back(history);
+  return particles.back();
 }
 
 void CheckObservation(const Observation& actual, const Observation& expected) {
@@ -51,7 +77,7 @@ void CheckParticleSetConsistency(const Game& game,
                                  std::shared_ptr<Observer> hand_observer,
                                  const ParticleSet& set) {
   SPIEL_CHECK_FALSE(set.particles.empty());
-  SPIEL_CHECK_FALSE(set.partition.empty());
+//  SPIEL_CHECK_FALSE(set.partition.empty());
 
   std::vector<std::unique_ptr<State>> histories;
   for (const Particle& particle : set.particles) {
@@ -67,20 +93,20 @@ void CheckParticleSetConsistency(const Game& game,
     CheckObservation(actual_public, expected_public);
   }
 
-  // Check partition
-  Observation expected_hand(game, hand_observer);
-  Observation actual_hand = expected_hand;
-  for (int pl = 0; pl < 2; ++pl) {
-    SPIEL_CHECK_FALSE(set.partition[pl].empty());
-    for (const std::vector<int>& partition_element : set.partition[pl]) {
-      SPIEL_CHECK_FALSE(partition_element.empty());
-      expected_hand.SetFrom(*histories[partition_element[0]], pl);
-      for (int particle_idx : partition_element) {
-        actual_hand.SetFrom(*histories[particle_idx], pl);
-        CheckObservation(actual_hand, expected_hand);
-      }
-    }
-  }
+//  // Check partition
+//  Observation expected_hand(game, hand_observer);
+//  Observation actual_hand = expected_hand;
+//  for (int pl = 0; pl < 2; ++pl) {
+//    SPIEL_CHECK_FALSE(set.partition[pl].empty());
+//    for (const std::vector<int>& partition_element : set.partition[pl]) {
+//      SPIEL_CHECK_FALSE(partition_element.empty());
+//      expected_hand.SetFrom(*histories[partition_element[0]], pl);
+//      for (int particle_idx : partition_element) {
+//        actual_hand.SetFrom(*histories[particle_idx], pl);
+//        CheckObservation(actual_hand, expected_hand);
+//      }
+//    }
+//  }
 }
 
 void CheckParticleSetConsistency(const Game& game,
@@ -88,32 +114,126 @@ void CheckParticleSetConsistency(const Game& game,
                                  std::vector<std::vector<algorithms::InfostateNode*>> infostate_nodes,
                                  const ParticleSet& set) {
   SPIEL_CHECK_FALSE(set.particles.empty());
-  SPIEL_CHECK_FALSE(set.partition.empty());
+//  SPIEL_CHECK_FALSE(set.partition.empty());
 
   std::vector<std::unique_ptr<State>> histories;
   for (const Particle& particle : set.particles) {
     histories.push_back(particle.MakeState(game));
   }
 
-  for (int pl = 0; pl < 2; ++pl) {
-    SPIEL_CHECK_FALSE(set.partition[pl].empty());
-    SPIEL_CHECK_FALSE(infostate_nodes[pl].empty());
-    SPIEL_CHECK_EQ(set.partition[pl].size(), infostate_nodes[pl].size());
+//  for (int pl = 0; pl < 2; ++pl) {
+//    SPIEL_CHECK_FALSE(set.partition[pl].empty());
+//    SPIEL_CHECK_FALSE(infostate_nodes[pl].empty());
+//    SPIEL_CHECK_EQ(set.partition[pl].size(), infostate_nodes[pl].size());
+//
+//    for (int i = 0; i < set.partition[pl].size(); ++i) {
+//      SPIEL_CHECK_FALSE(set.partition[pl][i].empty());
+//      for (int particle_idx : set.partition[pl][i]) {
+//        const algorithms::InfostateNode* node = infostate_nodes[pl][i];
+//        const State& h = *histories[particle_idx];
+//        SPIEL_CHECK_TRUE(node);
+//        SPIEL_CHECK_EQ(infostate_observer->StringFrom(h, pl),
+//                       node->infostate_string());
+//      }
+//    }
+//  }
 
-    for (int i = 0; i < set.partition[pl].size(); ++i) {
-      SPIEL_CHECK_FALSE(set.partition[pl][i].empty());
-      for (int particle_idx : set.partition[pl][i]) {
-        const algorithms::InfostateNode* node = infostate_nodes[pl][i];
-        const State& h = *histories[particle_idx];
-        SPIEL_CHECK_TRUE(node);
-        SPIEL_CHECK_EQ(infostate_observer->StringFrom(h, pl),
-                       node->infostate_string());
+}
+std::unique_ptr<ParticleSetPartition> MakeParticleSetPartition(
+    const algorithms::dlcfr::PublicState& state,
+    int primary_max_particles, double epsilon,
+    bool save_secondary, std::mt19937& rnd_gen) {
+
+  ParticleSet all;
+  all.particles.reserve(primary_max_particles);
+
+  for (int pl = 0; pl < 2; ++pl) {
+    for (int i = 0; i < state.nodes[pl].size(); ++i) {
+      for (int k = 0; k < state.nodes[pl][i]->corresponding_states_size(); ++k) {
+        const std::unique_ptr<State>& s = state.nodes[pl][i]->corresponding_states()[k];
+        const double chn = state.nodes[pl][i]->corresponding_chance_reach_probs()[k];
+        Particle& particle = pl == 0 ? all.add(s->History())
+                                     : all.at(s->History());
+        particle.player_reach[pl] = state.beliefs[pl][i];
+        particle.chance_reach = chn;
       }
     }
   }
 
-}
+  auto partition = std::make_unique<ParticleSetPartition>();
+  if (all.particles.size() <= primary_max_particles) {  // Fast track return.
+    partition->primary = std::move(all);
+    return partition;  // Secondary is empty.
+  }
 
+  // We have more particles (N) than needed (K):
+  // N choose (at most) K without repetition, using a discrete probability
+  // distribution D(U,R).
+  // The distribution D is epsilon-convex combination of a) uniform U and
+  // b) the normalized reach probs distribution R.
+
+  // Compute normalization factor of reach probs distribution R.
+  double norm_r = 0.;
+  for (const Particle& p : all.particles) norm_r += p.reach();
+  SPIEL_CHECK_GT(norm_r, 0.);
+
+  // Prepare CDF of distribution D.
+  std::map</*cumul=*/double, /*particle_index=*/int> cdf;
+  double cumul = 0.;
+  int n = all.particles.size();
+  int zero_entries = 0;
+  for (int i = 0; i < n; ++i) {
+    // D = U + R
+    double p = epsilon / n
+             + (1-epsilon) * all.particles[i].reach() / norm_r;
+    if (cumul + p == cumul) {
+      // Do not add this to the cdf, as it cannot be sampled.
+      ++zero_entries;
+    } else {
+      cumul += p;
+      cdf[cumul] = i;
+    }
+  }
+  SPIEL_CHECK_FLOAT_NEAR(cumul, 1., 1e-6);
+
+  // Pick K particles.
+  int k = primary_max_particles;
+
+  // However, some particles could have had (near) zero probability:
+  // we omit those choices.
+  if (k > n - zero_entries) {  // Fast track return.
+    SPIEL_CHECK_GT(n, zero_entries);
+    // Keep only non-zero reach entries.
+    for(auto& [cumul, particle_index] : cdf) {
+      partition->primary.particles.push_back(all.particles[particle_index]);
+    }
+    return partition;  // Secondary is empty.
+  }
+
+  // Finally, pick the indices iteratively based on the CDF.
+  std::set<int> pick;
+  std::uniform_real_distribution<double> unif(0., 1.);  // Interval [0,1)
+  while (pick.size() != k) {
+    double p = unif(rnd_gen);
+    int particle_index = cdf.upper_bound(p)->second;
+    pick.insert(particle_index);
+  }
+
+  // Construct primary set based on the pick.
+  partition->primary.particles.reserve(primary_max_particles);
+  for(int particle_index : pick) {
+    partition->primary.particles.push_back(all.particles[particle_index]);
+  }
+  // Construct secondary set as all the other particles.
+  if (save_secondary) {
+    for (int i = 0; i < n; ++i) {
+      if (pick.count(i) != 0) continue;
+      partition->secondary.particles.push_back(all.particles[i]);
+    }
+  }
+
+  return partition;
+}
 
 }  // papers_with_code
 }  // open_spiel

@@ -40,13 +40,21 @@ std::unique_ptr<Subgame> SubgameFactory::MakeTrunk(
 }
 
 std::unique_ptr<Subgame> SubgameFactory::MakeSubgame(
-    const ParticleSet& set) const {
+    const ParticleSet& set,
+    int custom_move_ahead_limit,
+    std::shared_ptr<const PublicStateEvaluator> custom_leaf_evaluator
+) const {
   SPIEL_CHECK_LE(set.particles.size(), max_particles);
-  auto trees = MakeSubgameInfostateTrees(set);
+  int depth = custom_move_ahead_limit ? custom_move_ahead_limit
+                                      : max_move_ahead_limit;
+  auto trees = MakeSubgameInfostateTrees(set, depth);
+  auto evaluator = custom_leaf_evaluator ? custom_leaf_evaluator
+                                         : leaf_evaluator;
   auto out = std::make_unique<Subgame>(
-      game, trees, leaf_evaluator, terminal_evaluator,
+      game, trees, evaluator, terminal_evaluator,
       public_observer, MakeBanditVectors(trees, use_bandits_for_cfr));
-  out->SetBeliefs(set.ComputeBeliefs());
+  set.AssignBeliefs(out->initial_state());
+  out->SetBeliefs(out->initial_state().beliefs);
   return out;
 }
 
@@ -74,7 +82,7 @@ std::unique_ptr<Subgame> SubgameFactory::MakeSubgame(
 }
 
 std::vector<std::shared_ptr<InfostateTree>>
-SubgameFactory::MakeSubgameInfostateTrees(const ParticleSet& set) const {
+SubgameFactory::MakeSubgameInfostateTrees(const ParticleSet& set, int depth) const {
   SPIEL_CHECK_LE(set.particles.size(), max_particles);
   SPIEL_DCHECK(CheckParticleSetConsistency(*game, public_observer,
                                            hand_observer, set));
@@ -88,7 +96,7 @@ SubgameFactory::MakeSubgameInfostateTrees(const ParticleSet& set) const {
   for (int pl = 0; pl < 2; ++pl) {
     trees.push_back(MakeInfostateTree(
         root_histories, chance_reach_probs,
-        infostate_observer, pl, max_move_ahead_limit,
+        infostate_observer, pl, depth,
         algorithms::dlcfr::kDlCfrInfostateTreeStorage
     ));
   }
@@ -96,12 +104,6 @@ SubgameFactory::MakeSubgameInfostateTrees(const ParticleSet& set) const {
                                            {trees[0]->root().children(),
                                             trees[1]->root().children()}, set));
   return trees;
-}
-
-std::unique_ptr<ParticleSet> SubgameFactory::SampleNextParticleSet(
-    const Subgame& subgame, std::mt19937& rnd_gen) const {
-  auto out = std::unique_ptr<ParticleSet>();  // TODO.
-  return out;
 }
 
 

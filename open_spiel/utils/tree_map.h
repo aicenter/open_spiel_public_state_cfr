@@ -56,6 +56,16 @@ class TreeMap {
     }
     return {};
   }
+
+  LeafValue fold_sum(LeafValue initial_acc) const {
+    if (children_.empty()) return value_;
+
+    LeafValue node_acc = initial_acc;
+    for (const auto&[edge, subtree] : children_) {
+      node_acc = node_acc + subtree->fold_sum(initial_acc);
+    }
+    return node_acc;
+  }
 };
 
 }  // open_spiel

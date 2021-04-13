@@ -402,6 +402,26 @@ bool PublicState::IsTerminal() const {
   SPIEL_DCHECK_TRUE(nodes[0][0]);
   return nodes[0][0]->type() == kTerminalInfostateNode;
 }
+double PublicState::ReachProbability() const {
+  TreeMap<State::PlayerAction, double> reach_map;
+
+  for (int pl = 0; pl < 2; ++pl) {
+    for (int i = 0; i < nodes[pl].size(); ++i) {
+      for (int k = 0; k < nodes[pl][i]->corresponding_states_size(); ++k) {
+        State* s = nodes[pl][i]->corresponding_states()[k].get();
+        const std::vector<State::PlayerAction>& h = s->FullHistory();
+        if (pl == 0) {
+          const double chn = nodes[pl][i]->corresponding_chance_reach_probs()[k];
+          reach_map[h] = chn * beliefs[pl][i];
+        } else {
+          reach_map[h] *= beliefs[pl][i];
+        }
+      }
+    }
+  }
+
+  return reach_map.fold_sum(0);
+}
 
 void DebugPrintPublicFeatures(const std::vector<PublicState>& states) {
   std::cout << "# Public features:\n";

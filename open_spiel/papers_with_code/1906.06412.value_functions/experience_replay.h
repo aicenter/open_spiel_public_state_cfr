@@ -51,6 +51,7 @@ enum ReplayFillerInit {
   kTrunkDlcfr,
   kTrunkRandom,
   kPbsRandom,
+  kSparsePbsRandom,
 };
 ReplayFillerInit GetReplayInit(const std::string& s);  // Enum from string.
 
@@ -79,6 +80,8 @@ struct ReplayFiller {
 
   NetArchitecture arch = NetArchitecture::kParticle;
   bool shuffle_input_output = false;
+  int sparse_particles = 0;
+  double sparse_epsilon = 0.;
 
   void AddExperience(const PublicState& state,
                      const NetContext* net_context);
@@ -87,6 +90,7 @@ struct ReplayFiller {
   void FillReplayWithTrunkRandomPbsSolutions();
   void FillReplayWithTrunkDlCfrPbsSolutions(const std::vector<int>& eval_iters);
   void FillReplayWithRandomPbsSolutions();
+  void FillReplayWithRandomSparsePbsSolutions();
 };
 
 }  // papers_with_code
