@@ -272,8 +272,29 @@ class VFTest(parameterized.TestCase, absltest.TestCase):
                                expected_expl["expl"].values.flatten(),
                                atol=5e-3)
 
-  # TODO sparse random pbs == random pbs with enough particles.
-  #      sparse random pbs != random pbs without enough particles.
+  @parameterized.parameters(_TEST_GAMES)
+  def test_pbs_iterations_identical(self, **game_spec):
+    args = dict(
+        arch="particle_vf", batch_size="1", cfr_oracle_iterations="100",
+        depth="7", device="cpu", exp_init="pbs_random",
+        game_name="leduc_poker", max_particles=-1, num_inputs_regression=-1,
+        num_layers=5, num_loops=1, num_width=5, prob_pure_strat=0.1,
+        replay_size=1, seed=0, shuffle_input_output="true",
+        train_batches=256, trunk_expl_iterations="1,5,10,50,100",
+        use_bandits_for_cfr="RegretMatchingPlus",
+        # Upper bounds all of the test games
+        sparse_particles=30
+    )
+    actual_pbs_random, = read_experiment_results_from_shell(
+        {**args, **game_spec, "exp_init": "pbs_random"}, metric_avg_loss)
+    actual_sparse_pbs_random, = read_experiment_results_from_shell(
+        {**args, **game_spec, "exp_init": "sparse_pbs_random"}, metric_avg_loss)
+
+    np.testing.assert_allclose(actual_pbs_random.values.flatten(),
+                               actual_sparse_pbs_random.values.flatten(),
+                               atol=1e-4)
+
+  # TODO sparse random pbs != random pbs without enough particles.
   #      fit one,two  exp replays.
 
 if __name__ == "__main__":

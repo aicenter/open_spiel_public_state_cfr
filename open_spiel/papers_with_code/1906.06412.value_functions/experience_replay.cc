@@ -215,8 +215,7 @@ void ReplayFiller::FillReplayWithRandomPbsSolutions() {
     UpdateBeliefs(state, bandits);
 
     // 2. Build subgame and solve it.
-    std::unique_ptr<Subgame> subgame =
-        factory->MakeSubgame(state, 1000, reuse->pbs_oracle);
+    std::unique_ptr<Subgame> subgame = factory->MakeSubgame(state, 1000);
     subgame->RunSimultaneousIterations(100);
     std::array<absl::Span<const double>, 2> root_values =
         subgame->RootChildrenCfValues();
@@ -264,7 +263,7 @@ void ReplayFiller::FillReplayWithRandomSparsePbsSolutions() {
 
     // 3. Build subgame and solve it.
     std::unique_ptr<Subgame> subgame =
-        factory->MakeSubgame(particle_partition->primary, 1000, reuse->pbs_oracle);
+        factory->MakeSubgame(particle_partition->primary, 1000);
     subgame->RunSimultaneousIterations(100);
     PublicState& result = subgame->initial_state();
 

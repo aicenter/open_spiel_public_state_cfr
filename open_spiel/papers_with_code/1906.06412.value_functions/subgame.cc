@@ -53,7 +53,9 @@ std::unique_ptr<Subgame> SubgameFactory::MakeSubgame(
   auto out = std::make_unique<Subgame>(
       game, trees, evaluator, terminal_evaluator,
       public_observer, MakeBanditVectors(trees, use_bandits_for_cfr));
+  // Compute beliefs for the initial state.
   set.AssignBeliefs(out->initial_state());
+  // Set those beliefs as initial ones for DL-CFR.
   out->SetBeliefs(out->initial_state().beliefs);
   return out;
 }

@@ -33,11 +33,20 @@ void ParticleSet::AssignBeliefs(algorithms::dlcfr::PublicState& state) const {
   for (int pl = 0; pl < 2; ++pl) {
     SPIEL_CHECK_EQ(state.beliefs[pl].size(), state.nodes[pl].size());
     for (int i = 0; i < state.nodes[pl].size(); ++i) {
-      state.beliefs[pl][i] = 0.;
-      for(const std::unique_ptr<State>& s: state.nodes[pl][i]->corresponding_states()) {
-        const Particle& particle = at(s->History());
-        state.beliefs[pl][i] += particle.player_reach[pl];
-      }
+      SPIEL_CHECK_FALSE(state.nodes[pl][i]->corresponding_states().empty());
+      State* a_state = state.nodes[pl][i]->corresponding_states()[0].get();
+      const Particle& particle = at(a_state->History());
+      state.beliefs[pl][i] += particle.player_reach[pl];
+
+      SPIEL_DCHECK({
+         // All particles should have identical player beliefs
+         // for the same infostates.
+         for (const std::unique_ptr <State>& s:
+              state.nodes[pl][i]->corresponding_states()) {
+           const Particle& particle = at(s->History());
+           SPIEL_CHECK_EQ(state.beliefs[pl][i], particle.player_reach[pl]);
+         }
+       });
     }
   }
 }
@@ -62,7 +71,7 @@ const Particle& ParticleSet::at(const std::vector<Action>& history) const {
   }
   SpielFatalError("Particle not found");
 }
-Particle& ParticleSet::add(const std::vector <Action>& history) {
+Particle& ParticleSet::add(const std::vector<Action>& history) {
   particles.emplace_back(history);
   return particles.back();
 }

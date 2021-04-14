@@ -354,6 +354,7 @@ void DepthLimitedCFR::EvaluateLeaf(PublicState* state,
   }
 }
 
+// TODO: use initial state for this storage!
 void DepthLimitedCFR::SetBeliefs(
     const std::array<std::vector<double>, 2>& beliefs) {
   beliefs_ = beliefs;
