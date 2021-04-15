@@ -15,6 +15,7 @@
 #ifndef OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_REUSABLE_STRUCTS_
 #define OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_REUSABLE_STRUCTS_
 
+#include "open_spiel/algorithms/bandits_policy.h"
 #include "open_spiel/algorithms/infostate_dl_cfr.h"
 #include "open_spiel/algorithms/ortools/dl_oracle_evaluator.h"
 
@@ -50,6 +51,9 @@ struct ReusableStructures {
 
   std::unique_ptr<PublicStatesInGame> all_states;
   PublicStatesInGame* GetAllPublicStates();
+
+  std::vector<algorithms::BanditVector> fixable_bandits_for_all_public_states;
+  std::vector<algorithms::BanditVector>& GetFixableBanditsForAllPublicStates();
 };
 
 

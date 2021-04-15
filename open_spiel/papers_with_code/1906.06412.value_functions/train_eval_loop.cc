@@ -303,6 +303,7 @@ void TrainEvalLoop() {
   filler.shuffle_input_output = absl::GetFlag(FLAGS_shuffle_input_output);
   filler.sparse_particles     = absl::GetFlag(FLAGS_sparse_particles);
   filler.sparse_epsilon       = absl::GetFlag(FLAGS_sparse_epsilon);
+  filler.eval_iters = ItersFromString(absl::GetFlag(FLAGS_trunk_expl_iterations));
   //
   std::cout << "# Making evaluation metrics ..." << std::endl;
   std::vector<std::unique_ptr<Metric>> metrics;
@@ -333,17 +334,7 @@ void TrainEvalLoop() {
   //
   std::cout << "# Initializing experience replay (may take a while) ..."
             << std::endl;
-  switch (GetReplayInit(absl::GetFlag(FLAGS_exp_init))) {
-    case kTrunkDlcfr:
-      filler.FillReplayWithTrunkDlCfrPbsSolutions(
-          ItersFromString(absl::GetFlag(FLAGS_trunk_expl_iterations))); break;
-    case kTrunkRandom:
-      filler.FillReplayWithTrunkRandomPbsSolutions(); break;
-    case kPbsRandom:
-      filler.FillReplayWithRandomPbsSolutions(); break;
-    case kSparsePbsRandom:
-      filler.FillReplayWithRandomSparsePbsSolutions(); break;
-  }
+  filler.FillReplay(GetReplayFillerPolicy(absl::GetFlag(FLAGS_exp_init)));
 
   // ---------------------------------------------------------------------------
   std::cout << "# Ready to run the train/eval loop!" << std::endl;

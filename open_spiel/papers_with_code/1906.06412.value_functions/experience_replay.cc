@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "open_spiel/algorithms/bandits_policy.h"
 #include "open_spiel/algorithms/infostate_dl_cfr.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/experience_replay.h"
 
@@ -90,17 +91,17 @@ void ExperienceReplay::SampleBatch(BatchData* batch,
   }
 }
 
-ReplayFillerInit GetReplayInit(const std::string& s) {
-  if (s == "trunk_dlcfr")  return kTrunkDlcfr;
-  if (s == "trunk_random") return kTrunkRandom;
-  if (s == "pbs_random")   return kPbsRandom;
-  if (s == "sparse_pbs_random")   return kSparsePbsRandom;
-  SpielFatalError("Exhausted pattern match: exp_init");
+ReplayFillerPolicy GetReplayFillerPolicy(const std::string& s) {
+  if (s == "trunk_dlcfr")       return kTrunkDlcfr;
+  if (s == "trunk_random")      return kTrunkRandom;
+  if (s == "pbs_random")        return kPbsRandom;
+  if (s == "sparse_pbs_random") return kSparsePbsRandom;
+  SpielFatalError("Exhausted pattern match: ReplayFillerPolicy.");
 }
 
 void ReplayFiller::AddExperience(const PublicState& leaf,
                                  const NetContext* net_context) {
-  switch(arch) {
+  switch (arch) {
     case NetArchitecture::kParticle: {
       auto particle_dims = open_spiel::down_cast<const ParticleDims&>(*dims);
       ParticleDataPoint data_point = replay->AddExperience(particle_dims);
@@ -131,44 +132,38 @@ void ReplayFiller::AddExperiencesFromPublicStates(
   }
 }
 
-void ReplayFiller::FillReplayWithTrunkRandomPbsSolutions() {
+void ReplayFiller::AddTrunkRandomPbsSolution() {
   Subgame* fixable_trunk_with_oracle = reuse->GetFixableTrunkWithOracle();
-
-  std::cout << "# Generating random trunks to fill experience replay.\n# ";
   int num_states = fixable_trunk_with_oracle->public_states().size();
   auto public_state_dist = std::uniform_int_distribution<>(0, num_states - 1);
 
-  for (int i = 0; i < replay->size(); ++i) {
-    if (i % 10 == 0) std::cout << '.' << std::flush;
-
-    fixable_trunk_with_oracle->Reset();
-    // Randomize strategy in the trunk.
-    randomizer->Randomize(fixable_trunk_with_oracle->bandits());
-    // Compute the reach probs from the trunk.
-    fixable_trunk_with_oracle->UpdateReachProbs();
-    // Do not call bottom-up, just evaluate leaves.
-    fixable_trunk_with_oracle->EvaluateLeaves();
-    // Pick some valid public state.
-    // Loop until we find one. There should be always one -- or perhaps
-    // the trunk is too deep, getting into only terminal states.
-    PublicState* state = nullptr;
-    int pick_public_state;
-    while (!state || state->IsTerminal() || state->IsInitial()) {
-      pick_public_state = public_state_dist(*randomizer->rnd_gen);
-      state = &fixable_trunk_with_oracle->public_states()[pick_public_state];
-    }
-    // Add experience for that state.
-    auto context = factory->leaf_evaluator->CreateContext(*state);
-    auto net_context = open_spiel::down_cast<NetContext*>(context.get());
-    AddExperience(*state, net_context);
+  // Reset trunk.
+  fixable_trunk_with_oracle->Reset();
+  // Randomize strategy in the trunk.
+  randomizer->Randomize(fixable_trunk_with_oracle->bandits());
+  // Compute the reach probs from the trunk.
+  fixable_trunk_with_oracle->UpdateReachProbs();
+  // Do not call bottom-up, just evaluate leaves.
+  fixable_trunk_with_oracle->EvaluateLeaves();
+  // Pick some valid public state.
+  // Loop until we find one. There should be always one -- or perhaps
+  // the trunk is too deep, getting into only terminal states.
+  PublicState* state = nullptr;
+  int pick_public_state;
+  while (!state || state->IsTerminal() || state->IsInitial()) {
+    pick_public_state = public_state_dist(*randomizer->rnd_gen);
+    state = &fixable_trunk_with_oracle->public_states()[pick_public_state];
   }
-  std::cout << std::endl;
+
+  // Add experience for that state.
+  auto context = factory->leaf_evaluator->CreateContext(*state);
+  auto net_context = open_spiel::down_cast<NetContext*>(context.get());
+  AddExperience(*state, net_context);
 }
 
 // The network should imitate DL-CFR at each iteration
 // when we use this generation method.
-void ReplayFiller::FillReplayWithTrunkDlCfrPbsSolutions(
-    const std::vector<int>& eval_iters) {
+void ReplayFiller::FillReplayWithTrunkDlCfrPbsSolutions() {
   Subgame* iterable_trunk_with_oracle = reuse->GetIterableTrunkWithOracle();
   SequenceFormLpSpecification* sf_lp = reuse->GetSfLp();
 
@@ -203,95 +198,109 @@ void ReplayFiller::FillReplayWithTrunkDlCfrPbsSolutions(
     AddExperiencesFromPublicStates(iterable_trunk_with_oracle->public_states());
     iterable_trunk_with_oracle->UpdateTrunk();
   }
+
   std::cout << "# </ref_expl>\n";
+  SPIEL_CHECK_TRUE(replay->IsFilled() && replay->IsAtBeginning());
 }
 
-void ReplayFiller::FillReplayWithRandomPbsSolutions() {
+void ReplayFiller::AddRandomPbsSolution() {
   PublicStatesInGame* all_states = reuse->GetAllPublicStates();
-
-  std::cout << "# Generating random PBS and finding their solutions ...\n# ";
-  auto bandits = MakeBanditVectors(all_states->infostate_trees, "FixableStrategy");
+  std::vector<algorithms::BanditVector>& bandits =
+      reuse->GetFixableBanditsForAllPublicStates();
   const int num_states = all_states->public_states.size();
   auto public_state_dist = std::uniform_int_distribution<>(0, num_states - 1);
   SPIEL_CHECK_TRUE(randomizer->rnd_gen);
 
-  int i = 0;
-  while(i < replay->size()) {
-    // 1. Pick a public state and compute according beliefs.
+  // 1. Pick a public state
+  PublicState* state = nullptr;  // TODO: make sure we can also add terminals
+  while (!state || state->IsTerminal()) {
     const int pick_public_state = public_state_dist(*randomizer->rnd_gen);
-    PublicState& state = all_states->public_states[pick_public_state];
-    if (state.IsTerminal()) continue; // TODO: make sure we can also add terminals
-    randomizer->Randomize(bandits);
-    UpdateBeliefs(state, bandits);
-
-    // 2. Build subgame and solve it.
-    std::unique_ptr<Subgame> subgame = factory->MakeSubgame(state, 1000);
-    subgame->RunSimultaneousIterations(100);
-    std::array<absl::Span<const double>, 2> root_values =
-        subgame->RootChildrenCfValues();
-    for (int pl = 0; pl < 2; ++pl) {
-      SPIEL_CHECK_EQ(state.values[pl].size(), root_values[pl].size());
-      std::copy(root_values[pl].begin(), root_values[pl].end(),
-                state.values[pl].begin());
-    }
-
-    // 3. Add solution to the experiences.
-    auto context = factory->leaf_evaluator->CreateContext(state);
-    auto net_context = open_spiel::down_cast<NetContext*>(context.get());
-    AddExperience(state, net_context);
-    if (i % 100 == 0) std::cout << '.' << std::flush;
-    i++;
+    state = &all_states->public_states[pick_public_state];
   }
-  std::cout << std::endl;
-  SPIEL_CHECK_TRUE(replay->IsFilled() && replay->IsAtBeginning());
+
+  // 2. Assign randomized beliefs.
+  randomizer->Randomize(bandits);
+  UpdateBeliefs(*state, bandits);
+
+  // 3. Build subgame and solve it.
+  std::unique_ptr<Subgame> subgame = factory->MakeSubgame(*state, 1000);
+  subgame->RunSimultaneousIterations(100);
+  std::array<absl::Span<const double>, 2> root_values =
+      subgame->RootChildrenCfValues();
+  for (int pl = 0; pl < 2; ++pl) {
+    SPIEL_CHECK_EQ(state->values[pl].size(), root_values[pl].size());
+    std::copy(root_values[pl].begin(), root_values[pl].end(),
+              state->values[pl].begin());
+  }
+
+  // 4. Add solution to the experiences.
+  auto context = factory->leaf_evaluator->CreateContext(*state);
+  auto net_context = open_spiel::down_cast<NetContext*>(context.get());
+  AddExperience(*state, net_context);
 }
 
-void ReplayFiller::FillReplayWithRandomSparsePbsSolutions() {
+void ReplayFiller::AddRandomSparsePbsSolution() {
   PublicStatesInGame* all_states = reuse->GetAllPublicStates();
-
-  std::cout << "# Generating random sparse PBS and finding their solutions ...\n# ";
-  auto bandits = MakeBanditVectors(all_states->infostate_trees, "FixableStrategy");
+  std::vector<algorithms::BanditVector>& bandits =
+      reuse->GetFixableBanditsForAllPublicStates();
   const int num_states = all_states->public_states.size();
   auto public_state_dist = std::uniform_int_distribution<>(0, num_states - 1);
   SPIEL_CHECK_TRUE(randomizer->rnd_gen);
   SPIEL_CHECK_GT(sparse_particles, 0);
 
-  int i = 0;
-  while(i < replay->size()) {
-    // 1. Pick a public state and compute according beliefs.
+  // 1. Pick a "nice" public state.
+  PublicState* state = nullptr;
+  // TODO: check IsReachable() is correct wrt cfvs
+  while (!state || !state->IsReachable()) {
     const int pick_public_state = public_state_dist(*randomizer->rnd_gen);
-    PublicState& state = all_states->public_states[pick_public_state];
-    if (state.IsTerminal()) continue; // TODO: make sure we can also add terminals
+    state = &all_states->public_states.at(pick_public_state);
+    // TODO: make sure we can also add terminals
+    if (state->IsTerminal()) continue;
+
+    // 2. Assign randomized beliefs.
     randomizer->Randomize(bandits);
-    UpdateBeliefs(state, bandits);
-    if (!state.IsReachable()) continue; // TODO: check this is correct wrt cfvs
+    UpdateBeliefs(*state, bandits);
+  }
 
-    // 2. Pick the most probable particles.
-    std::unique_ptr<ParticleSetPartition> particle_partition =
-        MakeParticleSetPartition(state, sparse_particles, sparse_epsilon,
-                                 /*save_secondary=*/false, *randomizer->rnd_gen);
+  // 3. Pick the most probable particles.
+  std::unique_ptr<ParticleSetPartition> particle_partition =
+      MakeParticleSetPartition(*state, sparse_particles, sparse_epsilon,
+          /*save_secondary=*/false, *randomizer->rnd_gen);
 
-    // 3. Build subgame and solve it.
-    std::unique_ptr<Subgame> subgame =
-        factory->MakeSubgame(particle_partition->primary, 1000);
-    subgame->RunSimultaneousIterations(100);
-    PublicState& result = subgame->initial_state();
+  // 5. Build subgame and solve it.
+  std::unique_ptr<Subgame> subgame =
+      factory->MakeSubgame(particle_partition->primary, 1000);
+  subgame->RunSimultaneousIterations(100);
+  PublicState& result = subgame->initial_state();
 
-    // 4. Copy the solution to state.
-    std::array<absl::Span<const double>, 2> root_values =
-        subgame->RootChildrenCfValues();
-    for (int pl = 0; pl < 2; ++pl) {
-      SPIEL_CHECK_EQ(result.values[pl].size(), root_values[pl].size());
-      std::copy(root_values[pl].begin(), root_values[pl].end(),
-                result.values[pl].begin());
+  // 6. Copy the solution to state.
+  std::array<absl::Span<const double>, 2> root_values =
+      subgame->RootChildrenCfValues();
+  for (int pl = 0; pl < 2; ++pl) {
+    SPIEL_CHECK_EQ(result.values[pl].size(), root_values[pl].size());
+    std::copy(root_values[pl].begin(), root_values[pl].end(),
+              result.values[pl].begin());
+  }
+
+  // 7. Add solution to the experiences.
+  auto context = factory->leaf_evaluator->CreateContext(result);
+  auto net_context = open_spiel::down_cast<NetContext*>(context.get());
+  AddExperience(result, net_context);
+}
+
+void ReplayFiller::FillReplay(ReplayFillerPolicy fill_policy) {
+  replay->ResetHead();
+  if (fill_policy == kTrunkDlcfr) return FillReplayWithTrunkDlCfrPbsSolutions();
+
+  std::cout << "# ";
+  for (int i = 0; i < replay->size(); ++i) {
+    if (i % 10 == 0) std::cout << '.' << std::flush;
+    switch (fill_policy) {
+      case kTrunkRandom:     AddTrunkRandomPbsSolution();  break;
+      case kPbsRandom:       AddRandomPbsSolution();       break;
+      case kSparsePbsRandom: AddRandomSparsePbsSolution(); break;
+      default: SpielFatalError("Exhausted pattern match on ReplayFillerPolicy");
     }
-
-    // 5. Add solution to the experiences.
-    auto context = factory->leaf_evaluator->CreateContext(result);
-    auto net_context = open_spiel::down_cast<NetContext*>(context.get());
-    AddExperience(result, net_context);
-    if (i % 100 == 0) std::cout << '.' << std::flush;
-    i++;
   }
   std::cout << std::endl;
   SPIEL_CHECK_TRUE(replay->IsFilled() && replay->IsAtBeginning());

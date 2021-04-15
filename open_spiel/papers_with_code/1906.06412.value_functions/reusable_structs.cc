@@ -54,6 +54,14 @@ PublicStatesInGame* ReusableStructures::GetAllPublicStates() {
   }
   return all_states.get();
 }
+std::vector<algorithms::BanditVector>&
+    ReusableStructures::GetFixableBanditsForAllPublicStates() {
+  if (fixable_bandits_for_all_public_states.empty()) {
+    fixable_bandits_for_all_public_states =
+        MakeBanditVectors(GetAllPublicStates()->infostate_trees, "FixableStrategy");
+  }
+  return fixable_bandits_for_all_public_states;
+}
 
 }  // papers_with_code
 }  // open_spiel

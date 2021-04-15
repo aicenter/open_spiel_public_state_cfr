@@ -42,18 +42,19 @@ class ExperienceReplay : public BatchData {
   void SampleBatch(BatchData* batch, std::mt19937& rnd_gen) const;
   bool IsFilled() const { return overflow_cnt_ > 0; }
   bool IsAtBeginning() const { return head_ == 0; }
+  void ResetHead() { head_ = 0; }
 
  protected:
   void AdvanceHead();
 };
 
-enum ReplayFillerInit {
+enum ReplayFillerPolicy {
   kTrunkDlcfr,
   kTrunkRandom,
   kPbsRandom,
   kSparsePbsRandom,
 };
-ReplayFillerInit GetReplayInit(const std::string& s);  // Enum from string.
+ReplayFillerPolicy GetReplayFillerPolicy(const std::string& s);  // From string.
 
 // Helper struct so we don't need to pass so many parameters
 // for bandit randomization.
@@ -82,15 +83,18 @@ struct ReplayFiller {
   bool shuffle_input_output = false;
   int sparse_particles = 0;
   double sparse_epsilon = 0.;
+  std::vector<int> eval_iters;
 
-  void AddExperience(const PublicState& state,
-                     const NetContext* net_context);
+  void FillReplay(ReplayFillerPolicy fill_policy);
+
+ protected:
+  void AddTrunkRandomPbsSolution();
+  void AddRandomPbsSolution();
+  void AddRandomSparsePbsSolution();
+  void FillReplayWithTrunkDlCfrPbsSolutions();
+
+  void AddExperience(const PublicState& state, const NetContext* net_context);
   void AddExperiencesFromPublicStates(const std::vector<PublicState>& states);
-
-  void FillReplayWithTrunkRandomPbsSolutions();
-  void FillReplayWithTrunkDlCfrPbsSolutions(const std::vector<int>& eval_iters);
-  void FillReplayWithRandomPbsSolutions();
-  void FillReplayWithRandomSparsePbsSolutions();
 };
 
 }  // papers_with_code
