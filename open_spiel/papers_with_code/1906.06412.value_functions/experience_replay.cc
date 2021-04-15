@@ -179,6 +179,9 @@ void ReplayFiller::FillReplayWithTrunkDlCfrPbsSolutions(
   }
   SPIEL_CHECK_GT(num_non_terminal_leaves, 0);
   int num_trunks = replay->size() / num_non_terminal_leaves;
+  // This replay filling is intended only for special test use cases -- you
+  // should know the size of the buffer before hand.
+  SPIEL_CHECK_EQ(num_trunks * num_non_terminal_leaves, replay->size());
 
   std::cout << "# <ref_expl>\n";
   std::cout << "# trunk_iter,expl\n";
