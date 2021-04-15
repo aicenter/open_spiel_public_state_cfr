@@ -135,14 +135,10 @@ void ReplayFiller::FillReplayWithTrunkRandomPbsSolutions() {
   Subgame* fixable_trunk_with_oracle = reuse->GetFixableTrunkWithOracle();
 
   std::cout << "# Generating random trunks to fill experience replay.\n# ";
-  int num_non_terminal_leaves = 0;
-  for (auto& state: fixable_trunk_with_oracle->public_states()) {
-    if (!state.IsTerminal() && state.IsLeaf()) num_non_terminal_leaves++;
-  }
-  SPIEL_CHECK_GT(num_non_terminal_leaves, 0);
-  int num_trunks = replay->size() / num_non_terminal_leaves;
+  int num_states = fixable_trunk_with_oracle->public_states().size();
+  auto public_state_dist = std::uniform_int_distribution<>(0, num_states - 1);
 
-  for (int i = 0; i < num_trunks; ++i) {
+  for (int i = 0; i < replay->size(); ++i) {
     if (i % 10 == 0) std::cout << '.' << std::flush;
 
     fixable_trunk_with_oracle->Reset();
@@ -152,8 +148,19 @@ void ReplayFiller::FillReplayWithTrunkRandomPbsSolutions() {
     fixable_trunk_with_oracle->UpdateReachProbs();
     // Do not call bottom-up, just evaluate leaves.
     fixable_trunk_with_oracle->EvaluateLeaves();
-    // Copy the leaves values to the experience replay.
-    AddExperiencesFromPublicStates(fixable_trunk_with_oracle->public_states());
+    // Pick some valid public state.
+    // Loop until we find one. There should be always one -- or perhaps
+    // the trunk is too deep, getting into only terminal states.
+    PublicState* state = nullptr;
+    int pick_public_state;
+    while (!state || state->IsTerminal() || state->IsInitial()) {
+      pick_public_state = public_state_dist(*randomizer->rnd_gen);
+      state = &fixable_trunk_with_oracle->public_states()[pick_public_state];
+    }
+    // Add experience for that state.
+    auto context = factory->leaf_evaluator->CreateContext(*state);
+    auto net_context = open_spiel::down_cast<NetContext*>(context.get());
+    AddExperience(*state, net_context);
   }
   std::cout << std::endl;
 }
