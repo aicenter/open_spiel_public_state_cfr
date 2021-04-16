@@ -23,6 +23,7 @@
 #include "open_spiel/algorithms/ortools/dl_oracle_evaluator.h"
 
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_architectures.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/experience_replay.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_data.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/subgame.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/sparse_trunk.h"
@@ -51,6 +52,9 @@ std::unique_ptr<Metric> MakeSparseRootsExplMetric(
     int roots_depth,
     double support_threshold,
     bool prune_chance_histories);
+
+std::unique_ptr<Metric> MakeReplayVisitsMetric(
+    ExperienceReplay* replay, int window);
 
 void ComputeMetrics(std::vector<std::unique_ptr<Metric>>& metrics);
 void PrintHeaders(const std::vector<std::unique_ptr<Metric>>& metrics);

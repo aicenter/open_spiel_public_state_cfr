@@ -60,6 +60,7 @@ PositionalDataPoint ExperienceReplay::AddExperience(const PositionalDims& dims) 
 }
 
 void ExperienceReplay::AdvanceHead() {
+  visit_cnt_[head_] = 0;
   ++head_;
   if (head_ >= size()) {
     head_ = 0;
@@ -67,8 +68,7 @@ void ExperienceReplay::AdvanceHead() {
   }
 }
 
-void ExperienceReplay::SampleBatch(BatchData* batch,
-                                   std::mt19937& rnd_gen) const {
+void ExperienceReplay::SampleBatch(BatchData* batch, std::mt19937& rnd_gen) {
   // Do not sample non-filled experiences.
   const int n = overflow_cnt_ == 0 ? head_ : size();
   const int k = batch->size();
@@ -86,12 +86,14 @@ void ExperienceReplay::SampleBatch(BatchData* batch,
   std::shuffle(perm.begin(), perm.end(), rnd_gen);
 
   for (int i = 0; i < k; ++i) {
+    ++visit_cnt_[perm[i]];
     batch->data[i].copy_(data[perm[i]]);
     batch->target[i].copy_(target[perm[i]]);
   }
 }
 
 ReplayFillerPolicy GetReplayFillerPolicy(const std::string& s) {
+  if (s == "nothing")           return kNothing;
   if (s == "trunk_dlcfr")       return kTrunkDlcfr;
   if (s == "trunk_random")      return kTrunkRandom;
   if (s == "pbs_random")        return kPbsRandom;
@@ -288,21 +290,28 @@ void ReplayFiller::AddRandomSparsePbsSolution() {
   AddExperience(result, net_context);
 }
 
-void ReplayFiller::FillReplay(ReplayFillerPolicy fill_policy) {
-  replay->ResetHead();
-  if (fill_policy == kTrunkDlcfr) return FillReplayWithTrunkDlCfrPbsSolutions();
-
+void ReplayFiller::CreateExperience(ReplayFillerPolicy fill_policy,
+                                    int num_experiences) {
+  SPIEL_CHECK_LE(num_experiences, replay->size());
   std::cout << "# ";
-  for (int i = 0; i < replay->size(); ++i) {
+  for (int i = 0; i < num_experiences; ++i) {
     if (i % 10 == 0) std::cout << '.' << std::flush;
     switch (fill_policy) {
       case kTrunkRandom:     AddTrunkRandomPbsSolution();  break;
       case kPbsRandom:       AddRandomPbsSolution();       break;
       case kSparsePbsRandom: AddRandomSparsePbsSolution(); break;
+      case kNothing:         break;
       default: SpielFatalError("Exhausted pattern match on ReplayFillerPolicy");
     }
   }
   std::cout << std::endl;
+}
+
+void ReplayFiller::FillReplay(ReplayFillerPolicy fill_policy) {
+  replay->ResetHead();
+  if (fill_policy == kTrunkDlcfr) return FillReplayWithTrunkDlCfrPbsSolutions();
+
+  CreateExperience(fill_policy, replay->size());
   SPIEL_CHECK_TRUE(replay->IsFilled() && replay->IsAtBeginning());
 }
 

@@ -220,6 +220,33 @@ class SparseRootsExplMetric : public Metric {
   }
 };
 
+class ReplayVisitsMetric : public Metric {
+  ExperienceReplay* replay_;
+  int window_;
+  double avg_visits_;
+ public:
+  ReplayVisitsMetric(ExperienceReplay* replay, int window)
+      : replay_(replay), window_(window) {}
+
+  std::string name() const override { return "replay_visits"; }
+
+  void Evaluate(std::ostream& progress) override {
+    double total_visits = 0;
+    const int head = replay_->head();
+    const std::vector<int>& visit_cnt = replay_->visit_cnt();
+    const int size = replay_->size();
+    SPIEL_CHECK_EQ(replay_->size(), visit_cnt.size());
+    for (int i = 0; i < window_; ++i) {
+      total_visits += visit_cnt[(size + head - i) % size];
+    }
+    avg_visits_ = total_visits / window_;
+  }
+
+  void PrintHeader(std::ostream& os) const override { os << name(); }
+  void PrintMetric(std::ostream& os) const override { os << avg_visits_; }
+  void Reset() override { avg_visits_ = 0;  }
+};
+
 std::unique_ptr<Metric> MakeFullTrunkExplMetric(
     std::vector<int> evaluate_iters, dlcfr::DepthLimitedCFR* trunk_with_net,
     ortools::SequenceFormLpSpecification* whole_game) {
@@ -235,6 +262,11 @@ std::unique_ptr<Metric> MakeSparseRootsExplMetric(
   return std::make_unique<SparseRootsExplMetric>(
       factory, whole_game, evaluate_iters,
       roots_depth, support_threshold, prune_chance_histories);
+}
+
+std::unique_ptr<Metric> MakeReplayVisitsMetric(ExperienceReplay* replay,
+                                               int window) {
+  return std::make_unique<ReplayVisitsMetric>(replay, window);
 }
 
 void ComputeMetrics(std::vector<std::unique_ptr<Metric>>& metrics) {

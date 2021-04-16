@@ -41,6 +41,13 @@ ABSL_FLAG(int, sparse_particles, 1000,
           "Number of particles to use for sparse pbs generation");
 ABSL_FLAG(double, sparse_epsilon, 0.,
           "How uniformly should the particles be sampled? [0,1] interval");
+ABSL_FLAG(std::string, exp_loop, "nothing",
+          "How the experience replay should be updated.");
+ABSL_FLAG(int, exp_loop_new, 128,
+          "Update experience replay every n steps.");
+ABSL_FLAG(int, exp_update, 128,
+          "Update experience replay every n steps.");
+
 
 // -- Training --
 ABSL_FLAG(int, train_batches, 32,
@@ -48,7 +55,8 @@ ABSL_FLAG(int, train_batches, 32,
 ABSL_FLAG(int, batch_size, 32,
           "Batch size per train step. If <1, then full replay buffer is used.");
 ABSL_FLAG(int, num_loops, 5000, "Number of train-eval loops.");
-ABSL_FLAG(double, learning_rate, 1e-3, "Optimizer (adam/sgd) learning rate.");
+ABSL_FLAG(std::string, optimizer, "adam", "Optimizer. One of adam/sgd");
+ABSL_FLAG(double, learning_rate, 1e-3, "Optimizer learning rate.");
 ABSL_FLAG(double, lr_decay, 1., "Learning rate decay after each loop.");
 ABSL_FLAG(int, max_particles, -1,
           "Max particles to use. Set -1 to find an upper bound automatically.");
@@ -77,7 +85,10 @@ ABSL_FLAG(double, sparse_support_threshold, 1e-5,
           "used for trunk sparsification.");
 ABSL_FLAG(bool, sparse_prune_chance_histories, false,
           "If true, do not start at chance histories.");
-
+// ReplayVisitsMetric
+ABSL_FLAG(int, replay_visits_window, -1,
+          "Track the average visit count over a past window "
+          "behind the head in experience reaply");
 
 // -----------------------------------------------------------------------------
 
@@ -119,10 +130,10 @@ double TrainNetwork(ValueNet* model, torch::Device* device,
   return loss.item().to<double>();
 }
 
-void DecayLearningRate(torch::optim::Optimizer& optimizer, double lr_decay) {
-  for (auto &group : optimizer.param_groups()) {
+void DecayLearningRate(torch::optim::Optimizer* optimizer, double lr_decay) {
+  for (auto &group : optimizer->param_groups()) {
     if(group.has_options()) {
-      auto &options = static_cast<torch::optim::AdamOptions &>(group.options());
+      auto &options = static_cast<torch::optim::SGDOptions &>(group.options());
       options.lr(options.lr() * lr_decay);
     }
   }
@@ -139,6 +150,20 @@ int LargestPublicState(const std::vector<PublicState>& states) {
   }
   SPIEL_CHECK_GT(max_size, 0);
   return max_size;
+}
+
+std::unique_ptr<torch::optim::Optimizer> MakeOptimizer(ValueNet* model) {
+  std::string choice = absl::GetFlag(FLAGS_optimizer);
+  if (choice == "sgd") {
+    return std::make_unique<torch::optim::SGD>(
+        model->parameters(),
+        torch::optim::SGDOptions(absl::GetFlag(FLAGS_learning_rate)));
+  }
+  if (choice == "adam") {
+    return std::make_unique<torch::optim::Adam>(
+        model->parameters(),
+        torch::optim::AdamOptions(absl::GetFlag(FLAGS_learning_rate)));
+  }
 }
 
 void TrainEvalLoop() {
@@ -258,11 +283,8 @@ void TrainEvalLoop() {
   model->to(device);
   //
   std::cout << "# Creating optimizer ..." << std::endl;
-  torch::optim::Adam optimizer(
-      model->parameters(),
-      torch::optim::AdamOptions()
-        .lr(absl::GetFlag(FLAGS_learning_rate))
-  );
+  std::unique_ptr<torch::optim::Optimizer> optimizer =
+      MakeOptimizer(model.get());
   const double lr_decay = absl::GetFlag(FLAGS_lr_decay);
   //
   const float size_mb = absl::GetFlag(FLAGS_replay_size)
@@ -331,10 +353,22 @@ void TrainEvalLoop() {
           absl::GetFlag(FLAGS_sparse_prune_chance_histories)));
     }
   }
+  {
+    int window = absl::GetFlag(FLAGS_replay_visits_window);
+    if (window > 0) {
+      std::cout << "# Making replay visits metric ..." << std::endl;
+      metrics.push_back(MakeReplayVisitsMetric(&experience_replay, window));
+    }
+  }
   //
   std::cout << "# Initializing experience replay (may take a while) ..."
             << std::endl;
-  filler.FillReplay(GetReplayFillerPolicy(absl::GetFlag(FLAGS_exp_init)));
+  ReplayFillerPolicy exp_init = GetReplayFillerPolicy(absl::GetFlag(FLAGS_exp_init));
+  filler.FillReplay(exp_init);
+  //
+  ReplayFillerPolicy exp_loop = GetReplayFillerPolicy(absl::GetFlag(FLAGS_exp_loop));
+  int exp_loop_new = absl::GetFlag(FLAGS_exp_loop_new);
+  int exp_update = absl::GetFlag(FLAGS_exp_update);
 
   // ---------------------------------------------------------------------------
   std::cout << "# Ready to run the train/eval loop!" << std::endl;
@@ -353,7 +387,7 @@ void TrainEvalLoop() {
     for (int i = 0; i < train_batches; ++i) {
       experience_replay.SampleBatch(&train_batch, rnd_gen);
       cumul_loss += TrainNetwork(model.get(), &device,
-                                 &optimizer, &train_batch);
+                                 optimizer.get(), &train_batch);
       std::cout << '.' << std::flush;
     }
     std::cout << std::endl;
@@ -361,11 +395,17 @@ void TrainEvalLoop() {
     std::cout << "# Evaluating " << std::endl;
     model->eval();  // Eval mode.
     ComputeMetrics(metrics);
+    // Always print avg loss.
     std::cout << loop << ',' << cumul_loss / train_batches;
     PrintMetrics(metrics);
     std::cout << std::endl;
 
-    DecayLearningRate(optimizer, lr_decay);
+    if (loop % exp_loop_new == 0 && loop > 0 && exp_loop != kNothing) {
+      std::cout << "# Making new experience ..." << std::endl;
+      filler.CreateExperience(exp_loop, exp_update);
+    }
+
+//    DecayLearningRate(optimizer.get(), lr_decay);
   }
 }
 

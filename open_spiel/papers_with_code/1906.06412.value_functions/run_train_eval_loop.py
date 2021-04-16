@@ -163,9 +163,51 @@ def sparse_roots():
                                "sparse_support_threshold", "seed"],
                   comb_param_fn=special_case)
 
+def training_dynamics():
+  base_params = dict(
+    arch="particle_vf",
+    batch_size="64",
+    cfr_oracle_iterations="100",
+    depth="7",
+    device="cpu",
+    exp_init="pbs_random",
+    exp_loop="nothing",
+    exp_loop_new="32",
+    exp_update="128",
+    game_name="leduc_poker",
+    max_particles="-1",
+    num_inputs_regression="-1",
+    num_layers="5",
+    num_loops="2048",
+    num_width="5",
+    prob_pure_strat="0.1",
+    replay_size="2048",
+    seed="0",
+    shuffle_input_output="true",
+    sparse_particles="30",
+    train_batches="32",
+    trunk_expl_iterations="100",
+    use_bandits_for_cfr="RegretMatchingPlus",
+    learning_rate="0.001",
+    optimizer="adam",
+    replay_visits_window="32",
+  )
+
+  def param_fn(param, context):
+    if param == "exp_loop_new":
+      return [16, 32, 64, 128, 256, 512]
+    elif param == "exp_update":
+      return [64, 128, 512, 1024, 2048]
+
+  sweep.run_sweep(backend, backend_params, binary_path,
+                  base_output_dir=f"{home}/experiments/training_dynamics",
+                  base_params=base_params,
+                  comb_params=["exp_loop_new", "exp_update"],
+                  comb_param_fn=param_fn)
 
 EXPERIMENTS_ = dict(vf_comparison=vf_comparison,
-                    sparse_roots=sparse_roots)
+                    sparse_roots=sparse_roots,
+                    training_dynamics=training_dynamics)
 
 if __name__ == '__main__':
   for arg in sys.argv:

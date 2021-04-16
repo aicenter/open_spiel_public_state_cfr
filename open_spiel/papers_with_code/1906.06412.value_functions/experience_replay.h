@@ -30,25 +30,31 @@ class ExperienceReplay : public BatchData {
   size_t head_ = 0;
   // Track how many times the whole buffer has been rewritten.
   size_t overflow_cnt_ = 0;
+  // Track how many times each experience has been sampled.
+  std::vector<int> visit_cnt_;
  public:
   ExperienceReplay(int buffer_size, int input_size, int output_size)
-    : BatchData(buffer_size, input_size, output_size) {}
+    : BatchData(buffer_size, input_size, output_size),
+      visit_cnt_(buffer_size, 0) {}
 
   // Return a data point that can be written to.
   ParticleDataPoint AddExperience(const ParticleDims& dims);
   PositionalDataPoint AddExperience(const PositionalDims& dims);
 
   // Fill batch with randomly sampled data points.
-  void SampleBatch(BatchData* batch, std::mt19937& rnd_gen) const;
+  void SampleBatch(BatchData* batch, std::mt19937& rnd_gen);
   bool IsFilled() const { return overflow_cnt_ > 0; }
   bool IsAtBeginning() const { return head_ == 0; }
   void ResetHead() { head_ = 0; }
+  size_t head() const { return head_; }
+  const std::vector<int>& visit_cnt() const { return visit_cnt_; }
 
  protected:
   void AdvanceHead();
 };
 
 enum ReplayFillerPolicy {
+  kNothing,
   kTrunkDlcfr,
   kTrunkRandom,
   kPbsRandom,
@@ -86,6 +92,7 @@ struct ReplayFiller {
   std::vector<int> eval_iters;
 
   void FillReplay(ReplayFillerPolicy fill_policy);
+  void CreateExperience(ReplayFillerPolicy fill_policy, int num_experiences);
 
  protected:
   void AddTrunkRandomPbsSolution();
