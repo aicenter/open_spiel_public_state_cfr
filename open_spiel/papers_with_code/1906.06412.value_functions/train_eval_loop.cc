@@ -27,8 +27,6 @@ ABSL_FLAG(std::string, use_bandits_for_cfr, "RegretMatchingPlus",
           "Which bandit should be used in the trunk.");
 
 // -- Data generation --
-ABSL_FLAG(std::string, exp_init, "trunk_random",
-          "One of trunk_random,trunk_dlcfr,pbs_random,sparse_pbs_random");
 ABSL_FLAG(int, depth, 3, "Depth of the trunk.");
 ABSL_FLAG(double, prob_pure_strat, 0.1, "Params for random generation.");
 ABSL_FLAG(double, prob_fully_mixed, 0.05, "Params for random generation.");
@@ -41,13 +39,17 @@ ABSL_FLAG(int, sparse_particles, 1000,
           "Number of particles to use for sparse pbs generation");
 ABSL_FLAG(double, sparse_epsilon, 0.,
           "How uniformly should the particles be sampled? [0,1] interval");
+
+ABSL_FLAG(std::string, exp_init, "trunk_random",
+          "Init experience. See options in code.");
+ABSL_FLAG(int, exp_init_size, -1, "How many experiences should be initialized."
+                                  " -1 fills replay buffer.");
 ABSL_FLAG(std::string, exp_loop, "nothing",
           "How the experience replay should be updated.");
 ABSL_FLAG(int, exp_loop_new, 128,
-          "Update experience replay every n steps.");
-ABSL_FLAG(int, exp_update, 128,
-          "Update experience replay every n steps.");
-
+          "Update experience replay every n steps of the train-eval loop.");
+ABSL_FLAG(int, exp_update_size, 128, "How many experiences should be updated. "
+                                     "-1 for the whole replay buffer");
 
 // -- Training --
 ABSL_FLAG(int, train_batches, 32,
@@ -364,11 +366,12 @@ void TrainEvalLoop() {
   std::cout << "# Initializing experience replay (may take a while) ..."
             << std::endl;
   ReplayFillerPolicy exp_init = GetReplayFillerPolicy(absl::GetFlag(FLAGS_exp_init));
-  filler.FillReplay(exp_init);
+  int exp_init_size = absl::GetFlag(FLAGS_exp_init_size);
+  filler.CreateExperiences(exp_init, exp_init_size);
   //
   ReplayFillerPolicy exp_loop = GetReplayFillerPolicy(absl::GetFlag(FLAGS_exp_loop));
   int exp_loop_new = absl::GetFlag(FLAGS_exp_loop_new);
-  int exp_update = absl::GetFlag(FLAGS_exp_update);
+  int exp_update_size = absl::GetFlag(FLAGS_exp_update_size);
 
   // ---------------------------------------------------------------------------
   std::cout << "# Ready to run the train/eval loop!" << std::endl;
@@ -402,7 +405,7 @@ void TrainEvalLoop() {
 
     if (loop % exp_loop_new == 0 && loop > 0 && exp_loop != kNothing) {
       std::cout << "# Making new experience ..." << std::endl;
-      filler.CreateExperience(exp_loop, exp_update);
+      filler.CreateExperiences(exp_loop, exp_update_size);
     }
 
 //    DecayLearningRate(optimizer.get(), lr_decay);

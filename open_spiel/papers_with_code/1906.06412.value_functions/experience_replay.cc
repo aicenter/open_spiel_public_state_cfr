@@ -290,9 +290,16 @@ void ReplayFiller::AddRandomSparsePbsSolution() {
   AddExperience(result, net_context);
 }
 
-void ReplayFiller::CreateExperience(ReplayFillerPolicy fill_policy,
-                                    int num_experiences) {
+void ReplayFiller::CreateExperiences(ReplayFillerPolicy fill_policy,
+                                     int num_experiences) {
   SPIEL_CHECK_LE(num_experiences, replay->size());
+  if (num_experiences == -1) num_experiences = replay->size();
+
+  if (fill_policy == kTrunkDlcfr) {
+    SPIEL_CHECK_EQ(num_experiences, replay->size());
+    return FillReplayWithTrunkDlCfrPbsSolutions();
+  }
+
   std::cout << "# ";
   for (int i = 0; i < num_experiences; ++i) {
     if (i % 10 == 0) std::cout << '.' << std::flush;
@@ -305,14 +312,6 @@ void ReplayFiller::CreateExperience(ReplayFillerPolicy fill_policy,
     }
   }
   std::cout << std::endl;
-}
-
-void ReplayFiller::FillReplay(ReplayFillerPolicy fill_policy) {
-  replay->ResetHead();
-  if (fill_policy == kTrunkDlcfr) return FillReplayWithTrunkDlCfrPbsSolutions();
-
-  CreateExperience(fill_policy, replay->size());
-  SPIEL_CHECK_TRUE(replay->IsFilled() && replay->IsAtBeginning());
 }
 
 }  // papers_with_code

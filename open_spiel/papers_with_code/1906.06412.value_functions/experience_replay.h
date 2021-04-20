@@ -91,8 +91,7 @@ struct ReplayFiller {
   double sparse_epsilon = 0.;
   std::vector<int> eval_iters;
 
-  void FillReplay(ReplayFillerPolicy fill_policy);
-  void CreateExperience(ReplayFillerPolicy fill_policy, int num_experiences);
+  void CreateExperiences(ReplayFillerPolicy fill_policy, int num_experiences);
 
  protected:
   void AddTrunkRandomPbsSolution();
