@@ -90,7 +90,7 @@ ABSL_FLAG(bool, sparse_prune_chance_histories, false,
 // ReplayVisitsMetric
 ABSL_FLAG(int, replay_visits_window, -1,
           "Track the average visit count over a past window "
-          "behind the head in experience reaply");
+          "behind the head in experience replay");
 
 // -----------------------------------------------------------------------------
 
@@ -170,7 +170,7 @@ std::unique_ptr<torch::optim::Optimizer> MakeOptimizer(ValueNet* model) {
 }
 
 float size_mb(int replay_size, int input_size, int output_size) {
-  return replay_size * input_size + output_size * 4 / 1024. / 1024.;
+  return replay_size * (input_size + output_size) * 4 / 1024. / 1024.;
 }
 
 void TrainEvalLoop() {
@@ -362,35 +362,54 @@ void TrainEvalLoop() {
     int window = absl::GetFlag(FLAGS_replay_visits_window);
     if (window > 0) {
       std::cout << "# Making replay visits metric ..." << std::endl;
+      SPIEL_CHECK_LE(window, replay_size);
       metrics.push_back(MakeReplayVisitsMetric(&experience_replay, window));
     }
   }
   //
-  std::cout << "# Initializing experience replay (may take a while) ..."
-            << std::endl;
   ReplayFillerPolicy exp_init = GetReplayFillerPolicy(absl::GetFlag(FLAGS_exp_init));
+  SPIEL_CHECK_NE(exp_init, kNothing);
   int exp_init_size = absl::GetFlag(FLAGS_exp_init_size);
-  filler.CreateExperiences(exp_init, exp_init_size);
   //
   ReplayFillerPolicy exp_loop = GetReplayFillerPolicy(absl::GetFlag(FLAGS_exp_loop));
   int exp_loop_new = absl::GetFlag(FLAGS_exp_loop_new);
+  // Must have some non-zero value, so we can also init experience.
+  // Use exp_loop="nothing" to skip experience regeneration.
+  SPIEL_CHECK_GT(exp_loop_new, 0);
   int exp_update_size = absl::GetFlag(FLAGS_exp_update_size);
+  if (exp_update_size == -1) exp_update_size = replay_size;
   //
   const int num_loops = absl::GetFlag(FLAGS_num_loops);
   const int train_batches = absl::GetFlag(FLAGS_train_batches);
   //
   if (exp_loop == kBootstrap) {
-    SPIEL_CHECK_EQ(exp_init, kNothing);
-    int bootstrap_size = (num_loops / exp_loop_new + 1) * exp_update_size;
-    std::cout << "# Will bootstrap the neural network.\n"
+    // First loop is not "regenerated" -- it is initialized.
+    const int num_regenerations = num_loops / exp_loop_new - 1;
+    // Skips root (move_number=0) and terminals (move_number=max):
+    // - computing root is unnecessary for bootstrapping.
+    // - terminals can be initialized using a custom exp_init.
+    const int bootstrap_depths = factory.game->MaxMoveNumber() - 2;
+    std::cout << "# Num regeneration steps: " << num_regenerations << "\n";
+    std::cout << "# Bootstrap depths: " << bootstrap_depths << "\n";
+    SPIEL_CHECK_EQ(bootstrap_depths, num_regenerations);
+
+    // Bootstrap replay must hold all created experiences,
+    // i.e. from initialization as well as from regeneration.
+    const int bootstrap_size = replay_size  // For init.
+                             // Regeneration per each depth.
+                             + exp_update_size * num_regenerations;
+
+    std::cout << "# Bootstrap size: " << bootstrap_size << "\n";
+    std::cout << "# Will be bootstrapping using replay of size: "
+              << bootstrap_size << "\n"
               << "# Allocating bootstrap replay ("
               << size_mb(bootstrap_size, dims->point_input_size(), dims->point_output_size())
               << " MB) ..." << std::endl;
-    ExperienceReplay bootstrap_replay(bootstrap_size,
-                                      dims->point_input_size(),
-                                      dims->point_output_size());
-    filler.bootstrap = &bootstrap_replay;
-    filler.bootstrap_depth = factory.game->MaxMoveNumber();
+    filler.bootstrap = std::make_unique<ExperienceReplay>(
+        bootstrap_size, dims->point_input_size(), dims->point_output_size());
+    // This is decremented before creating experience, so is not at terminals,
+    // but just above them.
+    filler.bootstrap_move_number = factory.game->MaxMoveNumber();
   }
   // ---------------------------------------------------------------------------
   std::cout << "# Ready to run the train/eval loop!" << std::endl;
@@ -401,6 +420,15 @@ void TrainEvalLoop() {
   std::cout << std::endl;
   //
   for (int loop = 0; loop < num_loops; ++loop) {
+    if (loop % exp_loop_new == 0) {
+      if (loop == 0) {
+        std::cout << "# Initializing experience replay." << std::endl;
+        filler.CreateExperiences(exp_init, exp_init_size);
+      } else {
+        filler.CreateExperiences(exp_loop, exp_update_size);
+      }
+    }
+
     std::cout << "# Training  ";
     model->train();  // Train mode.
     double cumul_loss = 0.;
@@ -419,10 +447,6 @@ void TrainEvalLoop() {
     std::cout << loop << ',' << cumul_loss / train_batches;
     PrintMetrics(metrics);
     std::cout << std::endl;
-
-    if (loop % exp_loop_new == 0 && loop > 0) {
-      filler.CreateExperiences(exp_loop, exp_update_size);
-    }
     //    DecayLearningRate(optimizer.get(), lr_decay);
   }
   // ---------------------------------------------------------------------------
@@ -432,9 +456,15 @@ void TrainEvalLoop() {
       // :'-)
       std::cout << "# WARN: bootstrap replay may not be properly filled.\n";
     }
+    if (filler.bootstrap_move_number != 1) {
+      std::cout << "# WARN: bootstrap depth != 1 -- bootstrapping may have "
+                   "skipped over some depths. (was " << filler.bootstrap_move_number
+                << ")\n";
+    }
     std::cout << "# Finished bootstrapped training.\n";
-    std::cout << "# Retraining the final network.\n";
+    std::cout << "# Retraining the final network.\n" << std::endl;
     for (int loop = num_loops; loop < 2*num_loops; ++loop) {
+      // Do not make any new data this time.
       std::cout << "# Training  ";
       model->train();  // Train mode.
       double cumul_loss = 0.;

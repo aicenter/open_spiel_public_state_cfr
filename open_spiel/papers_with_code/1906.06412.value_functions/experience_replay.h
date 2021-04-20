@@ -87,13 +87,13 @@ struct ReplayFiller {
   ReusableStructures* reuse;
 
   // Optional bootstrapping.
-  ExperienceReplay* bootstrap = nullptr;
-  // Bootstrapping starts at the maximum depth, and uses the neural network
-  // to incrementally generate target values for learning, as move from deep
-  // public states to the shallow ones, until root (bootstrap_depth=0) is
-  // reached. Initially the depth an unspecified: it will be assigned
-  // automatically based on the game.
-  int bootstrap_depth;
+  std::unique_ptr<ExperienceReplay> bootstrap = nullptr;
+  // Bootstrapping starts at the maximum move number - 1 (skips terminals), and
+  // uses the neural network to incrementally generate target values for
+  // learning, as we move from deep public states to the shallow ones, until
+  // root (bootstrap_move_number=0) is reached. The initial value assigned will
+  // be assigned automatically based on the game.
+   int bootstrap_move_number;
 
   // Params.
   NetArchitecture arch = NetArchitecture::kParticle;
@@ -108,7 +108,10 @@ struct ReplayFiller {
   void AddTrunkRandomPbsSolution();
   void AddRandomPbsSolution();
   void AddRandomSparsePbsSolution();
+  void AddBootstrappedSolution();
   void FillReplayWithTrunkDlCfrPbsSolutions();
+
+  std::unique_ptr<ParticleSet> PickParticleSet(int at_depth = -1);
 
   void AddExperience(const PublicState& state, const NetContext* net_context);
   void AddExperiencesFromPublicStates(const std::vector<PublicState>& states);

@@ -188,6 +188,11 @@ PublicState* DepthLimitedCFR::GetPublicState(Observation& public_observation,
   SPIEL_DCHECK_TRUE(DoStatesProduceEqualPublicObservations(
       *game_, public_observer_, *node, public_observation.Tensor()));
   PublicState* state = GetPublicState(public_observation, state_type);
+  if(state->move_number == -1) {
+    state->move_number = some_state->MoveNumber();
+  } else {
+    SPIEL_CHECK_EQ(state->move_number, some_state->MoveNumber());
+  }
   return state;
 }
 
@@ -573,7 +578,11 @@ std::unique_ptr<PublicStatesInGame> MakeAllPublicStates(const Game& game) {
         SPIEL_DCHECK_TRUE(DoStatesProduceEqualPublicObservations(
             game, public_observer, *node, public_observation.Tensor()));
         PublicState* state = all->GetPublicState(public_observation);
-
+        if(state->move_number == -1) {
+          state->move_number = some_state->MoveNumber();
+        } else {
+          SPIEL_CHECK_EQ(state->move_number, some_state->MoveNumber());
+        }
         SPIEL_DCHECK_FALSE(contains(state->nodes[pl], node->parent()));
         state->nodes[pl].push_back(node);
       }

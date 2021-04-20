@@ -87,6 +87,9 @@ struct PublicState {
   // leaf states. Both are listed for the special case if the public tree is
   // a singleton.
   /*const*/ std::array<std::vector<const InfostateNode*>, 2> nodes;
+  // Store the move number associated with all the states that belong to this
+  // public state.
+  /*const*/ int move_number = -1;
   // For each player, store beliefs for the top-most infostate nodes, which
   // correspond to bottom_nodes of the DL infostate tree.
   std::array<std::vector<double>, 2> beliefs;

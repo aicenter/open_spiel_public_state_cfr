@@ -107,13 +107,14 @@ void ReplayFiller::AddExperience(const PublicState& leaf,
   switch (arch) {
     case NetArchitecture::kParticle: {
       AddParticleExperience(leaf, replay);
-      if (bootstrap) AddParticleExperience(leaf, bootstrap);
+      if (bootstrap) AddParticleExperience(leaf, bootstrap.get());
       break;
     }
     case NetArchitecture::kPositional: {
       SPIEL_CHECK_TRUE(net_context);
       AddPositionalExperience(leaf, *net_context, replay);
-      if (bootstrap) AddPositionalExperience(leaf, *net_context, bootstrap);
+      if (bootstrap) AddPositionalExperience(leaf, *net_context,
+                                             bootstrap.get());
       break;
     }
   }
@@ -256,40 +257,15 @@ void ReplayFiller::AddRandomPbsSolution() {
 }
 
 void ReplayFiller::AddRandomSparsePbsSolution() {
-  PublicStatesInGame* all_states = reuse->GetAllPublicStates();
-  std::vector<algorithms::BanditVector>& bandits =
-      reuse->GetFixableBanditsForAllPublicStates();
-  const int num_states = all_states->public_states.size();
-  auto public_state_dist = std::uniform_int_distribution<>(0, num_states - 1);
-  SPIEL_CHECK_TRUE(randomizer->rnd_gen);
-  SPIEL_CHECK_GT(sparse_particles, 0);
+  // 1. Pick an arbitrary particle set.
+  std::unique_ptr<ParticleSet> set = PickParticleSet();
 
-  // 1. Pick a "nice" public state.
-  PublicState* state = nullptr;
-  // TODO: check IsReachable() is correct wrt cfvs
-  while (!state || !state->IsReachable()) {
-    const int pick_public_state = public_state_dist(*randomizer->rnd_gen);
-    state = &all_states->public_states.at(pick_public_state);
-    // TODO: make sure we can also add terminals
-    if (state->IsTerminal()) continue;
-
-    // 2. Assign randomized beliefs.
-    randomizer->Randomize(bandits);
-    UpdateBeliefs(*state, bandits);
-  }
-
-  // 3. Pick the most probable particles.
-  std::unique_ptr<ParticleSetPartition> particle_partition =
-      MakeParticleSetPartition(*state, sparse_particles, sparse_epsilon,
-          /*save_secondary=*/false, *randomizer->rnd_gen);
-
-  // 5. Build subgame and solve it.
-  std::unique_ptr<Subgame> subgame =
-      factory->MakeSubgame(particle_partition->primary, 1000);
+  // 2. Build subgame until the end of the game and solve it.
+  std::unique_ptr<Subgame> subgame = factory->MakeSubgame(*set, 1000);
   subgame->RunSimultaneousIterations(100);
   PublicState& result = subgame->initial_state();
 
-  // 6. Copy the solution to state.
+  // 3. Copy the solution to state.
   std::array<absl::Span<const double>, 2> root_values =
       subgame->RootChildrenCfValues();
   for (int pl = 0; pl < 2; ++pl) {
@@ -298,7 +274,32 @@ void ReplayFiller::AddRandomSparsePbsSolution() {
               result.values[pl].begin());
   }
 
-  // 7. Add solution to the experiences.
+  // 4. Add solution to the experiences.
+  auto context = factory->leaf_evaluator->CreateContext(result);
+  auto net_context = open_spiel::down_cast<NetContext*>(context.get());
+  AddExperience(result, net_context);
+}
+
+void ReplayFiller::AddBootstrappedSolution() {
+  // 1. Pick a particle set.
+  std::unique_ptr<ParticleSet> set = PickParticleSet(bootstrap_move_number);
+
+  // 2. Build subgame and solve it.
+  std::unique_ptr<Subgame> subgame = factory->MakeSubgame(
+      *set, /*custom_move_ahead_limit=*/1);
+  subgame->RunSimultaneousIterations(100);
+  PublicState& result = subgame->initial_state();
+
+  // 3. Copy the solution to state.
+  std::array<absl::Span<const double>, 2> root_values =
+      subgame->RootChildrenCfValues();
+  for (int pl = 0; pl < 2; ++pl) {
+    SPIEL_CHECK_EQ(result.values[pl].size(), root_values[pl].size());
+    std::copy(root_values[pl].begin(), root_values[pl].end(),
+              result.values[pl].begin());
+  }
+
+  // 4. Add solution to the experiences.
   auto context = factory->leaf_evaluator->CreateContext(result);
   auto net_context = open_spiel::down_cast<NetContext*>(context.get());
   AddExperience(result, net_context);
@@ -308,7 +309,7 @@ void ReplayFiller::CreateExperiences(ReplayFillerPolicy fill_policy,
                                      int num_experiences) {
   if (fill_policy == kNothing) return;
 
-  std::cout << "# Making new experience ..." << std::endl;
+  std::cout << "# Making new experience (may take a while) ..." << std::endl;
   SPIEL_CHECK_LE(num_experiences, replay->size());
   if (num_experiences == -1) num_experiences = replay->size();
 
@@ -318,7 +319,10 @@ void ReplayFiller::CreateExperiences(ReplayFillerPolicy fill_policy,
   }
   // Every time we create new batch of bootstrapped experiences,
   // we move up in the game.
-  if (fill_policy == kBootstrap) bootstrap_depth--;
+  if (fill_policy == kBootstrap) {
+    --bootstrap_move_number;
+    std::cout << "# Bootstrapping at move number " << bootstrap_move_number << "\n";
+  }
 
   std::cout << "# ";
   for (int i = 0; i < num_experiences; ++i) {
@@ -327,10 +331,51 @@ void ReplayFiller::CreateExperiences(ReplayFillerPolicy fill_policy,
       case kTrunkRandom:     AddTrunkRandomPbsSolution();  break;
       case kPbsRandom:       AddRandomPbsSolution();       break;
       case kSparsePbsRandom: AddRandomSparsePbsSolution(); break;
+      case kBootstrap:       AddBootstrappedSolution();    break;
       default: SpielFatalError("Exhausted pattern match on ReplayFillerPolicy");
     }
   }
   std::cout << std::endl;
+}
+
+std::unique_ptr<ParticleSet> ReplayFiller::PickParticleSet(int at_depth) {
+  PublicStatesInGame* all_states = reuse->GetAllPublicStates();
+  std::vector<algorithms::BanditVector>& bandits =
+      reuse->GetFixableBanditsForAllPublicStates();
+
+  // 1. Filter states at depth
+  std::vector<PublicState*> states;
+  for (PublicState& state : all_states->public_states) {
+    if (at_depth == -1 || state.move_number == at_depth) {
+      states.push_back(&state);
+    }
+  }
+  SPIEL_CHECK_FALSE(states.empty());
+
+  // 2. Pick a random state.
+  const int num_states = states.size();
+  auto public_state_dist = std::uniform_int_distribution<>(0, num_states - 1);
+  SPIEL_CHECK_TRUE(randomizer->rnd_gen);
+
+  PublicState* state = nullptr;
+  // TODO: check IsReachable() is correct wrt cfvs
+  while (!state || !state->IsReachable()) {
+    const int pick_public_state = public_state_dist(*randomizer->rnd_gen);
+    state = states.at(pick_public_state);
+    // TODO: make sure we can also add terminals
+    if (state->IsTerminal()) continue;
+
+    // 3. Assign randomized beliefs.
+    randomizer->Randomize(bandits);
+    UpdateBeliefs(*state, bandits);
+  }
+
+  // 4. Pick the most probable particles.
+  std::unique_ptr<ParticleSetPartition> particle_partition =
+      MakeParticleSetPartition(*state, sparse_particles, sparse_epsilon,
+          /*save_secondary=*/false, *randomizer->rnd_gen);
+
+  return std::make_unique<ParticleSet>(std::move(particle_partition->primary));
 }
 
 }  // papers_with_code
