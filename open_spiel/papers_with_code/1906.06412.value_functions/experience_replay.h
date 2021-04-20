@@ -59,6 +59,7 @@ enum ReplayFillerPolicy {
   kTrunkRandom,
   kPbsRandom,
   kSparsePbsRandom,
+  kBootstrap
 };
 ReplayFillerPolicy GetReplayFillerPolicy(const std::string& s);  // From string.
 
@@ -85,6 +86,16 @@ struct ReplayFiller {
   StrategyRandomizer* randomizer;
   ReusableStructures* reuse;
 
+  // Optional bootstrapping.
+  ExperienceReplay* bootstrap = nullptr;
+  // Bootstrapping starts at the maximum depth, and uses the neural network
+  // to incrementally generate target values for learning, as move from deep
+  // public states to the shallow ones, until root (bootstrap_depth=0) is
+  // reached. Initially the depth an unspecified: it will be assigned
+  // automatically based on the game.
+  int bootstrap_depth;
+
+  // Params.
   NetArchitecture arch = NetArchitecture::kParticle;
   bool shuffle_input_output = false;
   int sparse_particles = 0;
@@ -101,6 +112,11 @@ struct ReplayFiller {
 
   void AddExperience(const PublicState& state, const NetContext* net_context);
   void AddExperiencesFromPublicStates(const std::vector<PublicState>& states);
+
+  void AddParticleExperience(const PublicState& leaf, ExperienceReplay* buffer);
+  void AddPositionalExperience(const PublicState& leaf,
+                               const NetContext& net_context,
+                               ExperienceReplay* buffer);
 };
 
 }  // papers_with_code

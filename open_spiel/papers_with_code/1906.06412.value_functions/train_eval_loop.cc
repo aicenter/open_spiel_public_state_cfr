@@ -166,6 +166,11 @@ std::unique_ptr<torch::optim::Optimizer> MakeOptimizer(ValueNet* model) {
         model->parameters(),
         torch::optim::AdamOptions(absl::GetFlag(FLAGS_learning_rate)));
   }
+  SpielFatalError("Unknown optimizer!");
+}
+
+float size_mb(int replay_size, int input_size, int output_size) {
+  return replay_size * input_size + output_size * 4 / 1024. / 1024.;
 }
 
 void TrainEvalLoop() {
@@ -289,13 +294,11 @@ void TrainEvalLoop() {
       MakeOptimizer(model.get());
   const double lr_decay = absl::GetFlag(FLAGS_lr_decay);
   //
-  const float size_mb = absl::GetFlag(FLAGS_replay_size)
-      * (dims->point_input_size() + dims->point_output_size())
-      * 4 / 1024. / 1024.;
-  std::cout << "# Allocating experience replay (" << size_mb << " MB) ..."
-            << std::endl;
-  ExperienceReplay experience_replay(absl::GetFlag(FLAGS_replay_size),
-                                     dims->point_input_size(),
+  const int replay_size = absl::GetFlag(FLAGS_replay_size);
+  std::cout << "# Allocating experience replay ("
+            << size_mb(replay_size, dims->point_input_size(), dims->point_output_size())
+            << " MB) ..." << std::endl;
+  ExperienceReplay experience_replay(replay_size, dims->point_input_size(),
                                      dims->point_output_size());
   //
   std::cout << "# Making batch train/eval data ..." << std::endl;
@@ -372,7 +375,23 @@ void TrainEvalLoop() {
   ReplayFillerPolicy exp_loop = GetReplayFillerPolicy(absl::GetFlag(FLAGS_exp_loop));
   int exp_loop_new = absl::GetFlag(FLAGS_exp_loop_new);
   int exp_update_size = absl::GetFlag(FLAGS_exp_update_size);
-
+  //
+  const int num_loops = absl::GetFlag(FLAGS_num_loops);
+  const int train_batches = absl::GetFlag(FLAGS_train_batches);
+  //
+  if (exp_loop == kBootstrap) {
+    SPIEL_CHECK_EQ(exp_init, kNothing);
+    int bootstrap_size = (num_loops / exp_loop_new + 1) * exp_update_size;
+    std::cout << "# Will bootstrap the neural network.\n"
+              << "# Allocating bootstrap replay ("
+              << size_mb(bootstrap_size, dims->point_input_size(), dims->point_output_size())
+              << " MB) ..." << std::endl;
+    ExperienceReplay bootstrap_replay(bootstrap_size,
+                                      dims->point_input_size(),
+                                      dims->point_output_size());
+    filler.bootstrap = &bootstrap_replay;
+    filler.bootstrap_depth = factory.game->MaxMoveNumber();
+  }
   // ---------------------------------------------------------------------------
   std::cout << "# Ready to run the train/eval loop!" << std::endl;
   for (int i = 0; i < 80; ++i) std::cout << '#';
@@ -381,8 +400,6 @@ void TrainEvalLoop() {
   PrintHeaders(metrics);
   std::cout << std::endl;
   //
-  const int num_loops = absl::GetFlag(FLAGS_num_loops);
-  const int train_batches = absl::GetFlag(FLAGS_train_batches);
   for (int loop = 0; loop < num_loops; ++loop) {
     std::cout << "# Training  ";
     model->train();  // Train mode.
@@ -403,12 +420,40 @@ void TrainEvalLoop() {
     PrintMetrics(metrics);
     std::cout << std::endl;
 
-    if (loop % exp_loop_new == 0 && loop > 0 && exp_loop != kNothing) {
-      std::cout << "# Making new experience ..." << std::endl;
+    if (loop % exp_loop_new == 0 && loop > 0) {
       filler.CreateExperiences(exp_loop, exp_update_size);
     }
+    //    DecayLearningRate(optimizer.get(), lr_decay);
+  }
+  // ---------------------------------------------------------------------------
+  if (filler.bootstrap) {
+    if (!filler.bootstrap->IsAtBeginning()) {
+      // Don't put a CHECK here, because this may happen after hours of training
+      // :'-)
+      std::cout << "# WARN: bootstrap replay may not be properly filled.\n";
+    }
+    std::cout << "# Finished bootstrapped training.\n";
+    std::cout << "# Retraining the final network.\n";
+    for (int loop = num_loops; loop < 2*num_loops; ++loop) {
+      std::cout << "# Training  ";
+      model->train();  // Train mode.
+      double cumul_loss = 0.;
+      for (int i = 0; i < train_batches; ++i) {
+        filler.bootstrap->SampleBatch(&train_batch, rnd_gen);
+        cumul_loss += TrainNetwork(model.get(), &device,
+                                   optimizer.get(), &train_batch);
+        std::cout << '.' << std::flush;
+      }
+      std::cout << std::endl;
 
-//    DecayLearningRate(optimizer.get(), lr_decay);
+      std::cout << "# Evaluating " << std::endl;
+      model->eval();  // Eval mode.
+      ComputeMetrics(metrics);
+      // Always print avg loss.
+      std::cout << loop << ',' << cumul_loss / train_batches;
+      PrintMetrics(metrics);
+      std::cout << std::endl;
+    }
   }
 }
 

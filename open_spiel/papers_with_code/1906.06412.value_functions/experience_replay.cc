@@ -98,6 +98,7 @@ ReplayFillerPolicy GetReplayFillerPolicy(const std::string& s) {
   if (s == "trunk_random")      return kTrunkRandom;
   if (s == "pbs_random")        return kPbsRandom;
   if (s == "sparse_pbs_random") return kSparsePbsRandom;
+  if (s == "bootstrap")         return kBootstrap;
   SpielFatalError("Exhausted pattern match: ReplayFillerPolicy.");
 }
 
@@ -105,21 +106,34 @@ void ReplayFiller::AddExperience(const PublicState& leaf,
                                  const NetContext* net_context) {
   switch (arch) {
     case NetArchitecture::kParticle: {
-      auto particle_dims = open_spiel::down_cast<const ParticleDims&>(*dims);
-      ParticleDataPoint data_point = replay->AddExperience(particle_dims);
-      WriteParticleDataPoint(leaf, particle_dims, &data_point,
-                             factory->hand_observer,
-                             randomizer->rnd_gen, shuffle_input_output);
+      AddParticleExperience(leaf, replay);
+      if (bootstrap) AddParticleExperience(leaf, bootstrap);
       break;
     }
     case NetArchitecture::kPositional: {
-      auto pos_dims = open_spiel::down_cast<const PositionalDims&>(*dims);
-      PositionalDataPoint data_point = replay->AddExperience(pos_dims);
       SPIEL_CHECK_TRUE(net_context);
-      WritePositionalDataPoint(leaf, *net_context, pos_dims, &data_point);
+      AddPositionalExperience(leaf, *net_context, replay);
+      if (bootstrap) AddPositionalExperience(leaf, *net_context, bootstrap);
       break;
     }
   }
+}
+
+void ReplayFiller::AddParticleExperience(const PublicState& leaf,
+                                         ExperienceReplay* buffer) {
+  auto particle_dims = open_spiel::down_cast <const ParticleDims&>(*dims);
+  ParticleDataPoint data_point = buffer->AddExperience(particle_dims);
+  WriteParticleDataPoint(
+      leaf, particle_dims, &data_point, factory->hand_observer,
+      randomizer->rnd_gen, shuffle_input_output);
+}
+
+void ReplayFiller::AddPositionalExperience(const PublicState& leaf,
+                                           const NetContext& net_context,
+                                           ExperienceReplay* buffer) {
+  auto pos_dims = open_spiel::down_cast <const PositionalDims&>(*dims);
+  PositionalDataPoint data_point = buffer->AddExperience(pos_dims);
+  WritePositionalDataPoint(leaf, net_context, pos_dims, &data_point);
 }
 
 void ReplayFiller::AddExperiencesFromPublicStates(
@@ -292,6 +306,9 @@ void ReplayFiller::AddRandomSparsePbsSolution() {
 
 void ReplayFiller::CreateExperiences(ReplayFillerPolicy fill_policy,
                                      int num_experiences) {
+  if (fill_policy == kNothing) return;
+
+  std::cout << "# Making new experience ..." << std::endl;
   SPIEL_CHECK_LE(num_experiences, replay->size());
   if (num_experiences == -1) num_experiences = replay->size();
 
@@ -299,6 +316,9 @@ void ReplayFiller::CreateExperiences(ReplayFillerPolicy fill_policy,
     SPIEL_CHECK_EQ(num_experiences, replay->size());
     return FillReplayWithTrunkDlCfrPbsSolutions();
   }
+  // Every time we create new batch of bootstrapped experiences,
+  // we move up in the game.
+  if (fill_policy == kBootstrap) bootstrap_depth--;
 
   std::cout << "# ";
   for (int i = 0; i < num_experiences; ++i) {
@@ -307,7 +327,6 @@ void ReplayFiller::CreateExperiences(ReplayFillerPolicy fill_policy,
       case kTrunkRandom:     AddTrunkRandomPbsSolution();  break;
       case kPbsRandom:       AddRandomPbsSolution();       break;
       case kSparsePbsRandom: AddRandomSparsePbsSolution(); break;
-      case kNothing:         break;
       default: SpielFatalError("Exhausted pattern match on ReplayFillerPolicy");
     }
   }
