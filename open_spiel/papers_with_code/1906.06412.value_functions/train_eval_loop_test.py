@@ -301,19 +301,19 @@ class VFTest(parameterized.TestCase, absltest.TestCase):
   def test_bootstrap_leduc(self):
     args = dict(
         arch="particle_vf", batch_size="1",
-        cfr_oracle_iterations="100", depth="7", exp_init="trunk_random",
+        cfr_oracle_iterations="100", depth="7", exp_init="bootstrap",
         exp_loop="bootstrap", exp_loop_new="2", exp_update_size=-1,
         game_name="leduc_poker", max_particles=-1,
         num_inputs_regression=-1, num_layers="5",
         # Leduc has max_move_number=10, therefore we make 9 depths + 1 loop for
-        # init = 10, and 10*exp_loop_new = 20
-        num_loops="20", num_width="5", prob_pure_strat="0.1", replay_size="1",
+        # init, and 9*exp_loop_new = 18
+        num_loops="18", num_width="5", prob_pure_strat="0.1", replay_size="1",
         seed="0", shuffle_input_output="true", sparse_particles=30,
         train_batches="1", trunk_expl_iterations="",
         use_bandits_for_cfr="RegretMatchingPlus")
     actual_bootstrap, = read_experiment_results_from_shell(args, metric_avg_loss)
     # Just check the bootstrap runs.
-    self.assertEquals(actual_bootstrap.values.shape[0], 40)
+    self.assertEquals(actual_bootstrap.values.shape[0], 36)
 
 if __name__ == "__main__":
   absltest.main()

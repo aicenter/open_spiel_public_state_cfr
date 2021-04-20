@@ -383,8 +383,9 @@ void TrainEvalLoop() {
   const int train_batches = absl::GetFlag(FLAGS_train_batches);
   //
   if (exp_loop == kBootstrap) {
+    SPIEL_CHECK_EQ(exp_init, kBootstrap);
     // First loop is not "regenerated" -- it is initialized.
-    const int num_regenerations = num_loops / exp_loop_new - 1;
+    const int num_regenerations = num_loops / exp_loop_new;
     // Skips root (move_number=0) and terminals (move_number=max):
     // - computing root is unnecessary for bootstrapping.
     // - terminals can be initialized using a custom exp_init.
@@ -395,9 +396,7 @@ void TrainEvalLoop() {
 
     // Bootstrap replay must hold all created experiences,
     // i.e. from initialization as well as from regeneration.
-    const int bootstrap_size = replay_size  // For init.
-                             // Regeneration per each depth.
-                             + exp_update_size * num_regenerations;
+    const int bootstrap_size = exp_update_size * num_regenerations;
 
     std::cout << "# Bootstrap size: " << bootstrap_size << "\n";
     std::cout << "# Will be bootstrapping using replay of size: "
