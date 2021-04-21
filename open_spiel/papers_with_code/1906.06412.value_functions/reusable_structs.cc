@@ -43,7 +43,8 @@ Subgame* ReusableStructures::GetTrunkWithNet() {
 
 SequenceFormLpSpecification* ReusableStructures::GetSfLp() {
   if (!sf_lp) {
-    sf_lp = std::make_unique<SequenceFormLpSpecification>(*factory.game, "CLP");
+    sf_lp = std::make_unique<SequenceFormLpSpecification>(
+        *factory.game, "CLP", /*return_nan_if_non_optimal=*/true);
   }
   return sf_lp.get();
 }
