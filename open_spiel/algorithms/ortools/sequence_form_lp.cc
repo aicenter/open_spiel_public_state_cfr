@@ -29,21 +29,23 @@ namespace ortools {
 namespace opres = operations_research;
 
 SequenceFormLpSpecification::SequenceFormLpSpecification(
-    const Game& game, const std::string& solver_id)
+    const Game& game,
+    const std::string& solver_id, const bool return_nan_if_non_optimal)
     : SequenceFormLpSpecification(
           {
               MakeInfostateTree(game, 0),
               MakeInfostateTree(game, 1),
           },
-          solver_id) {}
+          solver_id, return_nan_if_non_optimal) {}
 
 SequenceFormLpSpecification::SequenceFormLpSpecification(
     std::vector<std::shared_ptr<InfostateTree>> trees,
-    const std::string& solver_id)
+    const std::string& solver_id, const bool return_nan_if_non_optimal)
     : trees_(std::move(trees)),
       terminal_bijection_(ConnectTerminals(*trees_[0], *trees_[1])),
       solver_(MPSolver::CreateSolver(solver_id)),
-      node_spec_() {
+      node_spec_(),
+      return_nan_if_non_optimal_(return_nan_if_non_optimal) {
   SPIEL_CHECK_TRUE(solver_);
   SPIEL_CHECK_EQ(trees_.size(), 2);
 }
@@ -184,7 +186,10 @@ double SequenceFormLpSpecification::Solve() {
   //    solver_->ExportModelAsLpFormat(false, &out);
   //    std::cout << out << "\n";
   //  }
-  SPIEL_CHECK_EQ(status, opres::MPSolver::ResultStatus::OPTIMAL);
+  if (status != opres::MPSolver::ResultStatus::OPTIMAL) {
+    if (return_nan_if_non_optimal_) return NAN;
+    SpielFatalError("The solution of SequenceFormLp is not optimal.");
+  }
   return -solver_->Objective().Value();
 }
 

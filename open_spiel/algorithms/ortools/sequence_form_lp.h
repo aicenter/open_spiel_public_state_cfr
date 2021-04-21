@@ -43,6 +43,8 @@ using MPSolver = operations_research::MPSolver;
 
 // See also MPSolver::OptimizationProblemType
 inline constexpr const char* kDefaultLinProgSolver = "GLOP";
+// Return NAN if the problem is not optimal, or exit with error (default exits).
+inline constexpr bool kDefaultReturnNanIfNonOptimal = false;
 
 template <class T>
 struct BijectiveContainer {
@@ -84,10 +86,13 @@ struct NodeSpecification {
 class SequenceFormLpSpecification {
  public:
   SequenceFormLpSpecification(
-      const Game& game, const std::string& solver_id = kDefaultLinProgSolver);
+      const Game& game,
+      const std::string& solver_id = kDefaultLinProgSolver,
+      const bool return_nan_if_nonoptimal = kDefaultReturnNanIfNonOptimal);
   SequenceFormLpSpecification(
       std::vector<std::shared_ptr<InfostateTree>> trees,
-      const std::string& solver_id = kDefaultLinProgSolver);
+      const std::string& solver_id = kDefaultLinProgSolver,
+      const bool return_nan_if_nonoptimal = kDefaultReturnNanIfNonOptimal);
 
   // Specify the linear program for given player.
   void SpecifyLinearProgram(Player pl);
@@ -131,6 +136,7 @@ class SequenceFormLpSpecification {
   const BijectiveContainer<const InfostateNode*> terminal_bijection_;
   std::unique_ptr<operations_research::MPSolver> solver_;
   std::unordered_map<const InfostateNode*, NodeSpecification> node_spec_;
+  const bool return_nan_if_non_optimal_;
 
   void SpecifyReachProbsConstraints(InfostateNode* player_node);
   void SpecifyCfValuesConstraints(InfostateNode* opponent_node);

@@ -344,6 +344,21 @@ class Observation {
     }
     SpielFatalError("Tensor not found");
   }
+  DimensionedSpan GetSpan(const std::string& name) {
+    size_t offset = 0;
+    size_t size = 0;
+    for (const TensorInfo& tensor : tensors_) {
+      size = tensor.size();
+      if (tensor.name == name) {
+        return DimensionedSpan(
+          absl::MakeSpan(&buffer_[offset], size),
+          absl::InlinedVector<int, 4>(tensor.shape.begin(), tensor.shape.end())
+        );
+      }
+      offset += size;
+    }
+    SpielFatalError("Tensor not found");
+  }
 
   // Returns information on the component tensors of the observation.
   const std::vector<TensorInfo>& tensor_info() const { return tensors_; }
