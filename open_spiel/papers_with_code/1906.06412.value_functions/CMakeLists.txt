@@ -13,6 +13,8 @@ add_library(paper_value_functions OBJECT
   net_dl_evaluator.h
   particle.cc
   particle.h
+  particle_regeneration.cc
+  particle_regeneration.h
   reusable_structs.cc
   reusable_structs.h
   solve_queue.cc
@@ -36,3 +38,4 @@ endmacro()
 add_paper_executable(train_eval_loop train_eval_loop.cc)
 add_paper_executable(hand_table_test hand_table_test.cc)
 add_paper_executable(sparse_trunk_test sparse_trunk_test.cc)
+add_paper_executable(particle_regeneration_test particle_regeneration_test.cc)
