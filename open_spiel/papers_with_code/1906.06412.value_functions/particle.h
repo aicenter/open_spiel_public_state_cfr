@@ -86,6 +86,10 @@ void CheckParticleSetConsistency(const Game& game,
                                  const ParticleSet& set);
 
 } // namespace papers_with_code
+
+std::ostream& operator<<(std::ostream& os,
+                         const papers_with_code::Particle& particle);
+
 } // namespace open_spiel
 
 #endif  // OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_PARTICLE_

@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "open_spiel/spiel_utils.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/particle.h"
 
 namespace open_spiel {
@@ -28,6 +29,7 @@ std::unique_ptr<State> Particle::MakeState(const Game& game) const {
   }
   return  s;
 }
+
 
 void ParticleSet::AssignBeliefs(algorithms::dlcfr::PublicState& state) const {
   for (int pl = 0; pl < 2; ++pl) {
@@ -245,4 +247,12 @@ std::unique_ptr<ParticleSetPartition> MakeParticleSetPartition(
 }
 
 }  // papers_with_code
+
+std::ostream& operator<<(std::ostream& os,
+                         const papers_with_code::Particle& particle) {
+  const std::vector<Action>& h = particle.history;
+  for (Action a : h) os << a << ' ';
+  return os << " with reach p=" << particle.reach();
+}
+
 }  // open_spiel
