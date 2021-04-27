@@ -1,9 +1,9 @@
-game: matrix_mp
+game: matrix_biased_mp
 
 GameType.chance_mode = ChanceMode.DETERMINISTIC
 GameType.dynamics = Dynamics.SIMULTANEOUS
 GameType.information = Information.ONE_SHOT
-GameType.long_name = "Matching Pennies"
+GameType.long_name = "Biased Matching Pennies"
 GameType.max_num_players = 2
 GameType.min_num_players = 2
 GameType.parameter_specification = []
@@ -13,7 +13,7 @@ GameType.provides_observation_string = False
 GameType.provides_observation_tensor = False
 GameType.provides_factored_observation_string = False
 GameType.reward_model = RewardModel.TERMINAL
-GameType.short_name = "matrix_mp"
+GameType.short_name = "matrix_biased_mp"
 GameType.utility = Utility.ZERO_SUM
 
 NumDistinctActions() = 2
@@ -21,8 +21,8 @@ PolicyTensorShape() = [2]
 MaxChanceOutcomes() = 0
 GetParameters() = {}
 NumPlayers() = 2
-MinUtility() = -1.0
-MaxUtility() = 1.0
+MinUtility() = -2.0
+MaxUtility() = 2.0
 UtilitySum() = 0.0
 InformationStateTensorShape() = [1]
 InformationStateTensorLayout() = TensorLayout.CHW
@@ -31,14 +31,14 @@ ObservationTensorShape() = [1]
 ObservationTensorLayout() = TensorLayout.CHW
 ObservationTensorSize() = 1
 MaxGameLength() = 1
-ToString() = "matrix_mp()"
+ToString() = "matrix_biased_mp()"
 
 # State 0
 # Terminal? false
 # Row actions: Heads Tails
 # Col actions: Heads Tails
 # Utility matrix:
-# 1,-1 -1,1
+# 1,-1 -2,2
 # -1,1 1,-1
 IsTerminal() = False
 History() = []
@@ -64,34 +64,34 @@ LegalActions(1) = [0, 1]
 StringLegalActions(0) = ["Heads", "Tails"]
 StringLegalActions(1) = ["Heads", "Tails"]
 
-# Apply joint action ["Tails", "Tails"]
-actions: [1, 1]
+# Apply joint action ["Tails", "Heads"]
+actions: [1, 0]
 
 # State 1
 # Terminal? true
-# History: 1, 1
-# Returns: 1,-1
+# History: 1, 0
+# Returns: -1,1
 # Row actions:
 # Col actions:
 # Utility matrix:
-# 1,-1 -1,1
+# 1,-1 -2,2
 # -1,1 1,-1
 IsTerminal() = True
-History() = [1, 1]
-HistoryString() = "1, 1"
+History() = [1, 0]
+HistoryString() = "1, 0"
 IsChanceNode() = False
 IsSimultaneousNode() = False
 CurrentPlayer() = -4
-InformationStateString(0) = "Observing player: 0. Terminal. History string: 1, 1"
-InformationStateString(1) = "Observing player: 1. Terminal. History string: 1, 1"
+InformationStateString(0) = "Observing player: 0. Terminal. History string: 1, 0"
+InformationStateString(1) = "Observing player: 1. Terminal. History string: 1, 0"
 InformationStateTensor(0).is_terminal: ◉
 InformationStateTensor(1).is_terminal: ◉
-ObservationString(0) = "Observing player: 0. Terminal. History string: 1, 1"
-ObservationString(1) = "Observing player: 1. Terminal. History string: 1, 1"
-PublicObservationString() = "Observing player: 0. Terminal. History string: 1, 1"
-PrivateObservationString(0) = "Observing player: 0. Terminal. History string: 1, 1"
-PrivateObservationString(1) = "Observing player: 1. Terminal. History string: 1, 1"
+ObservationString(0) = "Observing player: 0. Terminal. History string: 1, 0"
+ObservationString(1) = "Observing player: 1. Terminal. History string: 1, 0"
+PublicObservationString() = "Observing player: 0. Terminal. History string: 1, 0"
+PrivateObservationString(0) = "Observing player: 0. Terminal. History string: 1, 0"
+PrivateObservationString(1) = "Observing player: 1. Terminal. History string: 1, 0"
 ObservationTensor(0).is_terminal: ◉
 ObservationTensor(1).is_terminal: ◉
-Rewards() = [1.0, -1.0]
-Returns() = [1.0, -1.0]
+Rewards() = [-1.0, 1.0]
+Returns() = [-1.0, 1.0]

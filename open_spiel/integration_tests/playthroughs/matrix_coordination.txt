@@ -27,6 +27,9 @@ UtilitySum() = None
 InformationStateTensorShape() = [1]
 InformationStateTensorLayout() = TensorLayout.CHW
 InformationStateTensorSize() = 1
+ObservationTensorShape() = [1]
+ObservationTensorLayout() = TensorLayout.CHW
+ObservationTensorSize() = 1
 MaxGameLength() = 1
 ToString() = "matrix_coordination()"
 
@@ -45,8 +48,15 @@ IsSimultaneousNode() = True
 CurrentPlayer() = -2
 InformationStateString(0) = "Observing player: 0. Non-terminal"
 InformationStateString(1) = "Observing player: 1. Non-terminal"
-InformationStateTensor(0): ◯
-InformationStateTensor(1): ◯
+InformationStateTensor(0).is_terminal: ◯
+InformationStateTensor(1).is_terminal: ◯
+ObservationString(0) = "Observing player: 0. Non-terminal"
+ObservationString(1) = "Observing player: 1. Non-terminal"
+PublicObservationString() = "Observing player: 0. Non-terminal"
+PrivateObservationString(0) = "Observing player: 0. Non-terminal"
+PrivateObservationString(1) = "Observing player: 1. Non-terminal"
+ObservationTensor(0).is_terminal: ◯
+ObservationTensor(1).is_terminal: ◯
 Rewards() = [0.0, 0.0]
 Returns() = [0.0, 0.0]
 LegalActions(0) = [0, 1]
@@ -74,7 +84,14 @@ IsSimultaneousNode() = False
 CurrentPlayer() = -4
 InformationStateString(0) = "Observing player: 0. Terminal. History string: 1, 0"
 InformationStateString(1) = "Observing player: 1. Terminal. History string: 1, 0"
-InformationStateTensor(0): ◉
-InformationStateTensor(1): ◉
+InformationStateTensor(0).is_terminal: ◉
+InformationStateTensor(1).is_terminal: ◉
+ObservationString(0) = "Observing player: 0. Terminal. History string: 1, 0"
+ObservationString(1) = "Observing player: 1. Terminal. History string: 1, 0"
+PublicObservationString() = "Observing player: 0. Terminal. History string: 1, 0"
+PrivateObservationString(0) = "Observing player: 0. Terminal. History string: 1, 0"
+PrivateObservationString(1) = "Observing player: 1. Terminal. History string: 1, 0"
+ObservationTensor(0).is_terminal: ◉
+ObservationTensor(1).is_terminal: ◉
 Rewards() = [0.0, 0.0]
 Returns() = [0.0, 0.0]
