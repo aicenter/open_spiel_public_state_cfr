@@ -61,9 +61,9 @@ ActionsAndProbs BanditsPolicy::GetInfoStatePolicy(
       bandits_[found_pl][node->decision_id()].get();
   const std::vector<Action>& actions = node->legal_actions();
   std::vector<double> probs;
-  if (selection == PolicySelection::kCurrentStrategy) {
+  if (selection == PolicySelection::kCurrentPolicy) {
     probs = bandit->current_strategy();
-  } else if (selection == PolicySelection::kAverageStrategy) {
+  } else if (selection == PolicySelection::kAveragePolicy) {
     probs = bandit->AverageStrategy();
   } else {
     SpielFatalError("Exhausted pattern match!");

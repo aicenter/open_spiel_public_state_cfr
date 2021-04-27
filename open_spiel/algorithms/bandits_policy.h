@@ -41,8 +41,8 @@ class BanditsPolicy : public Policy {
   const std::vector<BanditVector>& bandits_;
  public:
   enum class PolicySelection {
-    kCurrentStrategy,
-    kAverageStrategy
+    kCurrentPolicy,
+    kAveragePolicy
   };
 
   BanditsPolicy(
@@ -61,7 +61,7 @@ class BanditsAveragePolicy : public BanditsPolicy {
       : BanditsPolicy(trees, bandits) {}
 
   ActionsAndProbs GetStatePolicy(const std::string& info_state) const override {
-    return GetInfoStatePolicy(info_state, PolicySelection::kAverageStrategy);
+    return GetInfoStatePolicy(info_state, PolicySelection::kAveragePolicy);
   }
 };
 
@@ -72,7 +72,7 @@ class BanditsCurrentPolicy : public BanditsPolicy {
       : BanditsPolicy(trees, bandits) {}
 
   ActionsAndProbs GetStatePolicy(const std::string& info_state) const override {
-    return GetInfoStatePolicy(info_state, PolicySelection::kCurrentStrategy);
+    return GetInfoStatePolicy(info_state, PolicySelection::kCurrentPolicy);
   }
 };
 
