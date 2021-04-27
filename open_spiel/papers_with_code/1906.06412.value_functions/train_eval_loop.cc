@@ -50,6 +50,13 @@ ABSL_FLAG(int, exp_loop_new, 128,
           "Update experience replay every n steps of the train-eval loop.");
 ABSL_FLAG(int, exp_update_size, 128, "How many experiences should be updated. "
                                      "-1 for the whole replay buffer");
+ABSL_FLAG(bool, exp_reset_nn, false,
+          "Should the neural net be reset and trained from scratch, "
+          "when new experience is made?");
+ABSL_FLAG(bool, bootstrap_reset_nn, false,
+          "Should the neural net be reset and trained from scratch, "
+          "when final bootstrap is made?");
+
 
 // -- Training --
 ABSL_FLAG(int, train_batches, 32,
@@ -378,6 +385,7 @@ void TrainEvalLoop() {
   SPIEL_CHECK_GT(exp_loop_new, 0);
   int exp_update_size = absl::GetFlag(FLAGS_exp_update_size);
   if (exp_update_size == -1) exp_update_size = replay_size;
+  bool exp_reset_nn = absl::GetFlag(FLAGS_exp_reset_nn);
   //
   const int num_loops = absl::GetFlag(FLAGS_num_loops);
   const int train_batches = absl::GetFlag(FLAGS_train_batches);
@@ -426,6 +434,11 @@ void TrainEvalLoop() {
       } else {
         filler.CreateExperiences(exp_loop, exp_update_size);
       }
+
+      if (exp_reset_nn) {
+        std::cout << "# Resetting net weights with random init." << std::endl;
+        model->apply(InitWeights);
+      }
     }
 
     std::cout << "# Training  ";
@@ -462,6 +475,13 @@ void TrainEvalLoop() {
     }
     std::cout << "# Finished bootstrapped training.\n";
     std::cout << "# Retraining the final network.\n" << std::endl;
+
+    bool bootstrap_reset_nn = absl::GetFlag(FLAGS_bootstrap_reset_nn);
+    if (bootstrap_reset_nn) {
+      std::cout << "# Resetting net weights with random init." << std::endl;
+      model->apply(InitWeights);
+    }
+
     for (int loop = num_loops; loop < 2*num_loops; ++loop) {
       // Do not make any new data this time.
       std::cout << "# Training  ";

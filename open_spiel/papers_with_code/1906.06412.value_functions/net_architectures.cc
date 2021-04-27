@@ -207,6 +207,19 @@ torch::Tensor ParticleValueNet::PrepareTarget(BatchData* batch) {
   return torch::cat(target_slices).unsqueeze(/*dim=*/0);
 }
 
+// TODO: test that this indeed initializes weights differently each call.
+void InitWeights(torch::nn::Module& m) {
+  auto p = m.named_parameters(false);
+  auto w = p.find("weight");
+  auto b = p.find("bias");
+  if (w != nullptr) {
+    torch::nn::init::xavier_uniform_(*w);
+  }
+  if (b != nullptr) {
+    torch::nn::init::constant_(*b, 0.01);
+  }
+}
+
 NetArchitecture GetArchitecture(const std::string& arch) {
   if (arch == "particle_vf") {
     return NetArchitecture::kParticle;

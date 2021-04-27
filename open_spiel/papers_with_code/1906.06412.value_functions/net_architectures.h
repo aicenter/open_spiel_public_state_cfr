@@ -84,6 +84,7 @@ struct ParticleValueNet final : public ValueNet {
   int regression_size() { return num_inputs_regression; }
 };
 
+void InitWeights(torch::nn::Module& m);
 
 std::unique_ptr<ValueNet> MakeModel(NetArchitecture arch, BasicDims* dims,
                                     int num_layers_regression,
