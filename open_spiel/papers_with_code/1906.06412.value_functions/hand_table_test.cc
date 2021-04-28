@@ -24,8 +24,8 @@ void TestCreateHandTable() {
   std::shared_ptr<const Game> game = LoadGame("kuhn_poker");
   std::shared_ptr<Observer>
       hand_observer = game->MakeObserver(kHandObsType, {});
-  auto leaf_evaluator = algorithms::dlcfr::MakeDummyEvaluator();
-  algorithms::dlcfr::DepthLimitedCFR dl_cfr(game, 3, leaf_evaluator, nullptr);
+  auto leaf_evaluator = MakeDummyEvaluator();
+  DepthLimitedCFR dl_cfr(game, 3, leaf_evaluator, nullptr);
 
   std::unique_ptr<HandInfo> hand_info = MakeHandInfo(*game, hand_observer,
                                                      dl_cfr.public_states());

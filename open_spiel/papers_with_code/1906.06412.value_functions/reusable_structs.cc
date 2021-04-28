@@ -51,7 +51,7 @@ SequenceFormLpSpecification* ReusableStructures::GetSfLp() {
 
 PublicStatesInGame* ReusableStructures::GetAllPublicStates() {
   if (!all_states) {
-    all_states = algorithms::dlcfr::MakeAllPublicStates(*factory.game);
+    all_states = MakeAllPublicStates(*factory.game);
   }
   return all_states.get();
 }

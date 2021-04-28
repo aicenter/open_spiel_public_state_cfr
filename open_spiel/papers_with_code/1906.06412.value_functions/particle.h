@@ -49,7 +49,7 @@ struct ParticleSet {
   const Particle& at(const std::vector<Action>& history) const;
   Particle& add(const std::vector<Action>& history);
 
-  void AssignBeliefs(algorithms::dlcfr::PublicState& state) const;
+  void AssignBeliefs(PublicState& state) const;
 };
 
 // See explanation below.
@@ -68,7 +68,7 @@ struct ParticleSetPartition {
 // particles are taken uniformly (epsilon=1) or according to this reach prob
 // distribution only (epsilon=0).
 std::unique_ptr<ParticleSetPartition> MakeParticleSetPartition(
-    const algorithms::dlcfr::PublicState& state,
+    const PublicState& state,
     int primary_max_particles,
     double epsilon,
     bool save_secondary,

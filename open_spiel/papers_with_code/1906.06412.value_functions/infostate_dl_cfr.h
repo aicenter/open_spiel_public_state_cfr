@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef OPEN_SPIEL_ALGORITHMS_INFOSTATE_DL_CFR_H_
-#define OPEN_SPIEL_ALGORITHMS_INFOSTATE_DL_CFR_H_
+#ifndef OPEN_SPIEL_PAPERS_WITH_CODE_INFOSTATE_DL_CFR_H_
+#define OPEN_SPIEL_PAPERS_WITH_CODE_INFOSTATE_DL_CFR_H_
 
 #include <map>
 #include <memory>
@@ -48,8 +48,7 @@
 // parts of the tree.
 
 namespace open_spiel {
-namespace algorithms {
-namespace dlcfr {
+namespace papers_with_code {
 
 
 enum PublicStateType {
@@ -59,7 +58,7 @@ enum PublicStateType {
   kInitialPublicState,
   // Leaf public state of the depth-limited lookahed tree. All such public
   // states are at the end of the lookahead. Some of them might be terminal,
-  // i.e. they contain only States that are terminal.
+  // i.e. they contain only `open_spiel::State`s that are terminal.
   kLeafPublicState,
 };
 
@@ -86,7 +85,7 @@ struct PublicState {
   // The top nodes are saved for initial states and bottom nodes are saved for
   // leaf states. Both are listed for the special case if the public tree is
   // a singleton.
-  /*const*/ std::array<std::vector<const InfostateNode*>, 2> nodes;
+  /*const*/ std::array<std::vector<const algorithms::InfostateNode*>, 2> nodes;
   // Store the move number associated with all the states that belong to this
   // public state.
   /*const*/ int move_number = -1;
@@ -122,7 +121,7 @@ void DebugPrintPublicFeatures(const std::vector<PublicState>& states);
 // for the entire game. All the public states are marked as initial (even
 // the terminal ones).
 struct PublicStatesInGame {
-  std::vector<std::shared_ptr<InfostateTree>> infostate_trees;
+  std::vector<std::shared_ptr<algorithms::InfostateTree>> infostate_trees;
   std::vector<PublicState> public_states;
   PublicState* GetPublicState(const Observation& public_observation);
 };
@@ -181,8 +180,8 @@ std::shared_ptr<PublicStateEvaluator> MakeDummyEvaluator();
 
 // Depth-limited CFR requires storage of perfect-information states both
 // in the roots and in the leaves of the infostate trees.
-constexpr int kDlCfrInfostateTreeStorage = kStoreStatesInRoots
-                                         | kStoreStatesInLeaves;
+constexpr int kDlCfrInfostateTreeStorage = algorithms::kStoreStatesInRoots
+                                         | algorithms::kStoreStatesInLeaves;
 
 // At least one evaluator must be specified: nonterminal_evaluator
 // or terminal_evaluator.
@@ -193,11 +192,11 @@ class DepthLimitedCFR {
                   std::shared_ptr<const PublicStateEvaluator> terminal_evaluator);
 
   DepthLimitedCFR(std::shared_ptr<const Game> game,
-                  std::vector<std::shared_ptr<InfostateTree>> depth_lim_trees,
+                  std::vector<std::shared_ptr<algorithms::InfostateTree>> depth_lim_trees,
                   std::shared_ptr<const PublicStateEvaluator> nonterminal_evaluator,
                   std::shared_ptr<const PublicStateEvaluator> terminal_evaluator,
                   std::shared_ptr<Observer> public_observer,
-                  std::vector<BanditVector> bandits);
+                  std::vector<algorithms::BanditVector> bandits);
 
   void RunSimultaneousIterations(int iterations);
   void PrepareRootReachProbs();
@@ -212,8 +211,8 @@ class DepthLimitedCFR {
   void Reset();
 
   // Accessors.
-  std::vector<std::shared_ptr<InfostateTree>>& trees() { return trees_; }
-  std::vector<BanditVector>& bandits() { return bandits_; }
+  std::vector<std::shared_ptr<algorithms::InfostateTree>>& trees() { return trees_; }
+  std::vector<algorithms::BanditVector>& bandits() { return bandits_; }
   std::vector<std::unique_ptr<PublicStateContext>>& contexts() {
     return contexts_;
   }
@@ -248,7 +247,7 @@ class DepthLimitedCFR {
   size_t num_iterations_ = 0;
  private:
   const std::shared_ptr<const Game> game_;
-  /*const*/ std::vector<std::shared_ptr<InfostateTree>> trees_;
+  /*const*/ std::vector<std::shared_ptr<algorithms::InfostateTree>> trees_;
   const std::shared_ptr<Observer> public_observer_;
   const std::shared_ptr<const PublicStateEvaluator> nonterminal_evaluator_;
   const std::shared_ptr<const PublicStateEvaluator> terminal_evaluator_;
@@ -261,8 +260,8 @@ class DepthLimitedCFR {
   // If no information should be saved, a nullptr is used.
   /*const*/ std::vector<std::unique_ptr<PublicStateContext>> contexts_;
   // Store the position of a node within the reach_probs_ resp. cf_values_
-  /*const*/ std::map<const InfostateNode*, int> leaf_node_positions_;
-  /*const*/ std::map<const InfostateNode*, int> root_node_positions_;
+  /*const*/ std::map<const algorithms::InfostateNode*, int> leaf_node_positions_;
+  /*const*/ std::map<const algorithms::InfostateNode*, int> root_node_positions_;
 
   // -- Mutable values to keep track of. --
   // These have the size at largest depth of the tree, i.e. the size of the
@@ -271,7 +270,7 @@ class DepthLimitedCFR {
   std::vector<std::vector<double>> reach_probs_;
   std::vector<std::vector<double>> cf_values_;
 
-  std::vector<BanditVector> bandits_;
+  std::vector<algorithms::BanditVector> bandits_;
 
   void PrepareInfostateNodesForPublicStates();
   void PrepareReachesAndValuesForPublicStates();
@@ -280,22 +279,18 @@ class DepthLimitedCFR {
                               PublicStateType state_type);
   PublicState* GetPublicState(Observation& public_observation,
                               PublicStateType state_type,
-                              InfostateNode* node);
+                              algorithms::InfostateNode* node);
 };
 
 // -- Dummy evaluator ----------------------------------------------------------
 
 // Evaluator that does nothing.
-struct DummyEvaluator : public algorithms::dlcfr::PublicStateEvaluator {
-  std::unique_ptr<algorithms::dlcfr::PublicStateContext> CreateContext(
-      const algorithms::dlcfr::PublicState& state) const override {
-    return nullptr;
-  };
-  void ResetContext(
-      algorithms::dlcfr::PublicStateContext* context) const override {};
-  void EvaluatePublicState(
-      algorithms::dlcfr::PublicState* public_state,
-      algorithms::dlcfr::PublicStateContext* context) const override {};
+struct DummyEvaluator : public PublicStateEvaluator {
+  std::unique_ptr<PublicStateContext> CreateContext(
+      const PublicState& state) const override { return nullptr; };
+  void ResetContext(PublicStateContext* context) const override {};
+  void EvaluatePublicState(PublicState* public_state,
+                           PublicStateContext* context) const override {};
 };
 
 
@@ -334,8 +329,7 @@ struct CFREvaluator : public PublicStateEvaluator {
 
 void PrintPublicStatesStats(const std::vector<PublicState>& public_leaves);
 
-}  // namespace dlcfr
-}  // namespace algorithms
+}  // namespace papers_with_code
 }  // namespace open_spiel
 
-#endif  // OPEN_SPIEL_ALGORITHMS_INFOSTATE_DL_CFR_H_
+#endif  // OPEN_SPIEL_PAPERS_WITH_CODE_INFOSTATE_DL_CFR_H_

@@ -137,9 +137,9 @@ void ReplayFiller::AddPositionalExperience(const PublicState& leaf,
 }
 
 void ReplayFiller::AddExperiencesFromPublicStates(
-    const std::vector<algorithms::dlcfr::PublicState>& states) {
+    const std::vector<PublicState>& states) {
   for (int i = 0; i < states.size(); ++i) {
-    const algorithms::dlcfr::PublicState& state = states[i];
+    const PublicState& state = states[i];
     // Add experiences only for non-terminals leaves.
     if (state.IsTerminal() || !state.IsLeaf()) continue;
     auto context = factory->leaf_evaluator->CreateContext(state);

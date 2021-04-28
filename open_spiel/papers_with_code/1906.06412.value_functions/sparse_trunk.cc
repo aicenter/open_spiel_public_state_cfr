@@ -18,8 +18,6 @@
 namespace open_spiel {
 namespace papers_with_code {
 
-using namespace algorithms;
-using namespace algorithms::dlcfr;
 
 // Note these are shared between players, that's why we loop only
 // over one player.
@@ -27,7 +25,7 @@ std::vector<const State*> CollectStates(const PublicState& public_state) {
   std::vector<const State*> states;
   // Just some estimate.
   states.reserve(8 * public_state.nodes[0].size());
-  for (const InfostateNode* node : public_state.nodes[0]) {
+  for (const algorithms::InfostateNode* node : public_state.nodes[0]) {
     for (int i = 0; i < node->corresponding_states_size(); ++i) {
       states.push_back(node->corresponding_states()[i].get());
     }
@@ -39,7 +37,7 @@ std::vector<double> CollectChances(const PublicState& public_state) {
   std::vector<double> chances;
   // Just some estimate.
   chances.reserve(8 * public_state.nodes[0].size());
-  for (const InfostateNode* node : public_state.nodes[0]) {
+  for (const algorithms::InfostateNode* node : public_state.nodes[0]) {
     for (int i = 0; i < node->corresponding_states_size(); ++i) {
       chances.push_back(node->corresponding_chance_reach_probs()[i]);
     }
@@ -49,7 +47,7 @@ std::vector<double> CollectChances(const PublicState& public_state) {
 
 std::vector<int> PickIndices(std::vector<int>& public_state_perm,
                              const std::vector<const State*>& states,
-                             const InfostateNode* node,
+                             const algorithms::InfostateNode* node,
                              int limit_initial_states,
                              std::mt19937& rnd_gen) {
 
@@ -119,9 +117,9 @@ std::vector<std::unique_ptr<SparseTrunk>> MakeSparseTrunks(
   int num_sparse_trunks = 0;
   for (const PublicState& public_state: temp_trunk.public_states()) {
     for (int pl = 0; pl < 2; ++pl) {
-      for (const InfostateNode* node : public_state.nodes[pl]) {
+      for (const algorithms::InfostateNode* node : public_state.nodes[pl]) {
         // We are interested only in sparsification for decision infostates.
-        if (node->type() != kDecisionInfostateNode) continue;
+        if (node->type() != algorithms::kDecisionInfostateNode) continue;
         num_sparse_trunks++;
       }
     }
@@ -139,9 +137,9 @@ std::vector<std::unique_ptr<SparseTrunk>> MakeSparseTrunks(
     std::iota(public_state_perm.begin(), public_state_perm.end(), 0);
 
     for (int pl = 0; pl < 2; ++pl) {
-      for (const InfostateNode* node : public_state.nodes[pl]) {
+      for (const algorithms::InfostateNode* node : public_state.nodes[pl]) {
         // We are interested only in sparsification for decision infostates.
-        if (node->type() != kDecisionInfostateNode) continue;
+        if (node->type() != algorithms::kDecisionInfostateNode) continue;
 
         std::vector<int> pick_indices = PickIndices(public_state_perm, states,
                                                     node, limit_initial_states,
@@ -156,10 +154,10 @@ std::vector<std::unique_ptr<SparseTrunk>> MakeSparseTrunks(
         }
 
         const int move_lim = trunk_depth - roots_depth;
-        std::vector<std::shared_ptr<InfostateTree>> sparse_trees = {
-            MakeInfostateTree(start_states, start_chances, infostate_observer,
+        std::vector<std::shared_ptr<algorithms::InfostateTree>> sparse_trees = {
+            algorithms::MakeInfostateTree(start_states, start_chances, infostate_observer,
                               /*pl=*/0, /*max_move_ahead_limit=*/move_lim),
-            MakeInfostateTree(start_states, start_chances, infostate_observer,
+            algorithms::MakeInfostateTree(start_states, start_chances, infostate_observer,
                               /*pl=*/1, /*max_move_ahead_limit=*/move_lim)
         };
         auto sparse_trunk = std::make_unique<SparseTrunk>();
@@ -277,8 +275,8 @@ std::unique_ptr<SparseTrunk> MakeSparseTrunkWithEqSupport(
     std::shared_ptr<Observer> infostate_observer,
     std::shared_ptr<Observer> public_observer,
     int roots_depth, int trunk_depth,
-    std::shared_ptr<const algorithms::dlcfr::PublicStateEvaluator> leaf_evaluator,
-    std::shared_ptr<const algorithms::dlcfr::PublicStateEvaluator> terminal_evaluator,
+    std::shared_ptr<const PublicStateEvaluator> leaf_evaluator,
+    std::shared_ptr<const PublicStateEvaluator> terminal_evaluator,
     const std::string& bandits_for_cfr,
     double support_threshold,
     bool prune_chance_histories) {
@@ -349,10 +347,10 @@ std::unique_ptr<SparseTrunk> MakeSparseTrunkWithEqSupport(
   const int move_lim = trunk_depth - roots_depth;
   auto sparse_trunk = std::make_unique<SparseTrunk>();
   if (!fixate_infostates.empty()) {
-    std::vector<std::shared_ptr<InfostateTree>> sparse_trees = {
-        MakeInfostateTree(start_states_ptrs, start_chances, infostate_observer,
+    std::vector<std::shared_ptr<algorithms::InfostateTree>> sparse_trees = {
+        algorithms::MakeInfostateTree(start_states_ptrs, start_chances, infostate_observer,
             /*pl=*/0, /*max_move_ahead_limit=*/move_lim),
-        MakeInfostateTree(start_states_ptrs, start_chances, infostate_observer,
+        algorithms::MakeInfostateTree(start_states_ptrs, start_chances, infostate_observer,
             /*pl=*/1, /*max_move_ahead_limit=*/move_lim)
     };
     sparse_trunk->dlcfr = std::make_unique<DepthLimitedCFR>(

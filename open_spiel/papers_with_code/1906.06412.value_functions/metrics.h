@@ -42,7 +42,7 @@ struct Metric {
 
 std::unique_ptr<Metric> MakeFullTrunkExplMetric(
     std::vector<int> evaluate_iters,
-    algorithms::dlcfr::DepthLimitedCFR* trunk_with_net,
+    DepthLimitedCFR* trunk_with_net,
     algorithms::ortools::SequenceFormLpSpecification* whole_game);
 
 std::unique_ptr<Metric> MakeSparseRootsExplMetric(

@@ -21,7 +21,6 @@
 namespace open_spiel {
 namespace papers_with_code {
 
-using namespace open_spiel::algorithms;
 
 
 size_t HandTable::Upsert(const Observation& hand) {
@@ -57,12 +56,12 @@ size_t HandInfo::hand_tensor_size() const {
 
 bool AllInfoStatesHaveDistinctHands(
     const Game& game, const std::shared_ptr<Observer>& hand_observer,
-    Player pl, const dlcfr::PublicState& state) {
-  const std::vector<const InfostateNode*>& info_states = state.nodes[pl];
-  std::unordered_map<Observation, const InfostateNode*> hands_for_infostates;
+    Player pl, const PublicState& state) {
+  const std::vector<const algorithms::InfostateNode*>& info_states = state.nodes[pl];
+  std::unordered_map<Observation, const algorithms::InfostateNode*> hands_for_infostates;
 
   Observation hand(game, hand_observer);
-  for (const InfostateNode* info_state : info_states) {
+  for (const algorithms::InfostateNode* info_state : info_states) {
     const State& some_state = *info_state->corresponding_states().at(0);
     hand.SetFrom(some_state, pl);
     if (hands_for_infostates.find(hand) == hands_for_infostates.end()) {
@@ -104,12 +103,12 @@ bool AllStatesHaveSameHands(const Observation& expected_hand, Player player,
 
 std::unique_ptr<HandInfo> MakeHandInfo(
     const Game& game, const std::shared_ptr<Observer>& hand_observer,
-    const std::vector<dlcfr::PublicState>& public_leaves) {
+    const std::vector<PublicState>& public_leaves) {
   auto hand_info = std::make_unique<HandInfo>(game, hand_observer);
   Observation& hand = hand_info->hand_buffer;
 
   for (int state_idx = 0; state_idx < public_leaves.size(); ++state_idx) {
-    const dlcfr::PublicState& state = public_leaves[state_idx];
+    const PublicState& state = public_leaves[state_idx];
     // Terminal states are not handled by non-terminal leaf evaluators,
     // so we don't need to create hand table for them.
     if (state.IsTerminal()) {
@@ -122,7 +121,7 @@ std::unique_ptr<HandInfo> MakeHandInfo(
 
       for (int tree_idx = 0;
            tree_idx < state.nodes[pl].size(); ++tree_idx) {
-        const InfostateNode* node = state.nodes[pl][tree_idx];
+        const algorithms::InfostateNode* node = state.nodes[pl][tree_idx];
         const State& some_state = *node->corresponding_states().at(0);
         hand.SetFrom(some_state, pl);
 

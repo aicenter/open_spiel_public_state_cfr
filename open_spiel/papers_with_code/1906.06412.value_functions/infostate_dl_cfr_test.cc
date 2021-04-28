@@ -30,8 +30,7 @@
 #include "open_spiel/algorithms/cfr.h"
 
 namespace open_spiel {
-namespace algorithms {
-namespace dlcfr {
+namespace papers_with_code {
 namespace {
 
 void CheckInfostatePolicy(
@@ -46,8 +45,8 @@ void CheckInfostatePolicy(
 }
 
 void CheckIterationConsistency(const Policy& a, const Policy& b,
-                               const InfostateTree& tree) {
-  for (DecisionId id : tree.AllDecisionIds()) {
+                               const algorithms::InfostateTree& tree) {
+  for (algorithms::DecisionId id : tree.AllDecisionIds()) {
     CheckInfostatePolicy(tree.decision_infostate(id)->infostate_string(), a, b);
   }
 }
@@ -56,7 +55,7 @@ void TestTerminalEvaluatorHasSameIterations(const std::string& game_name) {
   std::shared_ptr<const Game> game = LoadGame(game_name);
   const int cfr_iterations = 10;
 
-  InfostateCFR vec_solver(*game);
+  algorithms::InfostateCFR vec_solver(*game);
 
   // We use only the terminal evaluator.
   std::shared_ptr<PublicStateEvaluator> terminal_evaluator = MakeTerminalEvaluator();
@@ -119,7 +118,7 @@ void TestRecursiveDepthLimitedSolving(const std::string& game_name) {
     for (int subgame_depth_limit = 1; subgame_depth_limit < 4;
          ++subgame_depth_limit) {
 
-      InfostateCFR vec_solver(*game);
+      algorithms::InfostateCFR vec_solver(*game);
       std::unique_ptr<DepthLimitedCFR> dl_solver = MakeRecursiveDepthLimitedCFR(
           game, trunk_depth_limit, subgame_depth_limit);
 
@@ -170,7 +169,7 @@ void TestMakeAllPublicStates(const std::string& game_name) {
       SPIEL_CHECK_FALSE(s.nodes[0][0]->corresponding_states().empty());
       State* a_state = s.nodes[0][0]->corresponding_states()[0].get();
 
-      for (const InfostateNode* node : s.nodes[pl]) {
+      for (const algorithms::InfostateNode* node : s.nodes[pl]) {
         SPIEL_CHECK_FALSE(node->corresponding_states().empty());
         SPIEL_CHECK_EQ(node->tree().acting_player(), pl);
 
@@ -191,11 +190,8 @@ void TestMakeAllPublicStates(const std::string& game_name) {
 }
 
 }  // namespace
-}  // namespace dlcfr
-}  // namespace algorithms
+}  // namespace papers_with_code
 }  // namespace open_spiel
-
-namespace algorithms = open_spiel::algorithms::dlcfr;
 
 int main(int argc, char** argv) {
   std::vector<std::string> test_games = {
@@ -205,8 +201,8 @@ int main(int argc, char** argv) {
   };
 
   for (const std::string& game_name : test_games) {
-    algorithms::TestTerminalEvaluatorHasSameIterations(game_name);
-    algorithms::TestRecursiveDepthLimitedSolving(game_name);
-    algorithms::TestMakeAllPublicStates(game_name);
+    open_spiel::papers_with_code::TestTerminalEvaluatorHasSameIterations(game_name);
+    open_spiel::papers_with_code::TestRecursiveDepthLimitedSolving(game_name);
+    open_spiel::papers_with_code::TestMakeAllPublicStates(game_name);
   }
 }

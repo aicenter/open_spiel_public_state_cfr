@@ -17,7 +17,6 @@
 namespace open_spiel {
 namespace papers_with_code {
 
-using namespace open_spiel::algorithms;
 using namespace torch::indexing;  // Load all of the Slice, Ellipsis, etc.
 
 std::unique_ptr<PublicStateContext> PositionalNetEvaluator::CreateContext(
@@ -30,7 +29,7 @@ std::unique_ptr<PublicStateContext> PositionalNetEvaluator::CreateContext(
   for (int pl = 0; pl < 2; ++pl) {
     for (int tree_idx = 0;
          tree_idx < state.nodes[pl].size(); ++tree_idx) {
-      const InfostateNode* node = state.nodes[pl][tree_idx];
+      const algorithms::InfostateNode* node = state.nodes[pl][tree_idx];
       const State& some_state = *node->corresponding_states().at(0);
       hand.SetFrom(some_state, pl);
 
@@ -117,7 +116,7 @@ void WritePositionalHand(int net_id, absl::Span<float_net> write_to) {
   write_to[net_id] = 1.;
 }
 
-void WriteParticleDataPoint(const algorithms::dlcfr::PublicState& state,
+void WriteParticleDataPoint(const PublicState& state,
                             const ParticleDims& dims, ParticleDataPoint* point,
                             std::shared_ptr<Observer> hand_observer,
                             std::mt19937* rnd_gen, bool shuffle_input_output) {
@@ -175,7 +174,7 @@ void WriteParticleDataPoint(const algorithms::dlcfr::PublicState& state,
 }
 
 void CopyValuesFromNetToTree(ParticleDataPoint data_point,
-                             algorithms::dlcfr::PublicState& state,
+                             PublicState& state,
                              const ParticleDims& dims) {
   int parview_index = 0;
   for (int pl = 0; pl < 2; ++pl) {
@@ -188,7 +187,7 @@ void CopyValuesFromNetToTree(ParticleDataPoint data_point,
   SPIEL_CHECK_EQ(data_point.num_parviews(), parview_index);
 }
 
-void WritePositionalDataPoint(const algorithms::dlcfr::PublicState& state,
+void WritePositionalDataPoint(const PublicState& state,
                               const NetContext& net_context,
                               const PositionalDims& dims, PositionalDataPoint* point) {
   // Important !!
@@ -210,7 +209,7 @@ void WritePositionalDataPoint(const algorithms::dlcfr::PublicState& state,
 }
 
 void CopyValuesNetToTree(PositionalDataPoint* point,
-                         algorithms::dlcfr::PublicState& state,
+                         PublicState& state,
                          const NetContext& net_context) {
   for (int pl = 0; pl < 2; ++pl) {
     for (int j = 0; j < state.nodes[pl].size(); j++) {

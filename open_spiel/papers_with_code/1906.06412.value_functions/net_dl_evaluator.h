@@ -24,9 +24,9 @@
 namespace open_spiel {
 namespace papers_with_code {
 
-using PublicState = algorithms::dlcfr::PublicState;
-using PublicStateContext = algorithms::dlcfr::PublicStateContext;
-using PublicStateEvaluator = algorithms::dlcfr::PublicStateEvaluator;
+using PublicState = PublicState;
+using PublicStateContext = PublicStateContext;
+using PublicStateEvaluator = PublicStateEvaluator;
 
 // A bijection within the scope of a public state. This is a mapping between
 // PublicState::ranges coming from the tree (x) and the input position
@@ -102,20 +102,20 @@ std::shared_ptr<NetEvaluator> MakeNetEvaluator(
     std::shared_ptr<Observer> hand_observer);
 
 
-void WriteParticleDataPoint(const algorithms::dlcfr::PublicState& state,
+void WriteParticleDataPoint(const PublicState& state,
                             const ParticleDims& dims, ParticleDataPoint* point,
                             std::shared_ptr<Observer> hand_observer,
                             std::mt19937* rnd_gen, bool shuffle_input_output);
 void CopyValuesFromNetToTree(ParticleDataPoint data_point,
-                             algorithms::dlcfr::PublicState& state,
+                             PublicState& state,
                              const ParticleDims& dims);
 
-void WritePositionalDataPoint(const algorithms::dlcfr::PublicState& state,
+void WritePositionalDataPoint(const PublicState& state,
                               const NetContext& net_context,
                               const PositionalDims& dims,
                               PositionalDataPoint* point);
 void CopyValuesNetToTree(PositionalDataPoint* point,
-                         algorithms::dlcfr::PublicState& state,
+                         PublicState& state,
                          const NetContext& net_context);
 
 }  // namespace papers_with_code

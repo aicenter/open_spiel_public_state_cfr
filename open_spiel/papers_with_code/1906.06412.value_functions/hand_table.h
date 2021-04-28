@@ -49,7 +49,7 @@ struct HandInfo {
 std::unique_ptr<HandInfo> MakeHandInfo(
     const Game& game,
     const std::shared_ptr<Observer>& hand_observer,
-    const std::vector<algorithms::dlcfr::PublicState>& public_leaves);
+    const std::vector<PublicState>& public_leaves);
 
 void DebugPrintHandInfo(const HandInfo& hand_info);
 

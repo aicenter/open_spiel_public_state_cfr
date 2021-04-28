@@ -17,20 +17,19 @@
 namespace open_spiel {
 namespace papers_with_code {
 
-using namespace algorithms;
 
 std::unique_ptr<Subgame> SubgameFactory::MakeTrunk(
-    std::shared_ptr<const LeafEvaluator> custom_leaf_evaluator,
+    std::shared_ptr<const PublicStateEvaluator> custom_leaf_evaluator,
     std::string custom_bandits_for_cfr) const {
   std::vector<std::unique_ptr<State>> start_states {};
   start_states.push_back(game->NewInitialState());
   std::vector<double> chance_reach_probs {1.};
-  std::vector<std::shared_ptr<InfostateTree>> trees;
+  std::vector<std::shared_ptr<algorithms::InfostateTree>> trees;
   for (int pl = 0; pl < 2; ++pl) {
-    trees.push_back(MakeInfostateTree(
+    trees.push_back(algorithms::MakeInfostateTree(
         start_states, chance_reach_probs,
         infostate_observer, pl, max_move_ahead_limit,
-        algorithms::dlcfr::kDlCfrInfostateTreeStorage
+        kDlCfrInfostateTreeStorage
     ));
   }
   auto out = std::make_unique<Subgame>(
@@ -65,13 +64,13 @@ std::unique_ptr<Subgame> SubgameFactory::MakeSubgame(
     int custom_move_ahead_limit,
     std::shared_ptr<const PublicStateEvaluator> custom_leaf_evaluator
 ) const {
-  std::vector<std::shared_ptr<InfostateTree>> trees;
+  std::vector<std::shared_ptr<algorithms::InfostateTree>> trees;
   for (int pl = 0; pl < 2; ++pl) {
     trees.push_back(MakeInfostateTree(
         state.nodes[pl],
         custom_move_ahead_limit ? custom_move_ahead_limit
                                 : max_move_ahead_limit,
-        algorithms::dlcfr::kDlCfrInfostateTreeStorage
+        kDlCfrInfostateTreeStorage
     ));
   }
   auto evaluator = custom_leaf_evaluator ? custom_leaf_evaluator
@@ -83,7 +82,7 @@ std::unique_ptr<Subgame> SubgameFactory::MakeSubgame(
   return out;
 }
 
-std::vector<std::shared_ptr<InfostateTree>>
+std::vector<std::shared_ptr<algorithms::InfostateTree>>
 SubgameFactory::MakeSubgameInfostateTrees(const ParticleSet& set, int depth) const {
   SPIEL_CHECK_LE(set.particles.size(), max_particles);
   SPIEL_DCHECK(CheckParticleSetConsistency(*game, public_observer,
@@ -94,12 +93,12 @@ SubgameFactory::MakeSubgameInfostateTrees(const ParticleSet& set, int depth) con
     root_histories.push_back(particle.MakeState(*game));
     chance_reach_probs.push_back(particle.chance_reach);
   }
-  std::vector<std::shared_ptr<InfostateTree>> trees;
+  std::vector<std::shared_ptr<algorithms::InfostateTree>> trees;
   for (int pl = 0; pl < 2; ++pl) {
-    trees.push_back(MakeInfostateTree(
+    trees.push_back(algorithms::MakeInfostateTree(
         root_histories, chance_reach_probs,
         infostate_observer, pl, depth,
-        algorithms::dlcfr::kDlCfrInfostateTreeStorage
+        kDlCfrInfostateTreeStorage
     ));
   }
   SPIEL_DCHECK(CheckParticleSetConsistency(*game, infostate_observer,

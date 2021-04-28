@@ -113,7 +113,6 @@ ABSL_FLAG(int, replay_visits_window, -1,
 namespace open_spiel {
 namespace papers_with_code {
 
-using namespace algorithms;
 
 std::vector<int> ItersFromString(const std::string& s) {
   std::vector<std::string> xs = absl::StrSplit(s, ',');
@@ -152,7 +151,7 @@ int LargestPublicState(const std::vector<PublicState>& states) {
   int max_size = 0;
   for (const PublicState& state : states) {
     int state_size = 0;
-    for (const InfostateNode* node : state.nodes[0]) {
+    for (const algorithms::InfostateNode* node : state.nodes[0]) {
       state_size += node->corresponding_states_size();
     }
     max_size = std::max(max_size, state_size);
@@ -206,11 +205,11 @@ void TrainEvalLoop() {
   factory.use_bandits_for_cfr  = absl::GetFlag(FLAGS_use_bandits_for_cfr);
   factory.max_move_ahead_limit = absl::GetFlag(FLAGS_depth);
   factory.max_particles        = absl::GetFlag(FLAGS_max_particles);
-  factory.terminal_evaluator   = std::make_shared<dlcfr::TerminalEvaluator>();
+  factory.terminal_evaluator   = std::make_shared<TerminalEvaluator>();
   /* factory.leaf_evaluator will be set later: it needs dims and neural net. */
   //
   std::cout << "# Making oracle evaluator ..." << std::endl;
-  auto oracle = std::make_shared<algorithms::dlcfr::CFREvaluator>(
+  auto oracle = std::make_shared<CFREvaluator>(
       factory.game, /*full_subgame_depth=*/1000,
       /*no_leaf_evaluator=*/nullptr, factory.terminal_evaluator,
       factory.public_observer, factory.infostate_observer);

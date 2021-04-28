@@ -31,7 +31,7 @@ std::unique_ptr<State> Particle::MakeState(const Game& game) const {
 }
 
 
-void ParticleSet::AssignBeliefs(algorithms::dlcfr::PublicState& state) const {
+void ParticleSet::AssignBeliefs(PublicState& state) const {
   for (int pl = 0; pl < 2; ++pl) {
     SPIEL_CHECK_EQ(state.beliefs[pl].size(), state.nodes[pl].size());
     for (int i = 0; i < state.nodes[pl].size(); ++i) {
@@ -151,7 +151,7 @@ void CheckParticleSetConsistency(const Game& game,
 
 }
 std::unique_ptr<ParticleSetPartition> MakeParticleSetPartition(
-    const algorithms::dlcfr::PublicState& state,
+    const PublicState& state,
     int primary_max_particles, double epsilon,
     bool save_secondary, std::mt19937& rnd_gen) {
 

@@ -27,11 +27,11 @@ namespace papers_with_code {
 
 struct ReusableStructures {
   const SubgameFactory& factory;
-  const std::shared_ptr<const LeafEvaluator> pbs_oracle;
+  const std::shared_ptr<const PublicStateEvaluator> pbs_oracle;
 
   explicit ReusableStructures(
       const SubgameFactory& factory,
-      const std::shared_ptr <const LeafEvaluator>& pbs_oracle)
+      const std::shared_ptr <const PublicStateEvaluator>& pbs_oracle)
       : factory(factory), pbs_oracle(pbs_oracle) {}
 
   // Each of these is essentially a cache of the object.

@@ -19,20 +19,19 @@
 namespace open_spiel {
 namespace papers_with_code {
 
-using namespace algorithms;
 using namespace torch::indexing;  // Load all of the Slice, Ellipsis, etc.
-
+namespace or_algs = algorithms::ortools;
 
 class FullTrunkExplMetric : public Metric {
   std::vector<int> evaluate_iters_;
   std::vector<double> expls_;
-  dlcfr::DepthLimitedCFR* trunk_with_net_;
-  ortools::SequenceFormLpSpecification* whole_game_;
+  DepthLimitedCFR* trunk_with_net_;
+  or_algs::SequenceFormLpSpecification* whole_game_;
 
  public:
   FullTrunkExplMetric(std::vector<int> evaluate_iters,
-                      dlcfr::DepthLimitedCFR* trunk_with_net,
-                      ortools::SequenceFormLpSpecification* whole_game)
+                      DepthLimitedCFR* trunk_with_net,
+                      or_algs::SequenceFormLpSpecification* whole_game)
      : evaluate_iters_(std::move(evaluate_iters)),
        expls_(evaluate_iters_.size()),
        trunk_with_net_(trunk_with_net),
@@ -55,7 +54,7 @@ class FullTrunkExplMetric : public Metric {
       trunk_with_net_->EvaluateLeaves();
 
       if (should_evaluate_at_iter(i)) {
-        expls_[j++] = ortools::TrunkExploitability(whole_game_, *eval_policy);
+        expls_[j++] = or_algs::TrunkExploitability(whole_game_, *eval_policy);
         progress << '.' << std::flush;
       }
       trunk_with_net_->UpdateTrunk();
@@ -90,14 +89,14 @@ class FullTrunkExplMetric : public Metric {
 
 
 class UniformPolicyForInfostateTrees : public Policy {
-  const std::vector<std::shared_ptr<InfostateTree>>& trees_;
+  const std::vector<std::shared_ptr<algorithms::InfostateTree>>& trees_;
  public:
   UniformPolicyForInfostateTrees(
-      const std::vector<std::shared_ptr<InfostateTree>>& trees)
+      const std::vector<std::shared_ptr<algorithms::InfostateTree>>& trees)
       : trees_(trees) {}
   ActionsAndProbs GetStatePolicy(const std::string& info_state) const override {
     for (int pl = 0; pl < 2; ++pl) {
-      const InfostateNode* node =
+      const algorithms::InfostateNode* node =
           trees_[pl]->DecisionNodeFromInfostateString(info_state);
       if (node) {
         const std::vector<Action>& actions = node->legal_actions();
@@ -124,14 +123,14 @@ class SparseRootsExplMetric : public Metric {
 
   std::unique_ptr<DispatchPolicy> eval_policy_;
   std::unique_ptr<SparseTrunk> eval_trunk_;
-  std::unique_ptr<ortools::SequenceFormLpSpecification> eval_lp_;
+  std::unique_ptr<or_algs::SequenceFormLpSpecification> eval_lp_;
   std::shared_ptr<UniformPolicyForInfostateTrees> uniform_policy_;
   
  public:
   SparseRootsExplMetric(
       // Needed to construct proper evaluations.
       SubgameFactory* factory,
-      ortools::SequenceFormLpSpecification* whole_game,
+      or_algs::SequenceFormLpSpecification* whole_game,
       // Settings.
       std::vector<int> evaluate_iters,
       int roots_depth, double support_threshold, bool prune_chance_histories)
@@ -140,7 +139,7 @@ class SparseRootsExplMetric : public Metric {
         uniform_policy_(
             std::make_shared<UniformPolicyForInfostateTrees>(whole_game->trees())) {
     
-    auto[eq_policy, game_value] = ortools::MakeEquilibriumPolicy(whole_game);
+    auto[eq_policy, game_value] = or_algs::MakeEquilibriumPolicy(whole_game);
     sparse_eq_trunk_with_net_ = MakeSparseTrunkWithEqSupport(
         eq_policy, factory->game, factory->infostate_observer,
         factory->public_observer,
@@ -158,7 +157,7 @@ class SparseRootsExplMetric : public Metric {
         nullptr, factory->terminal_evaluator,
         kUseBanditsForCfr, /*support_threshold=*/1e-5, 
         /*prune_chance_histories=*/false);
-    eval_lp_ = std::make_unique<ortools::SequenceFormLpSpecification>(
+    eval_lp_ = std::make_unique<or_algs::SequenceFormLpSpecification>(
              eval_trunk_->dlcfr->trees(), "CLP");
     eval_policy_ = std::make_unique<DispatchPolicy>();
     eval_policy_->AddDispatch(sparse_eq_trunk_with_net_->fixate_infostates,
@@ -176,14 +175,14 @@ class SparseRootsExplMetric : public Metric {
     sparse_eq_trunk_with_net_->dlcfr->Reset();
 
     for (int i = 1; i <= evaluate_iters_.back(); ++i) {
-      dlcfr::DepthLimitedCFR* trunk_with_net = 
+      DepthLimitedCFR* trunk_with_net =
           sparse_eq_trunk_with_net_->dlcfr.get();
       ++trunk_with_net->num_iterations_;
       trunk_with_net->UpdateReachProbs();
       trunk_with_net->EvaluateLeaves();
 
       if (should_evaluate_at_iter(i)) {
-        expls_[j++] = ortools::TrunkExploitability(eval_lp_.get(),
+        expls_[j++] = or_algs::TrunkExploitability(eval_lp_.get(),
                                                    *eval_policy_);
         progress << '.' << std::flush;
       }
@@ -248,15 +247,15 @@ class ReplayVisitsMetric : public Metric {
 };
 
 std::unique_ptr<Metric> MakeFullTrunkExplMetric(
-    std::vector<int> evaluate_iters, dlcfr::DepthLimitedCFR* trunk_with_net,
-    ortools::SequenceFormLpSpecification* whole_game) {
+    std::vector<int> evaluate_iters, DepthLimitedCFR* trunk_with_net,
+    or_algs::SequenceFormLpSpecification* whole_game) {
   return std::make_unique<FullTrunkExplMetric>(std::move(evaluate_iters),
                                                trunk_with_net, whole_game);
 }
 
 std::unique_ptr<Metric> MakeSparseRootsExplMetric(
     SubgameFactory* factory,
-    ortools::SequenceFormLpSpecification* whole_game,
+    or_algs::SequenceFormLpSpecification* whole_game,
     std::vector<int> evaluate_iters,
     int roots_depth, double support_threshold, bool prune_chance_histories) {
   return std::make_unique<SparseRootsExplMetric>(

@@ -33,11 +33,7 @@ constexpr int kDefaultMaxParticles = 1000;
 
 // A (depth-limited) subgame rooted at some perfect-information histories,
 // that have belief distribution over the infostates induced by those histories.
-using Subgame = algorithms::dlcfr::DepthLimitedCFR;
-using PublicState = algorithms::dlcfr::PublicState;
-using TerminalEvaluator = algorithms::dlcfr::TerminalEvaluator;
-using LeafEvaluator = algorithms::dlcfr::PublicStateEvaluator;
-using PublicStatesInGame = algorithms::dlcfr::PublicStatesInGame;
+using Subgame = DepthLimitedCFR;
 using SequenceFormLpSpecification = algorithms::ortools::SequenceFormLpSpecification;
 
 // Produce a subgame given a particle set.
@@ -56,7 +52,7 @@ struct SubgameFactory {
 
   // Subgame from game's initial state.
   std::unique_ptr<Subgame> MakeTrunk(
-      std::shared_ptr<const LeafEvaluator> custom_leaf_evaluator,
+      std::shared_ptr<const PublicStateEvaluator> custom_leaf_evaluator,
       std::string custom_bandits_for_cfr) const;
   std::unique_ptr<Subgame> MakeSubgame(
       const ParticleSet& set,

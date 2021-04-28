@@ -24,7 +24,7 @@ namespace papers_with_code {
 
 // See comment below.
 struct SparseTrunk {
-  std::unique_ptr<algorithms::dlcfr::DepthLimitedCFR> dlcfr;
+  std::unique_ptr<DepthLimitedCFR> dlcfr;
   std::vector<std::string> fixate_infostates;
   std::vector<std::string> uniform_infostates;
 };
@@ -40,8 +40,8 @@ std::vector<std::unique_ptr<SparseTrunk>> MakeSparseTrunks(
     std::shared_ptr<Observer> infostate_observer,
     std::shared_ptr<Observer> public_observer,
     int roots_depth, int trunk_depth,
-    std::shared_ptr<const algorithms::dlcfr::PublicStateEvaluator> net_evaluator,
-    std::shared_ptr<const algorithms::dlcfr::PublicStateEvaluator> terminal_evaluator,
+    std::shared_ptr<const PublicStateEvaluator> net_evaluator,
+    std::shared_ptr<const PublicStateEvaluator> terminal_evaluator,
     int limit_initial_states, const std::string& bandits_for_cfr,
     std::mt19937& rnd_gen);
 
@@ -51,8 +51,8 @@ std::unique_ptr<SparseTrunk> MakeSparseTrunkWithEqSupport(
     std::shared_ptr<Observer> infostate_observer,
     std::shared_ptr<Observer> public_observer,
     int roots_depth, int trunk_depth,
-    std::shared_ptr<const algorithms::dlcfr::PublicStateEvaluator> leaf_evaluator,
-    std::shared_ptr<const algorithms::dlcfr::PublicStateEvaluator> terminal_evaluator,
+    std::shared_ptr<const PublicStateEvaluator> leaf_evaluator,
+    std::shared_ptr<const PublicStateEvaluator> terminal_evaluator,
     const std::string& bandits_for_cfr,
     double support_threshold,
     bool prune_chance_histories);

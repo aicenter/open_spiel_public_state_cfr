@@ -22,10 +22,8 @@ namespace open_spiel {
 namespace papers_with_code {
 namespace {
 
-using namespace algorithms;
-
 void CheckSparseTrunksKuhnDepth2(
-    const std::vector<std::unique_ptr<SparseTrunk>>& sparse_trunks,
+    const std::vector <std::unique_ptr <SparseTrunk>>& sparse_trunks,
     int num_states) {
   SPIEL_CHECK_EQ(sparse_trunks.size(), 3);
   for (int i = 0; i < sparse_trunks.size(); ++i) {
@@ -37,13 +35,13 @@ void CheckSparseTrunksKuhnDepth2(
 
     for (int pl = 0; pl < 2; ++pl) {
       SPIEL_CHECK_EQ(sparse_trunks[i]->dlcfr->trees()[pl]
-                     ->leaf_nodes().size(), num_states * 5);
+                         ->leaf_nodes().size(), num_states * 5);
     }
   }
 }
 
 void CheckSparseTrunksKuhnDepth3(
-    const std::vector<std::unique_ptr<SparseTrunk>>& sparse_trunks,
+    const std::vector <std::unique_ptr <SparseTrunk>>& sparse_trunks,
     int num_states) {
   SPIEL_CHECK_EQ(sparse_trunks.size(), 6);
   for (int i = 0; i < sparse_trunks.size(); ++i) {
@@ -56,12 +54,12 @@ void CheckSparseTrunksKuhnDepth3(
       if (eval_infostate[1] == 'p') {
         // Pass infostate
         SPIEL_CHECK_EQ(sparse_trunks[i]->dlcfr->trees()[pl]
-                       ->leaf_nodes().size(), num_states * 3);
+                           ->leaf_nodes().size(), num_states * 3);
         SPIEL_CHECK_EQ(sparse_trunks[i]->dlcfr->public_states().size(), 3);
       } else if (eval_infostate[1] == 'b') {
         // Bet infostate
         SPIEL_CHECK_EQ(sparse_trunks[i]->dlcfr->trees()[pl]
-                       ->leaf_nodes().size(), num_states * 2);
+                           ->leaf_nodes().size(), num_states * 2);
         SPIEL_CHECK_EQ(sparse_trunks[i]->dlcfr->public_states().size(), 2);
       } else {
         SpielFatalError("Exhausted pattern match!");
@@ -71,7 +69,7 @@ void CheckSparseTrunksKuhnDepth3(
 }
 
 void CheckSparseTrunksKuhnDepth4(
-    const std::vector<std::unique_ptr<SparseTrunk>>& sparse_trunks,
+    const std::vector <std::unique_ptr <SparseTrunk>>& sparse_trunks,
     int num_states) {
   SPIEL_CHECK_EQ(sparse_trunks.size(), 3);
   for (int i = 0; i < sparse_trunks.size(); ++i) {
@@ -83,22 +81,22 @@ void CheckSparseTrunksKuhnDepth4(
 
     for (int pl = 0; pl < 2; ++pl) {
       SPIEL_CHECK_EQ(sparse_trunks[i]->dlcfr->trees()[pl]
-                     ->leaf_nodes().size(), num_states * 2);
+                         ->leaf_nodes().size(), num_states * 2);
     }
   }
 }
 
 // Test that sparse trunks are constructed correctly.
 void TestMakeSparseTrunks() {
-  std::shared_ptr<const Game> game = LoadGame("kuhn_poker");
-  std::shared_ptr<Observer> infostate_observer =
+  std::shared_ptr <const Game> game = LoadGame("kuhn_poker");
+  std::shared_ptr <Observer> infostate_observer =
       game->MakeObserver(kInfoStateObsType, {});
-  std::shared_ptr<Observer> public_observer =
+  std::shared_ptr <Observer> public_observer =
       game->MakeObserver(kPublicStateObsType, {});
-  std::shared_ptr<dlcfr::PublicStateEvaluator> terminal_evaluator =
-      dlcfr::MakeTerminalEvaluator();
-  std::shared_ptr<dlcfr::PublicStateEvaluator> dummy_eval =
-      dlcfr::MakeDummyEvaluator();
+  std::shared_ptr <PublicStateEvaluator> terminal_evaluator =
+      MakeTerminalEvaluator();
+  std::shared_ptr <PublicStateEvaluator> dummy_eval =
+      MakeDummyEvaluator();
   std::string bandits_for_cfr = "RegretMatchingPlus";
   std::mt19937 rnd_gen(0);
 
@@ -108,7 +106,7 @@ void TestMakeSparseTrunks() {
     if (limit == 0) continue;
 
     for (int roots_depth = 2; roots_depth <= 4; ++roots_depth) {
-      std::vector<std::unique_ptr<SparseTrunk>> sparse_trunks =
+      std::vector <std::unique_ptr <SparseTrunk>> sparse_trunks =
           MakeSparseTrunks(game, infostate_observer, public_observer,
                            roots_depth, /*trunk_depth=*/1000,
                            dummy_eval, terminal_evaluator,
@@ -116,9 +114,12 @@ void TestMakeSparseTrunks() {
       int num_states = limit > 0 ? limit : 6;
 
       switch (roots_depth) {
-        case 2: CheckSparseTrunksKuhnDepth2(sparse_trunks, num_states); break;
-        case 3: CheckSparseTrunksKuhnDepth3(sparse_trunks, num_states); break;
-        case 4: CheckSparseTrunksKuhnDepth4(sparse_trunks, num_states); break;
+        case 2: CheckSparseTrunksKuhnDepth2(sparse_trunks, num_states);
+          break;
+        case 3: CheckSparseTrunksKuhnDepth3(sparse_trunks, num_states);
+          break;
+        case 4: CheckSparseTrunksKuhnDepth4(sparse_trunks, num_states);
+          break;
       }
     }
   }
@@ -129,35 +130,35 @@ void TestMakeSparseTrunks() {
 // subgame rooted in the slice, and call DL-CFR at the leaves of this subgame.
 void TestMakeSparseTrunkWithEqSupport() {
   const int no_move_limit = 1000;  // Some big number.
-  std::shared_ptr<const Game> game = LoadGame(
+  std::shared_ptr <const Game> game = LoadGame(
       "goofspiel(players=2,num_cards=5,imp_info=True,points_order=descending)");
-  std::shared_ptr<Observer> infostate_observer =
+  std::shared_ptr <Observer> infostate_observer =
       game->MakeObserver(kInfoStateObsType, {});
-  std::shared_ptr<Observer> public_observer =
+  std::shared_ptr <Observer> public_observer =
       game->MakeObserver(kPublicStateObsType, {});
-  std::shared_ptr<dlcfr::PublicStateEvaluator> terminal_evaluator =
-      dlcfr::MakeTerminalEvaluator();
-  auto cfr_eval = std::make_shared<dlcfr::CFREvaluator>(
+  std::shared_ptr <PublicStateEvaluator> terminal_evaluator =
+      MakeTerminalEvaluator();
+  auto cfr_eval = std::make_shared <CFREvaluator>(
       game, no_move_limit, /*leaf_evaluator=*/nullptr,
       terminal_evaluator, public_observer, infostate_observer);
   std::string bandits_for_cfr = "RegretMatchingPlus";
 
-  ortools::SequenceFormLpSpecification whole_game(*game, "CLP");
-  auto [eq_policy, game_value] = ortools::MakeEquilibriumPolicy(&whole_game);
+  algorithms::ortools::SequenceFormLpSpecification whole_game(*game, "CLP");
+  auto[eq_policy, game_value] = algorithms::ortools::MakeEquilibriumPolicy(&whole_game);
 
   const int roots_depth = 2;
   const int trunk_depth = 3;
   double support_threshold = 0.0;
   bool prune_chance_histories = false;
 
-  std::unique_ptr<SparseTrunk> sparse_slice =
+  std::unique_ptr <SparseTrunk> sparse_slice =
       MakeSparseTrunkWithEqSupport(eq_policy, game,
                                    infostate_observer, public_observer,
                                    roots_depth, trunk_depth,  // ! <--
                                    cfr_eval, terminal_evaluator,
                                    bandits_for_cfr,
                                    support_threshold, prune_chance_histories);
-  std::shared_ptr<Policy> slice_policy = sparse_slice->dlcfr->AveragePolicy();
+  std::shared_ptr <Policy> slice_policy = sparse_slice->dlcfr->AveragePolicy();
 
   // Make a special dispatch table for exploitability evaluation:
   // The roots of the sparse slice will change with the DL-CFR iterations.
@@ -167,23 +168,23 @@ void TestMakeSparseTrunkWithEqSupport() {
   // For evaluation, the sparse trunk is constructed as replacing the players'
   // equilibrium policies as a chance in the upper game. By constructing the
   // trunk with no move limit, we make an evaluation trunk.
-  std::unique_ptr<SparseTrunk> eval_trunk =
+  std::unique_ptr <SparseTrunk> eval_trunk =
       MakeSparseTrunkWithEqSupport(eq_policy, game,
                                    infostate_observer, public_observer,
                                    roots_depth, no_move_limit,  // ! <--
                                    cfr_eval, terminal_evaluator,
                                    bandits_for_cfr,
                                    support_threshold, prune_chance_histories);
-  ortools::SequenceFormLpSpecification eq_fixed_as_chance_lp(
+  algorithms::ortools::SequenceFormLpSpecification eq_fixed_as_chance_lp(
       eval_trunk->dlcfr->trees(), "CLP");
 
   double expl;
   for (int i = 0; i <= 50; ++i) {
-    cfr_eval->num_cfr_iterations = (i+1)*5;  // For faster convergence.
+    cfr_eval->num_cfr_iterations = (i + 1) * 5;  // For faster convergence.
     sparse_slice->dlcfr->RunSimultaneousIterations(1);
     if (i % 10 == 0) {
-      expl = ortools::TrunkExploitability(&eq_fixed_as_chance_lp,
-                                          dispatch_policy);
+      expl = algorithms::ortools::TrunkExploitability(&eq_fixed_as_chance_lp,
+                                                      dispatch_policy);
       std::cout << i << " " << expl << std::endl;
     }
   }
