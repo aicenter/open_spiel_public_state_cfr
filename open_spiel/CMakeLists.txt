@@ -66,8 +66,10 @@ if(APPLE)
   # has a virtual environment active
   set (CMAKE_FIND_FRAMEWORK LAST)
 else()
-  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pedantic -Wall -Wno-sign-compare -Wno-macro-redefined -Wno-tautological-type-limit-compare -Wno-unused-template -Wno-unused-value -Wno-potentially-evaluated-expression -Wno-gnu-zero-variadic-macro-arguments -Wno-c99-extensions -Wno-gcc-compat -Wno-gnu-case-range -Wno-extra-semi -Wno-unused-const-variable -Wno-unused-variable -Wno-unused-private-field"
+  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pedantic -Wall -Wno-sign-compare -Wno-macro-redefined -Wno-tautological-type-limit-compare -Wno-unused-template -Wno-unused-value -Wno-potentially-evaluated-expression -Wno-gnu-zero-variadic-macro-arguments -Wno-c99-extensions -Wno-gcc-compat -Wno-gnu-case-range -Wno-extra-semi -Wno-unused-const-variable -Wno-unused-variable -Wno-unused-private-field -Wno-sizeof-array-div -Wno-unused-function -Wno-zero-length-array"
     )
+  # -Wno-unused-function : open_spiel/games/universal_poker/acpc/project_acpc_server/evalHandTables:4257:16: warning: unused function 'emptyCardset'
+  # -Wno-sizeof-array-div : libtorch/libtorch/include/torch/csrc/jit/ir/attributes.h:37:42: warning: expression does not compute the number of elements in this array; element type is 'const char *', not 'torch::jit::AttributeKind' [-Wsizeof-array-div]
   # -Wno-c99-extensions : A nice convenience used by most compilers.
   # -Wno-extra-semi : open_spiel/libtorch/libtorch/include/ATen/core/jit_type.h:1945:1: warning: extra ';' inside a struct
   # -Wno-gcc-compat : open_spiel/abseil-cpp/absl/strings/internal/str_format/parser.h:293:11: warning: 'enable_if' is a clang extension
@@ -82,6 +84,7 @@ else()
   # -Wno-unused-template"  # open_spiel/abseil-cpp/absl/time/internal/cctz/src/time_zone_libc.cc:100:6: warning: unused function template 'tm_zone'
   # -Wno-unused-value"  # open_spiel/games/bridge/double_dummy_solver/src/Init.cpp:364:12: warning: expression result unused
   # -Wno-unused-variable : open_spiel/games/bridge/double_dummy_solver/src/System.cpp:229:7: warning: unused variable 'ignore'
+  # -Wno-zero-length-array open_spiel/ortools/include/ortools/sat/clause.h:135:21: warning: zero size arrays are an extension [-Wzero-length-array]
 endif()
 
 # Position-independent code is needed for Python extension modules.
