@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "open_spiel/papers_with_code/1906.06412.value_functions/infostate_dl_cfr.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/subgame.h"
 
 #include <cmath>
 #include <iostream>
@@ -60,8 +60,8 @@ void TestTerminalEvaluatorHasSameIterations(const std::string& game_name) {
   // We use only the terminal evaluator.
   std::shared_ptr<PublicStateEvaluator> terminal_evaluator = MakeTerminalEvaluator();
   std::shared_ptr<PublicStateEvaluator> nonterminal_evaluator = MakeDummyEvaluator();
-  DepthLimitedCFR dl_solver(game, /*depth_limit=*/100,
-                            nonterminal_evaluator, terminal_evaluator);
+  Subgame dl_solver(game, /*depth_limit=*/100,
+                    nonterminal_evaluator, terminal_evaluator);
 
   std::shared_ptr<Policy> vec_avg = vec_solver.AveragePolicy();
   std::shared_ptr<Policy> dl_avg = dl_solver.AveragePolicy();
@@ -78,7 +78,7 @@ void TestTerminalEvaluatorHasSameIterations(const std::string& game_name) {
   }
 }
 
-std::unique_ptr<DepthLimitedCFR> MakeRecursiveDepthLimitedCFR(
+std::unique_ptr<Subgame> MakeRecursiveDepthLimitedCFR(
     std::shared_ptr<const Game> game, int trunk_depth_limit,
     int subgame_depth_limit) {
   std::shared_ptr<const PublicStateEvaluator> terminal_evaluator =
@@ -102,7 +102,7 @@ std::unique_ptr<DepthLimitedCFR> MakeRecursiveDepthLimitedCFR(
 
   // Builds the root leaf public states so that we can call the recursive
   // evaluator.
-  return std::make_unique<DepthLimitedCFR>(
+  return std::make_unique<Subgame>(
       game, trunk_depth_limit, leaf_evaluator, terminal_evaluator);
 }
 
@@ -119,7 +119,7 @@ void TestRecursiveDepthLimitedSolving(const std::string& game_name) {
          ++subgame_depth_limit) {
 
       algorithms::InfostateCFR vec_solver(*game);
-      std::unique_ptr<DepthLimitedCFR> dl_solver = MakeRecursiveDepthLimitedCFR(
+      std::unique_ptr<Subgame> dl_solver = MakeRecursiveDepthLimitedCFR(
           game, trunk_depth_limit, subgame_depth_limit);
 
       std::shared_ptr<Policy> vec_avg = vec_solver.AveragePolicy();

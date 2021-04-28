@@ -16,7 +16,7 @@
 #define OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_HAND_TABLE_
 
 #include "open_spiel/algorithms/infostate_tree.h"
-#include "open_spiel/papers_with_code/1906.06412.value_functions/infostate_dl_cfr.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/subgame.h"
 
 namespace open_spiel {
 namespace papers_with_code {

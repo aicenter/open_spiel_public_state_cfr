@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include "open_spiel/papers_with_code/1906.06412.value_functions/hand_table.h"
-#include "infostate_dl_cfr.h"
+#include "subgame.h"
 
 
 namespace open_spiel {
@@ -25,7 +25,7 @@ void TestCreateHandTable() {
   std::shared_ptr<Observer>
       hand_observer = game->MakeObserver(kHandObsType, {});
   auto leaf_evaluator = MakeDummyEvaluator();
-  DepthLimitedCFR dl_cfr(game, 3, leaf_evaluator, nullptr);
+  Subgame dl_cfr(game, 3, leaf_evaluator, nullptr);
 
   std::unique_ptr<HandInfo> hand_info = MakeHandInfo(*game, hand_observer,
                                                      dl_cfr.public_states());

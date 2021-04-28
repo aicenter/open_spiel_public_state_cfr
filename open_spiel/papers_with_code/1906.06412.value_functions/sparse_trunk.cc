@@ -107,7 +107,7 @@ std::vector<std::unique_ptr<SparseTrunk>> MakeSparseTrunks(
   // 1. First of all, build a temporary full trunk, so we can identify all
   //    public states, infostates and associated histories.
   std::shared_ptr<PublicStateEvaluator> dummy_eval = MakeDummyEvaluator();
-  DepthLimitedCFR temp_trunk(game, roots_depth, dummy_eval, terminal_evaluator);
+  Subgame temp_trunk(game, roots_depth, dummy_eval, terminal_evaluator);
 //  std::cout << "# Temp trunk public states stats: \n";
 //  PrintPublicStatesStats(temp_trunk.public_states());
 
@@ -161,7 +161,7 @@ std::vector<std::unique_ptr<SparseTrunk>> MakeSparseTrunks(
                               /*pl=*/1, /*max_move_ahead_limit=*/move_lim)
         };
         auto sparse_trunk = std::make_unique<SparseTrunk>();
-        sparse_trunk->dlcfr = std::make_unique<DepthLimitedCFR>(
+        sparse_trunk->dlcfr = std::make_unique<Subgame>(
             game, sparse_trees, net_evaluator, terminal_evaluator,
             public_observer, MakeBanditVectors(sparse_trees, bandits_for_cfr));
         sparse_trunk->fixate_infostates = {node->infostate_string()};
@@ -353,7 +353,7 @@ std::unique_ptr<SparseTrunk> MakeSparseTrunkWithEqSupport(
         algorithms::MakeInfostateTree(start_states_ptrs, start_chances, infostate_observer,
             /*pl=*/1, /*max_move_ahead_limit=*/move_lim)
     };
-    sparse_trunk->dlcfr = std::make_unique<DepthLimitedCFR>(
+    sparse_trunk->dlcfr = std::make_unique<Subgame>(
         game, sparse_trees, leaf_evaluator, terminal_evaluator,
         public_observer, MakeBanditVectors(sparse_trees, bandits_for_cfr));
   }

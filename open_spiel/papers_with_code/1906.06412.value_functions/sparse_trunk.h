@@ -16,7 +16,7 @@
 #define OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_SPARSE_TRUNK_
 
 #include "open_spiel/algorithms/infostate_tree.h"
-#include "open_spiel/papers_with_code/1906.06412.value_functions/infostate_dl_cfr.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/subgame.h"
 #include "open_spiel/algorithms/ortools/sequence_form_lp.h"
 
 namespace open_spiel {
@@ -24,7 +24,7 @@ namespace papers_with_code {
 
 // See comment below.
 struct SparseTrunk {
-  std::unique_ptr<DepthLimitedCFR> dlcfr;
+  std::unique_ptr<Subgame> dlcfr;
   std::vector<std::string> fixate_infostates;
   std::vector<std::string> uniform_infostates;
 };

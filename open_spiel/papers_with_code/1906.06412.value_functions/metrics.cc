@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include "open_spiel/papers_with_code/1906.06412.value_functions/metrics.h"
-#include "open_spiel/papers_with_code/1906.06412.value_functions/subgame.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/subgame_factory.h"
 #include "open_spiel/algorithms/dispatch_policy.h"
 
 namespace open_spiel {
@@ -25,12 +25,12 @@ namespace or_algs = algorithms::ortools;
 class FullTrunkExplMetric : public Metric {
   std::vector<int> evaluate_iters_;
   std::vector<double> expls_;
-  DepthLimitedCFR* trunk_with_net_;
+  Subgame* trunk_with_net_;
   or_algs::SequenceFormLpSpecification* whole_game_;
 
  public:
   FullTrunkExplMetric(std::vector<int> evaluate_iters,
-                      DepthLimitedCFR* trunk_with_net,
+                      Subgame* trunk_with_net,
                       or_algs::SequenceFormLpSpecification* whole_game)
      : evaluate_iters_(std::move(evaluate_iters)),
        expls_(evaluate_iters_.size()),
@@ -175,7 +175,7 @@ class SparseRootsExplMetric : public Metric {
     sparse_eq_trunk_with_net_->dlcfr->Reset();
 
     for (int i = 1; i <= evaluate_iters_.back(); ++i) {
-      DepthLimitedCFR* trunk_with_net =
+      Subgame* trunk_with_net =
           sparse_eq_trunk_with_net_->dlcfr.get();
       ++trunk_with_net->num_iterations_;
       trunk_with_net->UpdateReachProbs();
@@ -247,7 +247,7 @@ class ReplayVisitsMetric : public Metric {
 };
 
 std::unique_ptr<Metric> MakeFullTrunkExplMetric(
-    std::vector<int> evaluate_iters, DepthLimitedCFR* trunk_with_net,
+    std::vector<int> evaluate_iters, Subgame* trunk_with_net,
     or_algs::SequenceFormLpSpecification* whole_game) {
   return std::make_unique<FullTrunkExplMetric>(std::move(evaluate_iters),
                                                trunk_with_net, whole_game);
