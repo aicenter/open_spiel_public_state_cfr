@@ -13,8 +13,8 @@ add_library(open_spiel_ortools OBJECT
   sequence_form_lp.h
   sequence_form_lp.cc
   sequence_form_lp.h
-  dl_oracle_evaluator.cc
-  dl_oracle_evaluator.h
+  trunk_exploitability.cc
+  trunk_exploitability.h
 )
 target_link_libraries(open_spiel_ortools ${ORTOOLS_LIBS})
 
@@ -28,7 +28,7 @@ add_executable(sequence_form_lp_test sequence_form_lp_test.cc ${OPEN_SPIEL_OBJEC
 target_link_libraries(sequence_form_lp_test ${ORTOOLS_LIBS})
 add_test(sequence_form_lp_test sequence_form_lp_test)
 
-add_executable(dl_oracle_evaluator_test dl_oracle_evaluator_test.cc ${OPEN_SPIEL_OBJECTS}
+add_executable(trunk_exploitability_test trunk_exploitability_test.cc ${OPEN_SPIEL_OBJECTS}
                $<TARGET_OBJECTS:tests> $<TARGET_OBJECTS:open_spiel_ortools>)
-target_link_libraries(dl_oracle_evaluator_test ${ORTOOLS_LIBS})
-add_test(dl_oracle_evaluator_test dl_oracle_evaluator_test)
+target_link_libraries(trunk_exploitability_test ${ORTOOLS_LIBS})
+add_test(trunk_exploitability_test trunk_exploitability_test)
