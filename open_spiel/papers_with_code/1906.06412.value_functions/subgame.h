@@ -111,8 +111,12 @@ struct PublicState {
   bool IsTerminal() const;
   // Compute the reach probability of this public state.
   double ReachProbability() const;
-  // Chech the state has non-zero reach probability.
+  // Check the state has non-zero reach probability.
   bool IsReachable() const { return ReachProbability() > 0; }
+  // Compute value of this state (for the given player).
+  double Value(int player = 0) const;
+  // Check if the public state is zero-sum.
+  bool IsZeroSum() const { return fabs(Value(0) + Value(1)) < 1e-10; }
 };
 
 void DebugPrintPublicFeatures(const std::vector<PublicState>& states);

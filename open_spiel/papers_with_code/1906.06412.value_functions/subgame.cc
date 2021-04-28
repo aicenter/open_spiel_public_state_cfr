@@ -428,6 +428,15 @@ double PublicState::ReachProbability() const {
   return reach_map.fold_sum(0);
 }
 
+double PublicState::Value(int player) const {
+  SPIEL_CHECK_EQ(beliefs[player].size(), values[player].size());
+  double acc = 0.;
+  for (int i = 0; i < beliefs[player].size(); ++i) {
+    acc += beliefs[player][i] * values[player][i];
+  }
+  return acc;
+}
+
 void DebugPrintPublicFeatures(const std::vector<PublicState>& states) {
   std::cout << "# Public features:\n";
   for (int i = 0; i < states.size(); ++i) {
