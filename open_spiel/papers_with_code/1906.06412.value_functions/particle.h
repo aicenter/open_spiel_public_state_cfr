@@ -48,6 +48,7 @@ struct ParticleSet {
   Particle& at(const std::vector<Action>& history);
   const Particle& at(const std::vector<Action>& history) const;
   Particle& add(const std::vector<Action>& history);
+  bool has(const std::vector<Action>& history) const;
 
   void AssignBeliefs(PublicState& state) const;
 };

@@ -78,6 +78,17 @@ Particle& ParticleSet::add(const std::vector<Action>& history) {
   return particles.back();
 }
 
+bool ParticleSet::has(const std::vector<Action>& history) const {
+  for (const Particle& particle : particles) {
+    // Maybe should be SPIEL_CHECK_EQ in most games.
+    if (particle.history.size() != history.size()) continue;
+    // Compare in reverse, as the endings are where they will not be equal.
+    if (std::equal(particle.history.rbegin(), particle.history.rend(),
+                   history.rbegin())) return true;
+  }
+  return false;
+}
+
 void CheckObservation(const Observation& actual, const Observation& expected) {
   SPIEL_CHECK_EQ(actual.Tensor(), expected.Tensor());
   SPIEL_CHECK_EQ(actual.tensor_info(), expected.tensor_info());

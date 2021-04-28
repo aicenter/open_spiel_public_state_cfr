@@ -19,8 +19,9 @@
 namespace open_spiel {
 namespace papers_with_code {
 
-std::unique_ptr<ParticleSet> GenerateParticles(Observation& public_state,
-                                               int max_particles) {
+std::unique_ptr<ParticleSet> GenerateParticles(
+    Observation& public_state, int max_particles, int max_rejection_cnt,
+    std::mt19937& rnd_gen) {
   int num_cards = public_state.Tensor("tie_sequence").size();
   const auto point_cards = public_state.Tensor("point_card_sequence");
   int bet_rounds = std::accumulate(point_cards.begin(), point_cards.end(), -1);
@@ -58,37 +59,54 @@ std::unique_ptr<ParticleSet> GenerateParticles(Observation& public_state,
     else SpielFatalError("Unknown outcome");
   }
 
-  // Solving part.
-  opr::sat::Model model;
-  opr::sat::SatParameters parameters;
-  parameters.set_enumerate_all_solutions(true);
-  parameters.set_cp_model_presolve(false);
-  model.Add(NewSatParameters(parameters));
-  
-  // Create an atomic Boolean that will be periodically checked by the limit.
-  std::atomic<bool> stopped(false);
-  model.GetOrCreate<opr::TimeLimit>()->RegisterExternalBooleanAsLimit(&stopped);
-
   // Store solution.
   auto set = std::make_unique<ParticleSet>();
-  model.Add(opr::sat::NewFeasibleSolutionObserver(
-      [&](const opr::sat::CpSolverResponse& response){
-        std::vector<Action> history;
-        history.reserve(bet_rounds * 2);
 
-        for (int i = 0; i < bet_rounds; ++i) {
-          history.push_back(SolutionIntegerValue(response, played[0][i]));
-          history.push_back(SolutionIntegerValue(response, played[1][i]));
-        }
-        set->particles.emplace_back(history);
+  auto card_dist = std::uniform_int_distribution<int>(1, num_cards);
+  auto player_dist = std::uniform_int_distribution<int>(0, 1);
+  auto dir_dist = std::uniform_int_distribution<int>(0, bet_rounds);
 
-        if (set->particles.size() >= max_particles) stopped = true;
+  int num_rejected = 0;
+  while (set->particles.size() < max_particles
+      && num_rejected < max_rejection_cnt) {
+    opr::sat::CpModelBuilder rnd_model = cp_model;
+    // Add random constraints to generate diverse solutions.
+    // Without this we would get exactly the same solution each call.
+    for (int i = 0; i < bet_rounds; ++i) {
+      int player = player_dist(rnd_gen);
+      int card = card_dist(rnd_gen);
+      int dir = dir_dist(rnd_gen);
+      opr::sat::IntVar& a = played[player][i];
+      // TODO: make more tuning of the constraints so that we have
+      //       better diversity. Now from 1000 particles ~500 begin with
+      //       first action 1
+      if      (dir == 0) rnd_model.AddLessOrEqual(a, card);
+      else if (dir == 1) rnd_model.AddEquality(a, card);
+      else               rnd_model.AddGreaterOrEqual(a, card);
+    }
+
+    // Solve.
+    opr::sat::CpSolverResponse response = Solve(rnd_model.Build());
+    if (response.status() == opr::sat::OPTIMAL) {
+      std::vector<Action> history;
+      history.reserve(bet_rounds * 2);
+      for (int j = 0; j < bet_rounds; ++j) {
+        history.push_back(SolutionIntegerValue(response, played[0][j]));
+        history.push_back(SolutionIntegerValue(response, played[1][j]));
       }
-  ));
+      // (Possibly) increases particles size.
+      if (set->has(history)) {
+        ++num_rejected;
+      } else {
+        set->add(history);
+      }
+    } else {
+      ++num_rejected;
+    }
+  }
 
-  // Solve.
-  SolveCpModel(cp_model.Build(), &model);
-  SPIEL_CHECK_LE(set->particles.size(), max_particles);
+  SPIEL_CHECK_TRUE(set->particles.size() == max_particles
+                  || num_rejected == max_rejection_cnt);
   return set;
 }
 

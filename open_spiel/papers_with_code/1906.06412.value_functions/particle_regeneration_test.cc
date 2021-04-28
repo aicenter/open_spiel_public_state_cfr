@@ -27,9 +27,10 @@ void TestGenerateParticles() {
       "goofspiel(imp_info=true,players=2,points_order=descending,num_cards=3)");
   auto observer = game->MakeObserver(kPublicStateObsType, {});
   auto observation = Observation(*game, observer);
+  std::mt19937 rnd_gen;
   auto check_particle_count = [&](const State& s, int expected_count) {
     observation.SetFrom(s, 0);
-    auto particle_set = GenerateParticles(observation, 1000);
+    auto particle_set = GenerateParticles(observation, 1000, 1000, rnd_gen);
     SPIEL_CHECK_EQ(particle_set->particles.size(), expected_count);
   };
 
@@ -57,6 +58,7 @@ void ShowParticleDiversity() {
       "goofspiel(imp_info=true,players=2,points_order=descending,num_cards=13)");
   auto observer = game->MakeObserver(kPublicStateObsType, {});
   auto observation = Observation(*game, observer);
+  std::mt19937 rnd_gen;
 
   auto state = game->NewInitialState();
   state->ApplyActions({1, 2});
@@ -68,7 +70,7 @@ void ShowParticleDiversity() {
   observation.SetFrom(*state, 0);
 
   const absl::Time start = absl::Now();
-  auto particle_set = GenerateParticles(observation, 1000);
+  auto particle_set = GenerateParticles(observation, 1000, 1000, rnd_gen);
   const absl::Time end = absl::Now();
   const double milis = absl::ToDoubleMilliseconds(end - start);
 
