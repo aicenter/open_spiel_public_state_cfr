@@ -19,7 +19,7 @@
 #include "torch/torch.h"
 
 #include "open_spiel/algorithms/dispatch_policy.h"
-#include "open_spiel/algorithms/infostate_dl_cfr.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/infostate_dl_cfr.h"
 #include "open_spiel/algorithms/ortools/dl_oracle_evaluator.h"
 
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_architectures.h"

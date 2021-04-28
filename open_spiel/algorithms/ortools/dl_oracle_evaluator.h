@@ -16,7 +16,6 @@
 #define OPEN_SPIEL_ALGORITHMS_ORTOOLS_DL_ORACLE_EVALUATOR_H_
 
 #include "open_spiel/algorithms/history_tree.h"
-#include "open_spiel/algorithms/infostate_dl_cfr.h"
 #include "open_spiel/algorithms/ortools/sequence_form_lp.h"
 
 namespace open_spiel {

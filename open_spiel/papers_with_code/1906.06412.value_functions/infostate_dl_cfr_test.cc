@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "open_spiel/algorithms/infostate_dl_cfr.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/infostate_dl_cfr.h"
 
 #include <cmath>
 #include <iostream>

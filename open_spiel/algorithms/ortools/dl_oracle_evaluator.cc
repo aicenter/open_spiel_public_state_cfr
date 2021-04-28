@@ -66,94 +66,94 @@ void RecursivelyUpdateTerminalUtilityConstraints(
   }
 }
 
-void RefineSpecToValueSolvingSubgame(
-    const InfostateNode* opponent_root,
-    absl::Span<const double> opponent_range,
-    const std::map<const InfostateNode*, const InfostateNode*>& opponent_terminal_map,
-    std::unordered_map<const InfostateNode*, NodeSpecification>& player_spec) {
-  SPIEL_CHECK_EQ(opponent_root->num_children(), opponent_range.size());
+//void RefineSpecToValueSolvingSubgame(
+//    const InfostateNode* opponent_root,
+//    absl::Span<const double> opponent_range,
+//    const std::map<const InfostateNode*, const InfostateNode*>& opponent_terminal_map,
+//    std::unordered_map<const InfostateNode*, NodeSpecification>& player_spec) {
+//  SPIEL_CHECK_EQ(opponent_root->num_children(), opponent_range.size());
+//
+//  // Set the reach probabilities of empty sequences that would correspond to
+//  // the trunk's leaf nodes to be equal to the player's range at those nodes.
+//  for (int i = 0; i < opponent_range.size(); ++i) {
+//    RecursivelyUpdateTerminalUtilityConstraints(
+//        opponent_root->child_at(i), opponent_range[i],
+//        player_spec, opponent_terminal_map);
+//  }
+//}
 
-  // Set the reach probabilities of empty sequences that would correspond to
-  // the trunk's leaf nodes to be equal to the player's range at those nodes.
-  for (int i = 0; i < opponent_range.size(); ++i) {
-    RecursivelyUpdateTerminalUtilityConstraints(
-        opponent_root->child_at(i), opponent_range[i],
-        player_spec, opponent_terminal_map);
-  }
-}
+//std::vector<double> ComputeGradient(
+//    const std::vector<InfostateNode*>& player_terminals,
+//    const std::map<const InfostateNode*, const InfostateNode*>& player_terminal_map,
+//    // We use player spec to get utility_weighted_by_opp_range.
+//    std::unordered_map<const InfostateNode*, NodeSpecification>& player_spec,
+//    std::unordered_map<const InfostateNode*, NodeSpecification>& opponent_spec) {
+//  std::vector<double> gradient(player_terminals.size(), 0.);
+//  for (int i = 0; i < player_terminals.size(); ++i) {
+//    const InfostateNode* player_node = player_terminals[i];
+//    const InfostateNode* opponent_node = player_terminal_map.at(player_node);
+//
+//    operations_research::MPVariable* opponent_reach =
+//        opponent_spec.at(opponent_node).var_reach_prob;
+//    SPIEL_CHECK_TRUE(opponent_reach);
+//
+//    opres::MPConstraint* ct = player_spec.at(opponent_node).ct_child_cf_value;
+//    SPIEL_CHECK_TRUE(ct);
+//    SPIEL_CHECK_TRUE(player_spec.at(player_node).var_reach_prob);
+//
+//    // Avoid recalculating this again. This corresponds to:
+//    // = opponent_node->terminal_utility()
+//    // * opponent_node->terminal_chance_reach_prob()
+//    // * opponent_range;
+//    const double utility_weighted_by_opp_range =
+//        ct->GetCoefficient(player_spec[player_node].var_reach_prob);
+//
+//    // As we compute best response for the player, we need to flip the sign,
+//    // as the utility was originally for the opponent.
+//    gradient[i] = - utility_weighted_by_opp_range
+//                * opponent_reach->solution_value();
+//  }
+//  return gradient;
+//}
 
-std::vector<double> ComputeGradient(
-    const std::vector<InfostateNode*>& player_terminals,
-    const std::map<const InfostateNode*, const InfostateNode*>& player_terminal_map,
-    // We use player spec to get utility_weighted_by_opp_range.
-    std::unordered_map<const InfostateNode*, NodeSpecification>& player_spec,
-    std::unordered_map<const InfostateNode*, NodeSpecification>& opponent_spec) {
-  std::vector<double> gradient(player_terminals.size(), 0.);
-  for (int i = 0; i < player_terminals.size(); ++i) {
-    const InfostateNode* player_node = player_terminals[i];
-    const InfostateNode* opponent_node = player_terminal_map.at(player_node);
-
-    operations_research::MPVariable* opponent_reach =
-        opponent_spec.at(opponent_node).var_reach_prob;
-    SPIEL_CHECK_TRUE(opponent_reach);
-
-    opres::MPConstraint* ct = player_spec.at(opponent_node).ct_child_cf_value;
-    SPIEL_CHECK_TRUE(ct);
-    SPIEL_CHECK_TRUE(player_spec.at(player_node).var_reach_prob);
-
-    // Avoid recalculating this again. This corresponds to:
-    // = opponent_node->terminal_utility()
-    // * opponent_node->terminal_chance_reach_prob()
-    // * opponent_range;
-    const double utility_weighted_by_opp_range =
-        ct->GetCoefficient(player_spec[player_node].var_reach_prob);
-
-    // As we compute best response for the player, we need to flip the sign,
-    // as the utility was originally for the opponent.
-    gradient[i] = - utility_weighted_by_opp_range
-                * opponent_reach->solution_value();
-  }
-  return gradient;
-}
-
-// TODO: gradient as move
-DecisionVector<std::vector<double>> RefineBestResponseToCfBestResponse(
-    const InfostateTree& player_tree, absl::Span<double> player_cf_gradient,
-    std::unordered_map<const InfostateNode*, NodeSpecification>& player_spec) {
-  std::mt19937 mt;
-  DecisionVector<std::vector<double>> strategy(&player_tree);
-  BottomUp(
-    player_tree, player_cf_gradient,
-    /*observe_rewards_fn=*/[&](DecisionId id, absl::Span<const double> rewards)
-    {
-      const InfostateNode* node = player_tree.decision_infostate(id);
-      SPIEL_CHECK_EQ(rewards.size(), node->num_children());
-      strategy[id] = std::vector(node->num_children(), 0.);
-      auto node_reach = player_spec[node].var_reach_prob;
-      SPIEL_CHECK_TRUE(node_reach);
-      if (node_reach->solution_value() > 0) {
-        size_t i = 0;
-        for (InfostateNode* child : node->child_iterator()) {
-          auto child_reach = player_spec[child].var_reach_prob;
-          SPIEL_CHECK_TRUE(child_reach);
-          strategy[id][i++] = child_reach->solution_value()
-              / node_reach->solution_value();
-        }
-      } else {
-        auto iter_max = std::max_element(rewards.begin(), rewards.end());
-        const double max_reward = *iter_max;
-        std::vector<size_t> max_indices;
-        for (int i = 0; i < rewards.size(); i++) {
-          if (fabs(max_reward - rewards[i]) < 1e-10) max_indices.push_back(i);
-        }
-        std::uniform_int_distribution<int> dist(0, max_indices.size() - 1);
-        const int resp_idx = dist(mt);
-        strategy[id][resp_idx] = 1.;
-      }
-      return strategy[id];
-    });
-  return strategy;
-}
+//// TODO: gradient as move
+//DecisionVector<std::vector<double>> RefineBestResponseToCfBestResponse(
+//    const InfostateTree& player_tree, absl::Span<double> player_cf_gradient,
+//    std::unordered_map<const InfostateNode*, NodeSpecification>& player_spec) {
+//  std::mt19937 mt;
+//  DecisionVector<std::vector<double>> strategy(&player_tree);
+//  BottomUp(
+//    player_tree, player_cf_gradient,
+//    /*observe_rewards_fn=*/[&](DecisionId id, absl::Span<const double> rewards)
+//    {
+//      const InfostateNode* node = player_tree.decision_infostate(id);
+//      SPIEL_CHECK_EQ(rewards.size(), node->num_children());
+//      strategy[id] = std::vector(node->num_children(), 0.);
+//      auto node_reach = player_spec[node].var_reach_prob;
+//      SPIEL_CHECK_TRUE(node_reach);
+//      if (node_reach->solution_value() > 0) {
+//        size_t i = 0;
+//        for (InfostateNode* child : node->child_iterator()) {
+//          auto child_reach = player_spec[child].var_reach_prob;
+//          SPIEL_CHECK_TRUE(child_reach);
+//          strategy[id][i++] = child_reach->solution_value()
+//              / node_reach->solution_value();
+//        }
+//      } else {
+//        auto iter_max = std::max_element(rewards.begin(), rewards.end());
+//        const double max_reward = *iter_max;
+//        std::vector<size_t> max_indices;
+//        for (int i = 0; i < rewards.size(); i++) {
+//          if (fabs(max_reward - rewards[i]) < 1e-10) max_indices.push_back(i);
+//        }
+//        std::uniform_int_distribution<int> dist(0, max_indices.size() - 1);
+//        const int resp_idx = dist(mt);
+//        strategy[id][resp_idx] = 1.;
+//      }
+//      return strategy[id];
+//    });
+//  return strategy;
+//}
 
 void RecursivelyRefineSpecFixStrategyWithPolicy(
     const InfostateNode* player_node,

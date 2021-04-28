@@ -15,9 +15,7 @@
 #ifndef OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_EXPERIENCE_REPLAY_
 #define OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_EXPERIENCE_REPLAY_
 
-#include "open_spiel/algorithms/infostate_dl_cfr.h"
-
-
+#include "open_spiel/papers_with_code/1906.06412.value_functions/infostate_dl_cfr.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_data.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/reusable_structs.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/subgame.h"

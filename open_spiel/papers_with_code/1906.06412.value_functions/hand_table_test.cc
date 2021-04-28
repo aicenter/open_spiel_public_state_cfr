@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include "open_spiel/papers_with_code/1906.06412.value_functions/hand_table.h"
-#include "open_spiel/algorithms/infostate_dl_cfr.h"
+#include "infostate_dl_cfr.h"
 
 
 namespace open_spiel {

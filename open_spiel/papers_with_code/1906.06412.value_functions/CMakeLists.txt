@@ -3,6 +3,8 @@ add_library(paper_value_functions OBJECT
   experience_replay.h
   hand_table.cc
   hand_table.h
+  infostate_dl_cfr.h
+  infostate_dl_cfr.cc
   metrics.cc
   metrics.h
   net_architectures.cc
@@ -39,3 +41,4 @@ add_paper_executable(train_eval_loop train_eval_loop.cc)
 add_paper_executable(hand_table_test hand_table_test.cc)
 add_paper_executable(sparse_trunk_test sparse_trunk_test.cc)
 add_paper_executable(particle_regeneration_test particle_regeneration_test.cc)
+add_paper_executable(infostate_dl_cfr_test infostate_dl_cfr_test.cc)
