@@ -242,7 +242,7 @@ torch::Tensor Activation(ActivationFunction f, torch::Tensor x) {
       return torch::sigmoid(x);
   }
 }
-std::unique_ptr<ValueNet> MakeModel(
+std::shared_ptr<ValueNet> MakeModel(
     NetArchitecture arch,
     BasicDims* dims,
     int num_layers_regression,
@@ -254,7 +254,7 @@ std::unique_ptr<ValueNet> MakeModel(
   switch (arch) {
     case NetArchitecture::kParticle: {
       auto particle_dims = open_spiel::down_cast<ParticleDims*>(dims);
-      auto model = std::make_unique<ParticleValueNet>(
+      auto model = std::make_shared<ParticleValueNet>(
           particle_dims,
           num_layers_regression, num_width_regression, num_inputs_regression,
           ActivationFunction::kRelu);
@@ -262,7 +262,7 @@ std::unique_ptr<ValueNet> MakeModel(
     }
     case NetArchitecture::kPositional: {
       auto positional_dims = open_spiel::down_cast<PositionalDims*>(dims);
-      return std::make_unique<PositionalValueNet>(
+      return std::make_shared<PositionalValueNet>(
           positional_dims, num_layers_regression, num_width_regression,
           ActivationFunction::kRelu);
     }

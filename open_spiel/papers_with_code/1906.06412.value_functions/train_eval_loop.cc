@@ -278,7 +278,7 @@ void TrainEvalLoop() {
   }
   //
   std::cout << "# Creating model ..." << std::endl;
-  std::unique_ptr<ValueNet> model = MakeModel(arch, dims.get(),
+  std::shared_ptr<ValueNet> model = MakeModel(arch, dims.get(),
                                               absl::GetFlag(FLAGS_num_layers),
                                               absl::GetFlag(FLAGS_num_width),
                                               num_inputs_regression);
