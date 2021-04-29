@@ -17,26 +17,33 @@
 namespace open_spiel {
 namespace papers_with_code {
 
-Subgame* ReusableStructures::GetFixableTrunkWithOracle() {
+std::shared_ptr<Subgame> ReusableStructures::GetTrunk() {
+  if (!trunk) {
+    trunk = factory.MakeTrunk();
+  }
+  return trunk;
+}
+
+SubgameSolver* ReusableStructures::GetFixableTrunkWithOracle() {
   if (!fixable_trunk_with_oracle) {
-    fixable_trunk_with_oracle =
-        factory.MakeTrunk(pbs_oracle, "FixableStrategy");
+    fixable_trunk_with_oracle = factory.MakeSolver(GetTrunk(), pbs_oracle,
+                                                   "FixableStrategy");
   }
   return fixable_trunk_with_oracle.get();
 }
 
-Subgame* ReusableStructures::GetIterableTrunkWithOracle() {
+SubgameSolver* ReusableStructures::GetIterableTrunkWithOracle() {
   if (!iterable_trunk_with_oracle) {
-    iterable_trunk_with_oracle = factory.MakeTrunk(pbs_oracle,
+    iterable_trunk_with_oracle = factory.MakeSolver(GetTrunk(), pbs_oracle,
                                                    factory.use_bandits_for_cfr);
   }
   return iterable_trunk_with_oracle.get();
 }
 
-Subgame* ReusableStructures::GetTrunkWithNet() {
+SubgameSolver* ReusableStructures::GetTrunkWithNet() {
   if (!trunk_with_net) {
-    trunk_with_net = factory.MakeTrunk(factory.leaf_evaluator,
-                                       factory.use_bandits_for_cfr);
+    trunk_with_net = factory.MakeSolver(GetTrunk(), factory.leaf_evaluator,
+                                        factory.use_bandits_for_cfr);
   }
   return trunk_with_net.get();
 }
@@ -55,6 +62,7 @@ PublicStatesInGame* ReusableStructures::GetAllPublicStates() {
   }
   return all_states.get();
 }
+
 std::vector<algorithms::BanditVector>&
     ReusableStructures::GetFixableBanditsForAllPublicStates() {
   if (fixable_bandits_for_all_public_states.empty()) {

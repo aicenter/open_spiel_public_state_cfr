@@ -149,27 +149,14 @@ void ReplayFiller::AddExperiencesFromPublicStates(
 }
 
 void ReplayFiller::AddTrunkRandomPbsSolution() {
-  Subgame* fixable_trunk_with_oracle = reuse->GetFixableTrunkWithOracle();
-  int num_states = fixable_trunk_with_oracle->public_states().size();
-  auto public_state_dist = std::uniform_int_distribution<>(0, num_states - 1);
+  SubgameSolver* solver = reuse->GetFixableTrunkWithOracle();
 
-  // Reset trunk.
-  fixable_trunk_with_oracle->Reset();
-  // Randomize strategy in the trunk.
-  randomizer->Randomize(fixable_trunk_with_oracle->bandits());
-  // Compute the reach probs from the trunk.
-  fixable_trunk_with_oracle->RunSimultaneousIterations(1);
-  // Pick some valid public state.
-  // Loop until we find one. There should be always one -- or perhaps
-  // the trunk is too deep, getting into only terminal states.
-  PublicState* state = nullptr;
-  int pick_public_state;
-  while (!state || state->IsTerminal() || state->IsInitial()) {
-    pick_public_state = public_state_dist(*randomizer->rnd_gen);
-    state = &fixable_trunk_with_oracle->public_states()[pick_public_state];
-  }
+  solver->Reset();
+  randomizer->Randomize(solver->bandits());
+  solver->RunSimultaneousIterations(1);
 
   // Add experience for that state.
+  PublicState* state = solver->subgame()->PickRandomLeaf(*randomizer->rnd_gen);
   auto context = factory->leaf_evaluator->CreateContext(*state);
   auto net_context = open_spiel::down_cast<NetContext*>(context.get());
   AddExperience(*state, net_context);
@@ -178,12 +165,13 @@ void ReplayFiller::AddTrunkRandomPbsSolution() {
 // The network should imitate DL-CFR at each iteration
 // when we use this generation method.
 void ReplayFiller::FillReplayWithTrunkDlCfrPbsSolutions() {
-  Subgame* iterable_trunk_with_oracle = reuse->GetIterableTrunkWithOracle();
+  SubgameSolver* solver = reuse->GetIterableTrunkWithOracle();
+  Subgame* subgame = solver->subgame();
   SequenceFormLpSpecification* sf_lp = reuse->GetSfLp();
 
   std::cout << "# Computing reference expls for given trunk iterations.\n";
   int num_non_terminal_leaves = 0;
-  for (auto& state: iterable_trunk_with_oracle->public_states()) {
+  for (auto& state: subgame->public_states) {
     if (!state.IsTerminal() && state.IsLeaf()) num_non_terminal_leaves++;
   }
   SPIEL_CHECK_GT(num_non_terminal_leaves, 0);
@@ -195,18 +183,18 @@ void ReplayFiller::FillReplayWithTrunkDlCfrPbsSolutions() {
   std::cout << "# <ref_expl>\n";
   std::cout << "# trunk_iter,expl\n";
 
-  iterable_trunk_with_oracle->Reset();
+  solver->Reset();
   for (int iter = 1; iter <= num_trunks; ++iter) {
-    iterable_trunk_with_oracle->RunSimultaneousIterations(1);
+    solver->RunSimultaneousIterations(1);
     bool should_evaluate = std::find(eval_iters.begin(), eval_iters.end(),
                                      iter) != eval_iters.end();
     if (should_evaluate) {
       double expl = algorithms::ortools::TrunkExploitability(
-          sf_lp, *iterable_trunk_with_oracle->AveragePolicy());
+          sf_lp, *solver->AveragePolicy());
       std::cout << "# " << iter << "," << expl << std::endl;
     }
 
-    AddExperiencesFromPublicStates(iterable_trunk_with_oracle->public_states());
+    AddExperiencesFromPublicStates(subgame->public_states);
   }
 
   std::cout << "# </ref_expl>\n";
@@ -222,31 +210,27 @@ void ReplayFiller::AddRandomPbsSolution() {
   SPIEL_CHECK_TRUE(randomizer->rnd_gen);
 
   // 1. Pick a public state
-  PublicState* state = nullptr;  // TODO: make sure we can also add terminals
-  while (!state || state->IsTerminal()) {
+   PublicState* state = nullptr;
+  // TODO: check IsReachable() is correct wrt cfvs
+  while (!state || state->IsTerminal() || !state->IsReachable()) {
     const int pick_public_state = public_state_dist(*randomizer->rnd_gen);
     state = &all_states->public_states[pick_public_state];
+
+    // 3. Assign randomized beliefs.
+    randomizer->Randomize(bandits);
+    UpdateBeliefs(*state, bandits);
   }
 
-  // 2. Assign randomized beliefs.
-  randomizer->Randomize(bandits);
-  UpdateBeliefs(*state, bandits);
-
-  // 3. Build subgame and solve it.
-  std::unique_ptr<Subgame> subgame = factory->MakeSubgame(*state, 1000);
-  subgame->RunSimultaneousIterations(100);
-  std::array<absl::Span<const double>, 2> root_values =
-      subgame->RootChildrenCfValues();
-  for (int pl = 0; pl < 2; ++pl) {
-    SPIEL_CHECK_EQ(state->values[pl].size(), root_values[pl].size());
-    std::copy(root_values[pl].begin(), root_values[pl].end(),
-              state->values[pl].begin());
-  }
+  // 3. Build subgame until the end of the game and solve it.
+  std::shared_ptr<Subgame> subgame = factory->MakeSubgame(*state, 1000);
+  std::unique_ptr<SubgameSolver> solver = factory->MakeSolver(subgame);
+  solver->RunSimultaneousIterations(100);
 
   // 4. Add solution to the experiences.
-  auto context = factory->leaf_evaluator->CreateContext(*state);
+  PublicState& result = subgame->initial_state();
+  auto context = factory->leaf_evaluator->CreateContext(result);
   auto net_context = open_spiel::down_cast<NetContext*>(context.get());
-  AddExperience(*state, net_context);
+  AddExperience(result, net_context);
 }
 
 void ReplayFiller::AddRandomSparsePbsSolution() {
@@ -254,20 +238,12 @@ void ReplayFiller::AddRandomSparsePbsSolution() {
   std::unique_ptr<ParticleSet> set = PickParticleSet();
 
   // 2. Build subgame until the end of the game and solve it.
-  std::unique_ptr<Subgame> subgame = factory->MakeSubgame(*set, 1000);
-  subgame->RunSimultaneousIterations(100);
+  std::shared_ptr<Subgame> subgame = factory->MakeSubgame(*set, 1000);
+  std::unique_ptr<SubgameSolver> solver = factory->MakeSolver(subgame);
+  solver->RunSimultaneousIterations(100);
+
+  // 3. Add solution to the experiences.
   PublicState& result = subgame->initial_state();
-
-  // 3. Copy the solution to state.
-  std::array<absl::Span<const double>, 2> root_values =
-      subgame->RootChildrenCfValues();
-  for (int pl = 0; pl < 2; ++pl) {
-    SPIEL_CHECK_EQ(result.values[pl].size(), root_values[pl].size());
-    std::copy(root_values[pl].begin(), root_values[pl].end(),
-              result.values[pl].begin());
-  }
-
-  // 4. Add solution to the experiences.
   auto context = factory->leaf_evaluator->CreateContext(result);
   auto net_context = open_spiel::down_cast<NetContext*>(context.get());
   AddExperience(result, net_context);
@@ -278,21 +254,13 @@ void ReplayFiller::AddBootstrappedSolution() {
   std::unique_ptr<ParticleSet> set = PickParticleSet(bootstrap_move_number);
 
   // 2. Build subgame and solve it.
-  std::unique_ptr<Subgame> subgame = factory->MakeSubgame(
+  std::shared_ptr<Subgame> subgame = factory->MakeSubgame(
       *set, /*custom_move_ahead_limit=*/1);
-  subgame->RunSimultaneousIterations(100);
+  std::unique_ptr<SubgameSolver> solver = factory->MakeSolver(subgame);
+  solver->RunSimultaneousIterations(100);
+
+  // 3. Add solution to the experiences.
   PublicState& result = subgame->initial_state();
-
-  // 3. Copy the solution to state.
-  std::array<absl::Span<const double>, 2> root_values =
-      subgame->RootChildrenCfValues();
-  for (int pl = 0; pl < 2; ++pl) {
-    SPIEL_CHECK_EQ(result.values[pl].size(), root_values[pl].size());
-    std::copy(root_values[pl].begin(), root_values[pl].end(),
-              result.values[pl].begin());
-  }
-
-  // 4. Add solution to the experiences.
   auto context = factory->leaf_evaluator->CreateContext(result);
   auto net_context = open_spiel::down_cast<NetContext*>(context.get());
   AddExperience(result, net_context);
@@ -352,11 +320,9 @@ std::unique_ptr<ParticleSet> ReplayFiller::PickParticleSet(int at_depth) {
 
   PublicState* state = nullptr;
   // TODO: check IsReachable() is correct wrt cfvs
-  while (!state || !state->IsReachable()) {
+  while (!state || state->IsTerminal() || !state->IsReachable()) {
     const int pick_public_state = public_state_dist(*randomizer->rnd_gen);
     state = states.at(pick_public_state);
-    // TODO: make sure we can also add terminals
-    if (state->IsTerminal()) continue;
 
     // 3. Assign randomized beliefs.
     randomizer->Randomize(bandits);

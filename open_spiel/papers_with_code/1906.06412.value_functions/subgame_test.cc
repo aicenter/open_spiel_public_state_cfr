@@ -60,8 +60,9 @@ void TestTerminalEvaluatorHasSameIterations(const std::string& game_name) {
   // We use only the terminal evaluator.
   std::shared_ptr<PublicStateEvaluator> terminal_evaluator = MakeTerminalEvaluator();
   std::shared_ptr<PublicStateEvaluator> nonterminal_evaluator = MakeDummyEvaluator();
-  Subgame dl_solver(game, /*depth_limit=*/100,
-                    nonterminal_evaluator, terminal_evaluator);
+  auto subgame = std::make_shared<Subgame>(game, /*depth_limit=*/100);
+  SubgameSolver dl_solver(subgame, nonterminal_evaluator, terminal_evaluator,
+                          "RegretMatching");
 
   std::shared_ptr<Policy> vec_avg = vec_solver.AveragePolicy();
   std::shared_ptr<Policy> dl_avg = dl_solver.AveragePolicy();
@@ -78,7 +79,7 @@ void TestTerminalEvaluatorHasSameIterations(const std::string& game_name) {
   }
 }
 
-std::unique_ptr<Subgame> MakeRecursiveDepthLimitedCFR(
+std::unique_ptr<SubgameSolver> MakeRecursiveDepthLimitedCFR(
     std::shared_ptr<const Game> game, int trunk_depth_limit,
     int subgame_depth_limit) {
   std::shared_ptr<const PublicStateEvaluator> terminal_evaluator =
@@ -102,8 +103,9 @@ std::unique_ptr<Subgame> MakeRecursiveDepthLimitedCFR(
 
   // Builds the root leaf public states so that we can call the recursive
   // evaluator.
-  return std::make_unique<Subgame>(
-      game, trunk_depth_limit, leaf_evaluator, terminal_evaluator);
+  auto subgame = std::make_shared<Subgame>(game, trunk_depth_limit);
+  return std::make_unique<SubgameSolver>(subgame, leaf_evaluator,
+                                         terminal_evaluator, "RegretMatching");
 }
 
 void TestRecursiveDepthLimitedSolving(const std::string& game_name) {
@@ -119,20 +121,20 @@ void TestRecursiveDepthLimitedSolving(const std::string& game_name) {
          ++subgame_depth_limit) {
 
       algorithms::InfostateCFR vec_solver(*game);
-      std::unique_ptr<Subgame> dl_solver = MakeRecursiveDepthLimitedCFR(
+      std::unique_ptr<SubgameSolver> dl_solver = MakeRecursiveDepthLimitedCFR(
           game, trunk_depth_limit, subgame_depth_limit);
 
       std::shared_ptr<Policy> vec_avg = vec_solver.AveragePolicy();
       std::shared_ptr<Policy> dl_avg = dl_solver->AveragePolicy();
       std::shared_ptr<Policy> vec_cur = vec_solver.CurrentPolicy();
       std::shared_ptr<Policy> dl_cur = dl_solver->CurrentPolicy();
-      auto trees = dl_solver->trees();
+      auto trees = dl_solver->subgame()->trees;
 
       for (int j = 0; j < trunk_iterations; ++j) {
         vec_solver.RunSimultaneousIterations(1);
         dl_solver->RunSimultaneousIterations(1);
         SPIEL_CHECK_FLOAT_NEAR(
-            vec_solver.RootValue(), dl_solver->RootValue(), 1e-6);
+            vec_solver.RootValue(), dl_solver->initial_state().Value(), 1e-6);
         for (int pl = 0; pl < 2; ++pl) {
           CheckIterationConsistency(*vec_avg, *dl_avg, *trees[pl]);
           CheckIterationConsistency(*vec_cur, *dl_cur, *trees[pl]);

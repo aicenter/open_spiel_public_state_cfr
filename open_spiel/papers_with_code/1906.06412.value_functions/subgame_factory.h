@@ -35,7 +35,7 @@ constexpr int kDefaultMaxParticles = 1000;
 // that have belief distribution over the infostates induced by those histories.
 using SequenceFormLpSpecification = algorithms::ortools::SequenceFormLpSpecification;
 
-// Produce a subgame given a particle set.
+// Produce a subgame and a solver given a particle set.
 struct SubgameFactory {
   std::shared_ptr<const Game> game;
   std::shared_ptr<Observer> infostate_observer;  // For infostate strings.
@@ -50,19 +50,22 @@ struct SubgameFactory {
   int max_particles = kDefaultMaxParticles;
 
   // Subgame from game's initial state.
-  std::unique_ptr<Subgame> MakeTrunk(
-      std::shared_ptr<const PublicStateEvaluator> custom_leaf_evaluator,
-      std::string custom_bandits_for_cfr) const;
-  std::unique_ptr<Subgame> MakeSubgame(
-      const ParticleSet& set,
-      int custom_move_ahead_limit = 0,
-      std::shared_ptr<const PublicStateEvaluator> custom_leaf_evaluator = nullptr) const;
-  std::unique_ptr<Subgame> MakeSubgame(
-      const PublicState& state,
-      int custom_move_ahead_limit = 0,
-      std::shared_ptr<const PublicStateEvaluator> custom_leaf_evaluator = nullptr) const;
+  std::shared_ptr<Subgame> MakeTrunk() const;
+
+  std::shared_ptr<Subgame> MakeSubgame(const ParticleSet& set,
+                                       int custom_move_ahead_limit = 0) const;
+  std::shared_ptr<Subgame> MakeSubgame(const PublicState& state,
+                                       int custom_move_ahead_limit = 0) const;
+
+  std::unique_ptr<SubgameSolver> MakeSolver(
+      std::shared_ptr<Subgame> subgame,
+      std::shared_ptr<const PublicStateEvaluator> custom_leaf_evaluator = nullptr,
+      std::string custom_bandits_for_cfr = "") const;
+
+ protected:
   std::vector<std::shared_ptr<algorithms::InfostateTree>>
-    MakeSubgameInfostateTrees(const ParticleSet& set, int depth) const;
+  MakeSubgameInfostateTrees(const ParticleSet& set, int depth) const;
+
 };
 
 

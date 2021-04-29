@@ -24,11 +24,10 @@ void TestCreateHandTable() {
   std::shared_ptr<const Game> game = LoadGame("kuhn_poker");
   std::shared_ptr<Observer>
       hand_observer = game->MakeObserver(kHandObsType, {});
-  auto leaf_evaluator = MakeDummyEvaluator();
-  Subgame dl_cfr(game, 3, leaf_evaluator, nullptr);
+  Subgame subgame(game, 3);
 
   std::unique_ptr<HandInfo> hand_info = MakeHandInfo(*game, hand_observer,
-                                                     dl_cfr.public_states());
+                                                     subgame.public_states);
   SPIEL_CHECK_EQ(hand_info->tables.size(), game->NumPlayers());
   for (const HandTable& player_table : hand_info->tables) {
     // 3 possible dealings of cards, 1 for an empty hand.

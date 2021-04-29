@@ -37,14 +37,18 @@ struct ReusableStructures {
   // Each of these is essentially a cache of the object.
   // You can set the cache by assigning to it directly, or you can
   // call a getter and initalize the values (if they are empty).
-  std::unique_ptr<Subgame> fixable_trunk_with_oracle;
-  Subgame* GetFixableTrunkWithOracle();
 
-  std::unique_ptr<Subgame> iterable_trunk_with_oracle;
-  Subgame* GetIterableTrunkWithOracle();
+  std::shared_ptr<Subgame> trunk;
+  std::shared_ptr<Subgame> GetTrunk();
 
-  std::unique_ptr<Subgame> trunk_with_net;
-  Subgame* GetTrunkWithNet();
+  std::unique_ptr<SubgameSolver> fixable_trunk_with_oracle;
+  SubgameSolver* GetFixableTrunkWithOracle();
+
+  std::unique_ptr<SubgameSolver> iterable_trunk_with_oracle;
+  SubgameSolver* GetIterableTrunkWithOracle();
+
+  std::unique_ptr<SubgameSolver> trunk_with_net;
+  SubgameSolver* GetTrunkWithNet();
 
   std::unique_ptr<SequenceFormLpSpecification> sf_lp;
   SequenceFormLpSpecification* GetSfLp();

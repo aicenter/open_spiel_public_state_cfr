@@ -25,12 +25,12 @@ namespace or_algs = algorithms::ortools;
 class FullTrunkExplMetric : public Metric {
   std::vector<int> evaluate_iters_;
   std::vector<double> expls_;
-  Subgame* trunk_with_net_;
+  SubgameSolver* trunk_with_net_;
   or_algs::SequenceFormLpSpecification* whole_game_;
 
  public:
   FullTrunkExplMetric(std::vector<int> evaluate_iters,
-                      Subgame* trunk_with_net,
+                      SubgameSolver* trunk_with_net,
                       or_algs::SequenceFormLpSpecification* whole_game)
      : evaluate_iters_(std::move(evaluate_iters)),
        expls_(evaluate_iters_.size()),
@@ -110,7 +110,7 @@ class ReplayVisitsMetric : public Metric {
 };
 
 std::unique_ptr<Metric> MakeFullTrunkExplMetric(
-    std::vector<int> evaluate_iters, Subgame* trunk_with_net,
+    std::vector<int> evaluate_iters, SubgameSolver* trunk_with_net,
     or_algs::SequenceFormLpSpecification* whole_game) {
   return std::make_unique<FullTrunkExplMetric>(std::move(evaluate_iters),
                                                trunk_with_net, whole_game);

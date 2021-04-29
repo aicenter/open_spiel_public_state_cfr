@@ -21,6 +21,8 @@ add_library(paper_value_functions OBJECT
   solve_queue.h
   subgame.cc
   subgame.h
+  subgame.cc
+  subgame.h
   subgame_factory.cc
   subgame_factory.h
 )

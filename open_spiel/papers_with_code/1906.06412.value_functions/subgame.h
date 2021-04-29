@@ -50,13 +50,14 @@
 namespace open_spiel {
 namespace papers_with_code {
 
+// -- Public state -------------------------------------------------------------
 
 enum PublicStateType {
-  // Initial public state of the depth-limited lookahed tree. There might be
+  // Initial public state of the depth-limited lookahead tree. There might be
   // multiple initial states (i.e. the lookahead tree is more precisely a forest
   // of trees).
   kInitialPublicState,
-  // Leaf public state of the depth-limited lookahed tree. All such public
+  // Leaf public state of the depth-limited lookahead tree. All such public
   // states are at the end of the lookahead. Some of them might be terminal,
   // i.e. they contain only `open_spiel::State`s that are terminal.
   kLeafPublicState,
@@ -86,6 +87,9 @@ struct PublicState {
   // leaf states. Both are listed for the special case if the public tree is
   // a singleton.
   /*const*/ std::array<std::vector<const algorithms::InfostateNode*>, 2> nodes;
+  // Store a map between infostate nodes and positions in the vectors
+  // of beliefs and values. The map is shared across the players.
+  /*const*/ std::map<const algorithms::InfostateNode*, int> nodes_positions;
   // Store the move number associated with all the states that belong to this
   // public state.
   /*const*/ int move_number = -1;
@@ -96,11 +100,8 @@ struct PublicState {
   // nodes, which correspond to bottom_nodes of the DL infostate tree.
   std::array<std::vector<double>, 2> values;
 
-  explicit PublicState(const Observation& public_observation,
-                       const PublicStateType state_type, const size_t public_id)
-      : public_tensor(public_observation), state_type(state_type),
-        public_id(public_id) {}
-
+  PublicState(const Observation& public_observation,
+              const PublicStateType state_type, const size_t public_id);
   // Check if the public state if initial, i.e. the depth-limited subgame
   // is rooted in this public state.
   bool IsInitial() const { return state_type == kInitialPublicState; }
@@ -113,14 +114,27 @@ struct PublicState {
   double ReachProbability() const;
   // Check the state has non-zero reach probability.
   bool IsReachable() const { return ReachProbability() > 0; }
+  // Check the state has non-zero beliefs for given player.
+  bool IsReachableByPlayer(int player) const;
+  // Check the state has non-zero beliefs for some player.
+  bool IsReachableBySomePlayer() const {
+    return IsReachableByPlayer(0) || IsReachableByPlayer(1);
+  };
   // Compute value of this state (for the given player).
   double Value(int player = 0) const;
   // Check if the public state is zero-sum.
   bool IsZeroSum() const { return fabs(Value(0) + Value(1)) < 1e-10; }
+  // Set new beliefs and check they have consistent sizes.
+  void SetBeliefs(const std::array<std::vector<double>, 2>& new_beliefs);
 };
 
 void DebugPrintPublicFeatures(const std::vector<PublicState>& states);
 
+// -- Many public states -------------------------------------------------------
+
+// TODO: merge with Subgame and introduce public tree structure.
+//  This struct is pretty much the same, but subgame stores only
+//  the initial / leaf public states.
 // Store all public states in the game. This requires building the game tree
 // for the entire game. All the public states are marked as initial (even
 // the terminal ones).
@@ -130,6 +144,44 @@ struct PublicStatesInGame {
   PublicState* GetPublicState(const Observation& public_observation);
 };
 std::unique_ptr<PublicStatesInGame> MakeAllPublicStates(const Game& game);
+
+// -- Subgame ------------------------------------------------------------------
+
+// Depth-limited CFR requires storage of perfect-information states both
+// in the roots and in the leaves of the infostate trees.
+constexpr int kDlCfrInfostateTreeStorage = algorithms::kStoreStatesInRoots
+                                         | algorithms::kStoreStatesInLeaves;
+
+// Subgame stores initial and leaf public states, associated
+// with depth-limited infostate trees.
+struct Subgame {
+  std::shared_ptr<const Game> game;
+  std::shared_ptr<Observer> public_observer;
+  std::vector<std::shared_ptr<algorithms::InfostateTree>> trees;
+  std::vector<PublicState> public_states;
+
+  Subgame(std::shared_ptr<const Game> game, int max_moves);
+  Subgame(std::shared_ptr<const Game> game,
+          std::shared_ptr<Observer> public_observer,
+          std::vector<std::shared_ptr<algorithms::InfostateTree>> trees);
+
+  PublicState& initial_state() {
+    SPIEL_CHECK_FALSE(public_states.empty());
+    SPIEL_CHECK_TRUE(public_states[0].IsInitial());
+    return public_states[0];
+  }
+
+  PublicState* PickRandomLeaf(std::mt19937& engine);
+ private:
+  void MakePublicStates();
+  void MakeBeliefsAndValues();
+  PublicState* GetPublicState(const Observation& public_observation,
+                              PublicStateType state_type);
+  PublicState* GetPublicState(Observation& public_observation,
+                              PublicStateType state_type,
+                              algorithms::InfostateNode* node);
+};
+
 
 // Derived classes specify members as they need for their specific
 // public state evaluators.
@@ -180,110 +232,51 @@ class TerminalEvaluator final : public PublicStateEvaluator {
 std::shared_ptr<PublicStateEvaluator> MakeTerminalEvaluator();
 std::shared_ptr<PublicStateEvaluator> MakeDummyEvaluator();
 
-// -- DL CFR -------------------------------------------------------------------
+// -- Subgame solver -----------------------------------------------------------
 
-// Depth-limited CFR requires storage of perfect-information states both
-// in the roots and in the leaves of the infostate trees.
-constexpr int kDlCfrInfostateTreeStorage = algorithms::kStoreStatesInRoots
-                                         | algorithms::kStoreStatesInLeaves;
-
-// At least one evaluator must be specified:
-// nonterminal_evaluator or terminal_evaluator.
-class Subgame {
+// CFR-based subgame solver that evaluates public leaves using terminal
+// or non-terminal evaluator.
+class SubgameSolver {
  public:
-  Subgame(std::shared_ptr<const Game> game, int depth_limit,
-          std::shared_ptr<const PublicStateEvaluator> nonterminal_evaluator,
-          std::shared_ptr<const PublicStateEvaluator> terminal_evaluator);
-
-  Subgame(std::shared_ptr<const Game> game,
-          std::vector<std::shared_ptr<algorithms::InfostateTree>> depth_lim_trees,
-          std::shared_ptr<const PublicStateEvaluator> nonterminal_evaluator,
-          std::shared_ptr<const PublicStateEvaluator> terminal_evaluator,
-          std::shared_ptr<Observer> public_observer,
-          std::vector<algorithms::BanditVector> bandits);
+  SubgameSolver(
+      std::shared_ptr<Subgame> subgame,
+      const std::shared_ptr<const PublicStateEvaluator> nonterminal_evaluator,
+      const std::shared_ptr<const PublicStateEvaluator> terminal_evaluator,
+      const std::string& bandit_name,
+      // TODO: implement average / none policy.
+      algorithms::PolicySelection init_values_save = algorithms::PolicySelection::kCurrentPolicy);
 
   void RunSimultaneousIterations(int iterations);
-  void PrepareRootReachProbs();
-  void EvaluateLeaves();
-  void EvaluateLeaf(PublicState* state, PublicStateContext* context);
-  void UpdateReachProbs();
-  void UpdateTrunk();
-
-  void SetBeliefs(const std::array<std::vector<double>, 2>& beliefs);
-  double RootValue(Player pl = 0) const;
-  std::array<absl::Span<const double>, 2> RootChildrenCfValues() const;
   void Reset();
 
   // Accessors.
-  std::vector<std::shared_ptr<algorithms::InfostateTree>>& trees() { return trees_; }
+  PublicState& initial_state() { return subgame_->initial_state(); }
   std::vector<algorithms::BanditVector>& bandits() { return bandits_; }
-  std::vector<std::unique_ptr<PublicStateContext>>& contexts() {
-    return contexts_;
-  }
-  template<class T>
-  std::vector<T*> contexts_as() {
-    SPIEL_CHECK_EQ(contexts_.size(), public_states_.size());
-    std::vector<T*> casted;
-    casted.reserve(contexts_.size());
-    for (int i = 0; i < contexts_.size(); ++i) {
-      PublicState& state = public_states_[i];
-      if (state.IsTerminal()) {
-        casted.push_back(nullptr);
-      } else {
-        std::unique_ptr<PublicStateContext>& context = contexts_[i];
-        casted.push_back(open_spiel::down_cast<T*>(context.get()));
-      }
-    }
-    return casted;
-  }
-  std::vector<PublicState>& public_states() { return public_states_; }
-  PublicState& initial_state() {
-    SPIEL_CHECK_FALSE(public_states_.empty());
-    SPIEL_CHECK_TRUE(public_states_[0].IsInitial());
-    return public_states_[0];
-  }
-  std::vector<std::vector<double>>& reach_probs() { return reach_probs_; }
-  std::vector<std::vector<double>>& cf_values() { return cf_values_; }
+  Subgame* subgame() { return subgame_.get(); }
 
-  // Trunk evaluation.
+  // Policy available only for the infostates of the subgame!
   std::shared_ptr<Policy> AveragePolicy();
   std::shared_ptr<Policy> CurrentPolicy();
-  size_t num_iterations_ = 0;
  private:
-  const std::shared_ptr<const Game> game_;
-  /*const*/ std::vector<std::shared_ptr<algorithms::InfostateTree>> trees_;
-  const std::shared_ptr<Observer> public_observer_;
+  const std::shared_ptr<Subgame> subgame_;
   const std::shared_ptr<const PublicStateEvaluator> nonterminal_evaluator_;
   const std::shared_ptr<const PublicStateEvaluator> terminal_evaluator_;
-
-  // Allocated based on propagator / cfr tree construction.
-  // The first PublicState/PublicStateContext corresponds to the
-  // root public state.
-  /*const*/ std::vector<PublicState> public_states_;
-  // Save evaluator-specific information for any public state.
-  // If no information should be saved, a nullptr is used.
-  /*const*/ std::vector<std::unique_ptr<PublicStateContext>> contexts_;
-  // Store the position of a node within the reach_probs_ resp. cf_values_
-  /*const*/ std::map<const algorithms::InfostateNode*, int> leaf_node_positions_;
-  /*const*/ std::map<const algorithms::InfostateNode*, int> root_node_positions_;
 
   // -- Mutable values to keep track of. --
   // These have the size at largest depth of the tree, i.e. the size of the
   // leaf infostate nodes.
-  std::array<std::vector<double>, 2> beliefs_;
+  std::vector<algorithms::BanditVector> bandits_;
   std::vector<std::vector<double>> reach_probs_;
   std::vector<std::vector<double>> cf_values_;
+  // Save evaluator-specific information for any public state.
+  // If no information should be saved, a nullptr is used.
+  std::vector<std::unique_ptr<PublicStateContext>> contexts_;
 
-  std::vector<algorithms::BanditVector> bandits_;
+  size_t num_iterations_ = 0;
+  algorithms::PolicySelection init_values_save_;
 
-  void PrepareInfostateNodesForPublicStates();
-  void PrepareReachesAndValuesForPublicStates();
-  void CreateContexts();
-  PublicState* GetPublicState(const Observation& public_observation,
-                              PublicStateType state_type);
-  PublicState* GetPublicState(Observation& public_observation,
-                              PublicStateType state_type,
-                              algorithms::InfostateNode* node);
+  void EvaluateLeaves();
+  void EvaluateLeaf(PublicState* state, PublicStateContext* context);
 };
 
 // -- Dummy evaluator ----------------------------------------------------------
@@ -301,8 +294,8 @@ struct DummyEvaluator : public PublicStateEvaluator {
 // -- CFR evaluator ------------------------------------------------------------
 
 struct CFRContext : public PublicStateContext {
-  std::unique_ptr<Subgame> dlcfr;
-  explicit CFRContext(std::unique_ptr<Subgame> d)
+  std::unique_ptr<SubgameSolver> dlcfr;
+  explicit CFRContext(std::unique_ptr<SubgameSolver> d)
       : dlcfr(std::move(d)) {}
 };
 

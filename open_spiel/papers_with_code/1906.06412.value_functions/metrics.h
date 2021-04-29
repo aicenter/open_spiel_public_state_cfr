@@ -41,7 +41,7 @@ struct Metric {
 
 std::unique_ptr<Metric> MakeFullTrunkExplMetric(
     std::vector<int> evaluate_iters,
-    Subgame* trunk_with_net,
+    SubgameSolver* trunk_with_net,
     algorithms::ortools::SequenceFormLpSpecification* whole_game);
 
 std::unique_ptr<Metric> MakeReplayVisitsMetric(

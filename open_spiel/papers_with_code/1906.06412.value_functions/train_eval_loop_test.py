@@ -192,86 +192,86 @@ def dict_prod(*iterables):
 
 class VFTest(parameterized.TestCase, absltest.TestCase):
 
-  @parameterized.parameters(_VALUE_NETS)
-  def test_kuhn_eval_iters_dlcfr_regression(self, **arch_spec):
-    args = {**_BASE_ARGS, **arch_spec,
-            **dict(num_loops=10, replay_size=200, exp_init="trunk_dlcfr",
-                   num_layers=3, num_width=3, trunk_expl_iterations="1,5,10")}
-    actual_eval, actual_expl = read_experiment_results_from_shell(
-        args, metric_avg_loss, metric_ref_expls)
-
-    arch = arch_spec["arch"]
-    expected_eval = df_from_lines(_REFERENCE_KUHN_DLCFR_EVAL[arch])
-    expected_expl = df_from_lines(_REFERENCE_KUHN_DLCFR_EXPL)
-
-    np.testing.assert_allclose(actual_eval.values, expected_eval.values,
-                               atol=1e-6)
-    np.testing.assert_allclose(actual_expl.values, expected_expl.values,
-                               atol=1e-6)
-
-  @parameterized.parameters(_VALUE_NETS)
-  def test_kuhn_eval_iters_random_regression(self, **arch_spec):
-    args = {**_BASE_ARGS, **arch_spec,
-            **dict(num_loops=10, replay_size=200, num_layers=3, num_width=3,
-                   exp_init="trunk_random", trunk_expl_iterations="1,5,10")}
-    actual_eval, = read_experiment_results_from_shell(args, metric_avg_loss)
-    arch = arch_spec["arch"]
-    expected_eval = df_from_lines(_REFERENCE_KUHN_RANDOM_EVAL[arch])
-    np.testing.assert_allclose(actual_eval.values, expected_eval.values,
-                               atol=1e-6)
-
-  @parameterized.parameters(dict_prod(_TEST_GAMES, _VALUE_NETS))
-  def test_fit_one_trunk(self, **game_spec):
-    replay_size = game_spec["replay_size"]
-    num_trunks = 1
-    args = {**_BASE_ARGS, **game_spec,
-            **dict(num_loops=20, batch_size=-1,
-                   exp_init="trunk_random",
-                   replay_size=replay_size * num_trunks,
-                   trunk_expl_iterations="")}
-    actual_eval, = read_experiment_results_from_shell(args, metric_avg_loss)
-    actual_loss = actual_eval["avg_loss"].values.min()
-    self.assertLess(actual_loss, 1e-8)
-
-  @parameterized.parameters(dict_prod(_TEST_GAMES, _VALUE_NETS))
-  def test_fit_two_trunks(self, **game_spec):
-    replay_size = game_spec["replay_size"]
-    num_trunks = 2
-    args = {**_BASE_ARGS, **game_spec,
-            **dict(num_loops=60, batch_size=-1,
-                   learning_rate=0.01, lr_decay=0.99,
-                   exp_init="trunk_random",
-                   replay_size=replay_size * num_trunks,
-                   trunk_expl_iterations=0)}
-    actual_eval, = read_experiment_results_from_shell(args, metric_avg_loss)
-    actual_loss = actual_eval["avg_loss"].values.min()
-    self.assertLess(actual_loss, 1e-6)
-
-  @parameterized.parameters(dict_prod(_TEST_GAMES, _VALUE_NETS))
-  def test_imitate_dlcfr_iterations(self, **game_spec):
-    if game_spec["game_name"] == "kuhn_poker" and game_spec["depth"] == 4:
-      # Skip this setting, as getting the precise DL-CFR iterations is
-      # difficult: the iterations are sensitive to the smallest changes in
-      # values.
-      return
-
-    num_iters = 3
-    replay_size = game_spec["replay_size"]
-    args = {**_BASE_ARGS, **game_spec,
-            # Run just 1 loop, as per-loop evals are the most expensive part.
-            **dict(num_loops=10, train_batches=100,
-                   batch_size=-1, exp_init="trunk_dlcfr",
-                   replay_size=replay_size * num_iters,
-                   trunk_expl_iterations=",".join(str(i) for i in range(1, num_iters + 1))
-                   )}
-    expected_expl, actual_eval = read_experiment_results_from_shell(
-        args, metric_ref_expls, metric_avg_loss)
-    expl_cols = [f"expl[{i}]" for i in range(1, num_iters+1)]
-    actual_expl = actual_eval.tail(1)[expl_cols]
-
-    np.testing.assert_allclose(actual_expl.values.flatten(),
-                               expected_expl["expl"].values.flatten(),
-                               atol=5e-3)
+  # @parameterized.parameters(_VALUE_NETS)
+  # def test_kuhn_eval_iters_dlcfr_regression(self, **arch_spec):
+  #   args = {**_BASE_ARGS, **arch_spec,
+  #           **dict(num_loops=10, replay_size=200, exp_init="trunk_dlcfr",
+  #                  num_layers=3, num_width=3, trunk_expl_iterations="1,5,10")}
+  #   actual_eval, actual_expl = read_experiment_results_from_shell(
+  #       args, metric_avg_loss, metric_ref_expls)
+  #
+  #   arch = arch_spec["arch"]
+  #   expected_eval = df_from_lines(_REFERENCE_KUHN_DLCFR_EVAL[arch])
+  #   expected_expl = df_from_lines(_REFERENCE_KUHN_DLCFR_EXPL)
+  #
+  #   np.testing.assert_allclose(actual_eval.values, expected_eval.values,
+  #                              atol=1e-6)
+  #   np.testing.assert_allclose(actual_expl.values, expected_expl.values,
+  #                              atol=1e-6)
+  #
+  # @parameterized.parameters(_VALUE_NETS)
+  # def test_kuhn_eval_iters_random_regression(self, **arch_spec):
+  #   args = {**_BASE_ARGS, **arch_spec,
+  #           **dict(num_loops=10, replay_size=200, num_layers=3, num_width=3,
+  #                  exp_init="trunk_random", trunk_expl_iterations="1,5,10")}
+  #   actual_eval, = read_experiment_results_from_shell(args, metric_avg_loss)
+  #   arch = arch_spec["arch"]
+  #   expected_eval = df_from_lines(_REFERENCE_KUHN_RANDOM_EVAL[arch])
+  #   np.testing.assert_allclose(actual_eval.values, expected_eval.values,
+  #                              atol=1e-6)
+  #
+  # @parameterized.parameters(dict_prod(_TEST_GAMES, _VALUE_NETS))
+  # def test_fit_one_trunk(self, **game_spec):
+  #   replay_size = game_spec["replay_size"]
+  #   num_trunks = 1
+  #   args = {**_BASE_ARGS, **game_spec,
+  #           **dict(num_loops=20, batch_size=-1,
+  #                  exp_init="trunk_random",
+  #                  replay_size=replay_size * num_trunks,
+  #                  trunk_expl_iterations="")}
+  #   actual_eval, = read_experiment_results_from_shell(args, metric_avg_loss)
+  #   actual_loss = actual_eval["avg_loss"].values.min()
+  #   self.assertLess(actual_loss, 1e-8)
+  #
+  # @parameterized.parameters(dict_prod(_TEST_GAMES, _VALUE_NETS))
+  # def test_fit_two_trunks(self, **game_spec):
+  #   replay_size = game_spec["replay_size"]
+  #   num_trunks = 2
+  #   args = {**_BASE_ARGS, **game_spec,
+  #           **dict(num_loops=60, batch_size=-1,
+  #                  learning_rate=0.01, lr_decay=0.99,
+  #                  exp_init="trunk_random",
+  #                  replay_size=replay_size * num_trunks,
+  #                  trunk_expl_iterations=0)}
+  #   actual_eval, = read_experiment_results_from_shell(args, metric_avg_loss)
+  #   actual_loss = actual_eval["avg_loss"].values.min()
+  #   self.assertLess(actual_loss, 1e-6)
+  #
+  # @parameterized.parameters(dict_prod(_TEST_GAMES, _VALUE_NETS))
+  # def test_imitate_dlcfr_iterations(self, **game_spec):
+  #   if game_spec["game_name"] == "kuhn_poker" and game_spec["depth"] == 4:
+  #     # Skip this setting, as getting the precise DL-CFR iterations is
+  #     # difficult: the iterations are sensitive to the smallest changes in
+  #     # values.
+  #     return
+  #
+  #   num_iters = 3
+  #   replay_size = game_spec["replay_size"]
+  #   args = {**_BASE_ARGS, **game_spec,
+  #           # Run just 1 loop, as per-loop evals are the most expensive part.
+  #           **dict(num_loops=10, train_batches=100,
+  #                  batch_size=-1, exp_init="trunk_dlcfr",
+  #                  replay_size=replay_size * num_iters,
+  #                  trunk_expl_iterations=",".join(str(i) for i in range(1, num_iters + 1))
+  #                  )}
+  #   expected_expl, actual_eval = read_experiment_results_from_shell(
+  #       args, metric_ref_expls, metric_avg_loss)
+  #   expl_cols = [f"expl[{i}]" for i in range(1, num_iters+1)]
+  #   actual_expl = actual_eval.tail(1)[expl_cols]
+  #
+  #   np.testing.assert_allclose(actual_expl.values.flatten(),
+  #                              expected_expl["expl"].values.flatten(),
+  #                              atol=5e-3)
 
   @parameterized.parameters(_TEST_GAMES)
   def test_pbs_iterations_identical(self, **game_spec):
