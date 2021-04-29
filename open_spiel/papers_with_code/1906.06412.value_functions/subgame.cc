@@ -148,6 +148,13 @@ void Subgame::PrepareInfostateNodesForPublicStates() {
       root_node_positions_[root_node] = i;  // TODO: do we need this?
     }
   }
+
+  // Make sure we have built only one initial state:
+  // the infostate trees are rooted in a single initial state.
+  // While more initial states are possible, we don't do this as it would
+  // complicate the code unnecessarily.
+  SPIEL_CHECK_EQ(public_states_.size(), 1);
+
   // Save node positions for leaf public states.
   for (int pl = 0; pl < 2; ++pl) {
     for (int i = 0; i < trees_[pl]->num_leaves(); ++i) {

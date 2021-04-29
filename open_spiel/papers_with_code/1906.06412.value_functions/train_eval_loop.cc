@@ -84,16 +84,6 @@ ABSL_FLAG(int, num_inputs_regression, 128,
 // FullTrunkExplMetric
 ABSL_FLAG(std::string, trunk_expl_iterations, "",
           "Evaluate trunk exploitability for each trunk iteration.");
-// SparseRootsExplMetric
-ABSL_FLAG(std::string, sparse_expl_iterations, "",
-          "Evaluate roots exploitability for each sparse trunk iteration.");
-ABSL_FLAG(int, sparse_roots_depth, 0,
-          "The depth at which sparse roots should be found.");
-ABSL_FLAG(double, sparse_support_threshold, 1e-5,
-          "Pruning threshold for not playing actions from equilibrium, "
-          "used for trunk sparsification.");
-ABSL_FLAG(bool, sparse_prune_chance_histories, false,
-          "If true, do not start at chance histories.");
 // ReplayVisitsMetric
 ABSL_FLAG(int, replay_visits_window, -1,
           "Track the average visit count over a past window "
@@ -107,7 +97,6 @@ ABSL_FLAG(int, replay_visits_window, -1,
 #include "open_spiel/papers_with_code/1906.06412.value_functions/experience_replay.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/metrics.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_dl_evaluator.h"
-#include "open_spiel/papers_with_code/1906.06412.value_functions/sparse_trunk.h"
 
 
 namespace open_spiel {
@@ -347,21 +336,6 @@ void TrainEvalLoop() {
       std::cout << "# Making full trunk exploitability metric ..." << std::endl;
       metrics.push_back(MakeFullTrunkExplMetric(
           trunk_expl_iterations, reuse.GetTrunkWithNet(), reuse.GetSfLp()));
-    }
-  }
-  {
-    std::vector<int> sparse_expl_iterations =
-        ItersFromString(absl::GetFlag(FLAGS_sparse_expl_iterations));
-    if (!sparse_expl_iterations.empty()) {
-      std::cout << "# Making sparse roots exploitability metric ..."
-                << std::endl;
-      metrics.push_back(MakeSparseRootsExplMetric(
-          &factory, reuse.GetSfLp(),
-          // Plumb through settings.
-          sparse_expl_iterations,
-          absl::GetFlag(FLAGS_sparse_roots_depth),
-          absl::GetFlag(FLAGS_sparse_support_threshold),
-          absl::GetFlag(FLAGS_sparse_prune_chance_histories)));
     }
   }
   {

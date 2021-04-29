@@ -16,7 +16,6 @@
 #define OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_TABULARIZE_POLICY_
 
 #include "open_spiel/policy.h"
-#include "open_spiel/papers_with_code/1906.06412.value_functions/sparse_trunk.h"
 
 namespace open_spiel {
 namespace papers_with_code {

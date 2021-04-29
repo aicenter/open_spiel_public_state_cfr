@@ -26,7 +26,6 @@
 #include "open_spiel/papers_with_code/1906.06412.value_functions/experience_replay.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_data.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/subgame_factory.h"
-#include "open_spiel/papers_with_code/1906.06412.value_functions/sparse_trunk.h"
 
 namespace open_spiel {
 namespace papers_with_code {
@@ -44,14 +43,6 @@ std::unique_ptr<Metric> MakeFullTrunkExplMetric(
     std::vector<int> evaluate_iters,
     Subgame* trunk_with_net,
     algorithms::ortools::SequenceFormLpSpecification* whole_game);
-
-std::unique_ptr<Metric> MakeSparseRootsExplMetric(
-    SubgameFactory* factory,
-    algorithms::ortools::SequenceFormLpSpecification* whole_game,
-    std::vector<int> evaluate_iters,
-    int roots_depth,
-    double support_threshold,
-    bool prune_chance_histories);
 
 std::unique_ptr<Metric> MakeReplayVisitsMetric(
     ExperienceReplay* replay, int window);

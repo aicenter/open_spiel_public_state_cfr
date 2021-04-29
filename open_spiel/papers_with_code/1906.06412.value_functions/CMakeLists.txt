@@ -3,8 +3,6 @@ add_library(paper_value_functions OBJECT
   experience_replay.h
   hand_table.cc
   hand_table.h
-        subgame.h
-        subgame.cc
   metrics.cc
   metrics.h
   net_architectures.cc
@@ -21,10 +19,10 @@ add_library(paper_value_functions OBJECT
   reusable_structs.h
   solve_queue.cc
   solve_queue.h
-  sparse_trunk.cc
-  sparse_trunk.h
-        subgame_factory.cc
-        subgame_factory.h
+  subgame.cc
+  subgame.h
+  subgame_factory.cc
+  subgame_factory.h
 )
 
 # Delete -Wall -Werror in
@@ -41,8 +39,6 @@ add_paper_executable(train_eval_loop train_eval_loop.cc)
 
 add_paper_executable(hand_table_test hand_table_test.cc)
 add_test(hand_table_test hand_table_test)
-add_paper_executable(sparse_trunk_test sparse_trunk_test.cc)
-add_test(sparse_trunk_test sparse_trunk_test)
 add_paper_executable(particle_regeneration_test particle_regeneration_test.cc)
 add_test(particle_regeneration_test particle_regeneration_test)
 add_paper_executable(subgame_test subgame_test.cc)
