@@ -69,6 +69,10 @@ ABSL_FLAG(double, learning_rate, 1e-3, "Optimizer learning rate.");
 ABSL_FLAG(double, lr_decay, 1., "Learning rate decay after each loop.");
 ABSL_FLAG(int, max_particles, -1,
           "Max particles to use. Set -1 to find an upper bound automatically.");
+ABSL_FLAG(int, snapshot_loop, -1,
+          "When should NN weights be saved to snapshot/ dir? -1 for never.");
+ABSL_FLAG(std::string, snapshot_dir, "snapshots/",
+          "Directory to store snapshots of NN weights.");
 
 // -- Network --
 ABSL_FLAG(std::string, arch, "particle_vf",
@@ -391,6 +395,9 @@ void TrainEvalLoop() {
     // but just above them.
     filler.bootstrap_move_number = factory.game->MaxMoveNumber();
   }
+  //
+  const int snapshot_loop = absl::GetFlag(FLAGS_snapshot_loop);
+  const std::string snapshot_dir = absl::GetFlag(FLAGS_snapshot_dir);
   // ---------------------------------------------------------------------------
   std::cout << "# Ready to run the train/eval loop!" << std::endl;
   for (int i = 0; i < 80; ++i) std::cout << '#';
@@ -412,6 +419,12 @@ void TrainEvalLoop() {
         std::cout << "# Resetting net weights with random init." << std::endl;
         model->apply(InitWeights);
       }
+    }
+    if (snapshot_loop > 0 && loop % snapshot_loop == 0) {
+      std::string save_as = absl::StrCat(snapshot_dir, loop, ".model");
+      std::cout << "# Saving snapshot of the neural net to "
+                << save_as << std::endl;
+      torch::save(model, save_as);
     }
 
     std::cout << "# Training  ";
