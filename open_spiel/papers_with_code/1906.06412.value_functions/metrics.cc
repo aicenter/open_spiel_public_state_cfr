@@ -47,17 +47,12 @@ class FullTrunkExplMetric : public Metric {
 
     // Important!! We must reset all the bandits & other memory for proper eval.
     trunk_with_net_->Reset();
-
     for (int i = 1; i <= evaluate_iters_.back(); ++i) {
-      ++trunk_with_net_->num_iterations_;
-      trunk_with_net_->UpdateReachProbs();
-      trunk_with_net_->EvaluateLeaves();
-
+      trunk_with_net_->RunSimultaneousIterations(1);
       if (should_evaluate_at_iter(i)) {
         expls_[j++] = or_algs::TrunkExploitability(whole_game_, *eval_policy);
         progress << '.' << std::flush;
       }
-      trunk_with_net_->UpdateTrunk();
     }
   }
 
@@ -177,17 +172,12 @@ class SparseRootsExplMetric : public Metric {
     for (int i = 1; i <= evaluate_iters_.back(); ++i) {
       Subgame* trunk_with_net =
           sparse_eq_trunk_with_net_->dlcfr.get();
-      ++trunk_with_net->num_iterations_;
-      trunk_with_net->UpdateReachProbs();
-      trunk_with_net->EvaluateLeaves();
-
+      trunk_with_net->RunSimultaneousIterations(1);
       if (should_evaluate_at_iter(i)) {
         expls_[j++] = or_algs::TrunkExploitability(eval_lp_.get(),
                                                    *eval_policy_);
         progress << '.' << std::flush;
       }
-
-      sparse_eq_trunk_with_net_->dlcfr->UpdateTrunk();
     }
   }
 

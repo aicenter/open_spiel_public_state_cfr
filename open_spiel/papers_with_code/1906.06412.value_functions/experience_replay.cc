@@ -158,9 +158,7 @@ void ReplayFiller::AddTrunkRandomPbsSolution() {
   // Randomize strategy in the trunk.
   randomizer->Randomize(fixable_trunk_with_oracle->bandits());
   // Compute the reach probs from the trunk.
-  fixable_trunk_with_oracle->UpdateReachProbs();
-  // Do not call bottom-up, just evaluate leaves.
-  fixable_trunk_with_oracle->EvaluateLeaves();
+  fixable_trunk_with_oracle->RunSimultaneousIterations(1);
   // Pick some valid public state.
   // Loop until we find one. There should be always one -- or perhaps
   // the trunk is too deep, getting into only terminal states.
@@ -199,10 +197,7 @@ void ReplayFiller::FillReplayWithTrunkDlCfrPbsSolutions() {
 
   iterable_trunk_with_oracle->Reset();
   for (int iter = 1; iter <= num_trunks; ++iter) {
-    ++iterable_trunk_with_oracle->num_iterations_;
-    iterable_trunk_with_oracle->UpdateReachProbs();
-    iterable_trunk_with_oracle->EvaluateLeaves();
-
+    iterable_trunk_with_oracle->RunSimultaneousIterations(1);
     bool should_evaluate = std::find(eval_iters.begin(), eval_iters.end(),
                                      iter) != eval_iters.end();
     if (should_evaluate) {
@@ -212,7 +207,6 @@ void ReplayFiller::FillReplayWithTrunkDlCfrPbsSolutions() {
     }
 
     AddExperiencesFromPublicStates(iterable_trunk_with_oracle->public_states());
-    iterable_trunk_with_oracle->UpdateTrunk();
   }
 
   std::cout << "# </ref_expl>\n";
