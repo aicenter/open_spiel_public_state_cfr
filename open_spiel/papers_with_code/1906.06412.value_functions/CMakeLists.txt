@@ -38,7 +38,12 @@ macro(add_paper_executable NAME SOURCES)
 endmacro()
 
 add_paper_executable(train_eval_loop train_eval_loop.cc)
+
 add_paper_executable(hand_table_test hand_table_test.cc)
+add_test(hand_table_test hand_table_test)
 add_paper_executable(sparse_trunk_test sparse_trunk_test.cc)
+add_test(sparse_trunk_test sparse_trunk_test)
 add_paper_executable(particle_regeneration_test particle_regeneration_test.cc)
-add_paper_executable(infostate_dl_cfr_test subgame_test.cc)
+add_test(particle_regeneration_test particle_regeneration_test)
+add_paper_executable(subgame_test subgame_test.cc)
+add_test(subgame_test subgame_test)

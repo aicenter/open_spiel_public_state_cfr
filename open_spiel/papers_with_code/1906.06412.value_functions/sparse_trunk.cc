@@ -154,12 +154,12 @@ std::vector<std::unique_ptr<SparseTrunk>> MakeSparseTrunks(
         }
 
         const int move_lim = trunk_depth - roots_depth;
-        std::vector<std::shared_ptr<algorithms::InfostateTree>> sparse_trees = {
-            algorithms::MakeInfostateTree(start_states, start_chances, infostate_observer,
-                              /*pl=*/0, /*max_move_ahead_limit=*/move_lim),
-            algorithms::MakeInfostateTree(start_states, start_chances, infostate_observer,
-                              /*pl=*/1, /*max_move_ahead_limit=*/move_lim)
-        };
+        std::vector<std::shared_ptr<algorithms::InfostateTree>> sparse_trees =
+            algorithms::MakeInfostateTrees(start_states, start_chances,
+                                           infostate_observer,
+                                           /*max_move_ahead_limit=*/move_lim,
+                                           kDlCfrInfostateTreeStorage);
+
         auto sparse_trunk = std::make_unique<SparseTrunk>();
         sparse_trunk->dlcfr = std::make_unique<Subgame>(
             game, sparse_trees, net_evaluator, terminal_evaluator,
@@ -347,12 +347,11 @@ std::unique_ptr<SparseTrunk> MakeSparseTrunkWithEqSupport(
   const int move_lim = trunk_depth - roots_depth;
   auto sparse_trunk = std::make_unique<SparseTrunk>();
   if (!fixate_infostates.empty()) {
-    std::vector<std::shared_ptr<algorithms::InfostateTree>> sparse_trees = {
-        algorithms::MakeInfostateTree(start_states_ptrs, start_chances, infostate_observer,
-            /*pl=*/0, /*max_move_ahead_limit=*/move_lim),
-        algorithms::MakeInfostateTree(start_states_ptrs, start_chances, infostate_observer,
-            /*pl=*/1, /*max_move_ahead_limit=*/move_lim)
-    };
+    std::vector<std::shared_ptr<algorithms::InfostateTree>> sparse_trees =
+        algorithms::MakeInfostateTrees(start_states_ptrs, start_chances,
+                                       infostate_observer,
+                                       /*max_move_ahead_limit=*/move_lim,
+                                       kDlCfrInfostateTreeStorage);
     sparse_trunk->dlcfr = std::make_unique<Subgame>(
         game, sparse_trees, leaf_evaluator, terminal_evaluator,
         public_observer, MakeBanditVectors(sparse_trees, bandits_for_cfr));

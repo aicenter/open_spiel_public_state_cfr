@@ -31,7 +31,8 @@ void TestCreateHandTable() {
                                                      dl_cfr.public_states());
   SPIEL_CHECK_EQ(hand_info->tables.size(), game->NumPlayers());
   for (const HandTable& player_table : hand_info->tables) {
-    SPIEL_CHECK_EQ(player_table.private_hands.size(), 3);
+    // 3 possible dealings of cards, 1 for an empty hand.
+    SPIEL_CHECK_EQ(player_table.private_hands.size(), 3+1);
   }
 }
 
