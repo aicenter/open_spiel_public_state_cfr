@@ -310,6 +310,28 @@ std::shared_ptr<InfostateTree> MakeInfostateTree(
     int max_move_ahead_limit = kDefaultMoveAheadLimit,
     int storage_policy = kDefaultStoragePolicy);
 
+// Same as above, but constructs trees for all players in the game.
+
+std::vector<std::shared_ptr<InfostateTree>> MakeInfostateTrees(
+    const Game& game,
+    int max_move_ahead_limit = kDefaultMoveAheadLimit,
+    int storage_policy = kDefaultStoragePolicy);
+
+std::vector<std::shared_ptr<InfostateTree>> MakeInfostateTrees(
+    const std::vector<const State*>& start_states,
+    const std::vector<double>& chance_reach_probs,
+    std::shared_ptr<Observer> infostate_observer,
+    int max_move_ahead_limit = kDefaultMoveAheadLimit,
+    int storage_policy = kDefaultStoragePolicy);
+
+std::vector<std::shared_ptr<InfostateTree>> MakeInfostateTrees(
+    const std::vector<std::unique_ptr<State>>& start_states,
+    const std::vector<double>& chance_reach_probs,
+    std::shared_ptr<Observer> infostate_observer,
+    int max_move_ahead_limit = kDefaultMoveAheadLimit,
+    int storage_policy = kDefaultStoragePolicy);
+
+
 class InfostateTree final {
  public:
   // -- Root accessors ---------------------------------------------------------

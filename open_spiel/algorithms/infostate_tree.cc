@@ -494,6 +494,51 @@ std::shared_ptr<InfostateTree> MakeInfostateTree(
                         storage_policy));
 }
 
+std::vector<std::shared_ptr<InfostateTree>> MakeInfostateTrees(
+    const Game &game, int max_move_ahead_limit, int storage_policy) {
+  std::vector<std::shared_ptr<InfostateTree>> trees;
+  trees.reserve(game.NumPlayers());
+  for (int pl = 0; pl < game.NumPlayers(); ++pl) {
+    trees.push_back(MakeInfostateTree(game, pl,
+                                      max_move_ahead_limit, storage_policy));
+  }
+  return trees;
+}
+
+std::vector<std::shared_ptr<InfostateTree>> MakeInfostateTrees(
+    const std::vector<const State*>& start_states,
+    const std::vector<double>& chance_reach_probs,
+    std::shared_ptr<Observer> infostate_observer,
+    int max_move_ahead_limit,
+    int storage_policy) {
+  std::vector<std::shared_ptr<InfostateTree>> trees;
+  const Game& game = *start_states[0]->GetGame();
+  trees.reserve(game.NumPlayers());
+  for (int pl = 0; pl < game.NumPlayers(); ++pl) {
+    trees.push_back(MakeInfostateTree(
+        start_states, chance_reach_probs, infostate_observer,
+        pl, max_move_ahead_limit, storage_policy));
+  }
+  return trees;
+}
+
+std::vector<std::shared_ptr<InfostateTree>> MakeInfostateTrees(
+    const std::vector<std::unique_ptr<State>>& start_states,
+    const std::vector<double>& chance_reach_probs,
+    std::shared_ptr<Observer> infostate_observer,
+    int max_move_ahead_limit,
+    int storage_policy) {
+  std::vector<std::shared_ptr<InfostateTree>> trees;
+  const Game& game = *start_states[0]->GetGame();
+  trees.reserve(game.NumPlayers());
+  for (int pl = 0; pl < game.NumPlayers(); ++pl) {
+    trees.push_back(MakeInfostateTree(
+        start_states, chance_reach_probs, infostate_observer, pl,
+        max_move_ahead_limit, storage_policy));
+  }
+  return trees;
+}
+
 SequenceId InfostateTree::empty_sequence() const {
   return root().sequence_id();
 }
