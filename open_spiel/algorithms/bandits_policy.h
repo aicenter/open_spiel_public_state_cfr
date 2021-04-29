@@ -36,15 +36,15 @@ std::vector<BanditVector> MakeBanditVectors(
     const std::string& bandit_name = "RegretMatching",
     GameParameters bandit_params = {});
 
+enum class PolicySelection {
+  kCurrentPolicy,
+  kAveragePolicy
+};
+
 class BanditsPolicy : public Policy {
   const std::vector<std::shared_ptr<InfostateTree>>& trees_;
   const std::vector<BanditVector>& bandits_;
  public:
-  enum class PolicySelection {
-    kCurrentPolicy,
-    kAveragePolicy
-  };
-
   BanditsPolicy(
       const std::vector<std::shared_ptr<InfostateTree>>& trees,
       const std::vector<BanditVector>& bandits)

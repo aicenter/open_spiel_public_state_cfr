@@ -45,7 +45,7 @@ std::vector<BanditVector> MakeBanditVectors(
 
 ActionsAndProbs BanditsPolicy::GetInfoStatePolicy(
     const std::string& info_state,
-    BanditsPolicy::PolicySelection selection) const {
+    PolicySelection selection) const {
   const InfostateNode* node = nullptr;
   int pl = 0;
   while (pl < trees_.size() && !node) {
