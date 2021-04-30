@@ -27,6 +27,13 @@ std::unique_ptr<ParticleSet> GenerateParticles(
   int bet_rounds = std::accumulate(point_cards.begin(), point_cards.end(), -1);
   DimensionedSpan wins = public_state.GetSpan("win_sequence");
   DimensionedSpan ties = public_state.GetSpan("tie_sequence");
+
+  auto set = std::make_unique<ParticleSet>();
+  if (bet_rounds == 0) {  // Initial state -- no actions made yet.
+    set->particles.push_back(std::vector<Action>{});
+    return set;
+  }
+
   SPIEL_CHECK_GE(bet_rounds, 1);
   SPIEL_CHECK_LE(bet_rounds, num_cards);
   SPIEL_CHECK_EQ(wins.shape[0], num_cards);
@@ -60,8 +67,6 @@ std::unique_ptr<ParticleSet> GenerateParticles(
   }
 
   // Store solution.
-  auto set = std::make_unique<ParticleSet>();
-
   auto card_dist = std::uniform_int_distribution<int>(1, num_cards);
   auto player_dist = std::uniform_int_distribution<int>(0, 1);
   auto dir_dist = std::uniform_int_distribution<int>(0, bet_rounds);
@@ -91,8 +96,9 @@ std::unique_ptr<ParticleSet> GenerateParticles(
       std::vector<Action> history;
       history.reserve(bet_rounds * 2);
       for (int j = 0; j < bet_rounds; ++j) {
-        history.push_back(SolutionIntegerValue(response, played[0][j]));
-        history.push_back(SolutionIntegerValue(response, played[1][j]));
+        // -1 due to 0-based indexing in the goofspiel game implementation.
+        history.push_back(SolutionIntegerValue(response, played[0][j]) - 1);
+        history.push_back(SolutionIntegerValue(response, played[1][j]) - 1);
       }
       // (Possibly) increases particles size.
       if (set->has(history)) {

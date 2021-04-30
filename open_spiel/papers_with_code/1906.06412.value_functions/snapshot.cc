@@ -23,8 +23,8 @@ void SaveNetSnapshot(std::shared_ptr<ValueNet> model, const std::string& path) {
   torch::save(model, path);
 }
 
-std::shared_ptr<ValueNet> LoadNetSnapshot(const std::string& path) {
-  return nullptr; // TODO
+void LoadNetSnapshot(std::shared_ptr<ValueNet> model, const std::string& path) {
+  torch::load(model, path);
 }
 
 }  // namespace papers_with_code

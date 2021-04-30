@@ -12,21 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_SNAPSHOT_
-#define OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_SNAPSHOT_
+#ifndef OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_BOT_
+#define OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_BOT_
 
-#include "open_spiel/papers_with_code/1906.06412.value_functions/net_architectures.h"
+#include "open_spiel/spiel_bots.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/subgame_factory.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/solver_factory.h"
 
 namespace open_spiel {
 namespace papers_with_code {
 
-constexpr const char* kDefaultSnapshotDir = "snapshots/";
+using BotParameters = GameParameters;
+using BotParameter = GameParameter;
 
-void SaveNetSnapshot(std::shared_ptr<ValueNet> model, const std::string& path);
-void LoadNetSnapshot(std::shared_ptr<ValueNet> model, const std::string& path);
+std::unique_ptr<Bot> MakeSherlockBot(std::unique_ptr<SubgameFactory> subgame_factory,
+                                     std::unique_ptr<SolverFactory> solver_factory,
+                                     Player player_id, int seed);
 
 }  // namespace papers_with_code
 }  // namespace open_spiel
 
-
-#endif  // OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_SNAPSHOT_
+#endif  // OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_BOT_

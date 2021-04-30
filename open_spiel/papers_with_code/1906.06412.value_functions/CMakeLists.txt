@@ -1,4 +1,6 @@
 add_library(paper_value_functions OBJECT
+  bot.cc
+  bot.h
   experience_replay.cc
   experience_replay.h
   hand_table.cc
@@ -41,6 +43,8 @@ endmacro()
 
 add_paper_executable(train_eval_loop train_eval_loop.cc)
 
+add_paper_executable(bot_test bot_test.cc)
+add_test(bot_test bot_test)
 add_paper_executable(hand_table_test hand_table_test.cc)
 add_test(hand_table_test hand_table_test)
 add_paper_executable(particle_regeneration_test particle_regeneration_test.cc)
