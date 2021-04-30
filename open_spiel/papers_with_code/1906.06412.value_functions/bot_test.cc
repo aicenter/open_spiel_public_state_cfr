@@ -25,6 +25,9 @@ namespace {
 
 void TestBotCanPlayGoofspiel() {
   const int num_games = 10;
+  std::string current_dir = __FILE__;
+  current_dir.resize(current_dir.rfind("/"));
+
   std::shared_ptr<const Game> game = LoadGame("goofspiel("
                                                 "players=2,"
                                                 "num_cards=3,"
@@ -42,11 +45,13 @@ void TestBotCanPlayGoofspiel() {
     {"max_particles",          BotParameter(1000)},
     {"device",                 BotParameter("cpu")},
     {"use_bandits_for_cfr",    BotParameter("RegretMatchingPlus")},
-    {"load_from",              BotParameter("snapshots/iigs3/trained.model")},
+    {"load_from",
+     BotParameter(absl::StrCat(current_dir, "/snapshots/iigs3/random.model"))},
   };
 
   std::vector<std::unique_ptr<Bot>> bots;
   for (Player p = 0; p < 2; ++p) {
+    params["seed"] = BotParameter(p);  // Different seeds for different outcomes.
     bots.push_back(LoadBot("sherlock", game, p, params));
   }
 
