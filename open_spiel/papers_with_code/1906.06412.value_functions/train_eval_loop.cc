@@ -56,7 +56,8 @@ ABSL_FLAG(bool, exp_reset_nn, false,
 ABSL_FLAG(bool, bootstrap_reset_nn, false,
           "Should the neural net be reset and trained from scratch, "
           "when final bootstrap is made?");
-
+ABSL_FLAG(int, cfr_iterations, 100,
+          "Number of iterations with value function (used in bootstrapping).");
 
 // -- Training --
 ABSL_FLAG(int, train_batches, 32,
@@ -330,6 +331,7 @@ void TrainEvalLoop() {
   filler.sparse_particles     = absl::GetFlag(FLAGS_sparse_particles);
   filler.sparse_epsilon       = absl::GetFlag(FLAGS_sparse_epsilon);
   filler.eval_iters = ItersFromString(absl::GetFlag(FLAGS_trunk_expl_iterations));
+  filler.cfr_iterations = absl::GetFlag(FLAGS_cfr_iterations);
   //
   std::cout << "# Making evaluation metrics ..." << std::endl;
   std::vector<std::unique_ptr<Metric>> metrics;

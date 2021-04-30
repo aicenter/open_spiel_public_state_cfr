@@ -98,6 +98,7 @@ struct ReplayFiller {
   bool shuffle_input_output = false;
   int sparse_particles = 0;
   double sparse_epsilon = 0.;
+  int cfr_iterations = 100;
   std::vector<int> eval_iters;
 
   void CreateExperiences(ReplayFillerPolicy fill_policy, int num_experiences);

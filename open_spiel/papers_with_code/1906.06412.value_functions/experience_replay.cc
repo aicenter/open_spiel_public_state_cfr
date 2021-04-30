@@ -257,7 +257,7 @@ void ReplayFiller::AddBootstrappedSolution() {
   std::shared_ptr<Subgame> subgame = factory->MakeSubgame(
       *set, /*custom_move_ahead_limit=*/1);
   std::unique_ptr<SubgameSolver> solver = factory->MakeSolver(subgame);
-  solver->RunSimultaneousIterations(100);
+  solver->RunSimultaneousIterations(cfr_iterations);
 
   // 3. Add solution to the experiences.
   PublicState& result = subgame->initial_state();
