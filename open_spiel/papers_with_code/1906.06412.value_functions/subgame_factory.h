@@ -13,8 +13,8 @@
 // limitations under the License.
 
 
-#ifndef OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_SUBGAME_
-#define OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_SUBGAME_
+#ifndef OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_SUBGAME_FACTORY_
+#define OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_SUBGAME_FACTORY_
 
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_data.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_dl_evaluator.h"
@@ -27,7 +27,7 @@
 namespace open_spiel {
 namespace papers_with_code {
 
-constexpr const char* kDefaultDlCfrBandit = "RegretMatchingPlus";
+constexpr int kDefaultMaxTrunkDepth = 3;
 constexpr int kDefaultMaxMoveAheadLimit = 2;
 constexpr int kDefaultMaxParticles = 1000;
 
@@ -35,32 +35,23 @@ constexpr int kDefaultMaxParticles = 1000;
 // that have belief distribution over the infostates induced by those histories.
 using SequenceFormLpSpecification = algorithms::ortools::SequenceFormLpSpecification;
 
-// Produce a subgame and a solver given a particle set.
+// Produce a subgame given some input.
 struct SubgameFactory {
   std::shared_ptr<const Game> game;
   std::shared_ptr<Observer> infostate_observer;  // For infostate strings.
   std::shared_ptr<Observer> public_observer;     // For public tensor.
   std::shared_ptr<Observer> hand_observer;       // For hand tensor.
 
-  std::shared_ptr<const TerminalEvaluator> terminal_evaluator;
-  std::shared_ptr<const NetEvaluator> leaf_evaluator;
-
-  std::string use_bandits_for_cfr = kDefaultDlCfrBandit;
+  int max_trunk_depth = kDefaultMaxTrunkDepth;
   int max_move_ahead_limit = kDefaultMaxMoveAheadLimit;
   int max_particles = kDefaultMaxParticles;
 
   // Subgame from game's initial state.
-  std::shared_ptr<Subgame> MakeTrunk() const;
-
+  std::shared_ptr<Subgame> MakeTrunk(int trunk_depth = -1) const;
   std::shared_ptr<Subgame> MakeSubgame(const ParticleSet& set,
-                                       int custom_move_ahead_limit = 0) const;
+                                       int custom_move_ahead_limit = -1) const;
   std::shared_ptr<Subgame> MakeSubgame(const PublicState& state,
-                                       int custom_move_ahead_limit = 0) const;
-
-  std::unique_ptr<SubgameSolver> MakeSolver(
-      std::shared_ptr<Subgame> subgame,
-      std::shared_ptr<const PublicStateEvaluator> custom_leaf_evaluator = nullptr,
-      std::string custom_bandits_for_cfr = "") const;
+                                       int custom_move_ahead_limit = -1) const;
 
  protected:
   std::vector<std::shared_ptr<algorithms::InfostateTree>>
@@ -72,5 +63,5 @@ struct SubgameFactory {
 } // namespace papers_with_code
 } // namespace open_spiel
 
-#endif  // OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_SUBGAME_
+#endif  // OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_SUBGAME_FACTORY_
 

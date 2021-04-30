@@ -124,7 +124,7 @@ void ReplayFiller::AddParticleExperience(const PublicState& leaf,
   auto particle_dims = open_spiel::down_cast <const ParticleDims&>(*dims);
   ParticleDataPoint data_point = buffer->AddExperience(particle_dims);
   WriteParticleDataPoint(
-      leaf, particle_dims, &data_point, factory->hand_observer,
+      leaf, particle_dims, &data_point, subgame_factory->hand_observer,
       randomizer->rnd_gen, shuffle_input_output);
 }
 
@@ -142,7 +142,7 @@ void ReplayFiller::AddExperiencesFromPublicStates(
     const PublicState& state = states[i];
     // Add experiences only for non-terminals leaves.
     if (state.IsTerminal() || !state.IsLeaf()) continue;
-    auto context = factory->leaf_evaluator->CreateContext(state);
+    auto context = solver_factory->leaf_evaluator->CreateContext(state);
     auto net_context = open_spiel::down_cast<NetContext*>(context.get());
     AddExperience(state, net_context);
   }
@@ -157,7 +157,7 @@ void ReplayFiller::AddTrunkRandomPbsSolution() {
 
   // Add experience for that state.
   PublicState* state = solver->subgame()->PickRandomLeaf(*randomizer->rnd_gen);
-  auto context = factory->leaf_evaluator->CreateContext(*state);
+  auto context = solver_factory->leaf_evaluator->CreateContext(*state);
   auto net_context = open_spiel::down_cast<NetContext*>(context.get());
   AddExperience(*state, net_context);
 }
@@ -222,13 +222,13 @@ void ReplayFiller::AddRandomPbsSolution() {
   }
 
   // 3. Build subgame until the end of the game and solve it.
-  std::shared_ptr<Subgame> subgame = factory->MakeSubgame(*state, 1000);
-  std::unique_ptr<SubgameSolver> solver = factory->MakeSolver(subgame);
+  std::shared_ptr<Subgame> subgame = subgame_factory->MakeSubgame(*state, 1000);
+  std::unique_ptr<SubgameSolver> solver = solver_factory->MakeSolver(subgame);
   solver->RunSimultaneousIterations(100);
 
   // 4. Add solution to the experiences.
   PublicState& result = subgame->initial_state();
-  auto context = factory->leaf_evaluator->CreateContext(result);
+  auto context = solver_factory->leaf_evaluator->CreateContext(result);
   auto net_context = open_spiel::down_cast<NetContext*>(context.get());
   AddExperience(result, net_context);
 }
@@ -238,13 +238,13 @@ void ReplayFiller::AddRandomSparsePbsSolution() {
   std::unique_ptr<ParticleSet> set = PickParticleSet();
 
   // 2. Build subgame until the end of the game and solve it.
-  std::shared_ptr<Subgame> subgame = factory->MakeSubgame(*set, 1000);
-  std::unique_ptr<SubgameSolver> solver = factory->MakeSolver(subgame);
+  std::shared_ptr<Subgame> subgame = subgame_factory->MakeSubgame(*set, 1000);
+  std::unique_ptr<SubgameSolver> solver = solver_factory->MakeSolver(subgame);
   solver->RunSimultaneousIterations(100);
 
   // 3. Add solution to the experiences.
   PublicState& result = subgame->initial_state();
-  auto context = factory->leaf_evaluator->CreateContext(result);
+  auto context = solver_factory->leaf_evaluator->CreateContext(result);
   auto net_context = open_spiel::down_cast<NetContext*>(context.get());
   AddExperience(result, net_context);
 }
@@ -254,14 +254,14 @@ void ReplayFiller::AddBootstrappedSolution() {
   std::unique_ptr<ParticleSet> set = PickParticleSet(bootstrap_move_number);
 
   // 2. Build subgame and solve it.
-  std::shared_ptr<Subgame> subgame = factory->MakeSubgame(
+  std::shared_ptr<Subgame> subgame = subgame_factory->MakeSubgame(
       *set, /*custom_move_ahead_limit=*/1);
-  std::unique_ptr<SubgameSolver> solver = factory->MakeSolver(subgame);
+  std::unique_ptr<SubgameSolver> solver = solver_factory->MakeSolver(subgame);
   solver->RunSimultaneousIterations(cfr_iterations);
 
   // 3. Add solution to the experiences.
   PublicState& result = subgame->initial_state();
-  auto context = factory->leaf_evaluator->CreateContext(result);
+  auto context = solver_factory->leaf_evaluator->CreateContext(result);
   auto net_context = open_spiel::down_cast<NetContext*>(context.get());
   AddExperience(result, net_context);
 }

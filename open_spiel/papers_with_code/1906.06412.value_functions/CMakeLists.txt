@@ -19,6 +19,8 @@ add_library(paper_value_functions OBJECT
   reusable_structs.h
   solve_queue.cc
   solve_queue.h
+  solver_factory.cc
+  solver_factory.h
   subgame.cc
   subgame.h
   subgame.cc

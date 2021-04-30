@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef OPEN_SPIEL_PAPERS_WITH_CODE_INFOSTATE_DL_CFR_H_
-#define OPEN_SPIEL_PAPERS_WITH_CODE_INFOSTATE_DL_CFR_H_
+#ifndef OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_SUBGAME_
+#define OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_SUBGAME_
 
 #include <map>
 #include <memory>
@@ -329,4 +329,4 @@ void PrintPublicStatesStats(const std::vector<PublicState>& public_leaves);
 }  // namespace papers_with_code
 }  // namespace open_spiel
 
-#endif  // OPEN_SPIEL_PAPERS_WITH_CODE_INFOSTATE_DL_CFR_H_
+#endif  // OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_SUBGAME_

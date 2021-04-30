@@ -21,18 +21,22 @@
 #include "open_spiel/papers_with_code/1906.06412.value_functions/subgame.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_data.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/subgame_factory.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/solver_factory.h"
 
 namespace open_spiel {
 namespace papers_with_code {
 
 struct ReusableStructures {
-  const SubgameFactory& factory;
+  SubgameFactory* subgame_factory;
+  SolverFactory* solver_factory;
   const std::shared_ptr<const PublicStateEvaluator> pbs_oracle;
 
   explicit ReusableStructures(
-      const SubgameFactory& factory,
+      SubgameFactory* subgame_factory,
+      SolverFactory* solver_factory,
       const std::shared_ptr <const PublicStateEvaluator>& pbs_oracle)
-      : factory(factory), pbs_oracle(pbs_oracle) {}
+      : subgame_factory(subgame_factory), solver_factory(solver_factory),
+        pbs_oracle(pbs_oracle) {}
 
   // Each of these is essentially a cache of the object.
   // You can set the cache by assigning to it directly, or you can

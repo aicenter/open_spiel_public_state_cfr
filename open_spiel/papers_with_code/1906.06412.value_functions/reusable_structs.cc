@@ -19,31 +19,32 @@ namespace papers_with_code {
 
 std::shared_ptr<Subgame> ReusableStructures::GetTrunk() {
   if (!trunk) {
-    trunk = factory.MakeTrunk();
+    trunk = subgame_factory->MakeTrunk();
   }
   return trunk;
 }
 
 SubgameSolver* ReusableStructures::GetFixableTrunkWithOracle() {
   if (!fixable_trunk_with_oracle) {
-    fixable_trunk_with_oracle = factory.MakeSolver(GetTrunk(), pbs_oracle,
-                                                   "FixableStrategy");
+    fixable_trunk_with_oracle = solver_factory->MakeSolver(
+        GetTrunk(), pbs_oracle, "FixableStrategy");
   }
   return fixable_trunk_with_oracle.get();
 }
 
 SubgameSolver* ReusableStructures::GetIterableTrunkWithOracle() {
   if (!iterable_trunk_with_oracle) {
-    iterable_trunk_with_oracle = factory.MakeSolver(GetTrunk(), pbs_oracle,
-                                                   factory.use_bandits_for_cfr);
+    iterable_trunk_with_oracle = solver_factory->MakeSolver(
+        GetTrunk(), pbs_oracle, solver_factory->use_bandits_for_cfr);
   }
   return iterable_trunk_with_oracle.get();
 }
 
 SubgameSolver* ReusableStructures::GetTrunkWithNet() {
   if (!trunk_with_net) {
-    trunk_with_net = factory.MakeSolver(GetTrunk(), factory.leaf_evaluator,
-                                        factory.use_bandits_for_cfr);
+    trunk_with_net = solver_factory->MakeSolver(
+        GetTrunk(), solver_factory->leaf_evaluator,
+        solver_factory->use_bandits_for_cfr);
   }
   return trunk_with_net.get();
 }
@@ -51,14 +52,14 @@ SubgameSolver* ReusableStructures::GetTrunkWithNet() {
 SequenceFormLpSpecification* ReusableStructures::GetSfLp() {
   if (!sf_lp) {
     sf_lp = std::make_unique<SequenceFormLpSpecification>(
-        *factory.game, "CLP", /*return_nan_if_non_optimal=*/true);
+        *subgame_factory->game, "CLP", /*return_nan_if_non_optimal=*/true);
   }
   return sf_lp.get();
 }
 
 PublicStatesInGame* ReusableStructures::GetAllPublicStates() {
   if (!all_states) {
-    all_states = MakeAllPublicStates(*factory.game);
+    all_states = MakeAllPublicStates(*subgame_factory->game);
   }
   return all_states.get();
 }
@@ -67,7 +68,8 @@ std::vector<algorithms::BanditVector>&
     ReusableStructures::GetFixableBanditsForAllPublicStates() {
   if (fixable_bandits_for_all_public_states.empty()) {
     fixable_bandits_for_all_public_states =
-        MakeBanditVectors(GetAllPublicStates()->infostate_trees, "FixableStrategy");
+        MakeBanditVectors(GetAllPublicStates()->infostate_trees,
+                          "FixableStrategy");
   }
   return fixable_bandits_for_all_public_states;
 }

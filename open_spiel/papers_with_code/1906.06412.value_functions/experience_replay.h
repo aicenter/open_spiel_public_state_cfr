@@ -19,6 +19,7 @@
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_data.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/reusable_structs.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/subgame_factory.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/solver_factory.h"
 
 namespace open_spiel {
 namespace papers_with_code {
@@ -79,7 +80,8 @@ struct StrategyRandomizer {
 struct ReplayFiller {
   // All of these must be supplied.
   ExperienceReplay* replay;
-  SubgameFactory* factory;
+  SubgameFactory* subgame_factory;
+  SolverFactory* solver_factory;
   BasicDims* dims;
   StrategyRandomizer* randomizer;
   ReusableStructures* reuse;
