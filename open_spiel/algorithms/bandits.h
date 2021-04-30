@@ -62,6 +62,10 @@ class Bandit {
       current_strategy_(num_actions, 1. / num_actions) {
     SPIEL_CHECK_GT(num_actions, 0);
   }
+  Bandit(std::vector<double> initial_strategy) :
+      current_strategy_(std::move(initial_strategy)) {
+    SPIEL_CHECK_FALSE(current_strategy_.empty());
+  }
   virtual ~Bandit() = default;
   // Return the positive number of actions (arms) available to the bandit.
   int num_actions() const { return current_strategy_.size(); }
@@ -142,6 +146,8 @@ class FixedStrategy final : public Bandit {
 class FixableStrategy : public Bandit {
  public:
   FixableStrategy(int num_actions) : Bandit(num_actions) {}
+  FixableStrategy(std::vector<double> initial_strategy)
+    : Bandit(std::move(initial_strategy)) {}
   // Return a writable view for the strategy.
   absl::Span<double> mutable_strategy() {
     return absl::MakeSpan(current_strategy_);
