@@ -54,8 +54,15 @@ class SherlockBot : public Bot {
     // Can be just inferred from legal actions from the referee.
     const ActionsAndProbs uniform_actions = UniformStatePolicy(state);
 
-    // TODO: make sure there are some particles consistent also
-    //       with the current infostate!!
+    // TODO: Tabularization of any Bot to compute offline TabularPolicy.
+    //       Bot base class will need to add a Clone() method.
+
+    // TODO: keep particles from previous step along with beliefs.
+    //       Currently can work only for one-step lookahead trees.
+
+    // TODO(for michal): Make sure there are some particles consistent also
+    //                   with the current infostate! Not needed if we store
+    //                   all particles between Step() calls.
     std::cout << "# Generate particles for current public state\n";
     std::unique_ptr<ParticleSet> set = GenerateParticles(public_observation,
                       subgame_factory_->max_particles,
@@ -74,10 +81,24 @@ class SherlockBot : public Bot {
     //  Update subgame's infostate trees: subgame->trees[1-player_id_]
     //  such that they begin with the choice for the opponent
     //  to follow or not into this subgame. This could be done by careful
-    //  manipulation with the (already constructed) infostate tree.
+    //  manipulation with the (already constructed) infostate tree,
+    //  or with changing how the trees are constructed. Plumb this through
+    //  MakeSubgame to affect infostate tree construction.
 
     std::cout << "# Making solver\n";
     std::unique_ptr<SubgameSolver> solver = solver_factory_->MakeSolver(subgame);
+
+//    // Code for opponent fixation:
+//    TabularPolicy opponent_policy;  // Needs to be provided.
+//    int opponent = 1 - player_id_;
+//    algorithms::BanditVector& opponent_bandits = solver->bandits()[opponent];
+//    for (algorithms::DecisionId id : opponent_bandits.range()) {
+//      algorithms::InfostateNode* node = subgame->trees[opponent]->decision_infostate(id);
+//      ActionsAndProbs infostate_policy = opponent_policy.GetStatePolicy(node->infostate_string());
+//      std::vector<double> probs = GetProbs(infostate_policy);
+//      auto fixable_bandit = std::make_unique<algorithms::bandits::FixableStrategy>(probs);
+//      opponent_bandits[id] = std::move(fixable_bandit);
+//    }
 
     std::cout << "# Solving!\n";
     solver->RunSimultaneousIterations(solver_factory_->cfr_iterations);

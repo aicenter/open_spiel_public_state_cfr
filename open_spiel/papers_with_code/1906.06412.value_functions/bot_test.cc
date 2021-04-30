@@ -28,6 +28,8 @@ void TestBotCanPlayGoofspiel() {
   std::string current_dir = __FILE__;
   current_dir.resize(current_dir.rfind("/"));
 
+  // TODO: implement game transformation that provides a chance node at the top
+  //       with Left-Right actions.
   std::shared_ptr<const Game> game = LoadGame("goofspiel("
                                                 "players=2,"
                                                 "num_cards=3,"
