@@ -23,7 +23,7 @@ std::unique_ptr<PublicStateContext> PositionalNetEvaluator::CreateContext(
     const PublicState& state) const {
 
   SPIEL_DCHECK_FALSE(state.IsTerminal());
-  auto net_context = std::make_unique<NetContext>(hand_info_);
+  auto net_context = std::make_unique<NetContext>(hand_info_.get());
   Observation& hand = hand_info_->hand_buffer;
 
   for (int pl = 0; pl < 2; ++pl) {
@@ -53,7 +53,7 @@ void ParticleNetEvaluator::EvaluatePublicState(
                          /*rnd_gen=*/nullptr, /*shuffle_input_output=*/false);
 
   // Input must be batched.
-  torch::Tensor input = point.data.to(*device_).unsqueeze(/*dim=*/0);
+  torch::Tensor input = point.data.to(device_).unsqueeze(/*dim=*/0);
   // The output must be "unbatched".
   torch::Tensor output = model_->forward(input).squeeze(/*dim=*/0);
   SPIEL_DCHECK_EQ(output.sizes().size(), 1);
@@ -75,7 +75,7 @@ void PositionalNetEvaluator::EvaluatePublicState(
   PositionalDataPoint point = batch_->point_at(0, *dims_);
   WritePositionalDataPoint(*state, *net_context, *dims_, &point);
 
-  torch::Tensor input = point.data.to(*device_);
+  torch::Tensor input = point.data.to(device_);
   torch::Tensor output = model_->forward(input);
   SPIEL_DCHECK_EQ(output.sizes(), point.target.sizes());
   point.target.copy_(output);
@@ -83,20 +83,20 @@ void PositionalNetEvaluator::EvaluatePublicState(
 }
 
 std::shared_ptr<NetEvaluator> MakeNetEvaluator(
-    BasicDims* dims, ValueNet* model,
-    BatchData* eval_batch, torch::Device* device,
+    std::shared_ptr<BasicDims> dims, std::shared_ptr<ValueNet> model,
+    std::shared_ptr<BatchData> eval_batch, torch::Device device,
     // One of:
-    HandInfo* hand_info, std::shared_ptr<Observer> hand_observer) {
+    std::shared_ptr<HandInfo> hand_info, std::shared_ptr<Observer> hand_observer) {
   switch (model->architecture()) {
     case NetArchitecture::kParticle: {
-      auto particle_model = open_spiel::down_cast<ParticleValueNet*>(model);
-      auto particle_dims = open_spiel::down_cast<ParticleDims*>(dims);
+      auto particle_model = std::dynamic_pointer_cast<ParticleValueNet>(model);
+      auto particle_dims = std::dynamic_pointer_cast<ParticleDims>(dims);
       return std::make_shared<ParticleNetEvaluator>(
           particle_model, particle_dims, eval_batch, device, hand_observer);
     }
     case NetArchitecture::kPositional: {
-      auto positional_model = open_spiel::down_cast<PositionalValueNet*>(model);
-      auto positional_dims = open_spiel::down_cast<PositionalDims*>(dims);
+      auto positional_model = std::dynamic_pointer_cast<PositionalValueNet>(model);
+      auto positional_dims = std::dynamic_pointer_cast<PositionalDims>(dims);
       return std::make_shared<PositionalNetEvaluator>(
           hand_info, positional_model, positional_dims, eval_batch, device);
     }

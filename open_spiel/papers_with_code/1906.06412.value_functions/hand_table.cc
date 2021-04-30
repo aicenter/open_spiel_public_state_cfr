@@ -101,10 +101,10 @@ bool AllStatesHaveSameHands(const Observation& expected_hand, Player player,
   return true;
 }
 
-std::unique_ptr<HandInfo> MakeHandInfo(
+std::shared_ptr<HandInfo> MakeHandInfo(
     const Game& game, const std::shared_ptr<Observer>& hand_observer,
     const std::vector<PublicState>& public_leaves) {
-  auto hand_info = std::make_unique<HandInfo>(game, hand_observer);
+  auto hand_info = std::make_shared<HandInfo>(game, hand_observer);
   Observation& hand = hand_info->hand_buffer;
 
   for (int state_idx = 0; state_idx < public_leaves.size(); ++state_idx) {

@@ -27,11 +27,13 @@ namespace open_spiel {
 namespace papers_with_code {
 
 constexpr const char* kDefaultDlCfrBandit = "RegretMatchingPlus";
+constexpr int kDefaultCfrIterations = 100;
 
 // Produce a solver given a subgame.
 struct SolverFactory {
   std::shared_ptr<const TerminalEvaluator> terminal_evaluator;
   std::shared_ptr<const NetEvaluator> leaf_evaluator;
+  int cfr_iterations = kDefaultCfrIterations;
   std::string use_bandits_for_cfr = kDefaultDlCfrBandit;
 
   std::unique_ptr<SubgameSolver> MakeSolver(

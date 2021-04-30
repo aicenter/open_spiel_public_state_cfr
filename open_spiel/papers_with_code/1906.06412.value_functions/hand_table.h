@@ -46,7 +46,7 @@ struct HandInfo {
   size_t hand_tensor_size() const;
 };
 
-std::unique_ptr<HandInfo> MakeHandInfo(
+std::shared_ptr<HandInfo> MakeHandInfo(
     const Game& game,
     const std::shared_ptr<Observer>& hand_observer,
     const std::vector<PublicState>& public_leaves);

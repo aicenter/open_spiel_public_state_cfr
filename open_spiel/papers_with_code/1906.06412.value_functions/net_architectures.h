@@ -22,6 +22,8 @@
 namespace open_spiel {
 namespace papers_with_code {
 
+constexpr const char* kDefaultArch = "particle_vf";
+
 // A base class for various possible value network architectures.
 struct ValueNet : public torch::nn::Module {
   virtual torch::Tensor forward(torch::Tensor x) = 0;

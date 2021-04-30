@@ -26,7 +26,7 @@ void TestCreateHandTable() {
       hand_observer = game->MakeObserver(kHandObsType, {});
   Subgame subgame(game, 3);
 
-  std::unique_ptr<HandInfo> hand_info = MakeHandInfo(*game, hand_observer,
+  std::shared_ptr<HandInfo> hand_info = MakeHandInfo(*game, hand_observer,
                                                      subgame.public_states);
   SPIEL_CHECK_EQ(hand_info->tables.size(), game->NumPlayers());
   for (const HandTable& player_table : hand_info->tables) {

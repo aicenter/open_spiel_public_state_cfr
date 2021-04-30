@@ -218,7 +218,7 @@ void TrainEvalLoop() {
   //
   const NetArchitecture arch = GetArchitecture(absl::GetFlag(FLAGS_arch));
   std::cout << "# Deducing dimensions ..." << std::endl;
-  std::unique_ptr<BasicDims> dims = DeduceBasicDims(
+  std::shared_ptr<BasicDims> dims = DeduceBasicDims(
       arch, *game, subgame_factory.public_observer, subgame_factory.hand_observer);
   std::cout << "# Public features: " << dims->public_features_size << std::endl;
   std::cout << "# Hand features: " << dims->hand_features_size << std::endl;
@@ -231,7 +231,7 @@ void TrainEvalLoop() {
                  "max_particles = " << subgame_factory.max_particles << ' ' <<
               "max_parviews = " << particle_dims->max_parviews << std::endl;
   }
-  std::unique_ptr<HandInfo> hand_info;
+  std::shared_ptr<HandInfo> hand_info;
   if (arch == NetArchitecture::kPositional || subgame_factory.max_particles == -1) {
     std::cout << "# Finding all hands in the game (may take a while) ..."
               << std::endl;
@@ -313,17 +313,18 @@ void TrainEvalLoop() {
   BatchData train_batch(batch_size,
                         dims->point_input_size(),
                         dims->point_output_size());
-  BatchData eval_batch(1,
-                       dims->point_input_size(),
-                       dims->point_output_size());
+  auto eval_batch = std::make_shared<BatchData>(1,
+                                                dims->point_input_size(),
+                                                dims->point_output_size());
   //
   SolverFactory solver_factory;
   std::cout << "# Making net evaluator ..." << std::endl;
+  solver_factory.cfr_iterations = absl::GetFlag(FLAGS_cfr_iterations);
   solver_factory.use_bandits_for_cfr  = absl::GetFlag(FLAGS_use_bandits_for_cfr);
   solver_factory.terminal_evaluator   = terminal_evaluator;
   solver_factory.leaf_evaluator = MakeNetEvaluator(
-      dims.get(), model.get(), &eval_batch, &device,
-      hand_info.get(),  // May be nullptr for particle VF.
+      dims, model, eval_batch, device,
+      hand_info,  // May be nullptr for particle VF.
       subgame_factory.hand_observer);
   reuse.solver_factory = &solver_factory;
   //
@@ -341,7 +342,6 @@ void TrainEvalLoop() {
   filler.sparse_epsilon       = absl::GetFlag(FLAGS_sparse_epsilon);
   filler.eval_iters =
       ItersFromString(absl::GetFlag(FLAGS_trunk_expl_iterations));
-  filler.cfr_iterations = absl::GetFlag(FLAGS_cfr_iterations);
   //
   std::cout << "# Making evaluation metrics ..." << std::endl;
   std::vector<std::unique_ptr<Metric>> metrics;

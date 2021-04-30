@@ -17,20 +17,20 @@
 namespace open_spiel {
 namespace papers_with_code {
 
-std::unique_ptr<BasicDims> DeduceBasicDims(
+std::shared_ptr<BasicDims> DeduceBasicDims(
     NetArchitecture arch,
     const Game& game,
     const std::shared_ptr<Observer>& public_observer,
     const std::shared_ptr<Observer>& hand_observer
 ) {
 
-  std::unique_ptr <BasicDims> dims;
+  std::shared_ptr<BasicDims> dims;
   switch (arch) {
     case NetArchitecture::kParticle:
-      dims = std::make_unique<ParticleDims>();
+      dims = std::make_shared<ParticleDims>();
       break;
     case NetArchitecture::kPositional:
-      dims = std::make_unique<PositionalDims>();
+      dims = std::make_shared<PositionalDims>();
       break;
   }
 

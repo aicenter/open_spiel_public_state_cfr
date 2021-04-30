@@ -64,7 +64,7 @@ struct BasicDims {
   virtual ~BasicDims() = default;
 };
 // Deduce basic dimensions based on the game and observers of that game.
-std::unique_ptr<BasicDims> DeduceBasicDims(
+std::shared_ptr<BasicDims> DeduceBasicDims(
     NetArchitecture arch, const Game& game,
     const std::shared_ptr<Observer>& public_observer,
     const std::shared_ptr<Observer>& hand_observer);

@@ -59,14 +59,16 @@ struct NetContext : public PublicStateContext {
 class NetEvaluator : public PublicStateEvaluator {};
 
 class ParticleNetEvaluator final : public NetEvaluator {
-  ParticleValueNet* model_;
-  torch::Device* device_;
-  BatchData* batch_;
-  ParticleDims* const dims_;
+  std::shared_ptr<ParticleValueNet> model_;
+  torch::Device device_;
+  std::shared_ptr<BatchData> batch_;
+  std::shared_ptr<ParticleDims> const dims_;
   std::shared_ptr<Observer> hand_observer_;
  public:
-  ParticleNetEvaluator(ParticleValueNet* model, ParticleDims* const dims,
-                       BatchData* batch, torch::Device* device,
+  ParticleNetEvaluator(std::shared_ptr<ParticleValueNet> model,
+                       std::shared_ptr<ParticleDims> const dims,
+                       std::shared_ptr<BatchData> batch,
+                       torch::Device device,
                        std::shared_ptr<Observer> hand_observer)
       : model_(model), device_(device), batch_(batch), dims_(dims),
         hand_observer_(hand_observer) {}
@@ -75,15 +77,17 @@ class ParticleNetEvaluator final : public NetEvaluator {
 };
 
 class PositionalNetEvaluator final : public NetEvaluator {
-  HandInfo* hand_info_;
-  PositionalValueNet* model_;
-  torch::Device* device_;
-  BatchData* batch_;
-  PositionalDims* const dims_;
+  std::shared_ptr<HandInfo> hand_info_;
+  std::shared_ptr<PositionalValueNet> model_;
+  torch::Device device_;
+  std::shared_ptr<BatchData> batch_;
+  std::shared_ptr<PositionalDims> const dims_;
  public:
-  PositionalNetEvaluator(HandInfo* hand_info,
-                         PositionalValueNet* model, PositionalDims* const dims,
-                         BatchData* batch, torch::Device* device)
+  PositionalNetEvaluator(std::shared_ptr<HandInfo> hand_info,
+                         std::shared_ptr<PositionalValueNet> model,
+                         std::shared_ptr<PositionalDims> const dims,
+                         std::shared_ptr<BatchData> batch,
+                         torch::Device device)
       : hand_info_(hand_info), model_(model), device_(device),
         batch_(batch), dims_(dims) {}
   void EvaluatePublicState(PublicState* state,
@@ -93,13 +97,10 @@ class PositionalNetEvaluator final : public NetEvaluator {
 };
 
 std::shared_ptr<NetEvaluator> MakeNetEvaluator(
-    BasicDims* dims,
-    ValueNet* model,
-    BatchData* eval_batch,
-    torch::Device* device,
+    std::shared_ptr<BasicDims> dims, std::shared_ptr<ValueNet> model,
+    std::shared_ptr<BatchData> eval_batch, torch::Device device,
     // One of:
-    HandInfo* hand_info,
-    std::shared_ptr<Observer> hand_observer);
+    std::shared_ptr<HandInfo> hand_info, std::shared_ptr<Observer> hand_observer);
 
 
 void WriteParticleDataPoint(const PublicState& state,
