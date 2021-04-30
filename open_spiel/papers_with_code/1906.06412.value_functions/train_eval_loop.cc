@@ -103,6 +103,7 @@ ABSL_FLAG(int, replay_visits_window, -1,
 #include "open_spiel/papers_with_code/1906.06412.value_functions/experience_replay.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/metrics.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_dl_evaluator.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/snapshot.h"
 
 
 namespace open_spiel {
@@ -439,7 +440,7 @@ void TrainEvalLoop() {
       std::string save_as = absl::StrCat(snapshot_dir, loop, ".model");
       std::cout << "# Saving snapshot of the neural net to "
                 << save_as << std::endl;
-      torch::save(model, save_as);
+      SaveNetSnapshot(model, save_as);
     }
 
     std::cout << "# Training  ";
