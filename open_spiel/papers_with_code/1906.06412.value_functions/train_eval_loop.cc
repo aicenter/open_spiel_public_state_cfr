@@ -59,6 +59,9 @@ ABSL_FLAG(bool, bootstrap_reset_nn, false,
 ABSL_FLAG(int, cfr_iterations, 100,
           "Number of iterations with value function (used in bootstrapping).");
 ABSL_FLAG(int, max_move_ahead_limit, 1, "Size of the lookahead tree.");
+ABSL_FLAG(std::string, save_values_policy, "average",
+          "What cf. values should be saved after solving the subgame: "
+          " one of {current,average}.");
 
 // -- Training --
 ABSL_FLAG(int, train_batches, 32,
@@ -203,6 +206,8 @@ void TrainEvalLoop() {
   subgame_factory.max_particles        = absl::GetFlag(FLAGS_max_particles);
   //
   std::cout << "# Making oracle evaluator ..." << std::endl;
+  const SaveValuesPolicy save_values_policy =
+      GetSaveValuesPolicy(absl::GetFlag(FLAGS_save_values_policy));
   auto terminal_evaluator = std::make_shared<TerminalEvaluator>();
   auto oracle = std::make_shared<CFREvaluator>(
       subgame_factory.game, /*full_subgame_depth=*/1000,
@@ -210,6 +215,7 @@ void TrainEvalLoop() {
       subgame_factory.public_observer, subgame_factory.infostate_observer);
   oracle->bandit_name = kDefaultDlCfrBandit;
   oracle->num_cfr_iterations = absl::GetFlag(FLAGS_cfr_oracle_iterations);
+  oracle->save_values_policy = save_values_policy;
   //
   std::cout << "# Init empty reusable structures ..." << std::endl;
   ReusableStructures reuse(&subgame_factory,
@@ -321,6 +327,7 @@ void TrainEvalLoop() {
   std::cout << "# Making net evaluator ..." << std::endl;
   solver_factory.cfr_iterations = absl::GetFlag(FLAGS_cfr_iterations);
   solver_factory.use_bandits_for_cfr  = absl::GetFlag(FLAGS_use_bandits_for_cfr);
+  solver_factory.save_values_policy   = save_values_policy;
   solver_factory.terminal_evaluator   = terminal_evaluator;
   solver_factory.leaf_evaluator = MakeNetEvaluator(
       dims, model, eval_batch, device,

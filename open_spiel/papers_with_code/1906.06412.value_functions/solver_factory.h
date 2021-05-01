@@ -35,6 +35,7 @@ struct SolverFactory {
   std::shared_ptr<const NetEvaluator> leaf_evaluator;
   int cfr_iterations = kDefaultCfrIterations;
   std::string use_bandits_for_cfr = kDefaultDlCfrBandit;
+  SaveValuesPolicy save_values_policy = SaveValuesPolicy::kAveragedCfValues;
 
   std::unique_ptr<SubgameSolver> MakeSolver(
       std::shared_ptr<Subgame> subgame,

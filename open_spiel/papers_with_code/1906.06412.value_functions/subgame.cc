@@ -345,6 +345,24 @@ void TerminalEvaluator::EvaluatePublicState(
   }
 }
 
+SubgameSolver::SubgameSolver(
+    std::shared_ptr<Subgame> subgame,
+    const std::shared_ptr<const PublicStateEvaluator> nonterminal_evaluator,
+    const std::shared_ptr<const PublicStateEvaluator> terminal_evaluator,
+    const std::string& bandit_name,
+    SaveValuesPolicy save_values_policy
+) : subgame_(subgame),
+    nonterminal_evaluator_(nonterminal_evaluator),
+    terminal_evaluator_(terminal_evaluator),
+    bandits_(algorithms::MakeBanditVectors(subgame_->trees, bandit_name)),
+    reach_probs_({std::vector<double>(subgame_->trees[0]->num_leaves()),
+                  std::vector<double>(subgame_->trees[1]->num_leaves())}),
+    cf_values_({std::vector<double>(subgame_->trees[0]->num_leaves()),
+                std::vector<double>(subgame_->trees[1]->num_leaves())}),
+    contexts_(MakeContexts(subgame, nonterminal_evaluator, terminal_evaluator)),
+    num_iterations_(0),
+    init_save_values_(save_values_policy) {}
+
 std::shared_ptr<Policy> SubgameSolver::AveragePolicy() {
   return std::make_shared<algorithms::BanditsAveragePolicy>(subgame()->trees,
                                                             bandits_);
@@ -382,18 +400,14 @@ void SubgameSolver::RunSimultaneousIterations(int iterations) {
                absl::MakeSpan(cf_values_[pl]));
     }
 //    SPIEL_DCHECK_FLOAT_NEAR(RootValue(/*pl=*/0), -RootValue(/*pl=*/1), 1e-6);
+
+    if (init_save_values_ == SaveValuesPolicy::kAveragedCfValues) {
+      IncrementallyAverageValuesInInitialState();
+    }
   }
 
-  // Copy values solution to the initial state.
-  if (init_values_save_ == algorithms::PolicySelection::kCurrentPolicy) {
-    for (int pl = 0; pl < 2; ++pl) {
-      int branching = subgame()->trees[pl]->root_branching_factor();
-      SPIEL_CHECK_EQ(initial_state().values[pl].size(), branching);
-      std::copy(cf_values_[pl].begin(), cf_values_[pl].begin() + branching,
-                initial_state().values[pl].begin());
-    }
-  } else {
-    SpielFatalError("Not implemented");
+  if (init_save_values_ == SaveValuesPolicy::kCurrentCfValues) {
+    CopyValuesToInitialState();
   }
 }
 
@@ -464,9 +478,11 @@ void SubgameSolver::Reset() {
   // Reset subgames
   for (int i = 0; i < subgame_->public_states.size(); ++i) {
     PublicState& state = subgame_->public_states[i];
-    if (state.IsInitial()) continue;  // Conserve beliefs for initial state.
     for (int pl = 0; pl < 2; ++pl) {
-      std::fill(state.beliefs[pl].begin(), state.beliefs[pl].end(), 0.);
+      // Conserve beliefs for initial state.
+      if (!state.IsInitial()) {
+        std::fill(state.beliefs[pl].begin(), state.beliefs[pl].end(), 0.);
+      }
       std::fill(state.values[pl].begin(), state.values[pl].end(), 0.);
     }
     if (nonterminal_evaluator_.get()) {
@@ -478,23 +494,38 @@ void SubgameSolver::Reset() {
   }
 }
 
-SubgameSolver::SubgameSolver(
-    std::shared_ptr<Subgame> subgame,
-    const std::shared_ptr<const PublicStateEvaluator> nonterminal_evaluator,
-    const std::shared_ptr<const PublicStateEvaluator> terminal_evaluator,
-    const std::string& bandit_name,
-    algorithms::PolicySelection init_values_save
-) : subgame_(subgame),
-    nonterminal_evaluator_(nonterminal_evaluator),
-    terminal_evaluator_(terminal_evaluator),
-    bandits_(algorithms::MakeBanditVectors(subgame_->trees, bandit_name)),
-    reach_probs_({std::vector<double>(subgame_->trees[0]->num_leaves()),
-                  std::vector<double>(subgame_->trees[1]->num_leaves())}),
-    cf_values_({std::vector<double>(subgame_->trees[0]->num_leaves()),
-                std::vector<double>(subgame_->trees[1]->num_leaves())}),
-    contexts_(MakeContexts(subgame, nonterminal_evaluator, terminal_evaluator)),
-    num_iterations_(0),
-    init_values_save_(init_values_save) {}
+
+void SubgameSolver::CopyValuesToInitialState() {
+  for (int pl = 0; pl < 2; ++pl) {
+    int branching = subgame()->trees[pl]->root_branching_factor();
+    SPIEL_CHECK_EQ(initial_state().values[pl].size(), branching);
+    std::copy(cf_values_[pl].begin(), cf_values_[pl].begin() + branching,
+              initial_state().values[pl].begin());
+  }
+}
+
+void SubgameSolver::IncrementallyAverageValuesInInitialState() {
+  // Check that we have reset the values, otherwise incremental averaging
+  // will not work properly!
+  SPIEL_DCHECK({
+    if (num_iterations_ == 0) {
+       for (int pl = 0; pl < 2; ++pl) {
+         for (double & value : initial_state().values[pl]) {
+           SPIEL_CHECK_EQ(value, 0.);
+         }
+       }
+    }
+  });
+
+  for (int pl = 0; pl < 2; ++pl) {
+    int branching = subgame()->trees[pl]->root_branching_factor();
+    SPIEL_CHECK_EQ(initial_state().values[pl].size(), branching);
+    for (int i = 0; i < branching; ++i) {
+      initial_state().values[pl][i] +=
+          (cf_values_[pl][i] - initial_state().values[pl][i]) / num_iterations_;
+    }
+  }
+}
 
 void DebugPrintPublicFeatures(const std::vector<PublicState>& states) {
   std::cout << "# Public features:\n";
@@ -534,7 +565,8 @@ std::unique_ptr<PublicStateContext> CFREvaluator::CreateContext(
   auto subgame = std::make_shared<Subgame>(
       game, public_observer, subgame_trees);
   auto solver = std::make_unique<SubgameSolver>(
-      subgame, nonterminal_evaluator, terminal_evaluator, bandit_name);
+      subgame, nonterminal_evaluator, terminal_evaluator,
+      bandit_name, save_values_policy);
   auto cfr_public_state = std::make_unique<CFRContext>(std::move(solver));
   SPIEL_DCHECK(CheckChildPublicStateConsistency(*cfr_public_state, state));
   return cfr_public_state;
@@ -650,6 +682,13 @@ PublicState* PublicStatesInGame::GetPublicState(
                              kInitialPublicState,
                              public_states.size());
   return &public_states.back();
+}
+
+SaveValuesPolicy GetSaveValuesPolicy(const std::string& s) {
+  if (s == "nothing") return SaveValuesPolicy::kSaveNothing;
+  if (s == "current") return SaveValuesPolicy::kCurrentCfValues;
+  if (s == "average") return SaveValuesPolicy::kAveragedCfValues;
+  SpielFatalError("Exhausted pattern match for SaveValuesPolicy");
 }
 
 
