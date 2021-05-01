@@ -63,7 +63,6 @@ struct ParticleValueNet final : public ValueNet {
   std::vector<torch::nn::Linear> fc_regression;
   std::vector<torch::nn::Linear> fc_basis;
   size_t num_inputs_regression;
-  int limit_parview_count = -1;
 
   ParticleValueNet(ParticleDims* particle_dims,
                    size_t num_layers_regression,

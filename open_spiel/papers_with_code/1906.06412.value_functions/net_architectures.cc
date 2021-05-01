@@ -148,10 +148,6 @@ torch::Tensor ParticleValueNet::forward(torch::Tensor xss) {
     // Convert fp32 to int -- for our small numbers < 1e7 this is ok.
     int num_parviews = xs[0].item<float_net>();                                 SPIEL_CHECK_GT(num_parviews, 0);
                                                                                 SPIEL_CHECK_LT(num_parviews, 1e7);
-    // Take only an ordered subset of particles, as specified by the amount.
-    if (is_training() && limit_parview_count > 0) {
-      num_parviews = std::min(num_parviews, limit_parview_count);
-    }
     // FIXME: nice offsets!
     const int pub_features_offset = 1;
     torch::Tensor public_features = xs
@@ -199,9 +195,6 @@ torch::Tensor ParticleValueNet::PrepareTarget(BatchData* batch) {
   target_slices.reserve(batch->size());
   for (int i = 0; i < batch->size(); ++i) {
     int num_parviews = parviews_counts[i].item<int>();
-    if (limit_parview_count > 0) {
-      num_parviews = std::min(num_parviews, limit_parview_count);
-    }
     target_slices.push_back(batch->target.index({i, Slice(0, num_parviews)}));
   }
   return torch::cat(target_slices).unsqueeze(/*dim=*/0);
