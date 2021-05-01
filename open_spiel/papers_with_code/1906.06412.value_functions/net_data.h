@@ -74,7 +74,7 @@ struct ParticleDims final : public BasicDims {
   int max_parviews = 1000;
 
   int point_input_size() const override {
-    return 1  // Store the number of parviews in the given point.
+    return 2  // Store the number of parviews in the given point.
          + public_features_size  // Public features.
          + max_parviews * parview_size();  // Parview contents.
   }
@@ -160,13 +160,14 @@ struct ParticleDataPoint final : DataPoint {
   ParticleDataPoint(const ParticleDims& particle_dims,
                     torch::Tensor data, torch::Tensor target);
   absl::Span<float_net> public_features();
-  float_net& num_parviews();
+  float_net& num_parviews(Player pl);
+  int total_parviews();
   ParviewDataPoint parview_at(int parview_index);
  private:
   // Offsets for number of parviews and the storage.
   int num_parviews_offset() const { return 0; }
-  int public_features_offset() const { return 1; }
-  int parviews_storage_offset() const { return dims.public_features_size + 1; }
+  int public_features_offset() const { return 2; }
+  int parviews_storage_offset() const { return dims.public_features_size + 2; }
 };
 
 struct PositionalDataPoint final : DataPoint {

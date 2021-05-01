@@ -146,10 +146,18 @@ torch::Tensor ParticleValueNet::forward(torch::Tensor xss) {
   for (int i = 0; i < batch_size; ++i) {
     torch::Tensor xs = xss[i];                                                  CHECK_SHAPE(xs, {dims->point_input_size()});
     // Convert fp32 to int -- for our small numbers < 1e7 this is ok.
-    int num_parviews = xs[0].item<float_net>();                                 SPIEL_CHECK_GT(num_parviews, 0);
-                                                                                SPIEL_CHECK_LT(num_parviews, 1e7);
+    std::array<int, 2> player_parviews = {xs[0].item<int>(),
+                                          xs[1].item<int>()};
+    SPIEL_DCHECK({
+      for (int pl = 0; pl < 2; ++pl) {
+        SPIEL_CHECK_GT(player_parviews[pl], 0);
+        SPIEL_CHECK_LT(player_parviews[pl], 1e7);
+      }
+    });
+    int num_parviews = player_parviews[0] + player_parviews[1];
+
     // FIXME: nice offsets!
-    const int pub_features_offset = 1;
+    const int pub_features_offset = 2;
     torch::Tensor public_features = xs
         // Skip the num_parviews item.
         .index({
@@ -158,7 +166,7 @@ torch::Tensor ParticleValueNet::forward(torch::Tensor xss) {
         })
         .reshape({1, dims->public_features_size});                              CHECK_SHAPE(public_features, {1, dims->public_features_size});
 
-    const int num_parviews_offset = 1 + dims->public_features_size;
+    const int num_parviews_offset = 2 + dims->public_features_size;
     torch::Tensor parviews = xs
         // Skip the num_parviews + public features item.
         .index({
@@ -189,7 +197,8 @@ torch::Tensor ParticleValueNet::forward(torch::Tensor xss) {
 }
 
 torch::Tensor ParticleValueNet::PrepareTarget(BatchData* batch) {
-  torch::Tensor parviews_counts = batch->data.index({Slice(), 0});
+  torch::Tensor parviews_counts =
+      batch->data.index({Slice(), Slice(0, 2)}).sum({1});
 
   std::vector<torch::Tensor> target_slices;
   target_slices.reserve(batch->size());

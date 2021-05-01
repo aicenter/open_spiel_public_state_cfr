@@ -101,8 +101,12 @@ ParticleDataPoint::ParticleDataPoint(const ParticleDims& particle_dims,
                                      torch::Tensor data, torch::Tensor target)
     : DataPoint(data, target), dims(particle_dims) {}
 
-float_net& ParticleDataPoint::num_parviews() {
-  return data_ptr()[num_parviews_offset()];
+float_net& ParticleDataPoint::num_parviews(Player pl) {
+  return data_ptr()[num_parviews_offset() + pl];
+}
+
+int ParticleDataPoint::total_parviews() {
+  return num_parviews(0) + num_parviews(1);
 }
 
 absl::Span<float_net> ParticleDataPoint::public_features() {
