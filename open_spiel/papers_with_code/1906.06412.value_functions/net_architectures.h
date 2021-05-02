@@ -59,6 +59,7 @@ struct PositionalValueNet final : public ValueNet {
 // A particle neural network that uses MLPs for regression and change of basis.
 struct ParticleValueNet final : public ValueNet {
   std::shared_ptr<ParticleDims> dims;
+  bool zero_sum_regression;
   ActivationFunction activation_fn;
   std::vector<torch::nn::Linear> fc_regression;
   std::vector<torch::nn::Linear> fc_basis;
@@ -68,6 +69,7 @@ struct ParticleValueNet final : public ValueNet {
                    size_t num_layers_regression,
                    size_t num_width_regression,
                    size_t num_inputs_regression,
+                   bool zero_sum_regression,
                    ActivationFunction activation = kRelu);
   torch::Tensor forward(torch::Tensor xss) override;
   torch::Tensor PrepareTarget(BatchData* batch) override;
@@ -90,7 +92,7 @@ void InitWeights(torch::nn::Module& m);
 std::shared_ptr<ValueNet> MakeModel(
     NetArchitecture arch, std::shared_ptr<BasicDims> dims,
     int num_layers_regression, int num_width_regression,
-    int num_inputs_regression);
+    int num_inputs_regression, bool zero_sum_regression);
 
 
 }  // namespace papers_with_code

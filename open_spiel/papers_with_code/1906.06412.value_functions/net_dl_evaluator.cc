@@ -55,7 +55,7 @@ void ParticleNetEvaluator::EvaluatePublicState(
   // Input must be batched.
   torch::Tensor input = point.data.to(device_).unsqueeze(/*dim=*/0);
   // The output must be "unbatched".
-  torch::Tensor output = model_->forward(input).squeeze(/*dim=*/0);
+  torch::Tensor output = model_->forward(input);
   SPIEL_DCHECK_EQ(output.sizes().size(), 1);
   SPIEL_DCHECK_EQ(output.size(/*dim=*/0), point.total_parviews());
   point.target.index_put_({Slice(0, point.total_parviews())}, output);
@@ -75,8 +75,10 @@ void PositionalNetEvaluator::EvaluatePublicState(
   PositionalDataPoint point = batch_->point_at(0, *dims_);
   WritePositionalDataPoint(*state, *net_context, *dims_, &point);
 
-  torch::Tensor input = point.data.to(device_);
-  torch::Tensor output = model_->forward(input);
+  // Input must be batched.
+  torch::Tensor input = point.data.to(device_).unsqueeze(/*dim=*/0);
+  // The output must be "unbatched".
+  torch::Tensor output = model_->forward(input).squeeze(/*dim=*/0);
   SPIEL_DCHECK_EQ(output.sizes(), point.target.sizes());
   point.target.copy_(output);
   CopyValuesNetToTree(&point, *state, *net_context);

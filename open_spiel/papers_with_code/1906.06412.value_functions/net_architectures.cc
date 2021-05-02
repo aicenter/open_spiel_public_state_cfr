@@ -88,8 +88,11 @@ ParticleValueNet::ParticleValueNet(std::shared_ptr<ParticleDims> particle_dims,
                                    size_t num_layers_regression,
                                    size_t num_width_regression,
                                    size_t num_inputs_regression,
+                                   bool zero_sum_regression,
                                    ActivationFunction activation)
-    : dims(particle_dims), activation_fn(activation),
+    : dims(particle_dims),
+      zero_sum_regression(zero_sum_regression),
+      activation_fn(activation),
       num_inputs_regression(num_inputs_regression) {
   int num_layers_kernel = 4;
 
@@ -142,7 +145,7 @@ torch::Tensor ParticleValueNet::forward(torch::Tensor xss) {
 
   std::vector<torch::Tensor> out;
   out.reserve(batch_size);
-
+  int total_batch_parviews = 0;
   for (int i = 0; i < batch_size; ++i) {
     torch::Tensor xs = xss[i];                                                  CHECK_SHAPE(xs, {dims->point_input_size()});
     // Convert fp32 to int -- for our small numbers < 1e7 this is ok.
@@ -190,10 +193,26 @@ torch::Tensor ParticleValueNet::forward(torch::Tensor xss) {
     torch::Tensor pooled = pool(cs).unsqueeze(/*dim=*/0);                       CHECK_SHAPE(pooled, {1, pooled_size()});
     torch::Tensor context = torch::cat({pooled, public_features}, /*dim=*/1);   CHECK_SHAPE(context, {1, context_size()});
     torch::Tensor ys = regression(context).expand({num_parviews, -1});          CHECK_SHAPE(ys, {num_parviews, regression_size()});
-    torch::Tensor proj = (ys * bs).sum(/*dim=*/1).unsqueeze(0);                 CHECK_SHAPE(proj, {1, num_parviews});
+    torch::Tensor proj = (ys * bs).sum(/*dim=*/1);                              CHECK_SHAPE(proj, {num_parviews});
+    if (zero_sum_regression) {
+      torch::Tensor ranges1d = ranges.squeeze(/*dim=*/1);                       CHECK_SHAPE(ranges1d, {num_parviews});
+      if (ranges1d.sum().item<float>() == 0) {
+        proj.zero_();
+      } else {
+        // beliefs * values = 0 (because game is zero-sum) and vectors are
+        // therefore perpendicular. If values are off and are not zero-sum,
+        // we project them to the beliefs plane (beliefs are the normal vector).
+        torch::Tensor proj_error = (proj.dot(ranges1d)) / (ranges1d.dot(ranges1d));
+        proj = proj - proj_error * ranges1d;
+      }
+      SPIEL_DCHECK_FLOAT_NEAR((proj.dot(ranges1d)).sum().item<float>(), 0., 1e-6);
+    }
+    SPIEL_CHECK_FALSE(torch::isfinite(proj).logical_not().any().item<bool>());
     out.push_back(proj);
+    total_batch_parviews += num_parviews;
   }
-  return torch::cat(out, /*dim=*/1);
+  torch::Tensor y = torch::cat(out);                                            CHECK_SHAPE(y, {total_batch_parviews});
+  return y;
 }
 
 torch::Tensor ParticleValueNet::PrepareTarget(BatchData* batch) {
@@ -249,7 +268,8 @@ std::shared_ptr<ValueNet> MakeModel(
     std::shared_ptr<BasicDims> dims,
     int num_layers_regression,
     int num_width_regression,
-    int num_inputs_regression
+    int num_inputs_regression,
+    bool zero_sum_regression
 ) {
   SPIEL_CHECK_GE(num_layers_regression, 1);
   SPIEL_CHECK_GE(num_width_regression, 1);
@@ -259,6 +279,7 @@ std::shared_ptr<ValueNet> MakeModel(
       auto model = std::make_shared<ParticleValueNet>(
           particle_dims,
           num_layers_regression, num_width_regression, num_inputs_regression,
+          zero_sum_regression,
           ActivationFunction::kRelu);
       return model;
     }

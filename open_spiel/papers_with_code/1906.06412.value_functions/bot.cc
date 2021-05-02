@@ -181,6 +181,19 @@ int GetParameterValue<int>(const GameParameters& table,
 }
 
 template <>
+bool GetParameterValue<bool>(const GameParameters& table,
+                           const std::string& key,
+                           const bool& default_value) {
+  auto it = table.find(key);
+  if (it == table.end()) return default_value;
+  if (!it->second.has_bool_value()) {
+    SpielFatalError(absl::StrCat(
+        "Parameter '", key, "' should have bool value"));
+  }
+  return it->second.bool_value();
+}
+
+template <>
 std::string GetParameterValue<std::string>(const GameParameters& table,
                                            const std::string& key,
                                            const std::string& default_value) {
@@ -217,6 +230,7 @@ class SherlockBotFactory : public BotFactory {
     int num_width = GetParameterValue(bot_params, "num_width", 3);
     int num_inputs_regression =
         GetParameterValue(bot_params, "num_inputs_regression", 128);
+    bool zero_sum_regression = GetParameterValue(bot_params, "zero_sum_regression", false);
     int cfr_iterations = GetParameterValue(bot_params, "cfr_iterations", kDefaultCfrIterations);
     int max_move_ahead_limit = GetParameterValue(bot_params, "max_move_ahead_limit", 1);
     int max_particles = GetParameterValue(bot_params, "max_particles", 1000);
@@ -246,7 +260,7 @@ class SherlockBotFactory : public BotFactory {
     //
     std::shared_ptr<ValueNet> model = MakeModel(
         NetArchitecture::kParticle,
-        dims, num_layers, num_width, num_inputs_regression);
+        dims, num_layers, num_width, num_inputs_regression, zero_sum_regression);
     LoadNetSnapshot(model, load_from);
     model->eval();  // Set only eval mode.
     //

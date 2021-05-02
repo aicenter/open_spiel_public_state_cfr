@@ -88,6 +88,9 @@ ABSL_FLAG(int, num_width, 3, "Multiplicative constant of the number of neurons "
 ABSL_FLAG(int, num_inputs_regression, 128,
           "Size of the regression input for particle VF. -1 means it will be"
           "the same as max_parviews");
+ABSL_FLAG(bool, zero_sum_regression, false,
+          "Make the regressed values automatically zero-sum through special "
+          "layer (does not introduce any new weights)");
 
 // -- Metrics --
 // FullTrunkExplMetric
@@ -291,10 +294,10 @@ void TrainEvalLoop() {
   }
   //
   std::cout << "# Creating model ..." << std::endl;
-  std::shared_ptr<ValueNet> model = MakeModel(arch, dims,
-                                              absl::GetFlag(FLAGS_num_layers),
-                                              absl::GetFlag(FLAGS_num_width),
-                                              num_inputs_regression);
+  std::shared_ptr<ValueNet> model = MakeModel(
+      arch, dims,
+      absl::GetFlag(FLAGS_num_layers), absl::GetFlag(FLAGS_num_width),
+      num_inputs_regression, absl::GetFlag(FLAGS_zero_sum_regression));
   model->to(device);
   //
   std::cout << "# Creating optimizer ..." << std::endl;
