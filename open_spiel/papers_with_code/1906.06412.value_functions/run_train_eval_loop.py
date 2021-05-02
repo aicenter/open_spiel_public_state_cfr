@@ -1,5 +1,5 @@
 import sys
-import grid_plot.sweep as sweep
+import grid_experiments.run as run
 
 # home = "/storage/praha1/home/sustrmic"
 # backend = "meta"
@@ -63,12 +63,12 @@ def vf_comparison():
     elif param == "seed":
       return list(range(10))
 
-  sweep.run_sweep(backend, backend_params, binary_path,
-                  base_output_dir=f"{home}/experiments/vf_comparison",
-                  base_params=vf_base_params,
-                  comb_params=["arch", "exp_init", "game_name", "depth",
-                               "sparse_particles", "seed"],
-                  comb_param_fn=param_fn)
+  run.sweep(backend, backend_params, binary_path,
+            base_output_dir=f"{home}/experiments/vf_comparison",
+            base_params=vf_base_params,
+            comb_params=["arch", "exp_init", "game_name", "depth",
+                         "sparse_particles", "seed"],
+            comb_param_fn=param_fn)
 
 def sparse_roots():
   base_params = dict(
@@ -131,13 +131,13 @@ def sparse_roots():
     elif param == "seed":
       return list(range(10))
 
-  sweep.run_sweep(backend, backend_params, binary_path,
-                  base_output_dir=f"{home}/experiments/sparse_roots",
-                  base_params={**base_params,
-                               "sparse_prune_chance_histories": "false"},
-                  comb_params=["game_name", "depth", "sparse_roots_depth",
-                               "sparse_support_threshold", "seed"],
-                  comb_param_fn=param_fn)
+  run.sweep(backend, backend_params, binary_path,
+            base_output_dir=f"{home}/experiments/sparse_roots",
+            base_params={**base_params,
+                         "sparse_prune_chance_histories": "false"},
+            comb_params=["game_name", "depth", "sparse_roots_depth",
+                         "sparse_support_threshold", "seed"],
+            comb_param_fn=param_fn)
 
   # Special case for Leduc -- there is a number of highest reachable histories
   # that are only for chance player -- ie there is no player infostate and
@@ -155,13 +155,13 @@ def sparse_roots():
     elif param == "seed":
       return list(range(10))
 
-  sweep.run_sweep(backend, backend_params, binary_path,
-                  base_output_dir=f"{home}/experiments/sparse_roots",
-                  base_params={**base_params,
-                               "sparse_prune_chance_histories": "true"},
-                  comb_params=["game_name", "depth", "sparse_roots_depth",
-                               "sparse_support_threshold", "seed"],
-                  comb_param_fn=special_case)
+  run.sweep(backend, backend_params, binary_path,
+            base_output_dir=f"{home}/experiments/sparse_roots",
+            base_params={**base_params,
+                         "sparse_prune_chance_histories": "true"},
+            comb_params=["game_name", "depth", "sparse_roots_depth",
+                         "sparse_support_threshold", "seed"],
+            comb_param_fn=special_case)
 
 def training_dynamics():
   base_params = dict(
@@ -199,11 +199,11 @@ def training_dynamics():
     elif param == "exp_update":
       return [64, 128, 512, 1024, 2048]
 
-  sweep.run_sweep(backend, backend_params, binary_path,
-                  base_output_dir=f"{home}/experiments/training_dynamics",
-                  base_params=base_params,
-                  comb_params=["exp_loop_new", "exp_update"],
-                  comb_param_fn=param_fn)
+  run.sweep(backend, backend_params, binary_path,
+            base_output_dir=f"{home}/experiments/training_dynamics",
+            base_params=base_params,
+            comb_params=["exp_loop_new", "exp_update"],
+            comb_param_fn=param_fn)
 
 def bootstraped_learning():
   base_params = dict(
@@ -246,17 +246,69 @@ def bootstraped_learning():
       elif param == "seed":
           return list(range(3))
 
-  sweep.run_sweep(backend, backend_params, binary_path,
-                  base_output_dir=f"{home}/experiments/bootstraped_learning",
-                  base_params=base_params,
-                  comb_params=[
-                      "arch", "game_name", "depth", "sparse_particles", "seed"],
-                  comb_param_fn=param_fn)
+  run.sweep(backend, backend_params, binary_path,
+            base_output_dir=f"{home}/experiments/bootstraped_learning",
+            base_params=base_params,
+            comb_params=[
+                "arch", "game_name", "depth", "sparse_particles", "seed"],
+            comb_param_fn=param_fn)
+
+
+
+def snapshot_pbs_training():
+    base_params = dict(
+        arch="particle_vf",
+        batch_size="64",
+        cfr_oracle_iterations="100",
+        depth="7",
+        device="cpu",
+        exp_init="pbs_random",
+        learning_rate="0.001",
+        max_particles="-1",
+        num_inputs_regression="-1",
+        num_layers="5",
+        num_loops="512",
+        num_width="5",
+        optimizer="adam",
+        prob_pure_strat="0.1",
+        prob_fully_mixed=0.05,
+        replay_size="10000",
+        shuffle_input_output="true",
+        train_batches="64",
+        trunk_expl_iterations="100",
+        use_bandits_for_cfr="RegretMatchingPlus",
+        snapshot_loop="64",
+    )
+
+    def param_fn(param, context):
+        if param == "game_name":
+            return ["leduc_poker",
+                    "goofspiel(players=2,num_cards=5,imp_info=True,points_order=descending)"]
+        elif param == "depth":
+            if context["game_name"] == "leduc_poker":
+                return [7]
+            elif "num_cards=5" in context["game_name"]:
+                return [2]
+        elif param == "save_values_policy":
+            return ["current", "average"]
+        elif param == "zero_sum_regression":
+            return ["true", "false"]
+        elif param == "seed":
+            return list(range(5))
+
+    run.sweep(backend, backend_params, binary_path,
+              base_output_dir=f"{home}/experiments/snapshot_pbs_training",
+              base_params=base_params,
+              comb_params=["game_name", "depth", "save_values_policy",
+                           "zero_sum_regression", "seed"],
+              comb_param_fn=param_fn,
+              save_snapshot=True)
 
 EXPERIMENTS_ = dict(vf_comparison=vf_comparison,
                     sparse_roots=sparse_roots,
                     training_dynamics=training_dynamics,
                     bootstraped_learning=bootstraped_learning,
+                    snapshot_pbs_training=snapshot_pbs_training
                     )
 
 if __name__ == '__main__':

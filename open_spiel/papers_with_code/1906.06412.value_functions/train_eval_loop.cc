@@ -76,7 +76,7 @@ ABSL_FLAG(int, max_particles, -1,
           "Max particles to use. Set -1 to find an upper bound automatically.");
 ABSL_FLAG(int, snapshot_loop, -1,
           "When should NN weights be saved to snapshot/ dir? -1 for never.");
-ABSL_FLAG(std::string, snapshot_dir, "snapshots/",
+ABSL_FLAG(std::string, snapshot_dir, "snapshots",
           "Directory to store snapshots of NN weights.");
 
 // -- Network --
@@ -447,7 +447,7 @@ void TrainEvalLoop() {
       }
     }
     if (snapshot_loop > 0 && loop % snapshot_loop == 0) {
-      std::string save_as = absl::StrCat(snapshot_dir, loop, ".model");
+      std::string save_as = absl::StrCat(snapshot_dir, "/", loop, ".model");
       std::cout << "# Saving snapshot of the neural net to "
                 << save_as << std::endl;
       SaveNetSnapshot(model, save_as);
