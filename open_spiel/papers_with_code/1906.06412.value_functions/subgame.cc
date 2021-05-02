@@ -399,7 +399,9 @@ void SubgameSolver::RunSimultaneousIterations(int iterations) {
       BottomUp(*subgame_->trees[pl], bandits_[pl],
                absl::MakeSpan(cf_values_[pl]));
     }
-//    SPIEL_DCHECK_FLOAT_NEAR(RootValue(/*pl=*/0), -RootValue(/*pl=*/1), 1e-6);
+    // Holds for oracle values, but not for the ones coming from NN (not yet).
+//    SPIEL_DCHECK_FLOAT_NEAR(initial_state().Value(0),
+//                            -initial_state().Value(1), 1e-6);
 
     if (init_save_values_ == SaveValuesPolicy::kAveragedCfValues) {
       IncrementallyAverageValuesInInitialState();
