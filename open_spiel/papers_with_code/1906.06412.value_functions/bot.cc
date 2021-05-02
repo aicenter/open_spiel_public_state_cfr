@@ -222,6 +222,7 @@ class SherlockBotFactory : public BotFactory {
     int max_particles = GetParameterValue(bot_params, "max_particles", 1000);
     std::string device_spec = GetParameterValue<std::string>(bot_params, "device", "auto");
     std::string use_bandits_for_cfr = GetParameterValue<std::string>(bot_params, "use_bandits_for_cfr", kDefaultDlCfrBandit);
+    std::string save_values_policy = GetParameterValue<std::string>(bot_params, "save_values_policy", "average");
     std::string game_model = absl::StrCat(game->GetType().short_name, ".model");
     std::string load_from = GetParameterValue<std::string>(bot_params, "load_from", game_model);
 
@@ -245,7 +246,7 @@ class SherlockBotFactory : public BotFactory {
     //
     std::shared_ptr<ValueNet> model = MakeModel(
         NetArchitecture::kParticle,
-        dims.get(), num_layers, num_width, num_inputs_regression);
+        dims, num_layers, num_width, num_inputs_regression);
     LoadNetSnapshot(model, load_from);
     model->eval();  // Set only eval mode.
     //
@@ -256,6 +257,7 @@ class SherlockBotFactory : public BotFactory {
     auto solver_factory = std::make_unique<SolverFactory>();
     solver_factory->cfr_iterations = cfr_iterations;
     solver_factory->use_bandits_for_cfr  = use_bandits_for_cfr;
+    solver_factory->save_values_policy   = GetSaveValuesPolicy(save_values_policy);
     solver_factory->terminal_evaluator   = std::make_shared<TerminalEvaluator>();
     solver_factory->leaf_evaluator = MakeNetEvaluator(
         dims, model, eval_batch, device, nullptr, subgame_factory->hand_observer);

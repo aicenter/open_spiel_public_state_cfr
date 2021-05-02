@@ -60,7 +60,7 @@ void ValueNet::RegisterLayers(const std::vector<torch::nn::Linear>& layers,
 
 // -- PositionalValueNet -------------------------------------------------------
 
-PositionalValueNet::PositionalValueNet(PositionalDims* positional_dims,
+PositionalValueNet::PositionalValueNet(std::shared_ptr<PositionalDims> positional_dims,
                                        size_t num_width_regression,
                                        size_t num_layers_regression,
                                        ActivationFunction activation)
@@ -84,7 +84,7 @@ torch::Tensor PositionalValueNet::forward(torch::Tensor x) {
 
 // -- ParticleValueNet ---------------------------------------------------------
 
-ParticleValueNet::ParticleValueNet(ParticleDims* particle_dims,
+ParticleValueNet::ParticleValueNet(std::shared_ptr<ParticleDims> particle_dims,
                                    size_t num_layers_regression,
                                    size_t num_width_regression,
                                    size_t num_inputs_regression,
@@ -246,7 +246,7 @@ torch::Tensor Activation(ActivationFunction f, torch::Tensor x) {
 }
 std::shared_ptr<ValueNet> MakeModel(
     NetArchitecture arch,
-    BasicDims* dims,
+    std::shared_ptr<BasicDims> dims,
     int num_layers_regression,
     int num_width_regression,
     int num_inputs_regression
@@ -255,7 +255,7 @@ std::shared_ptr<ValueNet> MakeModel(
   SPIEL_CHECK_GE(num_width_regression, 1);
   switch (arch) {
     case NetArchitecture::kParticle: {
-      auto particle_dims = open_spiel::down_cast<ParticleDims*>(dims);
+      auto particle_dims = std::dynamic_pointer_cast<ParticleDims>(dims);
       auto model = std::make_shared<ParticleValueNet>(
           particle_dims,
           num_layers_regression, num_width_regression, num_inputs_regression,
@@ -263,7 +263,7 @@ std::shared_ptr<ValueNet> MakeModel(
       return model;
     }
     case NetArchitecture::kPositional: {
-      auto positional_dims = open_spiel::down_cast<PositionalDims*>(dims);
+      auto positional_dims = std::dynamic_pointer_cast<PositionalDims>(dims);
       return std::make_shared<PositionalValueNet>(
           positional_dims, num_layers_regression, num_width_regression,
           ActivationFunction::kRelu);

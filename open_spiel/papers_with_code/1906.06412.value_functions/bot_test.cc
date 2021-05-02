@@ -47,6 +47,7 @@ void TestBotCanPlayGoofspiel() {
     {"max_particles",          BotParameter(1000)},
     {"device",                 BotParameter("cpu")},
     {"use_bandits_for_cfr",    BotParameter("RegretMatchingPlus")},
+    {"save_values_policy",     BotParameter("average")},
     {"load_from",
      BotParameter(absl::StrCat(current_dir, "/snapshots/iigs3/random.model"))},
   };
