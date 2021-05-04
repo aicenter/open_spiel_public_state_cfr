@@ -20,13 +20,15 @@ namespace open_spiel {
 namespace papers_with_code {
 
 std::unique_ptr<ParticleSet> GenerateParticles(
-    Observation& public_state, int max_particles, int max_rejection_cnt,
-    std::mt19937& rnd_gen) {
-  int num_cards = public_state.Tensor("tie_sequence").size();
-  const auto point_cards = public_state.Tensor("point_card_sequence");
+    Observation& infostate,
+    Player player_hand,
+    int max_particles,
+    int max_rejection_cnt,
+    int infostate_particles,
+    std::mt19937& rnd_gen
+) {
+  const auto point_cards = infostate.Tensor("point_card_sequence");
   int bet_rounds = std::accumulate(point_cards.begin(), point_cards.end(), -1);
-  DimensionedSpan wins = public_state.GetSpan("win_sequence");
-  DimensionedSpan ties = public_state.GetSpan("tie_sequence");
 
   auto set = std::make_unique<ParticleSet>();
   if (bet_rounds == 0) {  // Initial state -- no actions made yet.
@@ -34,6 +36,12 @@ std::unique_ptr<ParticleSet> GenerateParticles(
     return set;
   }
 
+  int num_cards = infostate.Tensor("tie_sequence").size();
+  DimensionedSpan wins = infostate.GetSpan("win_sequence");
+  DimensionedSpan ties = infostate.GetSpan("tie_sequence");
+  DimensionedSpan player_action_sequence = infostate.GetSpan("player_action_sequence");
+
+  SPIEL_CHECK_LE(infostate_particles, max_particles);
   SPIEL_CHECK_GE(bet_rounds, 1);
   SPIEL_CHECK_LE(bet_rounds, num_cards);
   SPIEL_CHECK_EQ(wins.shape[0], num_cards);
@@ -41,7 +49,7 @@ std::unique_ptr<ParticleSet> GenerateParticles(
 
   opr::sat::CpModelBuilder cp_model;
   // Init variables.
-  const opr::Domain cards(1, num_cards);
+  const opr::Domain cards(0, num_cards-1);
   std::array<std::vector<opr::sat::IntVar>, 2> played;
   for (int pl = 0; pl < 2; ++pl) {
     for (int i = 0; i < bet_rounds; ++i) {
@@ -75,19 +83,45 @@ std::unique_ptr<ParticleSet> GenerateParticles(
   while (set->particles.size() < max_particles
       && num_rejected < max_rejection_cnt) {
     opr::sat::CpModelBuilder rnd_model = cp_model;
-    // Add random constraints to generate diverse solutions.
-    // Without this we would get exactly the same solution each call.
+
     for (int i = 0; i < bet_rounds; ++i) {
-      int player = player_dist(rnd_gen);
-      int card = card_dist(rnd_gen);
-      int dir = dir_dist(rnd_gen);
-      opr::sat::IntVar& a = played[player][i];
-      // TODO: make more tuning of the constraints so that we have
-      //       better diversity. Now from 1000 particles ~500 begin with
-      //       first action 1
-      if      (dir == 0) rnd_model.AddLessOrEqual(a, card);
-      else if (dir == 1) rnd_model.AddEquality(a, card);
-      else               rnd_model.AddGreaterOrEqual(a, card);
+      int diverse_player;
+      if (set->particles.size() < infostate_particles) {
+        // Set player's actions.
+        int card = -1;
+        for (int c  = 0; c < num_cards; ++c) {
+          if (player_action_sequence.at(i, c)) card = c;
+        }
+        SPIEL_CHECK_GE(card, 0);
+        SPIEL_CHECK_LT(card, num_cards);
+        rnd_model.AddEquality(played[player_hand][i], card);
+
+        // Randomize only through the opponent.
+        diverse_player = 1 - player_hand;
+      } else {
+        diverse_player = player_dist(rnd_gen);
+      }
+
+      // Add random constraints to generate diverse solutions.
+      // Without this we would get exactly the same solution each call.
+      bool make_diverse_constraints =
+          // Make it easy to generate 1 infostate particle
+          // (no collisions due to diversity constraints).
+          infostate_particles > 1
+          // If we are generating only remaining public state particles,
+          // add diversity constraints.
+          || set->particles.size() >= infostate_particles;
+      if (make_diverse_constraints) {
+        int card = card_dist(rnd_gen);
+        int dir = dir_dist(rnd_gen);
+        opr::sat::IntVar& a = played[diverse_player][i];
+        // TODO: make more tuning of the constraints so that we have
+        //       better diversity. Now from 1000 particles ~500 begin with
+        //       first action 1
+        if      (dir == 0) rnd_model.AddLessOrEqual(a, card);
+        else if (dir == 1) rnd_model.AddEquality(a, card);
+        else               rnd_model.AddGreaterOrEqual(a, card);
+      }
     }
 
     // Solve.
@@ -97,8 +131,8 @@ std::unique_ptr<ParticleSet> GenerateParticles(
       history.reserve(bet_rounds * 2);
       for (int j = 0; j < bet_rounds; ++j) {
         // -1 due to 0-based indexing in the goofspiel game implementation.
-        history.push_back(SolutionIntegerValue(response, played[0][j]) - 1);
-        history.push_back(SolutionIntegerValue(response, played[1][j]) - 1);
+        history.push_back(SolutionIntegerValue(response, played[0][j]));
+        history.push_back(SolutionIntegerValue(response, played[1][j]));
       }
       // (Possibly) increases particles size.
       if (set->has(history)) {

@@ -45,9 +45,9 @@ class SherlockBot : public Bot {
     // These should be provided by the referee at some point,
     // not accessed from the perfect-information State.
     std::cout << "# Make observations\n";
-    Observation public_observation(*subgame_factory_->game,
-                                   subgame_factory_->public_observer);
-    public_observation.SetFrom(state, 0);
+    Observation infostate_observation(*subgame_factory_->game,
+                                      subgame_factory_->infostate_observer);
+    infostate_observation.SetFrom(state, player_id_);
     const std::string infostate =
         subgame_factory_->infostate_observer->StringFrom(state, player_id_);
     // const std::vector<Action> legal_actions = state.LegalActions(player_id_);
@@ -60,20 +60,18 @@ class SherlockBot : public Bot {
     // TODO: keep particles from previous step along with beliefs.
     //       Currently can work only for one-step lookahead trees.
 
-    // TODO(for michal): Make sure there are some particles consistent also
-    //                   with the current infostate! Not needed if we store
-    //                   all particles between Step() calls.
     std::cout << "# Generate particles for current public state\n";
-    std::unique_ptr<ParticleSet> set = GenerateParticles(public_observation,
-                      subgame_factory_->max_particles,
-                      subgame_factory_->max_particles,
-                      rnd_gen_);
-    if (set->particles.empty()) {
-      std::cout << "# No particles found! Playing randomly.\n";
-      double p = std::uniform_real_distribution<>(0., 1.)(rnd_gen_);
-      std::pair<Action, double> outcome = SampleAction(uniform_actions, p);
-      return outcome.first;
-    }
+    std::unique_ptr<ParticleSet> set = GenerateParticles(
+        infostate_observation,
+        player_id_,
+        subgame_factory_->max_particles,
+        subgame_factory_->max_particles,
+        // Make sure we always have 1 particle in the current infostate.
+        // Using this removes the strong global consistency guarantee,
+        // but it makes the algorithm always capable of playing the game.
+        /*infostate_particles=*/1,
+        rnd_gen_);
+    SPIEL_CHECK_FALSE(set->particles.empty());
 
     std::cout << "# Making subgame\n";
     std::shared_ptr<Subgame> subgame = subgame_factory_->MakeSubgame(*set);

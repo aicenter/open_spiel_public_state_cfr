@@ -34,10 +34,13 @@ namespace papers_with_code {
 namespace opr = operations_research;
 
 // Implemented only for imp. info GoofSpiel.
-std::unique_ptr<ParticleSet> GenerateParticles(Observation& public_state,
-                                               int max_particles,
-                                               int max_rejection_cnt,
-                                               std::mt19937& rnd_gen);
+std::unique_ptr<ParticleSet> GenerateParticles(
+    Observation& infostate,
+    Player player_hand,
+    int max_particles,
+    int max_rejection_cnt,
+    int infostate_particles,
+    std::mt19937& rnd_gen);
 
 
 } // namespace papers_with_code

@@ -25,12 +25,12 @@ namespace {
 void TestGenerateParticles() {
   std::shared_ptr<const Game> game = LoadGame(
       "goofspiel(imp_info=true,players=2,points_order=descending,num_cards=3)");
-  auto observer = game->MakeObserver(kPublicStateObsType, {});
+  auto observer = game->MakeObserver(kInfoStateObsType, {});
   auto observation = Observation(*game, observer);
   std::mt19937 rnd_gen;
   auto check_particle_count = [&](const State& s, int expected_count) {
     observation.SetFrom(s, 0);
-    auto particle_set = GenerateParticles(observation, 1000, 1000, rnd_gen);
+    auto particle_set = GenerateParticles(observation, 0, 1000, 1000, 0, rnd_gen);
     SPIEL_CHECK_EQ(particle_set->particles.size(), expected_count);
   };
 
@@ -56,8 +56,11 @@ void TestGenerateParticles() {
 void ShowParticleDiversity() {
   std::shared_ptr <const Game> game = LoadGame(
       "goofspiel(imp_info=true,players=2,points_order=descending,num_cards=13)");
-  auto observer = game->MakeObserver(kPublicStateObsType, {});
-  auto observation = Observation(*game, observer);
+  auto infostate_observer = game->MakeObserver(kInfoStateObsType, {});
+  auto infostate_observation = Observation(*game, infostate_observer);
+  auto public_observer = game->MakeObserver(kPublicStateObsType, {});
+  auto public_observation = Observation(*game, public_observer);
+  const int player = 0;
   std::mt19937 rnd_gen;
 
   auto state = game->NewInitialState();
@@ -67,14 +70,22 @@ void ShowParticleDiversity() {
   state->ApplyActions({7, 10});
   state->ApplyActions({12, 0});
   state->ApplyActions({8, 4});
-  observation.SetFrom(*state, 0);
+  infostate_observation.SetFrom(*state, player);
+  public_observation.SetFrom(*state, 0);
 
   const absl::Time start = absl::Now();
-  auto particle_set = GenerateParticles(observation, 1000, 1000, rnd_gen);
+  auto particle_set = GenerateParticles(infostate_observation, player,
+                                        1000, 1000, 1, rnd_gen);
   const absl::Time end = absl::Now();
   const double milis = absl::ToDoubleMilliseconds(end - start);
 
-  for (auto& particle: particle_set->particles) std::cout << particle << "\n";
+  auto particle_observation = public_observation;
+  for (auto& particle: particle_set->particles) {
+    std::cout << particle << "\n";
+    auto particle_state = particle.MakeState(*game);
+    particle_observation.SetFrom(*particle_state, 0);
+    SPIEL_CHECK_EQ(particle_observation.Tensor(), public_observation.Tensor());
+  }
   std::cout << "Generated " << particle_set->particles.size()
             << " particles in " << milis << "ms";
 }
