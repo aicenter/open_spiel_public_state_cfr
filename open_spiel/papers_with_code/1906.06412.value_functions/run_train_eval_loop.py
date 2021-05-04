@@ -206,17 +206,17 @@ def training_dynamics():
             comb_param_fn=param_fn)
 
 def bootstraped_learning():
+  loop_new = 512
   base_params = dict(
       batch_size=64,
       cfr_oracle_iterations=100,
       exp_init="bootstrap",
       exp_loop="bootstrap",
-      exp_loop_new=256,
+      exp_loop_new=loop_new,
       exp_update_size=-1,
       max_particles=-1,
       num_inputs_regression=-1,
       num_layers=5,
-      num_loops=2304,
       num_width=5,
       prob_pure_strat=0.1,
       replay_size=10000,
@@ -225,33 +225,37 @@ def bootstraped_learning():
       train_batches=64,
       trunk_expl_iterations=100,
       use_bandits_for_cfr="RegretMatchingPlus",
+      snapshot_loop="256",
+      exp_reset_nn="true",
+      bootstrap_reset_nn="true",
+      save_values_policy="average",
+      zero_sum_regression="true",
+      arch="particle_vf"
   )
   def param_fn(param, context):
-      if param == "arch":
-          return ["positional_vf", "particle_vf"]
-      elif param == "game_name":
+      if param == "game_name":
           return ["leduc_poker",
-                  #"goofspiel(players=2,num_cards=5,imp_info=True,points_order=descending)"
+                  "goofspiel(players=2,num_cards=5,imp_info=True,points_order=descending)"
                  ]
       elif param == "depth":
           if context["game_name"] == "leduc_poker":
               return [7]
           elif "num_cards=5" in context["game_name"]:
               return [2]
-      elif param == "sparse_particles":
+      elif param == "num_loops":
           if context["game_name"] == "leduc_poker":
-              return list(range(5, 31, 5))
-          if "num_cards=5" in context["game_name"]:
-              return list(range(20, 290, 25)) + [290]
+              return [9*loop_new]
+          elif "num_cards=5" in context["game_name"]:
+              return [3*loop_new]
       elif param == "seed":
-          return list(range(3))
+          return list(range(5))
 
   run.sweep(backend, backend_params, binary_path,
             base_output_dir=f"{home}/experiments/bootstraped_learning",
             base_params=base_params,
-            comb_params=[
-                "arch", "game_name", "depth", "sparse_particles", "seed"],
-            comb_param_fn=param_fn)
+            comb_params=["game_name", "depth", "num_loops", "seed"],
+            comb_param_fn=param_fn,
+            save_snapshot=True)
 
 
 

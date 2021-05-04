@@ -80,9 +80,10 @@ def plot_bootstrap(axes, params, data):
 
 
 def plot_cell(axes, params, data):
-    print(params)
     for zero_sum, df in data:
-        axes[0, 0].semilogy(df.loop, df["expl[100]"],
+        end = df["expl[100]"].tail(1).values[0]
+        print(zero_sum, (df["expl[100]"] - end).loc[[0, 128, 256, 400, 500]])
+        axes[0, 0].plot(df.loop, df["expl[100]"] - end,
                             label=f"zero_sum={zero_sum} expl", alpha=1)
         axes[1, 0].semilogy(df.loop, df.avg_loss,
                             label=f"zero_sum={zero_sum} mse loss", alpha=1)

@@ -85,6 +85,12 @@ void RegretMatching::Reset() {
 
 // -- RegretMatchingPlus -------------------------------------------------------
 
+// RM uses x+ = max(0, x), this constant sets this to 1e-5
+constexpr double kRegretMatchingMinRegret = 1e-5;
+// Pure strategies with prob smaller than this c are cut off
+// and probs are normalized.
+constexpr double kRegretMatchingAvgStratCutoff = 1e-2;
+
 RegretMatchingPlus::RegretMatchingPlus(int num_actions)
     : Bandit(num_actions),
       cumulative_regrets_(num_actions, 0.),
@@ -93,14 +99,14 @@ RegretMatchingPlus::RegretMatchingPlus(int num_actions)
 void RegretMatchingPlus::ComputeStrategy(size_t current_time, double weight) {
   double positive_regrets_sum = 0.;
   for (double regret : cumulative_regrets_) {
-    positive_regrets_sum += regret > 0. ? regret : 0.;
+    positive_regrets_sum += regret > kRegretMatchingMinRegret ? regret : 0.;
   }
 
   if (positive_regrets_sum) {
     for (int i = 0; i < num_actions(); ++i) {
       const double regret = cumulative_regrets_[i];
       current_strategy_[i] =
-          (regret > 0. ? regret : 0.) / positive_regrets_sum;
+          (regret > kRegretMatchingMinRegret ? regret : 0.) / positive_regrets_sum;
     }
   } else {
     for (int i = 0; i < num_actions(); ++i) {
@@ -134,6 +140,26 @@ std::vector<double> RegretMatchingPlus::AverageStrategy() const {
   if (normalization) {
     for (int i = 0; i < num_actions(); ++i) {
       strategy.push_back(cumulative_strategy_[i] / normalization);
+    }
+    double redistribute = 0.;
+    double zeroed_actions = 0.;
+    for (int i = 0; i < num_actions(); ++i) {
+      if (strategy[i] < kRegretMatchingAvgStratCutoff) {
+        redistribute += strategy[i];
+        zeroed_actions += 1;
+        strategy[i] = 0;
+      }
+    }
+    int num_redistribute = num_actions() - zeroed_actions;
+    if (num_redistribute > 0) {
+      for (int i = 0; i < num_actions(); ++i) {
+        if (strategy[i] > 0.) {
+          if (num_redistribute > 1)
+            strategy[i] += redistribute / num_redistribute;
+          else
+            strategy[i] = 1.;  // Avoid imprecise values like 0.99999999999998
+        }
+      }
     }
   } else {
     for (int i = 0; i < num_actions(); ++i) {

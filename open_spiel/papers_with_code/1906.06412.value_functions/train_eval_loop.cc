@@ -56,6 +56,8 @@ ABSL_FLAG(bool, exp_reset_nn, false,
 ABSL_FLAG(bool, bootstrap_reset_nn, false,
           "Should the neural net be reset and trained from scratch, "
           "when final bootstrap is made?");
+ABSL_FLAG(int, bootstrap_from_move, 1,
+          "From what depth should the bootstrapping happen?");
 ABSL_FLAG(int, cfr_iterations, 100,
           "Number of iterations with value function (used in bootstrapping).");
 ABSL_FLAG(int, max_move_ahead_limit, 1, "Size of the lookahead tree.");
@@ -393,21 +395,13 @@ void TrainEvalLoop() {
   //
   if (exp_loop == kBootstrap) {
     SPIEL_CHECK_EQ(exp_init, kBootstrap);
-    // First loop is not "regenerated" -- it is initialized.
+    // Number of times the experience should be regenerated.
     const int num_regenerations = num_loops / exp_loop_new;
-    // Skips root (move_number=0) and terminals (move_number=max):
-    // - computing root is unnecessary for bootstrapping.
-    // - terminals can be initialized using a custom exp_init.
-    const int bootstrap_depths = subgame_factory.game->MaxMoveNumber() - 2;
-    std::cout << "# Num regeneration steps: " << num_regenerations << "\n";
-    std::cout << "# Bootstrap depths: " << bootstrap_depths << "\n";
-    SPIEL_CHECK_EQ(bootstrap_depths, num_regenerations);
-
     // Bootstrap replay must hold all created experiences,
     // i.e. from initialization as well as from regeneration.
     const int bootstrap_size = exp_update_size * num_regenerations;
 
-    std::cout << "# Bootstrap size: " << bootstrap_size << "\n";
+    std::cout << "# Number of regenerations: " << num_regenerations << "\n";
     std::cout << "# Will be bootstrapping using replay of size: "
               << bootstrap_size << "\n"
               << "# Allocating bootstrap replay ("
@@ -417,9 +411,8 @@ void TrainEvalLoop() {
               << " MB) ..." << std::endl;
     filler.bootstrap = std::make_unique<ExperienceReplay>(
         bootstrap_size, dims->point_input_size(), dims->point_output_size());
-    // This is decremented before creating experience, so is not at terminals,
-    // but just above them.
-    filler.bootstrap_move_number = subgame_factory.game->MaxMoveNumber();
+    // This is decremented before creating experience, so make + 1.
+    filler.bootstrap_move_number = absl::GetFlag(FLAGS_bootstrap_from_move) + 1;
   }
   //
   const int snapshot_loop = absl::GetFlag(FLAGS_snapshot_loop);
@@ -479,12 +472,7 @@ void TrainEvalLoop() {
     if (!filler.bootstrap->IsAtBeginning()) {
       // Don't put a CHECK here, because this may happen after hours of training
       // :'-)
-      std::cout << "# WARN: bootstrap replay may not be properly filled.\n";
-    }
-    if (filler.bootstrap_move_number != 1) {
-      std::cout << "# WARN: bootstrap depth != 1 -- bootstrapping may have "
-                   "skipped over some depths. (was " << filler.bootstrap_move_number
-                << ")\n";
+      std::cout << "# WARN: bootstrap replay may not be properly filled !!\n";
     }
     std::cout << "# Finished bootstrapped training.\n";
     std::cout << "# Retraining the final network.\n" << std::endl;
