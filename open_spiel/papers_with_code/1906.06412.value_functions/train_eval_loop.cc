@@ -433,6 +433,13 @@ void TrainEvalLoop() {
   std::cout << std::endl;
   //
   for (int loop = 0; loop < num_loops; ++loop) {
+    if (snapshot_loop > 0 && (loop+1) % snapshot_loop == 0) {
+      std::string save_as = absl::StrCat(snapshot_dir, "/", loop, ".model");
+      std::cout << "# Saving snapshot of the neural net to "
+                << save_as << std::endl;
+      SaveNetSnapshot(model, save_as);
+    }
+    //
     if (loop % exp_loop_new == 0) {
       if (loop == 0) {
         std::cout << "# Initializing experience replay." << std::endl;
@@ -440,17 +447,11 @@ void TrainEvalLoop() {
       } else {
         filler.CreateExperiences(exp_loop, exp_update_size);
       }
-
+      // Reset must come after experience creation!
       if (exp_reset_nn) {
         std::cout << "# Resetting net weights with random init." << std::endl;
         model->apply(InitWeights);
       }
-    }
-    if (snapshot_loop > 0 && loop % snapshot_loop == 0) {
-      std::string save_as = absl::StrCat(snapshot_dir, "/", loop, ".model");
-      std::cout << "# Saving snapshot of the neural net to "
-                << save_as << std::endl;
-      SaveNetSnapshot(model, save_as);
     }
 
     std::cout << "# Training  ";
@@ -495,6 +496,12 @@ void TrainEvalLoop() {
     }
 
     for (int loop = num_loops; loop < 2*num_loops; ++loop) {
+      if (snapshot_loop > 0 && (loop+1) % snapshot_loop == 0) {
+        std::string save_as = absl::StrCat(snapshot_dir, "/", loop, ".model");
+        std::cout << "# Saving snapshot of the neural net to "
+                  << save_as << std::endl;
+        SaveNetSnapshot(model, save_as);
+      }
       // Do not make any new data this time.
       std::cout << "# Training  ";
       model->train();  // Train mode.
