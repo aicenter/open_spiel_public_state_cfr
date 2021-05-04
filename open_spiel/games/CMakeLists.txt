@@ -319,6 +319,7 @@ add_test(go_test go_test)
 
 add_executable(goofspiel_test goofspiel_test.cc ${OPEN_SPIEL_OBJECTS}
                $<TARGET_OBJECTS:tests>)
+target_link_libraries(goofspiel_test ${ORTOOLS_LIBS})
 add_test(goofspiel_test goofspiel_test)
 
 add_executable(havannah_test havannah_test.cc ${OPEN_SPIEL_OBJECTS}

@@ -191,16 +191,17 @@ add_library(open_spiel_core OBJECT ${OPEN_SPIEL_CORE_FILES})
 target_include_directories (
   open_spiel_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} abseil-cpp)
 link_libraries(open_spiel_core
-  absl::container
-  absl::flags
-  absl::flags_parse
-  absl::flat_hash_map
-  absl::optional
-  absl::random_random
-  absl::str_format
-  absl::strings
-  absl::time
-)
+        absl::container
+        absl::flags
+        absl::flags_parse
+        absl::flat_hash_map
+        absl::optional
+        absl::random_random
+        absl::str_format
+        absl::strings
+        absl::time
+        )
+
 
 # Just the minimal base library: no games.
 set (OPEN_SPIEL_CORE_OBJECTS $<TARGET_OBJECTS:open_spiel_core>)
@@ -213,7 +214,27 @@ set (OPEN_SPIEL_OBJECTS
   $<TARGET_OBJECTS:algorithms>
   $<TARGET_OBJECTS:utils>
   $<TARGET_OBJECTS:tests>
+  $<TARGET_OBJECTS:open_spiel_ortools>
 )
+if (BUILD_WITH_ORTOOLS)
+  # Compile with OR-Tools headers and link against binary distribution,
+  # downloaded from https://developers.google.com/optimization/install/cpp/linux
+  # and assumed to be in $HOME/or-tools.
+  # The flags were taken from the compilation of linear_programming.cc after
+  # running make test_cc.
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_BOP -DUSE_GLOP -DUSE_CBC -DUSE_CLP -DUSE_SCIP")
+  set(ORTOOLS_HOME "${CMAKE_CURRENT_SOURCE_DIR}/ortools")
+  set(ORTOOLS_INC_DIRS ${ORTOOLS_HOME} ${ORTOOLS_HOME}/include)
+  set(ORTOOLS_LIB_DIRS ${ORTOOLS_HOME}/lib ${ORTOOLS_HOME}/lib64)
+  set(ORTOOLS_LIBS z rt pthread ortools)
+  set_target_properties(open_spiel_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
+  include_directories(${ORTOOLS_INC_DIRS})
+  link_directories(${ORTOOLS_LIB_DIRS})
+  link_libraries(${ORTOOLS_LIBS})
+
+  # Use following to link your_target_executable with OrTools libraries:
+  # target_link_libraries(your_target_executable ${ORTOOLS_LIBS})
+endif()
 if (BUILD_WITH_HANABI)
   set(OPEN_SPIEL_OBJECTS ${OPEN_SPIEL_OBJECTS}
       $<TARGET_OBJECTS:hanabi_learning_environment>)
@@ -261,23 +282,6 @@ if (BUILD_WITH_LIBTORCH)
 endif()
 if (BUILD_WITH_GAMUT)
   set(OPEN_SPIEL_OBJECTS ${OPEN_SPIEL_OBJECTS} $<TARGET_OBJECTS:gamut>)
-endif()
-if (BUILD_WITH_ORTOOLS)
-  # Compile with OR-Tools headers and link against binary distribution,
-  # downloaded from https://developers.google.com/optimization/install/cpp/linux
-  # and assumed to be in $HOME/or-tools.
-  # The flags were taken from the compilation of linear_programming.cc after
-  # running make test_cc.
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_BOP -DUSE_GLOP -DUSE_CBC -DUSE_CLP -DUSE_SCIP")
-  set(ORTOOLS_HOME "${CMAKE_CURRENT_SOURCE_DIR}/ortools")
-  set(ORTOOLS_INC_DIRS ${ORTOOLS_HOME} ${ORTOOLS_HOME}/include)
-  set(ORTOOLS_LIB_DIRS ${ORTOOLS_HOME}/lib ${ORTOOLS_HOME}/lib64)
-  set(ORTOOLS_LIBS z rt pthread ortools)
-  set_target_properties(open_spiel_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
-  include_directories(${ORTOOLS_INC_DIRS})
-  link_directories(${ORTOOLS_LIB_DIRS})
-  # Use following to link your_target_executable with OrTools libraries:
-  # target_link_libraries(your_target_executable ${ORTOOLS_LIBS})
 endif()
 if (BUILD_WITH_TENSORFLOW_CC)
   add_compile_definitions(BUILD_WITH_TENSORFLOW_CC)

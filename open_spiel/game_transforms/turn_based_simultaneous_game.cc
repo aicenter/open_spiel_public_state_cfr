@@ -151,15 +151,25 @@ std::vector<double> TurnBasedSimultaneousState::Returns() const {
 
 std::unique_ptr<State> TurnBasedSimultaneousState::ResampleFromInfostate(
     int player_id, std::function<double()> rng) const {
-  std::unique_ptr<State> state_resampled =
-      state_->ResampleFromInfostate(player_id, rng);
-  auto state_wrapped =
-      std::make_unique<TurnBasedSimultaneousState>(game_, std::move(state_resampled));
-  // Copy any actions made so far in turn-based game.
-  state_wrapped->action_vector_ = action_vector_;
-  state_wrapped->current_player_ = current_player_;
-  state_wrapped->rollout_mode_ = rollout_mode_;
-  return state_wrapped;
+  // Implemented for only here.
+  SPIEL_CHECK_EQ(game_->GetType().long_name, "Turn-based Goofspiel");
+
+  if (player_id == 1) {
+    return Clone();  // Fuck this shit. Due to turn-based games magic resampling
+                     // may produce inconsistent states that will blow up later.
+                     // Just ignore it for PL1.
+  } else {
+    std::unique_ptr<State> state_resampled =
+        state_->ResampleFromInfostate(player_id, rng);
+    auto state_wrapped =
+        std::make_unique<TurnBasedSimultaneousState>(game_,
+                                                     std::move(state_resampled));
+    // Copy any actions made so far in turn-based game.
+    state_wrapped->action_vector_ = action_vector_;
+    state_wrapped->current_player_ = current_player_;
+    state_wrapped->rollout_mode_ = rollout_mode_;
+    return state_wrapped;
+  }
 }
 
 std::string TurnBasedSimultaneousState::InformationStateString(
