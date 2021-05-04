@@ -149,6 +149,19 @@ std::vector<double> TurnBasedSimultaneousState::Returns() const {
   return state_->Returns();
 }
 
+std::unique_ptr<State> TurnBasedSimultaneousState::ResampleFromInfostate(
+    int player_id, std::function<double()> rng) const {
+  std::unique_ptr<State> state_resampled =
+      state_->ResampleFromInfostate(player_id, rng);
+  auto state_wrapped =
+      std::make_unique<TurnBasedSimultaneousState>(game_, std::move(state_resampled));
+  // Copy any actions made so far in turn-based game.
+  state_wrapped->action_vector_ = action_vector_;
+  state_wrapped->current_player_ = current_player_;
+  state_wrapped->rollout_mode_ = rollout_mode_;
+  return state_wrapped;
+}
+
 std::string TurnBasedSimultaneousState::InformationStateString(
     Player player) const {
   SPIEL_CHECK_GE(player, 0);

@@ -53,6 +53,8 @@ class TurnBasedSimultaneousState : public State {
                          absl::Span<float> values) const override;
   std::unique_ptr<State> Clone() const override;
   std::vector<std::pair<Action, double>> ChanceOutcomes() const override;
+  std::unique_ptr<State> ResampleFromInfostate(int player_id,
+                                               std::function<double()> rng) const override;
 
   // Access to the wrapped state, used for debugging and in the tests.
   const State* SimultaneousGameState() const { return state_.get(); }
