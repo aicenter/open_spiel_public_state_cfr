@@ -40,6 +40,10 @@ class SherlockBot : public Bot {
       rnd_gen_(seed) {}
 
   Action Step(const State& state) override {
+    return StepWithPolicy(state).second;
+  }
+
+  std::pair<ActionsAndProbs, Action> StepWithPolicy(const State& state) override {
     SPIEL_CHECK_TRUE(state.IsPlayerActing(player_id_));
 
     // These should be provided by the referee at some point,
@@ -73,6 +77,14 @@ class SherlockBot : public Bot {
         rnd_gen_);
     SPIEL_CHECK_FALSE(set->particles.empty());
 
+    // TODO: proper management of beliefs between steps. This is just
+    //       a dummy initialization.
+    for (auto& particle: set->particles) {
+      particle.chance_reach = 1.;
+      particle.player_reach[0] = 1.;
+      particle.player_reach[1] = 1.;
+    }
+
     std::cout << "# Making subgame\n";
     std::shared_ptr<Subgame> subgame = subgame_factory_->MakeSubgame(*set);
     // TODO: implement continual resolving.
@@ -104,15 +116,11 @@ class SherlockBot : public Bot {
     auto policy = std::make_shared<algorithms::BanditsAveragePolicy>(
         subgame->trees, solver->bandits());
     ActionsAndProbs actions_and_probs = policy->GetStatePolicy(infostate);
-    if (actions_and_probs.empty()) {
-      std::cout << "# Infostate not found! Playing randomly.\n";
-      actions_and_probs = uniform_actions;
-    }
+    SPIEL_CHECK_FALSE(actions_and_probs.empty());
 
-//    std::cout << "# Found strategy: " << actions_and_probs << "\n";
     double p = std::uniform_real_distribution<>(0., 1.)(rnd_gen_);
     std::pair<Action, double> outcome = SampleAction(actions_and_probs, p);
-    return outcome.first;
+    return {actions_and_probs, outcome.first};
   }
 
   // Not implemented yet.
@@ -142,10 +150,6 @@ class SherlockBot : public Bot {
   }
   ActionsAndProbs GetPolicy(const State& state) override {
     return Bot::GetPolicy(state);
-  }
-  std::pair<ActionsAndProbs,
-            Action> StepWithPolicy(const State& state) override {
-    return Bot::StepWithPolicy(state);
   }
 };
 

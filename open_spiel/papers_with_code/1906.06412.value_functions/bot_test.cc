@@ -65,12 +65,16 @@ void TestBotCanPlayGoofspiel() {
     std::cout << "New game:";
     std::unique_ptr<State> state = game->NewInitialState();
     while (!state->IsTerminal()) {
-      std::vector<Action> actions = {
-          bots[0]->Step(*state),
-          bots[1]->Step(*state),
+      std::vector<std::pair<ActionsAndProbs, Action>> steps {
+          bots[0]->StepWithPolicy(*state),
+          bots[1]->StepWithPolicy(*state),
       };
+      std::vector<Action> actions = {steps[0].second, steps[1].second};
       state->ApplyActions(actions);
-      std::cout << "Played: " << actions << "\n";
+      std::cout << "Played: " << actions << " with probs: \n";
+      std::cout << "PL0: " << GetProbs(steps[0].first) << "\n";
+      std::cout << "PL1: " << GetProbs(steps[1].first) << "\n";
+
     }
     std::cout << "Outcome: " << state->Returns() << "\n";
     std::cout << "---\n";
