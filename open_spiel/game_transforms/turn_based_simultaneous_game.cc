@@ -278,6 +278,34 @@ TurnBasedSimultaneousGame::TurnBasedSimultaneousGame(
            ConvertParams(game->GetType(), game->GetParameters())),
       game_(game) {}
 
+class TurnBasedSimultaneousObserver : public Observer {
+  std::shared_ptr<Observer> observer_;
+ public:
+  TurnBasedSimultaneousObserver(const std::shared_ptr<Observer>& observer)
+      : Observer(observer->HasString(), observer->HasTensor()),
+        observer_(observer) {}
+  void WriteTensor(const State& state,
+                   Player player,
+                   Allocator* allocator) const override {
+    const TurnBasedSimultaneousState& turn_state =
+        open_spiel::down_cast<const TurnBasedSimultaneousState&>(state);
+    return observer_->WriteTensor(*turn_state.state_, player, allocator);
+  }
+  std::string StringFrom(const State& state, Player player) const override {
+    const TurnBasedSimultaneousState& turn_state =
+        open_spiel::down_cast<const TurnBasedSimultaneousState&>(state);
+    return observer_->StringFrom(*turn_state.state_, player);
+  }
+};
+
+std::shared_ptr<Observer> TurnBasedSimultaneousGame::MakeObserver(
+    absl::optional<IIGObservationType> iig_obs_type,
+    const GameParameters& params) const {
+  return std::make_shared<TurnBasedSimultaneousObserver>(
+      game_->MakeObserver(iig_obs_type, params));
+}
+
+
 std::shared_ptr<const Game> ConvertToTurnBased(const Game& game) {
   SPIEL_CHECK_EQ(game.GetType().dynamics, GameType::Dynamics::kSimultaneous);
   return std::shared_ptr<const TurnBasedSimultaneousGame>(

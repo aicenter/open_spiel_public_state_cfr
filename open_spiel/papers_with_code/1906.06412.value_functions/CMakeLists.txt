@@ -5,6 +5,8 @@ add_library(paper_value_functions OBJECT
   experience_replay.h
   hand_table.cc
   hand_table.h
+  ismcts_playthroughs.cc
+  ismcts_playthroughs.h
   metrics.cc
   metrics.h
   net_architectures.cc
@@ -47,6 +49,8 @@ add_paper_executable(bot_test bot_test.cc)
 add_test(bot_test bot_test)
 add_paper_executable(hand_table_test hand_table_test.cc)
 add_test(hand_table_test hand_table_test)
+add_paper_executable(ismcts_playthroughs_test ismcts_playthroughs_test.cc)
+add_test(ismcts_playthroughs_test ismcts_playthroughs_test)
 add_paper_executable(particle_regeneration_test particle_regeneration_test.cc)
 add_test(particle_regeneration_test particle_regeneration_test)
 add_paper_executable(subgame_test subgame_test.cc)

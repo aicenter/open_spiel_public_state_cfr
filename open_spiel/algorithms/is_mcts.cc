@@ -199,11 +199,18 @@ std::unique_ptr<State> ISMCTSBot::ISMCTSBot::SampleRootState(
 
 ISMCTSNode* ISMCTSBot::CreateNewNode(const State& state) {
   auto infostate_key = GetStateKey(state);
-  node_pool_.push_back(std::unique_ptr<ISMCTSNode>(new ISMCTSNode));
-  ISMCTSNode* node = node_pool_.back().get();
-  nodes_[infostate_key] = node;
+  Observation infostate_obs(*state.GetGame(),
+                            state.GetGame()->MakeObserver(kInfoStateObsType, {}));
+  infostate_obs.SetFrom(state, state.CurrentPlayer());
+  auto node = std::make_unique<ISMCTSNode>(infostate_obs);
   node->total_visits = kUnexpandedVisitCount;
-  return node;
+  node->move_number = state.MoveNumber();
+  node->player = state.CurrentPlayer();
+
+  node_pool_.push_back(std::move(node));
+  ISMCTSNode* node_ptr = node_pool_.back().get();
+  nodes_[infostate_key] = node_ptr;
+  return node_ptr;
 }
 
 ISMCTSNode* ISMCTSBot::LookupNode(const State& state) {

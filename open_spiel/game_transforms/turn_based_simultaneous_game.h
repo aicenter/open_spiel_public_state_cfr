@@ -34,6 +34,8 @@
 
 namespace open_spiel {
 
+class TurnBasedSimultaneousObserver;
+
 class TurnBasedSimultaneousState : public State {
  public:
   TurnBasedSimultaneousState(std::shared_ptr<const Game> game,
@@ -66,7 +68,7 @@ class TurnBasedSimultaneousState : public State {
  private:
   void DetermineWhoseTurn();
   void RolloutModeIncrementCurrentPlayer();
-
+  friend TurnBasedSimultaneousObserver;
   std::unique_ptr<State> state_;
 
   // A vector of actions that is used primarily to store the intermediate
@@ -114,6 +116,8 @@ class TurnBasedSimultaneousGame : public Game {
   int MaxChanceNodesInHistory() const override {
     return game_->MaxChanceNodesInHistory();
   }
+  std::shared_ptr<Observer> MakeObserver(absl::optional<IIGObservationType> iig_obs_type,
+                                         const GameParameters& params) const override;
 
  private:
   std::shared_ptr<const Game> game_;

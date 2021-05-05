@@ -55,6 +55,11 @@ struct ChildInfo {
 struct ISMCTSNode {
   absl::flat_hash_map<Action, ChildInfo> child_info;
   int total_visits;
+  Observation infostate_observation;
+  int move_number;
+  int player;
+  ISMCTSNode(Observation infostate_observation)
+      : infostate_observation(infostate_observation) {}
 };
 
 class ISMCTSBot : public Bot {
@@ -95,7 +100,9 @@ class ISMCTSBot : public Bot {
   // Bot maintains no history, so these are empty.
   void Restart() override {}
   void RestartAt(const State& state) override {}
-
+  std::vector<std::unique_ptr<ISMCTSNode>>& node_pool() {
+    return  node_pool_;
+  }
  private:
   void Reset();
   double RandomNumber();
