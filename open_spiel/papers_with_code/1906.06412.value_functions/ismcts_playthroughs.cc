@@ -22,6 +22,8 @@ namespace papers_with_code {
 void IsmctsPlaythroughs::GenerateNodes(const Game& game, std::mt19937& rnd) {
   // 1. Capture visited infostates along with visit statistics.
   std::cout << "# Making IS-MCTS play." << "\n# ";
+  int max_moves = 0;
+
   for (int i = 0; i < num_matches; ++i) {
     if (i % 1 == 0) std::cout << '.' << std::flush;
     std::unique_ptr<State> state = game.NewInitialState();
@@ -37,7 +39,8 @@ void IsmctsPlaythroughs::GenerateNodes(const Game& game, std::mt19937& rnd) {
           NodeStats& stats = infostate_stats[node->infostate_observation];
           stats.visits += node->total_visits;
           // Fix move numbers coming from turn_based game transform.
-          stats.move_number = node->move_number % 2;
+          stats.move_number = node->move_number / 2;
+          max_moves = std::max(stats.move_number, max_moves);
           stats.player = node->player;
         }
       }
@@ -46,21 +49,28 @@ void IsmctsPlaythroughs::GenerateNodes(const Game& game, std::mt19937& rnd) {
 
   }
   std::cout << "\n";
-  std::cout << "# Visited " << infostate_stats.size() << " infostates\n";
+  std::cout << "# Visited " << infostate_stats.size()
+            << " infostates with max moves " << max_moves << " \n";
 
-  // 2. Prepare a CDF for easy sampling.
-  double normalizer = 0.;
-  for (const auto&[obs, stats] : infostate_stats) {
-    normalizer += stats.visits;
-  }
+  // 2. Prepare a CDFs per move number for easy sampling.
+  for (int i = 0; i < max_moves; ++i) {
+    cdfs.push_back({});
 
-  double cumul = 0.;
-  for (auto it = infostate_stats.begin(); it != infostate_stats.end(); it++) {
-    double p = it->second.visits / normalizer;
-    SPIEL_CHECK_GT(p, 0.);
-    SPIEL_CHECK_LE(p, 1.);
-    cumul += p;
-    cdf[cumul] = it;
+    double normalizer = 0.;
+    for (const auto&[obs, stats] : infostate_stats) {
+      if (stats.move_number == i && stats.visits > 0) normalizer += stats.visits;
+    }
+
+    double cumul = 0.;
+    for (auto it = infostate_stats.begin(); it != infostate_stats.end(); it++) {
+      if (it->second.move_number == i && it->second.visits > 0) {
+        double p = it->second.visits / normalizer;
+        SPIEL_CHECK_GT(p, 0.);
+        SPIEL_CHECK_LE(p, 1.);
+        cumul += p;
+        cdfs[i][cumul] = it;
+      }
+    }
   }
 }
 
@@ -75,10 +85,10 @@ void IsmctsPlaythroughs::MakeBot(std::mt19937& rnd_gen) {
 }
 
 Observation& IsmctsPlaythroughs::SampleInfostate(
-    std::mt19937& rnd_gen) {
+    int move_number, std::mt19937& rnd_gen) {
   std::uniform_real_distribution<double> unif(0., 1.);  // Interval [0,1)
   double p = unif(rnd_gen);
-  InfostateStats::iterator it = cdf.upper_bound(p)->second;
+  InfostateStats::iterator it = cdfs.at(move_number).upper_bound(p)->second;
   return const_cast<Observation&>(it->first);
 }
 

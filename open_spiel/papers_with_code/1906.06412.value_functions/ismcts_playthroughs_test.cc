@@ -25,7 +25,7 @@ void TestSamplingPlaythroughs() {
   std::mt19937 rnd_gen(0);
   auto game =  LoadGame("goofspiel("
                           "players=2,"
-                          "num_cards=3,"
+                          "num_cards=6,"
                           "imp_info=True,"
                           "points_order=descending"
                         ")");
@@ -35,10 +35,17 @@ void TestSamplingPlaythroughs() {
   auto turn_based = ConvertToTurnBased(*game);
   playthroughs.MakeBot(rnd_gen);
   playthroughs.GenerateNodes(*turn_based, rnd_gen);
-  SPIEL_CHECK_FLOAT_NEAR((--playthroughs.cdf.end())->first, 1., 1e-8);
-  Observation& infostate = playthroughs.SampleInfostate(rnd_gen);
-  auto particle_set = GenerateParticles(infostate, 0, 1000, 1000, 0, rnd_gen);
-  SPIEL_CHECK_FALSE(particle_set->particles.empty());
+
+  for (int i = 0; i < playthroughs.cdfs.size(); ++i) {
+    auto& cdf = playthroughs.cdfs[i];
+    if (!cdf.empty()) {
+      SPIEL_CHECK_FLOAT_NEAR((--cdf.end())->first, 1., 1e-8);
+      Observation& infostate = playthroughs.SampleInfostate(i, rnd_gen);
+      auto particle_set = GenerateParticles(infostate, 0,
+                                            1000, 1000, 0, rnd_gen);
+      SPIEL_CHECK_FALSE(particle_set->particles.empty());
+    }
+  }
 }
 
 }  // namespace

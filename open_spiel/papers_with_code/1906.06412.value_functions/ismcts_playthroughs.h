@@ -40,13 +40,15 @@ struct IsmctsPlaythroughs {
   using InfostateStats = std::unordered_map<Observation, NodeStats>;
   // For storing infostate stats.
   InfostateStats infostate_stats;
-  // Cumulative distribution function based on the visit counts.
-  std::map</*cumul=*/double,
-           /*stats_ref=*/InfostateStats::iterator> cdf;
+  // Cumulative distribution function based on the visit counts,
+  // for each move number in the game.
+  std::vector</*move_number*/
+    std::map</*cumul=*/double,
+             /*stats_ref=*/InfostateStats::iterator>> cdfs;
 
   void MakeBot(std::mt19937& rnd_gen);;
   void GenerateNodes(const Game& game, std::mt19937& rnd_gen);
-  Observation& SampleInfostate(std::mt19937& rnd_gen);
+  Observation& SampleInfostate(int move_number, std::mt19937& rnd_gen);
 };
 
 }  // namespace papers_with_code
