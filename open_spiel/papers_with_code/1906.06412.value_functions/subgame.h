@@ -290,6 +290,7 @@ class SubgameSolver {
   void EvaluateLeaves();
   void EvaluateLeaf(PublicState* state, PublicStateContext* context);
   void CopyValuesToInitialState();
+  void IncrementallyAverageValuesInState(PublicState* state);
   void IncrementallyAverageValuesInInitialState();
 };
 

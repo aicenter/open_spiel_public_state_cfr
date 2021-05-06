@@ -515,27 +515,31 @@ void SubgameSolver::CopyValuesToInitialState() {
   }
 }
 
+void SubgameSolver::IncrementallyAverageValuesInState(PublicState* state) {
+    // Check that we have reset the values, otherwise incremental averaging
+    // will not work properly!
+    SPIEL_DCHECK({
+        if (num_iterations_ == 0) {
+            for (int pl = 0; pl < 2; ++pl) {
+                for (double & value : state->values[pl]) {
+                    SPIEL_CHECK_EQ(value, 0.);
+                }
+            }
+        }
+    });
+
+    for (int pl = 0; pl < 2; ++pl) {
+        for (int i = 0; i < state->values[pl].size(); ++i) {
+            state->values[pl][i] +=
+                    (cf_values_[pl][i] - state->values[pl][i]) / num_iterations_;
+        }
+    }
+}
+
 void SubgameSolver::IncrementallyAverageValuesInInitialState() {
   // Check that we have reset the values, otherwise incremental averaging
   // will not work properly!
-  SPIEL_DCHECK({
-    if (num_iterations_ == 0) {
-       for (int pl = 0; pl < 2; ++pl) {
-         for (double & value : initial_state().values[pl]) {
-           SPIEL_CHECK_EQ(value, 0.);
-         }
-       }
-    }
-  });
-
-  for (int pl = 0; pl < 2; ++pl) {
-    int branching = subgame()->trees[pl]->root_branching_factor();
-    SPIEL_CHECK_EQ(initial_state().values[pl].size(), branching);
-    for (int i = 0; i < branching; ++i) {
-      initial_state().values[pl][i] +=
-          (cf_values_[pl][i] - initial_state().values[pl][i]) / num_iterations_;
-    }
-  }
+  IncrementallyAverageValuesInState(&initial_state());
 }
 
 void DebugPrintPublicFeatures(const std::vector<PublicState>& states) {
