@@ -21,14 +21,14 @@ namespace papers_with_code {
 
 void IsmctsPlaythroughs::GenerateNodes(const Game& game, std::mt19937& rnd) {
   // 1. Capture visited infostates along with visit statistics.
-  std::cout << "# Making IS-MCTS play." << "\n# ";
-  int max_moves = 0;
+  std::cout << "# Making IS-MCTS play ... (this takes a while)\n# ";
 
+  int max_moves = 0;
   for (int i = 0; i < num_matches; ++i) {
-    if (i % 1 == 0) std::cout << '.' << std::flush;
+    if (i % 10 == 0) std::cout << '.' << std::flush;
     std::unique_ptr<State> state = game.NewInitialState();
     while (!state->IsTerminal()) {
-      Action chosen_action = kInvalidAction;
+      Action chosen_action;
       if (state->IsChanceNode()) {
         chosen_action = SampleAction(state->ChanceOutcomes(), rnd).first;
       } else {
@@ -102,12 +102,12 @@ void IsmctsPlaythroughs::MakeBot(std::mt19937& rnd_gen) {
       /*allow_inconsistent_action_sets=*/false);
 }
 
-Observation& IsmctsPlaythroughs::SampleInfostate(
+InfostateStats::iterator IsmctsPlaythroughs::SampleInfostate(
     int move_number, std::mt19937& rnd_gen) {
   std::uniform_real_distribution<double> unif(0., 1.);  // Interval [0,1)
   double p = unif(rnd_gen);
   InfostateStats::iterator it = cdfs.at(move_number).upper_bound(p)->second;
-  return const_cast<Observation&>(it->first);
+  return it;
 }
 
 }  // namespace papers_with_code

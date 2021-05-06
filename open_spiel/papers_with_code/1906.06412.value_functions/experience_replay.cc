@@ -14,6 +14,7 @@
 
 #include "open_spiel/algorithms/bandits_policy.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/experience_replay.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/particle_regeneration.h"
 
 
 namespace open_spiel {
@@ -98,6 +99,7 @@ ReplayFillerPolicy GetReplayFillerPolicy(const std::string& s) {
   if (s == "pbs_random")        return kPbsRandom;
   if (s == "sparse_pbs_random") return kSparsePbsRandom;
   if (s == "bootstrap")         return kBootstrap;
+  if (s == "ismcts_bootstrap")  return kIsmctsBootstrap;
   SpielFatalError("Exhausted pattern match: ReplayFillerPolicy.");
 }
 
@@ -266,6 +268,23 @@ void ReplayFiller::AddBootstrappedSolution() {
   AddExperience(result, net_context);
 }
 
+void ReplayFiller::AddIsmctsBootstrapedSolution() {
+  // 1. Pick a particle set.
+  std::unique_ptr<ParticleSet> set = PickIsmctsParticleSet(bootstrap_move_number);
+
+  // 2. Build subgame and solve it.
+  std::shared_ptr<Subgame> subgame = subgame_factory->MakeSubgame(
+      *set, /*custom_move_ahead_limit=*/1);
+  std::unique_ptr<SubgameSolver> solver = solver_factory->MakeSolver(subgame);
+  solver->RunSimultaneousIterations(solver_factory->cfr_iterations);
+
+  // 3. Add solution to the experiences.
+  PublicState& result = subgame->initial_state();
+  auto context = solver_factory->leaf_evaluator->CreateContext(result);
+  auto net_context = open_spiel::down_cast<NetContext*>(context.get());
+  AddExperience(result, net_context);
+}
+
 void ReplayFiller::CreateExperiences(ReplayFillerPolicy fill_policy,
                                      int num_experiences) {
   if (fill_policy == kNothing) return;
@@ -289,10 +308,11 @@ void ReplayFiller::CreateExperiences(ReplayFillerPolicy fill_policy,
   for (int i = 0; i < num_experiences; ++i) {
     if (i % 10 == 0) std::cout << '.' << std::flush;
     switch (fill_policy) {
-      case kTrunkRandom:     AddTrunkRandomPbsSolution();  break;
-      case kPbsRandom:       AddRandomPbsSolution();       break;
-      case kSparsePbsRandom: AddRandomSparsePbsSolution(); break;
-      case kBootstrap:       AddBootstrappedSolution();    break;
+      case kTrunkRandom:      AddTrunkRandomPbsSolution();     break;
+      case kPbsRandom:        AddRandomPbsSolution();          break;
+      case kSparsePbsRandom:  AddRandomSparsePbsSolution();    break;
+      case kBootstrap:        AddBootstrappedSolution();       break;
+      case kIsmctsBootstrap:  AddIsmctsBootstrapedSolution();  break;
       default: SpielFatalError("Exhausted pattern match on ReplayFillerPolicy");
     }
   }
@@ -335,6 +355,28 @@ std::unique_ptr<ParticleSet> ReplayFiller::PickParticleSet(int at_depth) {
           /*save_secondary=*/false, *randomizer->rnd_gen);
 
   return std::make_unique<ParticleSet>(std::move(particle_partition->primary));
+}
+
+std::unique_ptr<ParticleSet> ReplayFiller::PickIsmctsParticleSet(int at_depth) {
+  IsmctsPlaythroughs* playthroughs = reuse->GetIsmctsPlaythroughs();
+
+  // 1. Pick a random infostate.
+  SPIEL_CHECK_TRUE(randomizer->rnd_gen);
+  InfostateStats::iterator it =
+      playthroughs->SampleInfostate(at_depth, *randomizer->rnd_gen);
+
+  // 2. Generate particles compatible with the infostate.
+  std::unique_ptr<ParticleSet> set =
+      GenerateParticles(const_cast<Observation&>(it->first),
+                        it->second.player,
+                        sparse_particles,
+                        max_rejection_cnt,
+                        infostate_particles,
+                        *randomizer->rnd_gen);
+
+  // 3. Assign randomized beliefs.
+  randomizer->Randomize(set.get());
+  return set;
 }
 
 }  // papers_with_code

@@ -22,6 +22,7 @@
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_data.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/subgame_factory.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/solver_factory.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/ismcts_playthroughs.h"
 
 namespace open_spiel {
 namespace papers_with_code {
@@ -62,6 +63,9 @@ struct ReusableStructures {
 
   std::vector<algorithms::BanditVector> fixable_bandits_for_all_public_states;
   std::vector<algorithms::BanditVector>& GetFixableBanditsForAllPublicStates();
+
+  std::unique_ptr<IsmctsPlaythroughs> playthroughs;
+  IsmctsPlaythroughs* GetIsmctsPlaythroughs();
 };
 
 

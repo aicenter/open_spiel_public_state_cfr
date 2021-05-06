@@ -74,5 +74,10 @@ std::vector<algorithms::BanditVector>&
   return fixable_bandits_for_all_public_states;
 }
 
+IsmctsPlaythroughs* ReusableStructures::GetIsmctsPlaythroughs() {
+  SPIEL_CHECK_TRUE(playthroughs.get() != nullptr);
+  return playthroughs.get();
+}
+
 }  // papers_with_code
 }  // open_spiel

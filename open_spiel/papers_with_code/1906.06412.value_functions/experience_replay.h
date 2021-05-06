@@ -58,7 +58,8 @@ enum ReplayFillerPolicy {
   kTrunkRandom,
   kPbsRandom,
   kSparsePbsRandom,
-  kBootstrap
+  kBootstrap,
+  kIsmctsBootstrap
 };
 ReplayFillerPolicy GetReplayFillerPolicy(const std::string& s);  // From string.
 
@@ -72,6 +73,10 @@ struct StrategyRandomizer {
   void Randomize(std::vector<algorithms::BanditVector>& bandits) {
     SPIEL_CHECK_TRUE(rnd_gen);
     RandomizeStrategy(bandits, prob_pure_strat, prob_fully_mixed, *rnd_gen);
+  }
+  void Randomize(ParticleSet* set) {
+    SPIEL_CHECK_TRUE(rnd_gen);
+    SpielFatalError("Not implemented (yet)");
   }
 };
 
@@ -101,6 +106,8 @@ struct ReplayFiller {
   int sparse_particles = 0;
   double sparse_epsilon = 0.;
   std::vector<int> eval_iters;
+  int max_rejection_cnt = 1000;
+  int infostate_particles = 1;
 
   void CreateExperiences(ReplayFillerPolicy fill_policy, int num_experiences);
 
@@ -109,9 +116,11 @@ struct ReplayFiller {
   void AddRandomPbsSolution();
   void AddRandomSparsePbsSolution();
   void AddBootstrappedSolution();
+  void AddIsmctsBootstrapedSolution();
   void FillReplayWithTrunkDlCfrPbsSolutions();
 
   std::unique_ptr<ParticleSet> PickParticleSet(int at_depth = -1);
+  std::unique_ptr<ParticleSet> PickIsmctsParticleSet(int at_depth = -1);
 
   void AddExperience(const PublicState& state, const NetContext* net_context);
   void AddExperiencesFromPublicStates(const std::vector<PublicState>& states);

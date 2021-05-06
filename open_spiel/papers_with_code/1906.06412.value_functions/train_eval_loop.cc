@@ -64,6 +64,10 @@ ABSL_FLAG(int, max_move_ahead_limit, 1, "Size of the lookahead tree.");
 ABSL_FLAG(std::string, save_values_policy, "average",
           "What cf. values should be saved after solving the subgame: "
           " one of {current,average}.");
+ABSL_FLAG(int, ismcts_num_matches, 1000,
+          "Number of matches for IS-MCTS playthroughs.");
+ABSL_FLAG(int, ismcts_max_simulations, 100,
+          "Number of simulations for IS-MCTS playthroughs.");
 
 // -- Training --
 ABSL_FLAG(int, train_batches, 32,
@@ -108,10 +112,12 @@ ABSL_FLAG(int, replay_visits_window, -1,
 #include "absl/random/random.h"
 #include "torch/torch.h"
 
+#include "open_spiel/game_transforms/turn_based_simultaneous_game.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/experience_replay.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/metrics.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_dl_evaluator.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/snapshot.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/ismcts_playthroughs.h"
 
 
 namespace open_spiel {
@@ -226,6 +232,11 @@ void TrainEvalLoop() {
   ReusableStructures reuse(&subgame_factory,
                            /*solver_factory=*/nullptr, // Supplied later.
                            oracle);
+  //
+  std::cout << "# Setting IS-MCTS config ..." << std::endl;
+  reuse.playthroughs = std::make_unique<IsmctsPlaythroughs>();
+  reuse.playthroughs->num_matches     = absl::GetFlag(FLAGS_ismcts_num_matches);
+  reuse.playthroughs->max_simulations = absl::GetFlag(FLAGS_ismcts_max_simulations);
   //
   const NetArchitecture arch = GetArchitecture(absl::GetFlag(FLAGS_arch));
   std::cout << "# Deducing dimensions ..." << std::endl;
@@ -393,8 +404,8 @@ void TrainEvalLoop() {
   const int num_loops = absl::GetFlag(FLAGS_num_loops);
   const int train_batches = absl::GetFlag(FLAGS_train_batches);
   //
-  if (exp_loop == kBootstrap) {
-    SPIEL_CHECK_EQ(exp_init, kBootstrap);
+  if (exp_loop == kBootstrap || exp_loop == kIsmctsBootstrap) {
+    SPIEL_CHECK_TRUE(exp_init == kBootstrap || exp_init == kIsmctsBootstrap);
     // Number of times the experience should be regenerated.
     const int num_regenerations = num_loops / exp_loop_new;
     // Bootstrap replay must hold all created experiences,
@@ -413,6 +424,11 @@ void TrainEvalLoop() {
         bootstrap_size, dims->point_input_size(), dims->point_output_size());
     // This is decremented before creating experience, so make + 1.
     filler.bootstrap_move_number = absl::GetFlag(FLAGS_bootstrap_from_move) + 1;
+  }
+  //
+  if (exp_loop == kIsmctsBootstrap) {
+    reuse.playthroughs->MakeBot(rnd_gen);
+    reuse.playthroughs->GenerateNodes(*game, rnd_gen);
   }
   //
   const int snapshot_loop = absl::GetFlag(FLAGS_snapshot_loop);

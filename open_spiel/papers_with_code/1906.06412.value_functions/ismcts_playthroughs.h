@@ -28,6 +28,9 @@ struct NodeStats{
   int player;
 };
 
+using InfostateStats = std::unordered_map<Observation, NodeStats>;
+
+// Implemented only for imp. info GoofSpiel.
 struct IsmctsPlaythroughs {
   std::unique_ptr<algorithms::ISMCTSBot> bot;
   // Settings:
@@ -37,7 +40,6 @@ struct IsmctsPlaythroughs {
   algorithms::ISMCTSFinalPolicyType policy_type =
       algorithms::ISMCTSFinalPolicyType::kNormalizedVisitCount;
 
-  using InfostateStats = std::unordered_map<Observation, NodeStats>;
   // For storing infostate stats.
   InfostateStats infostate_stats;
   // Cumulative distribution function based on the visit counts,
@@ -48,7 +50,7 @@ struct IsmctsPlaythroughs {
 
   void MakeBot(std::mt19937& rnd_gen);;
   void GenerateNodes(const Game& game, std::mt19937& rnd_gen);
-  Observation& SampleInfostate(int move_number, std::mt19937& rnd_gen);
+  InfostateStats::iterator SampleInfostate(int move_number, std::mt19937& rnd_gen);
 };
 
 }  // namespace papers_with_code
