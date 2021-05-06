@@ -94,6 +94,7 @@ void MakeReachesAndValuesForPublicStates(std::vector<PublicState>& states) {
       const int num_nodes = state.nodes[pl].size();
       state.beliefs[pl] = std::vector<double>(num_nodes, 1.);
       state.values[pl] = std::vector<double>(num_nodes, 0.);
+      state.average_values[pl] = std::vector<double>(num_nodes, 0.);
     }
   }
 }
@@ -462,6 +463,14 @@ void SubgameSolver::EvaluateLeaf(PublicState* state,
       // Copy value from the leaf public state to the trunk.
       cf_values_[pl][trunk_position] = state->values[pl][j];
     }
+  }
+
+  // 4. Incrementally update average CFVs
+  for (int pl = 0; pl < 2; pl++) {
+      const int num_leaves = state->nodes[pl].size();
+      for (int j = 0; j < num_leaves; ++j) {
+          state->average_values[pl][j] += (state->values[pl][j] - state->average_values[pl][j]) / num_iterations_;
+      }
   }
 }
 
