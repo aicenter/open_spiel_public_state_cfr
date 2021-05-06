@@ -168,6 +168,8 @@ std::unique_ptr<State> TurnBasedSimultaneousState::ResampleFromInfostate(
     state_wrapped->action_vector_ = action_vector_;
     state_wrapped->current_player_ = current_player_;
     state_wrapped->rollout_mode_ = rollout_mode_;
+    state_wrapped->move_number_ = move_number_;
+    state_wrapped->history_ = state_wrapped->state_->FullHistory();
     return state_wrapped;
   }
 }

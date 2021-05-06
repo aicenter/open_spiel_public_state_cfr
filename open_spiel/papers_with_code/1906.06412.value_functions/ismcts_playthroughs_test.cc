@@ -25,13 +25,13 @@ void TestSamplingPlaythroughs() {
   std::mt19937 rnd_gen(0);
   auto game =  LoadGame("goofspiel("
                           "players=2,"
-                          "num_cards=6,"
+                          "num_cards=13,"
                           "imp_info=True,"
                           "points_order=descending"
                         ")");
   IsmctsPlaythroughs playthroughs;
   playthroughs.num_matches = 10;
-  playthroughs.max_simulations = 10;
+  playthroughs.max_simulations = 100;
   auto turn_based = ConvertToTurnBased(*game);
   playthroughs.MakeBot(rnd_gen);
   playthroughs.GenerateNodes(*turn_based, rnd_gen);
@@ -44,6 +44,15 @@ void TestSamplingPlaythroughs() {
       auto particle_set = GenerateParticles(infostate, 0,
                                             1000, 1000, 0, rnd_gen);
       SPIEL_CHECK_FALSE(particle_set->particles.empty());
+
+      // Check each collected infostate for move number it claims to be.
+      for(auto& [cumul, it] : cdf) {
+        const auto point_cards = it->first.Tensor("point_card_sequence");
+        int bet_rounds = std::accumulate(point_cards.begin(),
+                                         point_cards.end(), -1);
+        SPIEL_CHECK_EQ(it->second.move_number, i);
+        SPIEL_CHECK_EQ(bet_rounds, i);
+      }
     }
   }
 }

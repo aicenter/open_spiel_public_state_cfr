@@ -53,7 +53,8 @@ void IsmctsPlaythroughs::GenerateNodes(const Game& game, std::mt19937& rnd) {
             << " infostates with max moves " << max_moves << " \n";
 
   // 2. Prepare a CDFs per move number for easy sampling.
-  for (int i = 0; i < max_moves; ++i) {
+  std::cout << "# Preparing CDFs.\n";
+  for (int i = 0; i <= max_moves; ++i) {
     cdfs.push_back({});
 
     double normalizer = 0.;
@@ -62,6 +63,8 @@ void IsmctsPlaythroughs::GenerateNodes(const Game& game, std::mt19937& rnd) {
     }
 
     double cumul = 0.;
+    // Maintain some statistics about the pdfs
+    double p_min = 1., p_max = 0., p_mean = 0., p_std = 0.;
     for (auto it = infostate_stats.begin(); it != infostate_stats.end(); it++) {
       if (it->second.move_number == i && it->second.visits > 0) {
         double p = it->second.visits / normalizer;
@@ -69,8 +72,23 @@ void IsmctsPlaythroughs::GenerateNodes(const Game& game, std::mt19937& rnd) {
         SPIEL_CHECK_LE(p, 1.);
         cumul += p;
         cdfs[i][cumul] = it;
+
+        p_min = std::fmin(p, p_min);
+        p_max = std::fmax(p, p_max);
+        // Based on Welford's online algorithm
+        double delta = p - p_mean;
+        p_mean += delta / cdfs[i].size();
+        double delta2 = p - p_mean;
+        p_std += delta * delta2;
       }
     }
+    std::cout << "# Move number " << i
+              << " has " << cdfs[i].size() << " entries"
+              << "\tp_min=" << p_min
+              << "\tp_max=" << p_max
+              << "\tp_mean=" << p_mean
+              << "\tp_std=" << p_std / cdfs[i].size()
+              << "\n";
   }
 }
 

@@ -81,6 +81,7 @@ ActionsAndProbs ISMCTSBot::RunSearch(const State& state) {
     std::unique_ptr<State> sampled_root_state = SampleRootState(state);
     SPIEL_CHECK_TRUE(root_infostate_key == GetStateKey(*sampled_root_state));
     SPIEL_CHECK_TRUE(sampled_root_state != nullptr);
+    SPIEL_CHECK_EQ(sampled_root_state->MoveNumber(), state.MoveNumber());
     RunSimulation(sampled_root_state.get());
   }
 
