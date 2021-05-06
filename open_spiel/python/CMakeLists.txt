@@ -102,7 +102,7 @@ set(PYTHON_TESTS ${PYTHON_TESTS}
   algorithms/action_value_test.py
   algorithms/action_value_vs_best_response_test.py
   algorithms/alpha_zero/evaluator_test.py
-  algorithms/alpha_zero/model_test.py
+#  algorithms/alpha_zero/model_test.py # FIXME: disabled due to TF
   algorithms/best_response_test.py
   algorithms/cfr_br_test.py
   algorithms/cfr_test.py
