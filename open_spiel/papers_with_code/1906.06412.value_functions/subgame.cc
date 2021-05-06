@@ -351,10 +351,12 @@ SubgameSolver::SubgameSolver(
     const std::shared_ptr<const PublicStateEvaluator> nonterminal_evaluator,
     const std::shared_ptr<const PublicStateEvaluator> terminal_evaluator,
     const std::string& bandit_name,
-    SaveValuesPolicy save_values_policy
+    SaveValuesPolicy save_values_policy,
+    bool save_average_values
 ) : subgame_(subgame),
     nonterminal_evaluator_(nonterminal_evaluator),
     terminal_evaluator_(terminal_evaluator),
+    save_average_values_(save_average_values),
     bandits_(algorithms::MakeBanditVectors(subgame_->trees, bandit_name)),
     reach_probs_({std::vector<double>(subgame_->trees[0]->num_leaves()),
                   std::vector<double>(subgame_->trees[1]->num_leaves())}),
@@ -362,7 +364,7 @@ SubgameSolver::SubgameSolver(
                 std::vector<double>(subgame_->trees[1]->num_leaves())}),
     contexts_(MakeContexts(subgame, nonterminal_evaluator, terminal_evaluator)),
     num_iterations_(0),
-    init_save_values_(save_values_policy) {}
+    init_save_values_(save_values_policy){}
 
 std::shared_ptr<Policy> SubgameSolver::AveragePolicy() {
   return std::make_shared<algorithms::BanditsAveragePolicy>(subgame()->trees,
@@ -466,10 +468,12 @@ void SubgameSolver::EvaluateLeaf(PublicState* state,
   }
 
   // 4. Incrementally update average CFVs
-  for (int pl = 0; pl < 2; pl++) {
-      const int num_leaves = state->nodes[pl].size();
-      for (int j = 0; j < num_leaves; ++j) {
-          state->average_values[pl][j] += (state->values[pl][j] - state->average_values[pl][j]) / num_iterations_;
+  if(save_average_values_) {
+      for (int pl = 0; pl < 2; pl++) {
+          const int num_leaves = state->nodes[pl].size();
+          for (int j = 0; j < num_leaves; ++j) {
+              state->average_values[pl][j] += (state->values[pl][j] - state->average_values[pl][j]) / num_iterations_;
+          }
       }
   }
 }

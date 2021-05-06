@@ -40,7 +40,8 @@ struct SolverFactory {
   std::unique_ptr<SubgameSolver> MakeSolver(
       std::shared_ptr<Subgame> subgame,
       std::shared_ptr<const PublicStateEvaluator> custom_leaf_evaluator = nullptr,
-      std::string custom_bandits_for_cfr = "") const;
+      std::string custom_bandits_for_cfr = "",
+      bool save_average_values=false) const;
 };
 
 

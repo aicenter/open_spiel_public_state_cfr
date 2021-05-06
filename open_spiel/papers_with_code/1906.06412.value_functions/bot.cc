@@ -77,6 +77,8 @@ class SherlockBot : public Bot {
         rnd_gen_);
     SPIEL_CHECK_FALSE(set->particles.empty());
 
+    // subgame_factory_->game->NewInitialState();
+
     // TODO: proper management of beliefs between steps. This is just
     //       a dummy initialization.
     for (auto& particle: set->particles) {
@@ -96,7 +98,7 @@ class SherlockBot : public Bot {
     //  MakeSubgame to affect infostate tree construction.
 
     std::cout << "# Making solver\n";
-    std::unique_ptr<SubgameSolver> solver = solver_factory_->MakeSolver(subgame);
+    std::unique_ptr<SubgameSolver> solver = solver_factory_->MakeSolver(subgame, nullptr, "", true);
 
 //    // Code for opponent fixation:
 //    TabularPolicy opponent_policy;  // Needs to be provided.

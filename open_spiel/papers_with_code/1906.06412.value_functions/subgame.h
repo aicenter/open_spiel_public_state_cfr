@@ -239,7 +239,8 @@ std::shared_ptr<PublicStateEvaluator> MakeDummyEvaluator();
 enum class SaveValuesPolicy {
   kSaveNothing,
   kCurrentCfValues,
-  kAveragedCfValues  // Make an average over the cf values encountered during
+  kAveragedCfValues,
+                     // Make an average over the cf values encountered during
                      // the CFR iterations -- avoid a new call with avg policy
                      // to the network, as that would be likely too noisy.
 };
@@ -256,7 +257,8 @@ class SubgameSolver {
       const std::shared_ptr<const PublicStateEvaluator> nonterminal_evaluator,
       const std::shared_ptr<const PublicStateEvaluator> terminal_evaluator,
       const std::string& bandit_name,
-      SaveValuesPolicy save_values_policy = kDefaultSaveValuesPolicy);
+      SaveValuesPolicy save_values_policy = kDefaultSaveValuesPolicy,
+      bool save_average_values = false);
 
   void RunSimultaneousIterations(int iterations);
   void Reset();
@@ -273,6 +275,7 @@ class SubgameSolver {
   const std::shared_ptr<Subgame> subgame_;
   const std::shared_ptr<const PublicStateEvaluator> nonterminal_evaluator_;
   const std::shared_ptr<const PublicStateEvaluator> terminal_evaluator_;
+  const bool save_average_values_;
 
   // -- Mutable values to keep track of. --
   // These have the size at largest depth of the tree, i.e. the size of the
