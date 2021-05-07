@@ -29,6 +29,7 @@ class SherlockBot : public Bot {
   std::unique_ptr<SolverFactory> solver_factory_;
   Player player_id_;
   std::mt19937 rnd_gen_;
+  std::shared_ptr<Subgame> subgame_;
 
  public:
   SherlockBot(std::unique_ptr<SubgameFactory> subgame_factory,
@@ -46,38 +47,55 @@ class SherlockBot : public Bot {
   std::pair<ActionsAndProbs, Action> StepWithPolicy(const State& state) override {
     SPIEL_CHECK_TRUE(state.IsPlayerActing(player_id_));
 
+    if (state.MoveNumber() == 0) {
+        subgame_ = subgame_factory_->MakeTrunk(1);
+    }
+
     // These should be provided by the referee at some point,
     // not accessed from the perfect-information State.
     std::cout << "# Make observations\n";
-    Observation infostate_observation(*subgame_factory_->game,
-                                      subgame_factory_->infostate_observer);
+    // infostate observations
+    Observation infostate_observation(*subgame_factory_->game,subgame_factory_->infostate_observer);
     infostate_observation.SetFrom(state, player_id_);
     const std::string infostate =
         subgame_factory_->infostate_observer->StringFrom(state, player_id_);
+
+    // public state observations
+    Observation public_observation(*subgame_factory_->game,subgame_factory_->public_observer);
+    public_observation.SetFrom(state, 0);
+    PublicState *publicState;
+    for (PublicState& pubState : subgame_->public_states) {
+        if (pubState.public_tensor == public_observation) {
+            publicState = &pubState;
+            break;
+        }
+    }
     // const std::vector<Action> legal_actions = state.LegalActions(player_id_);
     // Can be just inferred from legal actions from the referee.
     const ActionsAndProbs uniform_actions = UniformStatePolicy(state);
+
 
     // TODO: Tabularization of any Bot to compute offline TabularPolicy.
     //       Bot base class will need to add a Clone() method.
 
     // TODO: keep particles from previous step along with beliefs.
     //       Currently can work only for one-step lookahead trees.
-
     std::cout << "# Generate particles for current public state\n";
-    std::unique_ptr<ParticleSet> set = GenerateParticles(
-        infostate_observation,
-        player_id_,
-        subgame_factory_->max_particles,
-        subgame_factory_->max_particles,
-        // Make sure we always have 1 particle in the current infostate.
-        // Using this removes the strong global consistency guarantee,
-        // but it makes the algorithm always capable of playing the game.
-        /*infostate_particles=*/1,
-        rnd_gen_);
+    std::unique_ptr<ParticleSetPartition> partition = MakeParticleSetPartition(*publicState, pow(10,7), pow(10,-9),false,rnd_gen_);
+    std::unique_ptr<ParticleSet> set = std::make_unique<ParticleSet>(partition->primary);
+    //    std::unique_ptr<ParticleSet> set = GenerateParticles(
+    //        infostate_observation,
+    //        player_id_,
+    //        subgame_factory_->max_particles,
+    //        subgame_factory_->max_particles,
+    //        // Make sure we always have 1 particle in the current infostate.
+    //        // Using this removes the strong global consistency guarantee,
+    //        // but it makes the algorithm always capable of playing the game.
+    //        /*infostate_particles=*/1,
+    //        rnd_gen_);
     SPIEL_CHECK_FALSE(set->particles.empty());
 
-    // subgame_factory_->game->NewInitialState();
+    //subgame_factory_->game->NewInitialState();
 
     // TODO: proper management of beliefs between steps. This is just
     //       a dummy initialization.
