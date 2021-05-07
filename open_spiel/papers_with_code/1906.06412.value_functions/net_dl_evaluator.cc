@@ -56,9 +56,11 @@ void ParticleNetEvaluator::EvaluatePublicState(
   torch::Tensor input = point.data.to(device_).unsqueeze(/*dim=*/0);
   // The output must be "unbatched".
   torch::Tensor output = model_->forward(input);
-  SPIEL_DCHECK_EQ(output.sizes().size(), 1);
-  SPIEL_DCHECK_EQ(output.size(/*dim=*/0), point.total_parviews());
-  point.target.index_put_({Slice(0, point.total_parviews())}, output);
+  SPIEL_DCHECK_EQ(output.sizes().size(), 2);
+  SPIEL_DCHECK_EQ(output.size(/*dim=*/0), batch_->size());
+  SPIEL_DCHECK_EQ(output.size(/*dim=*/1), dims_->max_parviews);
+  point.target.index_put_({Slice(0, point.total_parviews())},
+                          output.index({0, Slice(0, point.total_parviews())}));
 
   // !! This does not work with shuffling !!
   CopyValuesFromNetToTree(point, *state, *dims_);
@@ -183,6 +185,7 @@ void CopyValuesFromNetToTree(ParticleDataPoint data_point,
     for (int j = 0; j < state.nodes[pl].size(); j++) {
       ParviewDataPoint parview = data_point.parview_at(parview_index);
       state.values[pl][j] = parview.value();
+      SPIEL_DCHECK_TRUE(std::isfinite(state.values[pl][j]));
       parview_index++;
     }
   }

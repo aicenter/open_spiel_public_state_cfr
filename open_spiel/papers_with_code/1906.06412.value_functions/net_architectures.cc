@@ -108,124 +108,125 @@ ParticleValueNet::ParticleValueNet(std::shared_ptr<ParticleDims> particle_dims,
   RegisterLayers(fc_regression, "fc_regression_");
 }
 
-torch::Tensor ParticleValueNet::change_of_basis(torch::Tensor fs) {             CHECK_SHAPE(fs, {_, dims->full_features_size()});
+torch::Tensor ParticleValueNet::change_of_basis(torch::Tensor fs) {
+  const int batch_size = fs.size(0);
+  const int num_parviews = dims->max_parviews;
+  const int big_batch = batch_size * num_parviews;                              CHECK_SHAPE(fs, {batch_size, num_parviews, dims->full_features_size()});
+
+  // Turn batch of parviews into a big batch.
+  torch::Tensor big_batch_fs = fs.view({-1, dims->full_features_size()});       CHECK_SHAPE(big_batch_fs, {big_batch, dims->full_features_size()});
+
   for (int i = 0; i < fc_basis.size() - 1; ++i) {
-    fs = fc_basis[i]->forward(fs);
-    fs = Activation(activation_fn, fs);
+    big_batch_fs = fc_basis[i]->forward(big_batch_fs);
+    big_batch_fs = Activation(activation_fn, big_batch_fs);
   }
-  torch::Tensor bs = fc_basis.back()->forward(fs);                              CHECK_SHAPE(bs, {_, pooled_size()});
+  torch::Tensor big_batch_bs = fc_basis.back()->forward(big_batch_fs);          CHECK_SHAPE(big_batch_bs, {big_batch, pooled_size()});
+  torch::Tensor bs =
+      big_batch_bs.view({batch_size, num_parviews, pooled_size()});             CHECK_SHAPE(bs, {batch_size, num_parviews, pooled_size()});
   return bs;
 }
 
 torch::Tensor ParticleValueNet::base_coordinates(torch::Tensor bs,
                                                  torch::Tensor scales) {
-  CHECK_SHAPE(bs, {_, pooled_size()});
-  CHECK_SHAPE(scales, {_, 1});
-  torch::Tensor cs = bs.mul(scales);                                            CHECK_SHAPE(cs, {_, pooled_size()});
+  const int batch_size = bs.size(0);
+  const int num_parviews = dims->max_parviews;
+
+  CHECK_SHAPE(bs, {batch_size, num_parviews, pooled_size()});
+  CHECK_SHAPE(scales, {batch_size, num_parviews, 1});
+  torch::Tensor cs = bs.mul(scales);                                            CHECK_SHAPE(cs, {batch_size, num_parviews, pooled_size()});
   return cs;
 }
 
-torch::Tensor ParticleValueNet::pool(torch::Tensor cs) {                        CHECK_SHAPE(cs, {_, pooled_size()});
-  torch::Tensor context = torch::sum(cs, {0});                                  CHECK_SHAPE(context, {pooled_size()});
+torch::Tensor ParticleValueNet::pool(torch::Tensor cs) {
+  const int batch_size = cs.size(0);
+  const int num_parviews = dims->max_parviews;
+
+  CHECK_SHAPE(cs, {batch_size, num_parviews, pooled_size()});
+  torch::Tensor context = torch::sum(cs, {1});                                  CHECK_SHAPE(context, {batch_size, pooled_size()});
   return context;
 }
 
-torch::Tensor ParticleValueNet::regression(torch::Tensor xs) {                  CHECK_SHAPE(xs, {1, context_size()});
+torch::Tensor ParticleValueNet::regression(torch::Tensor xs) {                  CHECK_SHAPE(xs, {_, context_size()});
   for (int i = 0; i < fc_regression.size() - 1; ++i) {
     xs = fc_regression[i]->forward(xs);
     xs = Activation(activation_fn, xs);
   }
-  xs = fc_regression.back()->forward(xs);                                       CHECK_SHAPE(xs, {1, regression_size()});
+  xs = fc_regression.back()->forward(xs);                                       CHECK_SHAPE(xs, {_, regression_size()});
   return xs;
 }
 
 torch::Tensor ParticleValueNet::forward(torch::Tensor xss) {
-  int batch_size = xss.size(0);
+  const int batch_size = xss.size(0);
+  const int num_parviews = dims->max_parviews;
+  // FIXME: offsets coming from basic structures!
+  const int pub_features_offset = 2;
+  const int num_parviews_offset = 2 + dims->public_features_size;
+  const auto Batch = Slice();
+  const auto Parviews = Slice();
   CHECK_SHAPE(xss, {batch_size, dims->point_input_size()});
 
-  std::vector<torch::Tensor> out;
-  out.reserve(batch_size);
-  int total_batch_parviews = 0;
+  torch::Tensor public_features = xss.index({Batch,
+      // Skip the num_parviews item.
+      Slice(pub_features_offset,
+            pub_features_offset + dims->public_features_size)});                CHECK_SHAPE(public_features, {batch_size, dims->public_features_size});
+
+  torch::Tensor parviews = xss.index({Batch,
+      // Skip the num_parviews + public features item.
+      Slice(num_parviews_offset,
+            num_parviews_offset + num_parviews * dims->parview_size())
+    // Rearrange into parviews.
+    }).view({batch_size, num_parviews, dims->parview_size()});                  CHECK_SHAPE(parviews, {batch_size, num_parviews, dims->parview_size()});
+
+  torch::Tensor hand_fs = parviews
+      // Skip the range input (as the last value).
+      .index({Batch, Parviews, Slice(0, dims->features_size())});               CHECK_SHAPE(hand_fs, {batch_size, num_parviews, dims->features_size()});
+  torch::Tensor beliefs = parviews  // Skip all features.
+      .index({Batch, Parviews,
+              Slice(dims->features_size(), dims->parview_size())});             CHECK_SHAPE(beliefs, {batch_size, num_parviews, 1});
+
+  // Construct full features by concatenating hands with public features.
+  torch::Tensor pf_per_parview = public_features
+      .expand({num_parviews, -1, -1}).permute({1, 0, 2});                       CHECK_SHAPE(pf_per_parview, {batch_size, num_parviews, dims->public_features_size});
+  torch::Tensor infostate_fs =
+      torch::cat({pf_per_parview, hand_fs}, /*dim=*/2);                         CHECK_SHAPE(infostate_fs, {batch_size, num_parviews, dims->full_features_size()});
+
+  // Zero-out public state features for non-full sets.
+  torch::Tensor parview_counts =
+      xss.index({Batch, Slice(0, pub_features_offset)}).sum(/*dim=*/1);         CHECK_SHAPE(parview_counts, {batch_size});
   for (int i = 0; i < batch_size; ++i) {
-    torch::Tensor xs = xss[i];                                                  CHECK_SHAPE(xs, {dims->point_input_size()});
-    // Convert fp32 to int -- for our small numbers < 1e7 this is ok.
-    std::array<int, 2> player_parviews = {xs[0].item<int>(),
-                                          xs[1].item<int>()};
-    SPIEL_DCHECK({
-      for (int pl = 0; pl < 2; ++pl) {
-        SPIEL_CHECK_GT(player_parviews[pl], 0);
-        SPIEL_CHECK_LT(player_parviews[pl], 1e7);
-      }
-    });
-    int num_parviews = player_parviews[0] + player_parviews[1];
-
-    // FIXME: nice offsets!
-    const int pub_features_offset = 2;
-    torch::Tensor public_features = xs
-        // Skip the num_parviews item.
-        .index({
-          Slice(pub_features_offset,
-                pub_features_offset + dims->public_features_size)
-        })
-        .reshape({1, dims->public_features_size});                              CHECK_SHAPE(public_features, {1, dims->public_features_size});
-
-    const int num_parviews_offset = 2 + dims->public_features_size;
-    torch::Tensor parviews = xs
-        // Skip the num_parviews + public features item.
-        .index({
-          Slice(num_parviews_offset,
-                num_parviews_offset + num_parviews * dims->parview_size())
-        })
-        // Rearrange into parviews.
-        .reshape({num_parviews, dims->parview_size()});                         CHECK_SHAPE(parviews, {num_parviews,
-                                                                                                       dims->parview_size()});
-
-    torch::Tensor hand_fs = parviews  // Skip the range input (as the last value).
-        .index({Slice(), Slice(0, dims->features_size())});                     CHECK_SHAPE(hand_fs, {num_parviews, dims->features_size()});
-    torch::Tensor fs = torch::cat({
-        public_features.expand({num_parviews, -1}), hand_fs}, /*dim=*/1);       CHECK_SHAPE(fs, {num_parviews, dims->full_features_size()});
-    torch::Tensor ranges = parviews  // Skip all features.
-        .index({Slice(), Slice(dims->features_size(),
-                               dims->parview_size())});                         CHECK_SHAPE(ranges, {num_parviews, 1});
-
-    torch::Tensor bs = change_of_basis(fs);                                     CHECK_SHAPE(bs, {num_parviews, pooled_size()});
-    torch::Tensor cs = base_coordinates(bs, ranges);                            CHECK_SHAPE(cs, {num_parviews, pooled_size()});
-    torch::Tensor pooled = pool(cs).unsqueeze(/*dim=*/0);                       CHECK_SHAPE(pooled, {1, pooled_size()});
-    torch::Tensor context = torch::cat({pooled, public_features}, /*dim=*/1);   CHECK_SHAPE(context, {1, context_size()});
-    torch::Tensor ys = regression(context).expand({num_parviews, -1});          CHECK_SHAPE(ys, {num_parviews, regression_size()});
-    torch::Tensor proj = (ys * bs).sum(/*dim=*/1);                              CHECK_SHAPE(proj, {num_parviews});
-    if (zero_sum_regression) {
-      torch::Tensor ranges1d = ranges.squeeze(/*dim=*/1);                       CHECK_SHAPE(ranges1d, {num_parviews});
-      if (ranges1d.sum().item<float>() == 0) {
-        proj.zero_();
-      } else {
-        // beliefs * values = 0 (because game is zero-sum) and vectors are
-        // therefore perpendicular. If values are off and are not zero-sum,
-        // we project them to the beliefs plane (beliefs are the normal vector).
-        torch::Tensor proj_error = (proj.dot(ranges1d)) / (ranges1d.dot(ranges1d));
-        proj = proj - proj_error * ranges1d;
-      }
-      SPIEL_DCHECK_FLOAT_NEAR((proj.dot(ranges1d)).sum().item<float>(), 0., 1e-6);
-    }
-    SPIEL_CHECK_FALSE(torch::isfinite(proj).logical_not().any().item<bool>());
-    out.push_back(proj);
-    total_batch_parviews += num_parviews;
+    infostate_fs.index_put_(
+        {i, Slice(parview_counts[i].item<int>(), num_parviews), Slice()}, 0);
   }
-  torch::Tensor y = torch::cat(out);                                            CHECK_SHAPE(y, {total_batch_parviews});
-  return y;
+
+  torch::Tensor bs = change_of_basis(infostate_fs);                             CHECK_SHAPE(bs, {batch_size, num_parviews, pooled_size()});
+  torch::Tensor cs = base_coordinates(bs, beliefs);                             CHECK_SHAPE(cs, {batch_size, num_parviews, pooled_size()});
+  torch::Tensor pooled = pool(cs);                                              CHECK_SHAPE(pooled, {batch_size, pooled_size()});
+  torch::Tensor context = torch::cat({pooled, public_features}, /*dim=*/1);     CHECK_SHAPE(context, {batch_size, context_size()});
+  torch::Tensor ys = regression(context)
+      .expand({num_parviews, -1, -1}).permute({1, 0, 2});                       CHECK_SHAPE(ys, {batch_size, num_parviews, regression_size()});
+  torch::Tensor proj = (ys * bs).sum(/*dim=*/2);                                CHECK_SHAPE(proj, {batch_size, num_parviews});
+
+  if (zero_sum_regression) {
+    // beliefs * values = 0 (because game is zero-sum) and vectors are
+    // therefore perpendicular. If values are off and are not zero-sum,
+    // we project them to the beliefs plane (beliefs are the normal vector).
+    torch::Tensor batch_beliefs = beliefs.squeeze(/*dim=*/2);                   CHECK_SHAPE(batch_beliefs, {batch_size, num_parviews});
+    torch::Tensor proj_error = (proj * batch_beliefs).sum(/*dim=*/1)
+                             / (batch_beliefs * batch_beliefs).sum(/*dim=*/1);  CHECK_SHAPE(proj_error, {batch_size});
+    proj_error.nan_to_num_();  // Zero-out NaNs due to zero beliefs.
+
+    torch::Tensor expanded_proj_error =
+        proj_error.expand({num_parviews, -1}).permute({1, 0});                  CHECK_SHAPE(expanded_proj_error, {batch_size, num_parviews});
+    proj = proj - expanded_proj_error * batch_beliefs;
+  }
+
+  // No weird values anywhere.
+  SPIEL_DCHECK_FALSE(torch::isfinite(proj).logical_not().any().item<bool>());
+  return proj;
 }
 
 torch::Tensor ParticleValueNet::PrepareTarget(BatchData* batch) {
-  torch::Tensor parviews_counts =
-      batch->data.index({Slice(), Slice(0, 2)}).sum({1});
-
-  std::vector<torch::Tensor> target_slices;
-  target_slices.reserve(batch->size());
-  for (int i = 0; i < batch->size(); ++i) {
-    int num_parviews = parviews_counts[i].item<int>();
-    target_slices.push_back(batch->target.index({i, Slice(0, num_parviews)}));
-  }
-  return torch::cat(target_slices).unsqueeze(/*dim=*/0);
+  return batch->target;
 }
 
 // TODO: test that this indeed initializes weights differently each call.

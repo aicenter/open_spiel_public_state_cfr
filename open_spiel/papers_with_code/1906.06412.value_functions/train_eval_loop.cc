@@ -106,6 +106,9 @@ ABSL_FLAG(std::string, trunk_expl_iterations, "",
 ABSL_FLAG(int, replay_visits_window, -1,
           "Track the average visit count over a past window "
           "behind the head in experience replay");
+ABSL_FLAG(bool, track_time, false, "Track time between loops");
+ABSL_FLAG(bool, track_lr, false, "Track time between loops");
+
 
 // -----------------------------------------------------------------------------
 
@@ -151,8 +154,17 @@ double TrainNetwork(ValueNet* model, torch::Device* device,
 void DecayLearningRate(torch::optim::Optimizer* optimizer, double lr_decay) {
   for (auto &group : optimizer->param_groups()) {
     if(group.has_options()) {
-      auto &options = static_cast<torch::optim::SGDOptions &>(group.options());
+      auto &options = static_cast<torch::optim::AdamOptions &>(group.options());
       options.lr(options.lr() * lr_decay);
+    }
+  }
+}
+
+void ResetLearningRate(torch::optim::Optimizer* optimizer, double lr) {
+  for (auto &group : optimizer->param_groups()) {
+    if(group.has_options()) {
+      auto &options = static_cast<torch::optim::AdamOptions &>(group.options());
+      options.lr(lr);
     }
   }
 }
@@ -170,15 +182,16 @@ int LargestPublicState(const std::vector<PublicState>& states) {
   return max_size;
 }
 
-std::unique_ptr<torch::optim::Optimizer> MakeOptimizer(ValueNet* model) {
+std::shared_ptr<torch::optim::Optimizer> MakeOptimizer(ValueNet* model) {
   std::string choice = absl::GetFlag(FLAGS_optimizer);
   if (choice == "sgd") {
-    return std::make_unique<torch::optim::SGD>(
-        model->parameters(),
-        torch::optim::SGDOptions(absl::GetFlag(FLAGS_learning_rate)));
+    SpielFatalError("Not supported");
+//    return std::make_unique<torch::optim::SGD>(
+//        model->parameters(),
+//        torch::optim::SGDOptions(absl::GetFlag(FLAGS_learning_rate)));
   }
   if (choice == "adam") {
-    return std::make_unique<torch::optim::Adam>(
+    return std::make_shared<torch::optim::Adam>(
         model->parameters(),
         torch::optim::AdamOptions(absl::GetFlag(FLAGS_learning_rate)));
   }
@@ -314,9 +327,10 @@ void TrainEvalLoop() {
   model->to(device);
   //
   std::cout << "# Creating optimizer ..." << std::endl;
-  std::unique_ptr<torch::optim::Optimizer> optimizer =
+  std::shared_ptr<torch::optim::Optimizer> optimizer =
       MakeOptimizer(model.get());
   const double lr_decay = absl::GetFlag(FLAGS_lr_decay);
+  const double learning_rate = absl::GetFlag(FLAGS_learning_rate);
   //
   const int replay_size = absl::GetFlag(FLAGS_replay_size);
   std::cout << "# Allocating experience replay ("
@@ -384,6 +398,14 @@ void TrainEvalLoop() {
       SPIEL_CHECK_LE(window, replay_size);
       metrics.push_back(MakeReplayVisitsMetric(&experience_replay, window));
     }
+  }
+  if (absl::GetFlag(FLAGS_track_lr)) {
+    std::cout << "# Making tracking learning rate ..." << std::endl;
+    metrics.push_back(MakeTrackLearningRate(optimizer.get()));
+  }
+  if (absl::GetFlag(FLAGS_track_time)) {
+    std::cout << "# Making tracking time metric ..." << std::endl;
+    metrics.push_back(MakeTrackTimeMetric());
   }
   //
   ReplayFillerPolicy exp_init =
@@ -461,6 +483,9 @@ void TrainEvalLoop() {
         std::cout << "# Resetting net weights with random init." << std::endl;
         model->apply(InitWeights);
       }
+      std::cout << "# Resetting optimizer." << std::endl;
+      optimizer->state().clear();
+      ResetLearningRate(optimizer.get(), learning_rate);
     }
 
     std::cout << "# Training  ";
@@ -481,7 +506,7 @@ void TrainEvalLoop() {
     std::cout << loop << ',' << cumul_loss / train_batches;
     PrintMetrics(metrics);
     std::cout << std::endl;
-    //    DecayLearningRate(optimizer.get(), lr_decay);
+    DecayLearningRate(optimizer.get(), lr_decay);
   }
   // ---------------------------------------------------------------------------
   if (filler.bootstrap) {

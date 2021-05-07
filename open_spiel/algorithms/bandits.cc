@@ -135,30 +135,15 @@ std::vector<double> RegretMatchingPlus::AverageStrategy() const {
   std::vector<double> strategy;
   strategy.reserve(num_actions());
   double normalization = 0.;
-  for (double action : cumulative_strategy_) normalization += action;
-
+  for (double action : cumulative_strategy_) {
+    if (action >= kRegretMatchingAvgStratCutoff) normalization += action;
+  }
   if (normalization) {
     for (int i = 0; i < num_actions(); ++i) {
-      strategy.push_back(cumulative_strategy_[i] / normalization);
-    }
-    double redistribute = 0.;
-    double zeroed_actions = 0.;
-    for (int i = 0; i < num_actions(); ++i) {
-      if (strategy[i] < kRegretMatchingAvgStratCutoff) {
-        redistribute += strategy[i];
-        zeroed_actions += 1;
-        strategy[i] = 0;
-      }
-    }
-    int num_redistribute = num_actions() - zeroed_actions;
-    if (num_redistribute > 0) {
-      for (int i = 0; i < num_actions(); ++i) {
-        if (strategy[i] > 0.) {
-          if (num_redistribute > 1)
-            strategy[i] += redistribute / num_redistribute;
-          else
-            strategy[i] = 1.;  // Avoid imprecise values like 0.99999999999998
-        }
+      if (cumulative_strategy_[i]  >= kRegretMatchingAvgStratCutoff) {
+        strategy.push_back(cumulative_strategy_[i] / normalization);
+      } else {
+        strategy.push_back(0.);
       }
     }
   } else {

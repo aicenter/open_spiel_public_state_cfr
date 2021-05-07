@@ -47,6 +47,9 @@ std::unique_ptr<Metric> MakeFullTrunkExplMetric(
 std::unique_ptr<Metric> MakeReplayVisitsMetric(
     ExperienceReplay* replay, int window);
 
+std::unique_ptr<Metric> MakeTrackTimeMetric();
+std::unique_ptr<Metric> MakeTrackLearningRate(torch::optim::Optimizer* optimizer);
+
 void ComputeMetrics(std::vector<std::unique_ptr<Metric>>& metrics);
 void PrintHeaders(const std::vector<std::unique_ptr<Metric>>& metrics);
 void PrintMetrics(const std::vector<std::unique_ptr<Metric>>& metrics);

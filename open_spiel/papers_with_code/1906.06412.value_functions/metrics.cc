@@ -16,6 +16,8 @@
 #include "open_spiel/papers_with_code/1906.06412.value_functions/subgame_factory.h"
 #include "open_spiel/algorithms/dispatch_policy.h"
 
+#include <chrono>
+
 namespace open_spiel {
 namespace papers_with_code {
 
@@ -109,6 +111,45 @@ class ReplayVisitsMetric : public Metric {
   void Reset() override { avg_visits_ = 0;  }
 };
 
+
+class TrackTimeMetric : public Metric {
+  std::chrono::time_point<std::chrono::system_clock> prev;
+  std::chrono::duration<double> dt;
+ public:
+  TrackTimeMetric() : prev(std::chrono::system_clock::now()) {}
+  std::string name() const override { return "time_elapsed"; }
+  void Evaluate(std::ostream& progress) override {
+    auto now = std::chrono::system_clock::now();
+    dt = now - prev;
+    prev = now;
+  }
+
+  void PrintHeader(std::ostream& os) const override { os << name(); }
+  void PrintMetric(std::ostream& os) const override { os << dt.count(); }
+  void Reset() override {}
+};
+
+class TrackLearningRate : public Metric {
+  torch::optim::Optimizer* optimizer_;
+  double lr;
+ public:
+  TrackLearningRate(torch::optim::Optimizer* optimizer)
+    : optimizer_(optimizer) {}
+  std::string name() const override { return "lr"; }
+  void Evaluate(std::ostream& progress) override {
+    for (auto &group : optimizer_->param_groups()) {
+      if(group.has_options()) {
+        auto &options = static_cast<torch::optim::AdamOptions &>(group.options());
+        lr = options.lr();
+      }
+    }
+  }
+
+  void PrintHeader(std::ostream& os) const override { os << name(); }
+  void PrintMetric(std::ostream& os) const override { os << lr; }
+  void Reset() override {}
+};
+
 std::unique_ptr<Metric> MakeFullTrunkExplMetric(
     std::vector<int> evaluate_iters, SubgameSolver* trunk_with_net,
     or_algs::SequenceFormLpSpecification* whole_game) {
@@ -120,6 +161,15 @@ std::unique_ptr<Metric> MakeReplayVisitsMetric(ExperienceReplay* replay,
                                                int window) {
   return std::make_unique<ReplayVisitsMetric>(replay, window);
 }
+
+std::unique_ptr<Metric> MakeTrackTimeMetric() {
+  return std::make_unique<TrackTimeMetric>();
+}
+
+std::unique_ptr<Metric> MakeTrackLearningRate(torch::optim::Optimizer* optimizer) {
+  return std::make_unique<TrackLearningRate>(optimizer);
+}
+
 
 void ComputeMetrics(std::vector<std::unique_ptr<Metric>>& metrics) {
   for (std::unique_ptr<Metric>& evaluator : metrics) {
