@@ -233,6 +233,7 @@ class SherlockBotFactory : public BotFactory {
     int num_inputs_regression =
         GetParameterValue(bot_params, "num_inputs_regression", 128);
     bool zero_sum_regression = GetParameterValue(bot_params, "zero_sum_regression", false);
+    bool normalize_beliefs = GetParameterValue(bot_params, "normalize_beliefs", false);
     int cfr_iterations = GetParameterValue(bot_params, "cfr_iterations", kDefaultCfrIterations);
     int max_move_ahead_limit = GetParameterValue(bot_params, "max_move_ahead_limit", 1);
     int max_particles = GetParameterValue(bot_params, "max_particles", 1000);
@@ -262,7 +263,8 @@ class SherlockBotFactory : public BotFactory {
     //
     std::shared_ptr<ValueNet> model = MakeModel(
         NetArchitecture::kParticle,
-        dims, num_layers, num_width, num_inputs_regression, zero_sum_regression);
+        dims, num_layers, num_width, num_inputs_regression,
+        zero_sum_regression, normalize_beliefs);
     LoadNetSnapshot(model, load_from);
     model->eval();  // Set only eval mode.
     //

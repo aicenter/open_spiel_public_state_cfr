@@ -89,9 +89,11 @@ ParticleValueNet::ParticleValueNet(std::shared_ptr<ParticleDims> particle_dims,
                                    size_t num_width_regression,
                                    size_t num_inputs_regression,
                                    bool zero_sum_regression,
+                                   bool normalize_beliefs,
                                    ActivationFunction activation)
     : dims(particle_dims),
       zero_sum_regression(zero_sum_regression),
+      normalize_beliefs(normalize_beliefs),
       activation_fn(activation),
       num_inputs_regression(num_inputs_regression) {
   int num_layers_kernel = 4;
@@ -192,10 +194,21 @@ torch::Tensor ParticleValueNet::forward(torch::Tensor xss) {
 
   // Zero-out public state features for non-full sets.
   torch::Tensor parview_counts =
-      xss.index({Batch, Slice(0, pub_features_offset)}).sum(/*dim=*/1);         CHECK_SHAPE(parview_counts, {batch_size});
+      xss.index({Batch, Slice(0, pub_features_offset)});                        CHECK_SHAPE(parview_counts, {batch_size, 2});
+  torch::Tensor parview_sum = parview_counts.sum(/*dim=*/1);                    CHECK_SHAPE(parview_sum, {batch_size});
+  torch::Tensor belief_normalizer = torch::ones({batch_size, 2});
   for (int i = 0; i < batch_size; ++i) {
     infostate_fs.index_put_(
-        {i, Slice(parview_counts[i].item<int>(), num_parviews), Slice()}, 0);
+        {i, Slice(parview_sum[i].item<int>(), num_parviews), Slice()}, 0);
+    if (normalize_beliefs) {
+      auto slice_pl0 = Slice(0, parview_counts[i][0].item<int>());
+      auto slice_pl1 = Slice(parview_counts[i][0].item<int>(),
+                             parview_sum[i].item<int>());
+      belief_normalizer.index_put_({i, 0}, beliefs.index({i, slice_pl0}).sum());
+      belief_normalizer.index_put_({i, 1}, beliefs.index({i, slice_pl1}).sum());
+      beliefs.index({i, slice_pl0}).div_(belief_normalizer[i][0]).nan_to_num_();
+      beliefs.index({i, slice_pl1}).div_(belief_normalizer[i][1]).nan_to_num_();
+    }
   }
 
   torch::Tensor bs = change_of_basis(infostate_fs);                             CHECK_SHAPE(bs, {batch_size, num_parviews, pooled_size()});
@@ -218,6 +231,17 @@ torch::Tensor ParticleValueNet::forward(torch::Tensor xss) {
     torch::Tensor expanded_proj_error =
         proj_error.expand({num_parviews, -1}).permute({1, 0});                  CHECK_SHAPE(expanded_proj_error, {batch_size, num_parviews});
     proj = proj - expanded_proj_error * batch_beliefs;
+  }
+
+  if (normalize_beliefs) {
+    for (int i = 0; i < batch_size; ++i) {
+      auto slice_pl0 = Slice(0, parview_counts[i][0].item<int>());
+      auto slice_pl1 = Slice(parview_counts[i][0].item<int>(),
+                             parview_sum[i].item<int>());
+      // Opposite CFVs !!!
+      proj.index({i, slice_pl0}).mul_(belief_normalizer[i][1]);
+      proj.index({i, slice_pl1}).mul_(belief_normalizer[i][0]);
+    }
   }
 
   // No weird values anywhere.
@@ -270,7 +294,8 @@ std::shared_ptr<ValueNet> MakeModel(
     int num_layers_regression,
     int num_width_regression,
     int num_inputs_regression,
-    bool zero_sum_regression
+    bool zero_sum_regression,
+    bool normalize_beliefs
 ) {
   SPIEL_CHECK_GE(num_layers_regression, 1);
   SPIEL_CHECK_GE(num_width_regression, 1);
@@ -280,7 +305,7 @@ std::shared_ptr<ValueNet> MakeModel(
       auto model = std::make_shared<ParticleValueNet>(
           particle_dims,
           num_layers_regression, num_width_regression, num_inputs_regression,
-          zero_sum_regression,
+          zero_sum_regression, normalize_beliefs,
           ActivationFunction::kRelu);
       return model;
     }

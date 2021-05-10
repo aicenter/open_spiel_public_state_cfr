@@ -97,6 +97,8 @@ ABSL_FLAG(int, num_inputs_regression, 128,
 ABSL_FLAG(bool, zero_sum_regression, false,
           "Make the regressed values automatically zero-sum through special "
           "layer (does not introduce any new weights)");
+ABSL_FLAG(bool, normalize_beliefs, false,
+          "Normalize the per-player beliefs and values accordingly.");
 
 // -- Metrics --
 // FullTrunkExplMetric
@@ -323,7 +325,8 @@ void TrainEvalLoop() {
   std::shared_ptr<ValueNet> model = MakeModel(
       arch, dims,
       absl::GetFlag(FLAGS_num_layers), absl::GetFlag(FLAGS_num_width),
-      num_inputs_regression, absl::GetFlag(FLAGS_zero_sum_regression));
+      num_inputs_regression, absl::GetFlag(FLAGS_zero_sum_regression),
+      absl::GetFlag(FLAGS_normalize_beliefs));
   model->to(device);
   //
   std::cout << "# Creating optimizer ..." << std::endl;
@@ -374,7 +377,7 @@ void TrainEvalLoop() {
   filler.randomizer = &randomizer;
   filler.reuse      = &reuse;
   filler.arch       = arch;
-  filler.shuffle_input_output = absl::GetFlag(FLAGS_shuffle_input_output);
+  filler.shuffle_input_output = false; //absl::GetFlag(FLAGS_shuffle_input_output);
   filler.sparse_particles     = absl::GetFlag(FLAGS_sparse_particles);
   filler.sparse_epsilon       = absl::GetFlag(FLAGS_sparse_epsilon);
   filler.eval_iters =
