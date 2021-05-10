@@ -52,6 +52,7 @@ struct SubgameFactory {
                                        int custom_move_ahead_limit = -1) const;
   std::shared_ptr<Subgame> MakeSubgameSafeResolving(const ParticleSet& set,
                                                          int player,
+                                                         std::unordered_map<std::string, double> CFVs,
                                                          int custom_move_ahead_limit = -1) const;
   std::shared_ptr<Subgame> MakeSubgame(const PublicState& state,
                                        int custom_move_ahead_limit = -1) const;
@@ -60,7 +61,8 @@ struct SubgameFactory {
   std::vector<std::shared_ptr<algorithms::InfostateTree>>
     MakeSubgameInfostateTrees(const ParticleSet& set, int depth) const;
   std::vector<std::shared_ptr<algorithms::InfostateTree>>
-    MakeSubgameInfostateTreesSafeResolving(const ParticleSet& set, int depth, int player) const;
+    MakeSubgameInfostateTreesSafeResolving(const ParticleSet& set, int depth,
+            int player, std::unordered_map<std::string, double> CFVs) const;
 
 };
 

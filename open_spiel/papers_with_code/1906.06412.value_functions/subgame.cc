@@ -48,8 +48,8 @@ void CheckConsistency(const PublicState& s) {
           SPIEL_CHECK_TRUE(state_histories.find(h) != state_histories.end());
         }
 
-        if (state->IsTerminal()) num_terminals++;
-        else num_nonterminals++;
+//        if (state->IsTerminal()) num_terminals++;
+//        else num_nonterminals++;
       }
     }
   }
@@ -132,6 +132,7 @@ PublicState::PublicState(const Observation& public_observation,
 bool PublicState::IsTerminal() const {
   // A quick shortcut for checking if the state is terminal: we ensure
   // this indeed holds by calling CheckConsistency() in debug mode.
+  // TODO: find which player has non empty nodes and call type
   SPIEL_DCHECK_FALSE(nodes[0].empty());
   SPIEL_DCHECK_TRUE(nodes[0][0]);
   return nodes[0][0]->type() == algorithms::kTerminalInfostateNode;

@@ -157,7 +157,7 @@ void TestMakeAllPublicStates(const std::string& game_name) {
 //    for (int pl = 0; pl < 2; ++pl) {
 //      std::cout << "Nodes " << pl << ":\n";
 //      for (const InfostateNode* node : s.nodes[pl]) {
-//        std::cout << "  " << node->ToString() << "\n";
+//        std::cout << "  " << node->TreePath() << "\n";
 //        std::cout << "  States:\n";
 //        for (const std::unique_ptr<State> & state
 //            : node->corresponding_states()) {

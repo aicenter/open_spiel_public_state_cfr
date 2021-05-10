@@ -84,9 +84,9 @@ std::ostream& InfostateNode::operator<<(std::ostream& os) const {
   return os << parent_ << ',' << incoming_index_;
 }
 
-std::string InfostateNode::ToString() const {
+std::string InfostateNode::TreePath() const {
   if (!parent_) return "x";
-  return absl::StrCat(parent_->ToString(), ",", incoming_index_);
+  return absl::StrCat(parent_->TreePath(), ",", incoming_index_);
 }
 
 std::string InfostateNode::MakeCertificate() const {
@@ -202,9 +202,16 @@ std::unique_ptr<InfostateNode> InfostateTree::MakeNode(
       originating_state && originating_state->IsPlayerActing(acting_player_)
           ? originating_state->LegalActions(acting_player_)
           : std::vector<Action>();
-  auto terminal_history = originating_state && originating_state->IsTerminal()
+  std::vector<Action> terminal_history;
+  if (safe_resolving_) {
+      terminal_history = originating_state ? originating_state->History()
+                                                : std::vector<Action>();
+  } else {
+      terminal_history = originating_state && originating_state->IsTerminal()
                               ? originating_state->History()
                               : std::vector<Action>();
+  }
+
   // Instantiate node using new to make sure that we can call
   // the private constructor.
   auto node = std::unique_ptr<InfostateNode>(new InfostateNode(
@@ -250,6 +257,37 @@ void InfostateTree::AddCorrespondingState(InfostateNode* node,
 void InfostateTree::RecursivelyBuildTree(InfostateNode* parent, size_t depth,
                                          const State& state,
                                          double chance_reach_prob) {
+  if(safe_resolving_ and depth == 1) {
+      // std::cout << "Builidng the F/T node\n";
+      // Make the F/T node
+      SPIEL_DCHECK_EQ(parent->type(), kObservationInfostateNode);
+      std::string info_state =
+              infostate_observer_->StringFrom(state, acting_player_);
+      InfostateNode *node;
+      if (ftplayer_ == acting_player_) {
+           node = parent->AddChild(MakeNode(
+                  parent, kDecisionInfostateNode, "f/t" + info_state,
+                  /*terminal_utility=*/NAN, /*chance_reach_prob=*/NAN, depth, &state));
+      } else {
+          node = parent->AddChild(MakeNode(
+                  parent, kObservationInfostateNode, "f/t" + info_state,
+                  /*terminal_utility=*/NAN, /*chance_reach_prob=*/NAN, depth, &state));
+      }
+      AddCorrespondingState(node, state, chance_reach_prob);
+      parent = node;
+      depth++;
+
+      // Make the terminal node
+      std::string cfv_info_state =
+              infostate_observer_->StringFrom(state, ftplayer_);
+      const double terminal_utility = CFVs_->at(cfv_info_state);
+      InfostateNode* terminal_node = parent->AddChild(
+              MakeNode(parent, kTerminalInfostateNode,
+                       "terminal" + info_state,
+                       terminal_utility, chance_reach_prob, depth, &state));
+      UpdateLeafNode(depth);
+      AddCorrespondingState(terminal_node, state, chance_reach_prob);
+  }
   if (state.IsTerminal()) {
     return BuildTerminalNode(parent, depth, state, chance_reach_prob);
   } else if (state.IsPlayerActing(acting_player_)) {
@@ -257,21 +295,6 @@ void InfostateTree::RecursivelyBuildTree(InfostateNode* parent, size_t depth,
   } else {
     return BuildObservationNode(parent, depth, state, chance_reach_prob);
   }
-}
-
-void InfostateTree::RecursivelyBuildTreeSafeResolving(InfostateNode* parent, size_t depth,
-                                             const State& state,
-                                             double chance_reach_prob) {
-    if(state.MoveNumber() == 0) {
-        std::cout << "Here I would like to have the F/T node\n";
-    }
-    if (state.IsTerminal()) {
-        return BuildTerminalNode(parent, depth, state, chance_reach_prob);
-    } else if (state.IsPlayerActing(acting_player_)) {
-        return BuildDecisionNode(parent, depth, state, chance_reach_prob);
-    } else {
-        return BuildObservationNode(parent, depth, state, chance_reach_prob);
-    }
 }
 
 void InfostateTree::BuildTerminalNode(InfostateNode* parent, size_t depth,
@@ -289,7 +312,7 @@ void InfostateTree::BuildTerminalNode(InfostateNode* parent, size_t depth,
 void InfostateTree::BuildDecisionNode(InfostateNode* parent, size_t depth,
                                       const State& state,
                                       double chance_reach_prob) {
-  SPIEL_DCHECK_EQ(parent->type(), kObservationInfostateNode);
+  //SPIEL_DCHECK_EQ(parent->type(), kObservationInfostateNode);
   std::string info_state =
       infostate_observer_->StringFrom(state, acting_player_);
   InfostateNode* decision_node = parent->GetChild(info_state);
@@ -513,11 +536,12 @@ std::shared_ptr<InfostateTree> MakeInfostateTreeSafeResolving(
         const std::vector<std::unique_ptr<State>>& start_states,
         const std::vector<double>& chance_reach_probs,
         std::shared_ptr<Observer> infostate_observer, Player acting_player,
-        int max_move_ahead_limit, int storage_policy) {
+        std::unordered_map<std::string, double> CFVs,
+        int ftplayer, int max_move_ahead_limit, int storage_policy) {
     return std::shared_ptr<InfostateTree>(
             new InfostateTree(start_states, chance_reach_probs, infostate_observer,
                     acting_player, max_move_ahead_limit,
-                    storage_policy, true));
+                    storage_policy, true, &CFVs, ftplayer));
 }
 
 std::vector<std::shared_ptr<InfostateTree>> MakeInfostateTrees(

@@ -46,9 +46,13 @@ class SherlockBot : public Bot {
 
   std::unordered_map<std::string, double> GetCFVs(PublicState *publicState) {
       std::unordered_map<std::string, double> CFVs;
-      for (auto& infostate : publicState->nodes) {
-
+      for (auto& infostate : publicState->nodes[1-player_id_]) {
+          std::string infostate_string = infostate->infostate_string();
+          int value_index = publicState->nodes_positions.at(infostate);
+          double cfv = publicState->average_values[1-player_id_][value_index];
+          CFVs.emplace(infostate_string, cfv);
       }
+      return CFVs;
   }
 
   std::pair<ActionsAndProbs, Action> StepWithPolicy(const State& state) override {
@@ -113,12 +117,13 @@ class SherlockBot : public Bot {
     //      particle.player_reach[1] = 1.;
     //    }
 
-    std::cout << "# Making subgame\n";
-    std::shared_ptr<Subgame> subgame = subgame_factory_->MakeSubgame(*set);
-
     // We will do the gadget if we are resolving
+    std::cout << "# Making subgame\n";
+    std::shared_ptr<Subgame> subgame;
     if (state.MoveNumber() > 0) {
-
+        subgame = subgame_factory_->MakeSubgameSafeResolving(*set, player_id_, GetCFVs(publicState));
+    } else {
+        subgame = subgame_factory_->MakeSubgame(*set);
     }
     // TODO: implement continual resolving.
     //  Update subgame's infostate trees: subgame->trees[1-player_id_]
