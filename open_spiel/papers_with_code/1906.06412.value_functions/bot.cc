@@ -44,6 +44,13 @@ class SherlockBot : public Bot {
     return StepWithPolicy(state).second;
   }
 
+  std::unordered_map<std::string, double> GetCFVs(PublicState *publicState) {
+      std::unordered_map<std::string, double> CFVs;
+      for (auto& infostate : publicState->nodes) {
+
+      }
+  }
+
   std::pair<ActionsAndProbs, Action> StepWithPolicy(const State& state) override {
     SPIEL_CHECK_TRUE(state.IsPlayerActing(player_id_));
 

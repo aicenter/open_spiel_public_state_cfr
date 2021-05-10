@@ -294,6 +294,15 @@ std::shared_ptr<InfostateTree> MakeInfostateTree(
     int max_move_ahead_limit = kDefaultMoveAheadLimit,
     int storage_policy = kDefaultStoragePolicy);
 
+// Creates an infostate tree for a player based on some start states,
+// up to some move limit from the deepest start state.
+std::shared_ptr<InfostateTree> MakeInfostateTreeSafeResolving(
+        const std::vector<std::unique_ptr<State>>& start_states,
+        const std::vector<double>& chance_reach_probs,
+        std::shared_ptr<Observer> infostate_observer, Player acting_player,
+        int max_move_ahead_limit = kDefaultMoveAheadLimit,
+        int storage_policy = kDefaultStoragePolicy);
+
 // Creates an infostate tree based on some leaf infostate nodes coming from
 // another infostate tree, up to some move limit.
 // This is useful for easily constructing (depth-limited) tree continuations.
@@ -433,35 +442,48 @@ class InfostateTree final {
                 const std::vector<double>& chance_reach_probs,
                 std::shared_ptr<Observer> infostate_observer,
                 Player acting_player, int max_move_ahead_limit,
-                int storage_policy)
-      : acting_player_(acting_player),
-        infostate_observer_(std::move(infostate_observer)),
-        root_(MakeRootNode()),
-        storage_policy_(storage_policy) {
-    SPIEL_CHECK_FALSE(start_states.empty());
-    SPIEL_CHECK_EQ(start_states.size(), chance_reach_probs.size());
-    SPIEL_CHECK_GE(acting_player_, 0);
-    SPIEL_CHECK_LT(acting_player_, start_states[0]->GetGame()->NumPlayers());
-    SPIEL_CHECK_TRUE(infostate_observer_->HasString());
+                int storage_policy) : InfostateTree(
+                        start_states, chance_reach_probs, infostate_observer,
+                        acting_player, max_move_ahead_limit, storage_policy, false){}
 
-    int start_max_move_number = 0;
-    for (const auto& start_state : start_states) {
-      start_max_move_number =
-          std::max(start_max_move_number, start_state->MoveNumber());
+  template<typename S>
+  InfostateTree(const std::vector<S>& start_states,
+                  const std::vector<double>& chance_reach_probs,
+                  std::shared_ptr<Observer> infostate_observer,
+                  Player acting_player, int max_move_ahead_limit,
+                  int storage_policy, bool safe_resolving)
+            : acting_player_(acting_player),
+              infostate_observer_(std::move(infostate_observer)),
+              root_(MakeRootNode()),
+              storage_policy_(storage_policy) {
+        SPIEL_CHECK_FALSE(start_states.empty());
+        SPIEL_CHECK_EQ(start_states.size(), chance_reach_probs.size());
+        SPIEL_CHECK_GE(acting_player_, 0);
+        SPIEL_CHECK_LT(acting_player_, start_states[0]->GetGame()->NumPlayers());
+        SPIEL_CHECK_TRUE(infostate_observer_->HasString());
+
+        int start_max_move_number = 0;
+        for (const auto& start_state : start_states) {
+            start_max_move_number =
+                    std::max(start_max_move_number, start_state->MoveNumber());
+        }
+        move_limit_ = start_max_move_number + max_move_ahead_limit;
+
+        for (int i = 0; i < start_states.size(); ++i) {
+            if(safe_resolving) {
+                RecursivelyBuildTreeSafeResolving(root_.get(), /*depth=*/1, *start_states[i], chance_reach_probs[i]);
+            } else {
+                RecursivelyBuildTree(root_.get(), /*depth=*/1, *start_states[i], chance_reach_probs[i]);
+            }
+        }
+
+        // Operations to make after building the tree.
+        RebalanceTree();
+        nodes_at_depths_.resize(tree_height() + 1);
+        CollectNodesAtDepth(mutable_root(), 0);
+        LabelNodesWithIds();
     }
-    move_limit_ = start_max_move_number + max_move_ahead_limit;
 
-    for (int i = 0; i < start_states.size(); ++i) {
-      RecursivelyBuildTree(root_.get(), /*depth=*/1,
-                           *start_states[i], chance_reach_probs[i]);
-    }
-
-    // Operations to make after building the tree.
-    RebalanceTree();
-    nodes_at_depths_.resize(tree_height() + 1);
-    CollectNodesAtDepth(mutable_root(), 0);
-    LabelNodesWithIds();
-  }
   // Friend factories.
   // Note that only MakeInfostateTree is allowed to call the constructor
   // to ensure the trees are always allocated on heap. We do this so that all
@@ -477,6 +499,10 @@ class InfostateTree final {
       std::shared_ptr<Observer>, Player, int, int);
   friend std::shared_ptr<InfostateTree> MakeInfostateTree(
       const std::vector<const InfostateNode*>&, int, int);
+
+  friend std::shared_ptr<InfostateTree> MakeInfostateTreeSafeResolving(
+          const std::vector<std::unique_ptr<State>>&, const std::vector<double>&,
+          std::shared_ptr<Observer>, Player, int, int);
 
   const Player acting_player_;
   const std::shared_ptr<Observer> infostate_observer_;
@@ -513,6 +539,11 @@ class InfostateTree final {
   // Build the tree.
   void RecursivelyBuildTree(InfostateNode* parent, size_t depth,
                             const State& state, double chance_reach_prob);
+  // Build the tree.
+  void RecursivelyBuildTreeSafeResolving(InfostateNode* parent, size_t depth,
+          const State& state, double chance_reach_prob);
+
+
   void BuildTerminalNode(InfostateNode* parent, size_t depth,
                          const State& state, double chance_reach_prob);
   void BuildDecisionNode(InfostateNode* parent, size_t depth,

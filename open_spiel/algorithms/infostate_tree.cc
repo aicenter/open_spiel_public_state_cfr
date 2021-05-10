@@ -259,6 +259,21 @@ void InfostateTree::RecursivelyBuildTree(InfostateNode* parent, size_t depth,
   }
 }
 
+void InfostateTree::RecursivelyBuildTreeSafeResolving(InfostateNode* parent, size_t depth,
+                                             const State& state,
+                                             double chance_reach_prob) {
+    if(state.MoveNumber() == 0) {
+        std::cout << "Here I would like to have the F/T node\n";
+    }
+    if (state.IsTerminal()) {
+        return BuildTerminalNode(parent, depth, state, chance_reach_prob);
+    } else if (state.IsPlayerActing(acting_player_)) {
+        return BuildDecisionNode(parent, depth, state, chance_reach_prob);
+    } else {
+        return BuildObservationNode(parent, depth, state, chance_reach_prob);
+    }
+}
+
 void InfostateTree::BuildTerminalNode(InfostateNode* parent, size_t depth,
                                       const State& state,
                                       double chance_reach_prob) {
@@ -492,6 +507,17 @@ std::shared_ptr<InfostateTree> MakeInfostateTree(
       new InfostateTree(start_states, chance_reach_probs, infostate_observer,
                         acting_player, max_move_ahead_limit,
                         storage_policy));
+}
+
+std::shared_ptr<InfostateTree> MakeInfostateTreeSafeResolving(
+        const std::vector<std::unique_ptr<State>>& start_states,
+        const std::vector<double>& chance_reach_probs,
+        std::shared_ptr<Observer> infostate_observer, Player acting_player,
+        int max_move_ahead_limit, int storage_policy) {
+    return std::shared_ptr<InfostateTree>(
+            new InfostateTree(start_states, chance_reach_probs, infostate_observer,
+                    acting_player, max_move_ahead_limit,
+                    storage_policy, true));
 }
 
 std::vector<std::shared_ptr<InfostateTree>> MakeInfostateTrees(

@@ -40,6 +40,17 @@ std::shared_ptr<Subgame> SubgameFactory::MakeSubgame(
   return out;
 }
 
+    std::shared_ptr<Subgame> SubgameFactory::MakeSubgameSafeResolving(
+            const ParticleSet& set, int player, int custom_move_ahead_limit) const {
+        SPIEL_CHECK_LE(set.particles.size(), max_particles);
+        int depth = custom_move_ahead_limit > 0 ? custom_move_ahead_limit
+                                                : max_move_ahead_limit;
+        auto trees = MakeSubgameInfostateTrees(set, depth);
+        auto out = std::make_unique<Subgame>(game, public_observer, trees);
+        set.AssignBeliefs(out->initial_state());  // Compute initial beliefs..
+        return out;
+    }
+
 std::shared_ptr<Subgame> SubgameFactory::MakeSubgame(
     const PublicState& state, int custom_move_ahead_limit) const {
   std::vector<std::shared_ptr<algorithms::InfostateTree>> trees;
@@ -80,6 +91,34 @@ SubgameFactory::MakeSubgameInfostateTrees(const ParticleSet& set, int depth) con
                                             trees[1]->root().children()}, set));
   return trees;
 }
+
+    std::vector<std::shared_ptr<algorithms::InfostateTree>>
+    SubgameFactory::MakeSubgameInfostateTreesSafeResolving(const ParticleSet& set, int depth, int player) const {
+        SPIEL_CHECK_LE(set.particles.size(), max_particles);
+        SPIEL_DCHECK(CheckParticleSetConsistency(*game, public_observer,
+                                                 hand_observer, set));
+        std::vector<std::unique_ptr<State>> root_histories;
+        std::vector<double> chance_reach_probs;
+        for (const Particle& particle : set.particles) {
+            root_histories.push_back(particle.MakeState(*game));
+            chance_reach_probs.push_back(particle.chance_reach);
+        }
+        std::vector<std::shared_ptr<algorithms::InfostateTree>> trees;
+        trees.push_back(algorithms::MakeInfostateTree(
+                root_histories, chance_reach_probs,
+                infostate_observer, 1-player, depth,
+                kDlCfrInfostateTreeStorage
+        ));
+        trees.push_back(algorithms::MakeInfostateTreeSafeResolving(
+                root_histories, chance_reach_probs,
+                infostate_observer, player, depth,
+                kDlCfrInfostateTreeStorage
+        ));
+        SPIEL_DCHECK(CheckParticleSetConsistency(*game, infostate_observer,
+                                                 {trees[0]->root().children(),
+                                                  trees[1]->root().children()}, set));
+        return trees;
+    }
 
 
 }  // papers_with_code

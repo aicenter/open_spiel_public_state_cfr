@@ -170,8 +170,8 @@ void InfostateCFR::RunSimultaneousIterations(int iterations) {
     ++num_iterations_;
     PrepareRootReachProbs();
     for (int pl = 0; pl < 2; ++pl) {
-      TopDown(*trees_[pl], bandits_[pl],
-              absl::MakeSpan(reach_probs_[pl]), num_iterations_);
+        TopDownCurrent(*trees_[pl], bandits_[pl],
+                       absl::MakeSpan(reach_probs_[pl]), num_iterations_);
     }
     SPIEL_CHECK_FLOAT_NEAR(TerminalReachProbSum(), 1.0, 1e-3);
 
@@ -189,8 +189,8 @@ void InfostateCFR::RunAlternatingIterations(int iterations) {
     ++num_iterations_;
     for (int pl = 0; pl < 2; ++pl) {
       PrepareRootReachProbs(1 - pl);
-      TopDown(*trees_[1 - pl], bandits_[1 - pl],
-              absl::MakeSpan(reach_probs_[1 - pl]), num_iterations_);
+        TopDownCurrent(*trees_[1 - pl], bandits_[1 - pl],
+                       absl::MakeSpan(reach_probs_[1 - pl]), num_iterations_);
 
       EvaluateLeaves(pl);
       BottomUp(*trees_[pl], bandits_[pl], absl::MakeSpan(cf_values_[pl]));

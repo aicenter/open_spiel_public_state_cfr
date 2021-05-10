@@ -352,11 +352,11 @@ SubgameSolver::SubgameSolver(
     const std::shared_ptr<const PublicStateEvaluator> terminal_evaluator,
     const std::string& bandit_name,
     SaveValuesPolicy save_values_policy,
-    bool save_average_values
+    bool safe_resolving
 ) : subgame_(subgame),
     nonterminal_evaluator_(nonterminal_evaluator),
     terminal_evaluator_(terminal_evaluator),
-    save_average_values_(save_average_values),
+    safe_resolving_(safe_resolving),
     bandits_(algorithms::MakeBanditVectors(subgame_->trees, bandit_name)),
     reach_probs_({std::vector<double>(subgame_->trees[0]->num_leaves()),
                   std::vector<double>(subgame_->trees[1]->num_leaves())}),
@@ -414,6 +414,20 @@ void SubgameSolver::RunSimultaneousIterations(int iterations) {
   if (init_save_values_ == SaveValuesPolicy::kCurrentCfValues) {
     CopyValuesToInitialState();
   }
+
+  // 5. put average beliefs to the leaf public states so we can reuse them in next step
+  // 5.1 Prepare initial reach probs, based on beliefs in initial state.
+  if (safe_resolving_) {
+      std::array<std::vector<double>, 2>& beliefs = initial_state().beliefs;
+      for (int pl = 0; pl < 2; ++pl) {
+          std::copy(beliefs[pl].begin(), beliefs[pl].end(),reach_probs_[pl].begin());
+      }
+
+      // 5.2 Copmute reach probs to the terminals
+      for (int pl = 0; pl < 2; ++pl) {
+          TopDownAverage(*subgame_->trees[pl], bandits_[pl], absl::MakeSpan(reach_probs_[pl]), num_iterations_);
+      }
+  }
 }
 
 void SubgameSolver::EvaluateLeaves() {
@@ -468,7 +482,7 @@ void SubgameSolver::EvaluateLeaf(PublicState* state,
   }
 
   // 4. Incrementally update average CFVs
-  if(save_average_values_) {
+  if(safe_resolving_) {
       for (int pl = 0; pl < 2; pl++) {
           const int num_leaves = state->nodes[pl].size();
           for (int j = 0; j < num_leaves; ++j) {
