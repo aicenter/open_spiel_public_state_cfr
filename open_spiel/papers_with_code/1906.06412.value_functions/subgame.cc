@@ -390,8 +390,8 @@ void SubgameSolver::RunSimultaneousIterations(int iterations) {
 
     // 2. Compute reach probs to the terminals.
     for (int pl = 0; pl < 2; ++pl) {
-      TopDown(*subgame_->trees[pl], bandits_[pl],
-              absl::MakeSpan(reach_probs_[pl]), num_iterations_);
+        TopDownCurrent(*subgame_->trees[pl], bandits_[pl],
+                       absl::MakeSpan(reach_probs_[pl]), num_iterations_);
     }
 
     // 3. Evaluate leaves using current reach probs.

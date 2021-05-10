@@ -105,15 +105,21 @@ class SherlockBot : public Bot {
     //subgame_factory_->game->NewInitialState();
 
     // TODO: proper management of beliefs between steps. This is just
-    //       a dummy initialization.
-    for (auto& particle: set->particles) {
-      particle.chance_reach = 1.;
-      particle.player_reach[0] = 1.;
-      particle.player_reach[1] = 1.;
-    }
+    //       a dummy initialization. (Not needed when I initialize from public state.)
+
+    //    for (auto& particle: set->particles) {
+    //      particle.chance_reach = 1.;
+    //      particle.player_reach[0] = 1.;
+    //      particle.player_reach[1] = 1.;
+    //    }
 
     std::cout << "# Making subgame\n";
     std::shared_ptr<Subgame> subgame = subgame_factory_->MakeSubgame(*set);
+
+    // We will do the gadget if we are resolving
+    if (state.MoveNumber() > 0) {
+
+    }
     // TODO: implement continual resolving.
     //  Update subgame's infostate trees: subgame->trees[1-player_id_]
     //  such that they begin with the choice for the opponent
