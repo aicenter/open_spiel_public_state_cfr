@@ -44,17 +44,6 @@ class SherlockBot : public Bot {
     return StepWithPolicy(state).second;
   }
 
-  std::unordered_map<std::string, double> GetCFVs(PublicState *publicState) {
-      std::unordered_map<std::string, double> CFVs;
-      for (auto& infostate : publicState->nodes[1-player_id_]) {
-          std::string infostate_string = infostate->infostate_string();
-          int value_index = publicState->nodes_positions.at(infostate);
-          double cfv = publicState->average_values[1-player_id_][value_index];
-          CFVs.emplace(infostate_string, cfv);
-      }
-      return CFVs;
-  }
-
   std::pair<ActionsAndProbs, Action> StepWithPolicy(const State& state) override {
     SPIEL_CHECK_TRUE(state.IsPlayerActing(player_id_));
 
@@ -121,7 +110,7 @@ class SherlockBot : public Bot {
     std::cout << "# Making subgame\n";
     std::shared_ptr<Subgame> subgame;
     if (state.MoveNumber() > 0) {
-        subgame = subgame_factory_->MakeSubgameSafeResolving(*set, player_id_, GetCFVs(publicState));
+        subgame = subgame_factory_->MakeSubgameSafeResolving(*set, player_id_, publicState->GetCFVs(1 - player_id_));
     } else {
         subgame = subgame_factory_->MakeSubgame(*set);
     }

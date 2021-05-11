@@ -182,6 +182,17 @@ void PublicState::SetBeliefs(
   beliefs = new_beliefs;
 }
 
+std::unordered_map<std::string, double> PublicState::GetCFVs(Player player) {
+    std::unordered_map<std::string, double> CFVs;
+    for (auto& infostate : nodes[player]) {
+        std::string infostate_string = infostate->infostate_string();
+        int value_index = nodes_positions.at(infostate);
+        double cfv = average_values[player][value_index];
+        CFVs.emplace(infostate_string, cfv);
+    }
+    return CFVs;
+}
+
 // -- Subgame ------------------------------------------------------------------
 
 Subgame::Subgame(
@@ -424,7 +435,7 @@ void SubgameSolver::RunSimultaneousIterations(int iterations) {
           std::copy(beliefs[pl].begin(), beliefs[pl].end(),reach_probs_[pl].begin());
       }
 
-      // 5.2 Copmute reach probs to the terminals
+      // 5.2 Compute reach probs to the terminals
       for (int pl = 0; pl < 2; ++pl) {
           TopDownAverage(*subgame_->trees[pl], bandits_[pl], absl::MakeSpan(reach_probs_[pl]), num_iterations_);
       }

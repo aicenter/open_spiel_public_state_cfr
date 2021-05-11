@@ -128,6 +128,7 @@ struct PublicState {
   bool IsZeroSum() const { return fabs(Value(0) + Value(1)) < 1e-10; }
   // Set new beliefs and check they have consistent sizes.
   void SetBeliefs(const std::array<std::vector<double>, 2>& new_beliefs);
+  std::unordered_map<std::string, double> GetCFVs(Player player);
 };
 
 void DebugPrintPublicFeatures(const std::vector<PublicState>& states);
