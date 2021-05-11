@@ -64,14 +64,16 @@ class ParticleNetEvaluator final : public NetEvaluator {
   std::shared_ptr<BatchData> batch_;
   std::shared_ptr<ParticleDims> const dims_;
   std::shared_ptr<Observer> hand_observer_;
+  bool normalize_beliefs_;
  public:
   ParticleNetEvaluator(std::shared_ptr<ParticleValueNet> model,
                        std::shared_ptr<ParticleDims> const dims,
                        std::shared_ptr<BatchData> batch,
                        torch::Device device,
-                       std::shared_ptr<Observer> hand_observer)
+                       std::shared_ptr<Observer> hand_observer,
+                       bool normalize_beliefs)
       : model_(model), device_(device), batch_(batch), dims_(dims),
-        hand_observer_(hand_observer) {}
+        hand_observer_(hand_observer), normalize_beliefs_(normalize_beliefs) {}
   void EvaluatePublicState(PublicState* state,
                            PublicStateContext* context) const override;
 };

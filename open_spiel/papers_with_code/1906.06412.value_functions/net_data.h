@@ -163,6 +163,10 @@ struct ParticleDataPoint final : DataPoint {
   float_net& num_parviews(Player pl);
   int total_parviews();
   ParviewDataPoint parview_at(int parview_index);
+  std::array<torch::Tensor, 2> beliefs();
+  std::array<torch::Tensor, 2> values();
+  std::array<float, 2> NormalizeBeliefsAndValues();
+  void DenormalizeValues(const std::array<float, 2>& belief_normalizers);
  private:
   // Offsets for number of parviews and the storage.
   int num_parviews_offset() const { return 0; }

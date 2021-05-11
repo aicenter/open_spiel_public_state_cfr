@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_data.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/torch_utils.h"
 
 namespace open_spiel {
 namespace papers_with_code {
@@ -75,6 +76,70 @@ ParviewDataPoint ParticleDataPoint::parview_at(int parview_index) {
                    /*end=*/parview_index + 1, /*step=*/1));
 }
 
+std::array<torch::Tensor, 2> ParticleDataPoint::beliefs() {
+  const int max_parviews = dims.max_parviews;
+
+  torch::Tensor parviews = data.index({
+    Slice(parviews_storage_offset(),
+          parviews_storage_offset() + max_parviews * dims.parview_size())
+    // Rearrange into parviews.
+  }).view({max_parviews, dims.parview_size()});                                 CHECK_SHAPE(parviews, {max_parviews, dims.parview_size()});
+
+  torch::Tensor beliefs = parviews  // Skip all features.
+      .index({Slice(), Slice(dims.features_size(), dims.parview_size())});      CHECK_SHAPE(beliefs, {max_parviews, 1});
+
+  return {
+    beliefs.index({Slice(0, num_parviews(0))}),
+    beliefs.index({Slice(num_parviews(0), total_parviews())}),
+  };
+}
+std::array<torch::Tensor, 2> ParticleDataPoint::values() {
+  const int max_parviews = dims.max_parviews;
+
+  torch::Tensor parviews = data.index({
+    Slice(parviews_storage_offset(),
+          parviews_storage_offset() + max_parviews * dims.parview_size())
+    // Rearrange into parviews.
+  }).view({max_parviews, dims.parview_size()});                                 CHECK_SHAPE(parviews, {max_parviews, dims.parview_size()});
+
+  return {
+    target.index({Slice(0, num_parviews(0))}),
+    target.index({Slice(num_parviews(0), total_parviews())}),
+  };
+}
+
+std::array<float, 2> ParticleDataPoint::NormalizeBeliefsAndValues() {
+  std::array<torch::Tensor, 2> player_beliefs = beliefs();
+  std::array<torch::Tensor, 2> player_values = values();
+  std::array<float, 2> belief_normalizers = {player_beliefs[0].sum().item<float>(),
+                                             player_beliefs[1].sum().item<float>()};
+
+  for (int pl = 0; pl < 2; ++pl) {
+    SPIEL_DCHECK_TRUE(std::isfinite(belief_normalizers[pl]));
+
+    // In-place modifications!
+    player_beliefs[pl].div_(belief_normalizers[pl]).nan_to_num_();
+    // Important: Opposite beliefs for values !!!
+    player_values[pl].div_(belief_normalizers[1 - pl]).nan_to_num_();
+
+    SPIEL_DCHECK_FALSE(torch::isfinite(player_beliefs[pl]).logical_not().any().item<bool>());
+    SPIEL_DCHECK_FALSE(torch::isfinite(player_values[pl]).logical_not().any().item<bool>());
+  }
+  return belief_normalizers;
+}
+
+void ParticleDataPoint::DenormalizeValues(
+    const std::array<float, 2>& belief_normalizers) {
+  std::array<torch::Tensor, 2> player_values = values();
+  // In-place modification!
+  for (int pl = 0; pl < 2; ++pl) {
+    SPIEL_DCHECK_TRUE(std::isfinite(belief_normalizers[pl]));
+
+    // Important: Opposite beliefs for values !!!
+    player_values[pl].mul_(belief_normalizers[1 - pl]);
+    SPIEL_DCHECK_FALSE(torch::isfinite(player_values[pl]).logical_not().any().item<bool>());
+  }
+}
 
 absl::Span<float_net> ParviewDataPoint::hand_features() {
   return absl::MakeSpan(&data_ptr()[hand_features_offset()],

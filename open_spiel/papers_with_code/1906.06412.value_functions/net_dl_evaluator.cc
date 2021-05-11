@@ -52,6 +52,11 @@ void ParticleNetEvaluator::EvaluatePublicState(
   WriteParticleDataPoint(*state, *dims_, &point, hand_observer_,
                          /*rnd_gen=*/nullptr, /*shuffle_input_output=*/false);
 
+  std::array<float, 2> belief_normalizers;
+  if (normalize_beliefs_) {
+    belief_normalizers = point.NormalizeBeliefsAndValues();
+  }
+
   // Input must be batched.
   torch::Tensor input = point.data.to(device_).unsqueeze(/*dim=*/0);
   // The output must be "unbatched".
@@ -61,6 +66,10 @@ void ParticleNetEvaluator::EvaluatePublicState(
   SPIEL_DCHECK_EQ(output.size(/*dim=*/1), dims_->max_parviews);
   point.target.index_put_({Slice(0, point.total_parviews())},
                           output.index({0, Slice(0, point.total_parviews())}));
+
+  if (normalize_beliefs_) {
+    point.DenormalizeValues(belief_normalizers);
+  }
 
   // !! This does not work with shuffling !!
   CopyValuesFromNetToTree(point, *state, *dims_);
@@ -96,7 +105,8 @@ std::shared_ptr<NetEvaluator> MakeNetEvaluator(
       auto particle_model = std::dynamic_pointer_cast<ParticleValueNet>(model);
       auto particle_dims = std::dynamic_pointer_cast<ParticleDims>(dims);
       return std::make_shared<ParticleNetEvaluator>(
-          particle_model, particle_dims, eval_batch, device, hand_observer);
+          particle_model, particle_dims, eval_batch, device, hand_observer,
+          particle_model->normalize_beliefs);
     }
     case NetArchitecture::kPositional: {
       auto positional_model = std::dynamic_pointer_cast<PositionalValueNet>(model);

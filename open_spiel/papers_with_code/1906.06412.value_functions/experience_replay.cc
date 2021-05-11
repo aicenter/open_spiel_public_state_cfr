@@ -128,6 +128,9 @@ void ReplayFiller::AddParticleExperience(const PublicState& leaf,
   WriteParticleDataPoint(
       leaf, particle_dims, &data_point, subgame_factory->hand_observer,
       randomizer->rnd_gen, shuffle_input_output);
+  if (normalize_beliefs) {
+    data_point.NormalizeBeliefsAndValues();
+  }
 }
 
 void ReplayFiller::AddPositionalExperience(const PublicState& leaf,

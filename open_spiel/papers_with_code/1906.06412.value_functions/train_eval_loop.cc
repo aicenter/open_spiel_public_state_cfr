@@ -378,6 +378,7 @@ void TrainEvalLoop() {
   filler.reuse      = &reuse;
   filler.arch       = arch;
   filler.shuffle_input_output = false; //absl::GetFlag(FLAGS_shuffle_input_output);
+  filler.normalize_beliefs    = absl::GetFlag(FLAGS_normalize_beliefs);
   filler.sparse_particles     = absl::GetFlag(FLAGS_sparse_particles);
   filler.sparse_epsilon       = absl::GetFlag(FLAGS_sparse_epsilon);
   filler.eval_iters =

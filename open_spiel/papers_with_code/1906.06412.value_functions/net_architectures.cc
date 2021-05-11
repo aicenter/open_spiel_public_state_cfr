@@ -13,34 +13,13 @@
 // limitations under the License.
 
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_architectures.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/torch_utils.h"
 
 namespace open_spiel {
 namespace papers_with_code {
 
 using namespace torch::indexing;  // Load all of the Slice, Ellipsis, etc.
 
-#define _ -1  // A shape placeholder.
-#ifndef NDEBUG
-void CHECK_SHAPE(const torch::Tensor& tensor,
-                 std::initializer_list<int64_t> shape) {
-  const std::vector<int64_t> expected_shape(shape);
-  SPIEL_DCHECK_EQ(tensor.dim(), expected_shape.size());
-  for (int i = 0; i < expected_shape.size(); i++) {
-    if (expected_shape[i] == _) continue;
-    if (tensor.sizes().at(i) != expected_shape[i]) {
-      std::string actual_str = absl::StrJoin(tensor.sizes().vec(), ",");
-      std::string expected_str = absl::StrJoin(expected_shape, ",");
-      SpielFatalError(absl::StrCat(
-          "CHECK_SHAPE: ",
-          tensor.sizes().at(i), " != ", expected_shape[i], " at index ", i,
-          " -- full shapes: actual ", actual_str, " expected ", expected_str));
-    }
-  }
-}
-#else
-void CHECK_SHAPE(const torch::Tensor& tensor,
-                 std::initializer_list<int64_t> shape) {}
-#endif
 
 void ValueNet::MakeLayers(std::vector<torch::nn::Linear>& layers, int num_layers,
                      int inputs_size, int hidden_size, int outputs_size) {
@@ -196,19 +175,9 @@ torch::Tensor ParticleValueNet::forward(torch::Tensor xss) {
   torch::Tensor parview_counts =
       xss.index({Batch, Slice(0, pub_features_offset)});                        CHECK_SHAPE(parview_counts, {batch_size, 2});
   torch::Tensor parview_sum = parview_counts.sum(/*dim=*/1);                    CHECK_SHAPE(parview_sum, {batch_size});
-  torch::Tensor belief_normalizer = torch::ones({batch_size, 2});
   for (int i = 0; i < batch_size; ++i) {
     infostate_fs.index_put_(
         {i, Slice(parview_sum[i].item<int>(), num_parviews), Slice()}, 0);
-    if (normalize_beliefs) {
-      auto slice_pl0 = Slice(0, parview_counts[i][0].item<int>());
-      auto slice_pl1 = Slice(parview_counts[i][0].item<int>(),
-                             parview_sum[i].item<int>());
-      belief_normalizer.index_put_({i, 0}, beliefs.index({i, slice_pl0}).sum());
-      belief_normalizer.index_put_({i, 1}, beliefs.index({i, slice_pl1}).sum());
-      beliefs.index({i, slice_pl0}).div_(belief_normalizer[i][0]).nan_to_num_();
-      beliefs.index({i, slice_pl1}).div_(belief_normalizer[i][1]).nan_to_num_();
-    }
   }
 
   torch::Tensor bs = change_of_basis(infostate_fs);                             CHECK_SHAPE(bs, {batch_size, num_parviews, pooled_size()});
@@ -231,17 +200,6 @@ torch::Tensor ParticleValueNet::forward(torch::Tensor xss) {
     torch::Tensor expanded_proj_error =
         proj_error.expand({num_parviews, -1}).permute({1, 0});                  CHECK_SHAPE(expanded_proj_error, {batch_size, num_parviews});
     proj = proj - expanded_proj_error * batch_beliefs;
-  }
-
-  if (normalize_beliefs) {
-    for (int i = 0; i < batch_size; ++i) {
-      auto slice_pl0 = Slice(0, parview_counts[i][0].item<int>());
-      auto slice_pl1 = Slice(parview_counts[i][0].item<int>(),
-                             parview_sum[i].item<int>());
-      // Opposite CFVs !!!
-      proj.index({i, slice_pl0}).mul_(belief_normalizer[i][1]);
-      proj.index({i, slice_pl1}).mul_(belief_normalizer[i][0]);
-    }
   }
 
   // No weird values anywhere.

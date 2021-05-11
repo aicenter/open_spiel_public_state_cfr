@@ -108,6 +108,7 @@ struct ReplayFiller {
   std::vector<int> eval_iters;
   int max_rejection_cnt = 1000;
   int infostate_particles = 1;
+  bool normalize_beliefs = false;
 
   void CreateExperiences(ReplayFillerPolicy fill_policy, int num_experiences);
 

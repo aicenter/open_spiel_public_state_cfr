@@ -31,6 +31,7 @@ add_library(paper_value_functions OBJECT
   subgame.h
   subgame_factory.cc
   subgame_factory.h
+  torch_utils.h
 )
 
 # Delete -Wall -Werror in
