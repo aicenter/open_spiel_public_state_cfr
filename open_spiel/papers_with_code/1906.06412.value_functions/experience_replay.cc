@@ -302,7 +302,7 @@ void ReplayFiller::CreateExperiences(ReplayFillerPolicy fill_policy,
   }
   // Every time we create new batch of bootstrapped experiences,
   // we move up in the game.
-  if (fill_policy == kBootstrap) {
+  if (fill_policy == kBootstrap || fill_policy == kIsmctsBootstrap) {
     --bootstrap_move_number;
     std::cout << "# Bootstrapping at move number " << bootstrap_move_number << "\n";
   }
@@ -354,8 +354,9 @@ std::unique_ptr<ParticleSet> ReplayFiller::PickParticleSet(int at_depth) {
 
   // 4. Pick the most probable particles.
   std::unique_ptr<ParticleSetPartition> particle_partition =
-      MakeParticleSetPartition(*state, sparse_particles, sparse_epsilon,
-          /*save_secondary=*/false, *randomizer->rnd_gen);
+      MakeParticleSetPartition(*state, subgame_factory->max_particles,
+                               sparse_epsilon, /*save_secondary=*/false,
+                               *randomizer->rnd_gen);
 
   return std::make_unique<ParticleSet>(std::move(particle_partition->primary));
 }
@@ -372,14 +373,76 @@ std::unique_ptr<ParticleSet> ReplayFiller::PickIsmctsParticleSet(int at_depth) {
   std::unique_ptr<ParticleSet> set =
       GenerateParticles(const_cast<Observation&>(it->first),
                         it->second.player,
-                        sparse_particles,
+                        subgame_factory->max_particles,
                         max_rejection_cnt,
                         infostate_particles,
                         *randomizer->rnd_gen);
 
   // 3. Assign randomized beliefs.
-  randomizer->Randomize(set.get());
+  randomizer->Randomize(*subgame_factory->game, set.get(),
+                        subgame_factory->infostate_observer);
   return set;
+}
+
+void StrategyRandomizer::Randomize(std::vector<algorithms::BanditVector>& bandits) {
+  SPIEL_CHECK_TRUE(rnd_gen);
+  RandomizeStrategy(bandits, prob_pure_strat, prob_fully_mixed, *rnd_gen);
+}
+
+void StrategyRandomizer::Randomize(
+    const Game& game, ParticleSet* set,
+    std::shared_ptr<Observer> infostate_observer) {
+  SPIEL_CHECK_TRUE(rnd_gen);
+
+  TabularPolicy tabular_policy;
+  for (Particle& particle : set->particles) {
+    // Reset reach probs.
+    particle.chance_reach = 1.;
+    particle.player_reach = {1., 1.};
+
+    // Make a playthrough and randomize policies at each infostate on the way.
+    std::unique_ptr<State> s = game.NewInitialState();
+    for (int i = 0; i < particle.history.size(); ++i) {
+      for (int pl = 0; pl < 2; ++pl) {
+        if (s->IsPlayerActing(pl)) {
+          std::string infostate = infostate_observer->StringFrom(*s, pl);
+          ActionsAndProbs current_policy =
+              tabular_policy.GetStatePolicy(infostate);
+
+          if (current_policy.empty()) {
+            std::vector<Action> actions = s->LegalActions(pl);
+            for (Action a : actions) current_policy.push_back({a, 0.});
+            algorithms::RandomizeDecisionPoint(current_policy, prob_pure_strat,
+                                               prob_fully_mixed, *rnd_gen);
+            tabular_policy.SetStatePolicy(infostate, current_policy);
+          }
+
+          Action action;
+          if (s->IsSimultaneousNode()) {
+            action = particle.history[i+pl];
+          } else {
+            action = particle.history[i];
+          }
+          double prob = GetProb(current_policy, action);
+          SPIEL_DCHECK_PROB(prob);
+          particle.player_reach[pl] *= prob;
+        }
+      }
+
+      if (s->IsChanceNode()) {
+        ActionsAndProbs current_policy = s->ChanceOutcomes();
+        double prob = GetProb(current_policy, particle.history[i]);
+        SPIEL_DCHECK_PROB(prob);
+        particle.chance_reach *= prob;
+      }
+
+      if (s->IsSimultaneousNode()) {
+        s->ApplyActions({particle.history[i], particle.history.at(++i)});
+      } else {
+        s->ApplyAction(particle.history[i]);
+      }
+    }
+  }
 }
 
 }  // papers_with_code

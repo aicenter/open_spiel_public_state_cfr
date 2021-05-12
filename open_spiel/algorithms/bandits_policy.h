@@ -81,6 +81,16 @@ void RandomizeStrategy(std::vector<algorithms::BanditVector>& bandits,
                        double prob_pure_strat, double prob_fully_mixed,
                        std::mt19937& rnd_gen);
 
+// Randomize single decision point.
+void RandomizeDecisionPoint(absl::Span<double> policy,
+                            double prob_pure_strat,
+                            double prob_fully_mixed,
+                            std::mt19937& rnd_gen);
+void RandomizeDecisionPoint(ActionsAndProbs& policy,
+                            double prob_pure_strat,
+                            double prob_fully_mixed,
+                            std::mt19937& rnd_gen);
+
 }  // namespace algorithms
 }  // namespace open_spiel
 

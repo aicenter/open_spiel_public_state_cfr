@@ -97,7 +97,7 @@ void CheckObservation(const Observation& actual, const Observation& expected) {
 
 void CheckParticleSetConsistency(const Game& game,
                                  std::shared_ptr<Observer> public_observer,
-                                 std::shared_ptr<Observer> hand_observer,
+                                 std::shared_ptr<Observer> infostate_observer,
                                  const ParticleSet& set) {
   SPIEL_CHECK_FALSE(set.particles.empty());
 //  SPIEL_CHECK_FALSE(set.partition.empty());
@@ -111,25 +111,26 @@ void CheckParticleSetConsistency(const Game& game,
   Observation expected_public(game, public_observer);
   Observation actual_public = expected_public;
   expected_public.SetFrom(*histories[0], kDefaultPlayerId);
-  for (const std::unique_ptr<State>& history : histories) {
+  // Check reach probs consistency
+  Observation infostate(game, infostate_observer);
+  std::array<std::unordered_map<Observation, double>, 2> infostate_reach;
+
+  for (int i = 0; i < set.particles.size(); ++i) {
+    const std::unique_ptr<State>& history = histories[i];
+    const Particle& particle = set.particles[i];
     actual_public.SetFrom(*history, kDefaultPlayerId);
     CheckObservation(actual_public, expected_public);
-  }
 
-//  // Check partition
-//  Observation expected_hand(game, hand_observer);
-//  Observation actual_hand = expected_hand;
-//  for (int pl = 0; pl < 2; ++pl) {
-//    SPIEL_CHECK_FALSE(set.partition[pl].empty());
-//    for (const std::vector<int>& partition_element : set.partition[pl]) {
-//      SPIEL_CHECK_FALSE(partition_element.empty());
-//      expected_hand.SetFrom(*histories[partition_element[0]], pl);
-//      for (int particle_idx : partition_element) {
-//        actual_hand.SetFrom(*histories[particle_idx], pl);
-//        CheckObservation(actual_hand, expected_hand);
-//      }
-//    }
-//  }
+    for (int pl = 0; pl < 2; ++pl) {
+      infostate.SetFrom(*history, pl);
+      if (infostate_reach[pl].find(infostate) == infostate_reach[pl].end()) {
+        infostate_reach[pl][infostate] = particle.player_reach[pl];
+      } else {
+        SPIEL_CHECK_EQ(infostate_reach[pl][infostate],
+                       particle.player_reach[pl]);
+      }
+    }
+  }
 }
 
 void CheckParticleSetConsistency(const Game& game,

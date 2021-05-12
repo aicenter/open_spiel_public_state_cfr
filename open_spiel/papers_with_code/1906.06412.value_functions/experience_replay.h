@@ -70,14 +70,9 @@ struct StrategyRandomizer {
   double prob_pure_strat = 0.1;
   double prob_fully_mixed = 0.05;
 
-  void Randomize(std::vector<algorithms::BanditVector>& bandits) {
-    SPIEL_CHECK_TRUE(rnd_gen);
-    RandomizeStrategy(bandits, prob_pure_strat, prob_fully_mixed, *rnd_gen);
-  }
-  void Randomize(ParticleSet* set) {
-    SPIEL_CHECK_TRUE(rnd_gen);
-    SpielFatalError("Not implemented (yet)");
-  }
+  void Randomize(std::vector<algorithms::BanditVector>& bandits);
+  void Randomize(const Game& game, ParticleSet* set,
+                 std::shared_ptr<Observer> infostate_observer);
 };
 
 // Helper struct so we don't need to pass so many parameters
@@ -103,7 +98,6 @@ struct ReplayFiller {
   // Params.
   NetArchitecture arch = NetArchitecture::kParticle;
   bool shuffle_input_output = false;
-  int sparse_particles = 0;
   double sparse_epsilon = 0.;
   std::vector<int> eval_iters;
   int max_rejection_cnt = 1000;

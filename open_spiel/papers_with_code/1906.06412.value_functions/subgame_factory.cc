@@ -60,7 +60,7 @@ std::vector<std::shared_ptr<algorithms::InfostateTree>>
 SubgameFactory::MakeSubgameInfostateTrees(const ParticleSet& set, int depth) const {
   SPIEL_CHECK_LE(set.particles.size(), max_particles);
   SPIEL_DCHECK(CheckParticleSetConsistency(*game, public_observer,
-                                           hand_observer, set));
+                                           infostate_observer, set));
   std::vector<std::unique_ptr<State>> root_histories;
   std::vector<double> chance_reach_probs;
   for (const Particle& particle : set.particles) {

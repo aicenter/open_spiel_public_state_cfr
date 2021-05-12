@@ -163,8 +163,10 @@ void WriteParticleDataPoint(const PublicState& state,
       const State& repr_state = *state.nodes[pl][j]->corresponding_states()[0];
       ContiguousAllocator allocator(parview.hand_features());
       hand_observer->WriteTensor(repr_state, pl, &allocator);
-
+      // Player features.
       parview.player_features()[pl] = 1.;
+      // Hand beliefs.
+      SPIEL_DCHECK_TRUE(std::isfinite(state.beliefs[pl][j]));
       parview.range() = state.beliefs[pl][j];
       i++;
     }
@@ -179,6 +181,7 @@ void WriteParticleDataPoint(const PublicState& state,
     for (int j = 0; j < state.nodes[pl].size(); j++) {
       ParviewDataPoint parview = point->parview_at(shuffle_input_output
                                                    ? parview_placement[i] : i);
+      SPIEL_DCHECK_TRUE(std::isfinite(state.values[pl][j]));
       parview.value() = state.values[pl][j];
       i++;
     }

@@ -84,10 +84,10 @@ void IsmctsPlaythroughs::GenerateNodes(const Game& game, std::mt19937& rnd) {
     }
     std::cout << "# Move number " << i
               << " has " << cdfs[i].size() << " entries"
-              << "\tp_min=" << p_min
-              << "\tp_max=" << p_max
-              << "\tp_mean=" << p_mean
-              << "\tp_std=" << p_std / cdfs[i].size()
+              << "\tp_min="  << std::setprecision(3) << p_min
+              << "\tp_max="  << std::setprecision(3) << p_max
+              << "\tp_mean=" << std::setprecision(3) << p_mean
+              << "\tp_std="  << std::setprecision(3) << p_std / cdfs[i].size()
               << "\n";
   }
 }

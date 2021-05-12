@@ -276,13 +276,13 @@ class VFTest(parameterized.TestCase, absltest.TestCase):
       args = dict(
           arch="particle_vf", batch_size="1", cfr_oracle_iterations="100",
           depth="7", device="cpu", exp_init="pbs_random",
-          game_name="leduc_poker", max_particles=-1, num_inputs_regression=-1,
+          game_name="leduc_poker", num_inputs_regression=-1,
           num_layers=5, num_loops=1, num_width=5, prob_pure_strat=0.1,
           replay_size=1, seed=0, shuffle_input_output="true",
           train_batches=256, trunk_expl_iterations="1,5,10,50,100",
           use_bandits_for_cfr="RegretMatchingPlus",
           # Upper bounds all of the test games
-          sparse_particles=30
+          max_particles=30
       )
       actual_pbs_random, = read_experiment_results_from_shell(
           {**args, **game_spec, "exp_init": "pbs_random"}, metric_avg_loss)
@@ -301,11 +301,10 @@ class VFTest(parameterized.TestCase, absltest.TestCase):
           arch="particle_vf", batch_size="1",
           cfr_oracle_iterations="100", depth="7", exp_init="bootstrap",
           exp_loop="bootstrap", exp_loop_new="2", exp_update_size=-1,
-          game_name="leduc_poker", max_particles=-1,
-          num_inputs_regression=-1, num_layers="5",
+          game_name="leduc_poker", num_inputs_regression=-1, num_layers="5",
           num_loops="18", bootstrap_from_move=10,
           num_width="5", prob_pure_strat="0.1", replay_size="1",
-          seed="0", shuffle_input_output="true", sparse_particles=30,
+          seed="0", shuffle_input_output="true", max_particles=30,
           train_batches="1", trunk_expl_iterations="",
           use_bandits_for_cfr="RegretMatchingPlus")
       actual_bootstrap, = read_experiment_results_from_shell(args, metric_avg_loss)

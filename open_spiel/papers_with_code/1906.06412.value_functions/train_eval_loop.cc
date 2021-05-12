@@ -35,8 +35,6 @@ ABSL_FLAG(bool, shuffle_input_output, false,
 ABSL_FLAG(int, replay_size, 100,
           "Size of experience replay in terms of public states.");
 ABSL_FLAG(int, cfr_oracle_iterations, 100, "Number of oracle iterations.");
-ABSL_FLAG(int, sparse_particles, 1000,
-          "Number of particles to use for sparse pbs generation");
 ABSL_FLAG(double, sparse_epsilon, 0.,
           "How uniformly should the particles be sampled? [0,1] interval");
 
@@ -144,8 +142,11 @@ double TrainNetwork(ValueNet* model, torch::Device* device,
   SPIEL_DCHECK_TRUE(model->is_training());
   torch::Tensor data = batch->data.to(*device);
   torch::Tensor target = model->PrepareTarget(batch).to(*device);
+  SPIEL_DCHECK_TRUE(torch::isfinite(data).all().item<bool>());
+  SPIEL_DCHECK_TRUE(torch::isfinite(target).all().item<bool>());
   optimizer->zero_grad();
   torch::Tensor output = model->forward(data);
+  SPIEL_DCHECK_TRUE(torch::isfinite(output).all().item<bool>());
   torch::Tensor loss = torch::mse_loss(output, target);
   SPIEL_CHECK_FALSE(std::isnan(loss.template item<float>()));
   loss.backward();
@@ -379,7 +380,6 @@ void TrainEvalLoop() {
   filler.arch       = arch;
   filler.shuffle_input_output = false; //absl::GetFlag(FLAGS_shuffle_input_output);
   filler.normalize_beliefs    = absl::GetFlag(FLAGS_normalize_beliefs);
-  filler.sparse_particles     = absl::GetFlag(FLAGS_sparse_particles);
   filler.sparse_epsilon       = absl::GetFlag(FLAGS_sparse_epsilon);
   filler.eval_iters =
       ItersFromString(absl::GetFlag(FLAGS_trunk_expl_iterations));
@@ -453,8 +453,13 @@ void TrainEvalLoop() {
   }
   //
   if (exp_loop == kIsmctsBootstrap) {
+    SPIEL_CHECK_TRUE(exp_init == kIsmctsBootstrap);
     reuse.playthroughs->MakeBot(rnd_gen);
-    reuse.playthroughs->GenerateNodes(*game, rnd_gen);
+    std::shared_ptr<const Game> turn_based = game;
+    if (game->GetType().dynamics == GameType::Dynamics::kSimultaneous) {
+      turn_based = ConvertToTurnBased(*game);
+    }
+    reuse.playthroughs->GenerateNodes(*turn_based, rnd_gen);
   }
   //
   const int snapshot_loop = absl::GetFlag(FLAGS_snapshot_loop);
@@ -527,6 +532,9 @@ void TrainEvalLoop() {
       std::cout << "# Resetting net weights with random init." << std::endl;
       model->apply(InitWeights);
     }
+    std::cout << "# Resetting optimizer." << std:: endl;
+    optimizer->state().clear();
+    ResetLearningRate(optimizer.get(), learning_rate);
 
     for (int loop = num_loops; loop < 2*num_loops; ++loop) {
       if (snapshot_loop > 0 && (loop+1) % snapshot_loop == 0) {
@@ -554,6 +562,7 @@ void TrainEvalLoop() {
       std::cout << loop << ',' << cumul_loss / train_batches;
       PrintMetrics(metrics);
       std::cout << std::endl;
+      DecayLearningRate(optimizer.get(), lr_decay);
     }
   }
 }
