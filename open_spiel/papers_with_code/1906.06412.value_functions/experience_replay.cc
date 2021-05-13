@@ -123,10 +123,14 @@ void ReplayFiller::AddExperience(const PublicState& leaf,
 
 void ReplayFiller::AddParticleExperience(const PublicState& leaf,
                                          ExperienceReplay* buffer) {
-  auto particle_dims = open_spiel::down_cast <const ParticleDims&>(*dims);
+  auto particle_dims = open_spiel::down_cast<const ParticleDims&>(*dims);
   ParticleDataPoint data_point = buffer->AddExperience(particle_dims);
-  WriteParticleDataPoint(leaf, particle_dims, &data_point,
-                         subgame_factory->hand_observer, randomizer->rnd_gen);
+
+  std::array<std::vector<int>, 2> perms = RandomParviewPermutation(
+      leaf, particle_dims.max_parviews, *randomizer->rnd_gen);
+
+  WriteParticleDataPoint(leaf, perms, particle_dims, &data_point,
+                         subgame_factory->hand_observer);
   if (normalize_beliefs) {
     data_point.NormalizeBeliefsAndValues();
   }

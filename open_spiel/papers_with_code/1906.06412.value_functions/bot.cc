@@ -278,7 +278,9 @@ class SherlockBotFactory : public BotFactory {
     solver_factory->save_values_policy   = GetSaveValuesPolicy(save_values_policy);
     solver_factory->terminal_evaluator   = std::make_shared<TerminalEvaluator>();
     solver_factory->leaf_evaluator = MakeNetEvaluator(
-        dims, model, eval_batch, device, nullptr, subgame_factory->hand_observer);
+        dims, model, eval_batch, device,
+        /*rnd_gen*/nullptr,  // FIXME: Assign rnd_gen later.
+        nullptr, subgame_factory->hand_observer);
     //
     return MakeSherlockBot(std::move(subgame_factory),
                            std::move(solver_factory),

@@ -362,7 +362,7 @@ void TrainEvalLoop() {
   solver_factory.save_values_policy   = save_values_policy;
   solver_factory.terminal_evaluator   = terminal_evaluator;
   solver_factory.leaf_evaluator = MakeNetEvaluator(
-      dims, model, eval_batch, device,
+      dims, model, eval_batch, device, &rnd_gen,
       hand_info,  // May be nullptr for particle VF.
       subgame_factory.hand_observer);
   reuse.solver_factory = &solver_factory;

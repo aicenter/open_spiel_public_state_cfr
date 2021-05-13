@@ -40,6 +40,20 @@ std::unique_ptr<PublicStateContext> PositionalNetEvaluator::CreateContext(
   return net_context;
 }
 
+std::array<std::vector<int>, 2> RandomParviewPermutation(
+    const PublicState& state, int max_parviews, std::mt19937& rnd_gen) {
+  std::array<std::vector<int>, 2> perms{std::vector<int>(state.nodes[0].size()),
+                                        std::vector<int>(state.nodes[1].size())};
+  for (int pl = 0; pl < 2; ++pl) {
+    std::iota(perms[pl].begin(), perms[pl].end(), 0);
+    if (perms[pl].size() > max_parviews / 2) {
+      std::shuffle(perms[pl].begin(), perms[pl].end(), rnd_gen);
+    }
+  }
+  return perms;
+}
+
+
 // TODO: evaluate all public states with a batch.
 void ParticleNetEvaluator::EvaluatePublicState(
     PublicState* state, PublicStateContext* context) const {
@@ -47,10 +61,12 @@ void ParticleNetEvaluator::EvaluatePublicState(
   SPIEL_DCHECK_FALSE(model_->is_training());
   torch::NoGradGuard no_grad_guard;  // We run only inference.
 
+  // Make random permutations of parviews for (potential) subset selection.
+  std::array<std::vector<int>, 2> perms =
+      RandomParviewPermutation(*state, dims_->max_parviews, *rnd_gen_);
+
   ParticleDataPoint point = batch_->point_at(0, *dims_);
-  // !! Do not shuffle, so that we can get back the values in an ordered way !!
-  WriteParticleDataPoint(*state, *dims_, &point, hand_observer_,
-                         /*rnd_gen=*/nullptr);
+  WriteParticleDataPoint(*state, perms, *dims_, &point, hand_observer_);
 
   std::array<float, 2> belief_normalizers;
   if (normalize_beliefs_) {
@@ -71,8 +87,7 @@ void ParticleNetEvaluator::EvaluatePublicState(
     point.DenormalizeValues(belief_normalizers);
   }
 
-  // !! This does not work with shuffling !!
-  CopyValuesFromNetToTree(point, *state, *dims_);
+  CopyValuesFromNetToTree(point, *state, perms, *dims_);
 }
 
 void PositionalNetEvaluator::EvaluatePublicState(
@@ -97,7 +112,7 @@ void PositionalNetEvaluator::EvaluatePublicState(
 
 std::shared_ptr<NetEvaluator> MakeNetEvaluator(
     std::shared_ptr<BasicDims> dims, std::shared_ptr<ValueNet> model,
-    std::shared_ptr<BatchData> eval_batch, torch::Device device,
+    std::shared_ptr<BatchData> eval_batch, torch::Device device, std::mt19937* rnd_gen,
     // One of:
     std::shared_ptr<HandInfo> hand_info, std::shared_ptr<Observer> hand_observer) {
   switch (model->architecture()) {
@@ -106,7 +121,7 @@ std::shared_ptr<NetEvaluator> MakeNetEvaluator(
       auto particle_dims = std::dynamic_pointer_cast<ParticleDims>(dims);
       return std::make_shared<ParticleNetEvaluator>(
           particle_model, particle_dims, eval_batch, device, hand_observer,
-          particle_model->normalize_beliefs);
+          particle_model->normalize_beliefs, rnd_gen);
     }
     case NetArchitecture::kPositional: {
       auto positional_model = std::dynamic_pointer_cast<PositionalValueNet>(model);
@@ -131,26 +146,29 @@ void WritePositionalHand(int net_id, absl::Span<float_net> write_to) {
 }
 
 void WriteParticleDataPoint(const PublicState& state,
-                            const ParticleDims& dims, ParticleDataPoint* point,
-                            std::shared_ptr<Observer> hand_observer,
-                            std::mt19937* rnd_gen) {
+                            const std::array<std::vector<int>, 2>& parview_perms,
+                            const ParticleDims& dims,
+                            ParticleDataPoint* point,
+                            std::shared_ptr<Observer> hand_observer) {
   // Important !!
   point->Reset();
 
   // Find out how many parviews we will write.
-  const int num_parviews = state.nodes[0].size()
-                         + state.nodes[1].size();
-  SPIEL_CHECK_GE(num_parviews, 2);
-  SPIEL_CHECK_LE(num_parviews, dims.max_parviews);
-
-  // Make a random permutation if something should be shuffled.
-  std::vector<int> parview_placement(num_parviews);
-
+  const std::array<int, 2> num_parviews = {
+      std::min((int) state.nodes[0].size(), dims.max_parviews / 2),
+      std::min((int) state.nodes[1].size(), dims.max_parviews / 2),
+  };
+  SPIEL_CHECK_GE(num_parviews[0], 1);
+  SPIEL_CHECK_GE(num_parviews[1], 1);
 
   // Write inputs
   int i = 0;
   for (int pl = 0; pl < 2; ++pl) {
-    for (int j = 0; j < state.nodes[pl].size(); j++) {
+    for (int k = 0; k < num_parviews[pl]; k++) {
+      int j = parview_perms[pl][k];  // Infostate idx.
+      SPIEL_CHECK_GE(j, 0);
+      SPIEL_CHECK_LT(j, state.nodes[pl].size());
+
       ParviewDataPoint parview = point->parview_at(i);
       // Hand features.
       SPIEL_CHECK_GT(state.nodes[pl][j]->corresponding_states_size(), 0);
@@ -164,31 +182,49 @@ void WriteParticleDataPoint(const PublicState& state,
       parview.range() = state.beliefs[pl][j];
       i++;
     }
-    point->num_parviews(pl) = state.nodes[pl].size();
+    point->num_parviews(pl) = num_parviews[pl];
   }
-  SPIEL_CHECK_EQ(i, num_parviews);
+  SPIEL_CHECK_EQ(i, num_parviews[0] + num_parviews[1]);
   Copy(state.public_tensor.Tensor(), point->public_features());
 
   // Write outputs
   i = 0;
   for (int pl = 0; pl < 2; ++pl) {
-    for (int j = 0; j < state.nodes[pl].size(); j++) {
+    for (int k = 0; k < num_parviews[pl]; k++) {
+      int j = parview_perms[pl][k];  // Infostate idx.
+      SPIEL_CHECK_GE(j, 0);
+      SPIEL_CHECK_LT(j, state.nodes[pl].size());
+
       ParviewDataPoint parview = point->parview_at(i);
       SPIEL_DCHECK_TRUE(std::isfinite(state.values[pl][j]));
       parview.value() = state.values[pl][j];
       i++;
     }
   }
-
-  SPIEL_CHECK_EQ(i, num_parviews);
+  SPIEL_CHECK_EQ(i, num_parviews[0] + num_parviews[1]);
 }
 
 void CopyValuesFromNetToTree(ParticleDataPoint data_point,
                              PublicState& state,
+                             const std::array<std::vector<int>, 2>& parview_perms,
                              const ParticleDims& dims) {
+  const std::array<int, 2> num_parviews = {
+      std::min((int) state.nodes[0].size(), dims.max_parviews / 2),
+      std::min((int) state.nodes[1].size(), dims.max_parviews / 2),
+  };
+  SPIEL_CHECK_GE(num_parviews[0], 1);
+  SPIEL_CHECK_GE(num_parviews[1], 1);
+
   int parview_index = 0;
   for (int pl = 0; pl < 2; ++pl) {
     for (int j = 0; j < state.nodes[pl].size(); j++) {
+      state.values[pl][j] = 0;  // Zero-out all values first.
+    }
+    for (int k = 0; k < num_parviews[pl]; k++) {
+      int j = parview_perms[pl][k];  // Infostate idx.
+      SPIEL_CHECK_GE(j, 0);
+      SPIEL_CHECK_LT(j, state.nodes[pl].size());
+
       ParviewDataPoint parview = data_point.parview_at(parview_index);
       state.values[pl][j] = parview.value();
       SPIEL_DCHECK_TRUE(std::isfinite(state.values[pl][j]));
