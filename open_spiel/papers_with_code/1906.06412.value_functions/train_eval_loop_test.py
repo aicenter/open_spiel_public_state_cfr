@@ -278,8 +278,8 @@ class VFTest(parameterized.TestCase, absltest.TestCase):
           depth="7", device="cpu", exp_init="pbs_random",
           game_name="leduc_poker", num_inputs_regression=-1,
           num_layers=5, num_loops=1, num_width=5, prob_pure_strat=0.1,
-          replay_size=1, seed=0, shuffle_input_output="true",
-          train_batches=256, trunk_expl_iterations="1,5,10,50,100",
+          replay_size=1, seed=0, train_batches=256,
+          trunk_expl_iterations="1,5,10,50,100",
           use_bandits_for_cfr="RegretMatchingPlus",
           # Upper bounds all of the test games
           max_particles=30
@@ -304,9 +304,8 @@ class VFTest(parameterized.TestCase, absltest.TestCase):
           game_name="leduc_poker", num_inputs_regression=-1, num_layers="5",
           num_loops="18", bootstrap_from_move=10,
           num_width="5", prob_pure_strat="0.1", replay_size="1",
-          seed="0", shuffle_input_output="true", max_particles=30,
-          train_batches="1", trunk_expl_iterations="",
-          use_bandits_for_cfr="RegretMatchingPlus")
+          seed="0", max_particles=30, train_batches="1",
+          trunk_expl_iterations="", use_bandits_for_cfr="RegretMatchingPlus")
       actual_bootstrap, = read_experiment_results_from_shell(args, metric_avg_loss)
       # Just check the bootstrap runs.
       self.assertEqual(actual_bootstrap.values.shape[0], 36)

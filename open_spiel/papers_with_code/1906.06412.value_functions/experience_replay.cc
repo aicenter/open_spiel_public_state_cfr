@@ -125,9 +125,8 @@ void ReplayFiller::AddParticleExperience(const PublicState& leaf,
                                          ExperienceReplay* buffer) {
   auto particle_dims = open_spiel::down_cast <const ParticleDims&>(*dims);
   ParticleDataPoint data_point = buffer->AddExperience(particle_dims);
-  WriteParticleDataPoint(
-      leaf, particle_dims, &data_point, subgame_factory->hand_observer,
-      randomizer->rnd_gen, shuffle_input_output);
+  WriteParticleDataPoint(leaf, particle_dims, &data_point,
+                         subgame_factory->hand_observer, randomizer->rnd_gen);
   if (normalize_beliefs) {
     data_point.NormalizeBeliefsAndValues();
   }

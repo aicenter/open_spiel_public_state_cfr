@@ -5,26 +5,33 @@ from matplotlib import colors as mcolors
 import pandas as pd
 import numpy as np
 
-base_dir="./experiments/snapshot_pbs_training"
+# base_dir="./experiments/snapshot_pbs_training"
+base_dir="./experiments/bootstraped_learning"
 
 select = dict(
     randomization=".*",
     arch="particle_vf",
-    game_name=".*",
+    game_name="goof.*",
+    num_loops=".*",
+    bootstrap_from_move=".*",
     depth=".*",
     sparse_particles=".*",
     seed=".*",
     save_values_policy="average",
     zero_sum_regression=".*",
+    norm=".*",
 )
 pipeline = [
     process.read,
-    process.average("seed"),
-    process.concat("zero_sum_regression"),
+    # process.average("seed"),
+    # process.concat("zero_sum_regression"),
+    process.concat("norm"),
 ]
 layout = dict(
     x=[],
-    y=["game_name", "depth", "save_values_policy"]
+    y=["game_name"]
+    # y=["game_name", "depth", "num_loops", "bootstrap_from_move"]
+    # y=["game_name", "depth", "save_values_policy", "seed"]
 )
 cell_size = [2, 1]
 
@@ -66,30 +73,44 @@ colors = plt.rcParams['axes.prop_cycle'].by_key()['color'][1:]
 
 
 def plot_bootstrap(axes, params, data):
-    for arch, df in data:
-        axes[0, 0].semilogy(df.loop, df["expl[100]"].rolling(10).mean(),
-                            label=f"{arch}: expl", alpha=1)
-        axes[1, 0].semilogy(df.loop, df.avg_loss.rolling(10).mean(),
-                            label="mse loss", alpha=1)
+    df = data
+    axes[0, 0].semilogy(df.loop, df["expl[100]"],
+                        label=f"expl", alpha=1)
+    axes[1, 0].semilogy(df.loop, df.avg_loss,
+                        label="mse loss", alpha=1)
 
-        for idx in range(0, 2305,256):
-            axes[0, 0].semilogy([idx] * 2, [0.1, 2], "k--", alpha=0.2)
-            axes[1, 0].semilogy([idx] * 2, [1e-3, 1e-14], "k--", alpha=0.2)
+    for idx in range(0, 10*512, 512):
+        move = 10 - idx / 512
+        if move > 1:
+            axes[0, 0].annotate( f'Move: {int(move)}', (idx+64, 0.05))
+        else:
+            axes[0, 0].annotate(f'Final retraining', (idx+64, 0.05))
 
-        # ax.semilogy(df.loop, df.replay_visits / 10, label="replay_visits", alpha=1)
+        axes[0, 0].semilogy([idx] * 2, [0.05, 2], "k--", alpha=0.2)
+        axes[1, 0].semilogy([idx] * 2, [1e-2, 1e-6], "k--", alpha=0.2)
+
+    axes[1, 0].set_ylim([1e-6, 5e-3])
 
 
 def plot_cell(axes, params, data):
-    for zero_sum, df in data:
-        end = df["expl[100]"].tail(1).values[0]
-        print(zero_sum, (df["expl[100]"] - end).loc[[0, 128, 256, 400, 500]])
-        axes[0, 0].plot(df.loop, df["expl[100]"] - end,
-                            label=f"zero_sum={zero_sum} expl", alpha=1)
+    for normalize, dfs in data:
+        df=dfs[0]
+        axes[0, 0].plot(df.loop, df["expl[100]"],
+                        label=f"normalize={normalize} expl", alpha=1)
         axes[1, 0].semilogy(df.loop, df.avg_loss,
-                            label=f"zero_sum={zero_sum} mse loss", alpha=1)
+                            label=f"normalize={normalize} mse loss", alpha=1)
+
+def plot_cell2(axes, params, data):
+    df = data[0]
+    axes[0, 0].plot(df.loop, df["expl[100]"],
+                    label=f"expl", alpha=1)
+    axes[1, 0].semilogy(df.loop, df.avg_loss,
+                        label=f"mse loss", alpha=1)
 
 
 
 lazy_pipeline = process.make_lazy_pipeline(base_dir, select, pipeline)
 # print(lazy_pipeline)
 plot.display(lazy_pipeline, layout, cell_size, plot_cell, translation_map)
+# plot.display(lazy_pipeline, layout, cell_size, plot_cell2, translation_map)
+# plot.display(lazy_pipeline, layout, cell_size, plot_bootstrap, translation_map)

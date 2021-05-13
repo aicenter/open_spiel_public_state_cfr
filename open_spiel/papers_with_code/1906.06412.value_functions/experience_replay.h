@@ -97,7 +97,6 @@ struct ReplayFiller {
 
   // Params.
   NetArchitecture arch = NetArchitecture::kParticle;
-  bool shuffle_input_output = false;
   double sparse_epsilon = 0.;
   std::vector<int> eval_iters;
   int max_rejection_cnt = 1000;

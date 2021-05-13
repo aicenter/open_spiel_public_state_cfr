@@ -30,8 +30,6 @@ ABSL_FLAG(std::string, use_bandits_for_cfr, "RegretMatchingPlus",
 ABSL_FLAG(int, depth, 3, "Depth of the trunk.");
 ABSL_FLAG(double, prob_pure_strat, 0.1, "Params for random generation.");
 ABSL_FLAG(double, prob_fully_mixed, 0.05, "Params for random generation.");
-ABSL_FLAG(bool, shuffle_input_output, false,
-          "Should parview inputs/outputs be shuffled?");
 ABSL_FLAG(int, replay_size, 100,
           "Size of experience replay in terms of public states.");
 ABSL_FLAG(int, cfr_oracle_iterations, 100, "Number of oracle iterations.");
@@ -378,7 +376,6 @@ void TrainEvalLoop() {
   filler.randomizer = &randomizer;
   filler.reuse      = &reuse;
   filler.arch       = arch;
-  filler.shuffle_input_output = false; //absl::GetFlag(FLAGS_shuffle_input_output);
   filler.normalize_beliefs    = absl::GetFlag(FLAGS_normalize_beliefs);
   filler.sparse_epsilon       = absl::GetFlag(FLAGS_sparse_epsilon);
   filler.eval_iters =

@@ -50,7 +50,7 @@ void ParticleNetEvaluator::EvaluatePublicState(
   ParticleDataPoint point = batch_->point_at(0, *dims_);
   // !! Do not shuffle, so that we can get back the values in an ordered way !!
   WriteParticleDataPoint(*state, *dims_, &point, hand_observer_,
-                         /*rnd_gen=*/nullptr, /*shuffle_input_output=*/false);
+                         /*rnd_gen=*/nullptr);
 
   std::array<float, 2> belief_normalizers;
   if (normalize_beliefs_) {
@@ -133,7 +133,7 @@ void WritePositionalHand(int net_id, absl::Span<float_net> write_to) {
 void WriteParticleDataPoint(const PublicState& state,
                             const ParticleDims& dims, ParticleDataPoint* point,
                             std::shared_ptr<Observer> hand_observer,
-                            std::mt19937* rnd_gen, bool shuffle_input_output) {
+                            std::mt19937* rnd_gen) {
   // Important !!
   point->Reset();
 
@@ -145,19 +145,13 @@ void WriteParticleDataPoint(const PublicState& state,
 
   // Make a random permutation if something should be shuffled.
   std::vector<int> parview_placement(num_parviews);
-  if (shuffle_input_output) {
-    SPIEL_CHECK_TRUE(rnd_gen);
-    std::iota(parview_placement.begin(), parview_placement.end(), 0);
-    std::shuffle(parview_placement.begin(), parview_placement.end(),
-                 *rnd_gen);
-  }
+
 
   // Write inputs
   int i = 0;
   for (int pl = 0; pl < 2; ++pl) {
     for (int j = 0; j < state.nodes[pl].size(); j++) {
-      ParviewDataPoint parview = point->parview_at(shuffle_input_output
-                                                   ? parview_placement[i] : i);
+      ParviewDataPoint parview = point->parview_at(i);
       // Hand features.
       SPIEL_CHECK_GT(state.nodes[pl][j]->corresponding_states_size(), 0);
       const State& repr_state = *state.nodes[pl][j]->corresponding_states()[0];
@@ -179,8 +173,7 @@ void WriteParticleDataPoint(const PublicState& state,
   i = 0;
   for (int pl = 0; pl < 2; ++pl) {
     for (int j = 0; j < state.nodes[pl].size(); j++) {
-      ParviewDataPoint parview = point->parview_at(shuffle_input_output
-                                                   ? parview_placement[i] : i);
+      ParviewDataPoint parview = point->parview_at(i);
       SPIEL_DCHECK_TRUE(std::isfinite(state.values[pl][j]));
       parview.value() = state.values[pl][j];
       i++;

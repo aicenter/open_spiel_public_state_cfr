@@ -208,29 +208,34 @@ def training_dynamics():
 def bootstraped_learning():
   loop_new = 512
   base_params = dict(
+      arch="particle_vf",
       batch_size=64,
+      bootstrap_reset_nn="true",
       cfr_oracle_iterations=100,
       exp_init="bootstrap",
       exp_loop="bootstrap",
       exp_loop_new=loop_new,
+      exp_reset_nn="true",
       exp_update_size=-1,
+      learning_rate="0.001",
+      lr_decay=0.99,
       max_particles=-1,
+      normalize_beliefs="true",
       num_inputs_regression=-1,
       num_layers=5,
       num_width=5,
       prob_pure_strat=0.1,
       replay_size=10000,
       replay_visits_window=10000,
+      save_values_policy="average",
       shuffle_input_output="true",
+      snapshot_loop="256",
+      track_lr="true",
+      track_time="true",
       train_batches=64,
       trunk_expl_iterations=100,
       use_bandits_for_cfr="RegretMatchingPlus",
-      snapshot_loop="256",
-      exp_reset_nn="true",
-      bootstrap_reset_nn="true",
-      save_values_policy="average",
       zero_sum_regression="true",
-      arch="particle_vf"
   )
   def param_fn(param, context):
       if param == "game_name":

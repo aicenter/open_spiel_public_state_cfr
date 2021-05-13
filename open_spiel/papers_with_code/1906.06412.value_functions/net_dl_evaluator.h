@@ -108,7 +108,7 @@ std::shared_ptr<NetEvaluator> MakeNetEvaluator(
 void WriteParticleDataPoint(const PublicState& state,
                             const ParticleDims& dims, ParticleDataPoint* point,
                             std::shared_ptr<Observer> hand_observer,
-                            std::mt19937* rnd_gen, bool shuffle_input_output);
+                            std::mt19937* rnd_gen);
 void CopyValuesFromNetToTree(ParticleDataPoint data_point,
                              PublicState& state,
                              const ParticleDims& dims);
