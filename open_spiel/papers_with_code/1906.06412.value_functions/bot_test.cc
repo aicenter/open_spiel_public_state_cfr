@@ -60,8 +60,7 @@ void TestBotCanPlayGoofspiel() {
   }
 
   for (int i = 0; i < num_games; i++) {
-    // Not implemented yet.
-//    for (Player p = 0; p < 2; ++p) bots[p]->Restart();
+    for (Player p = 0; p < 2; ++p) bots[p]->Restart();
     std::cout << "New game:";
     std::unique_ptr<State> state = game->NewInitialState();
     while (!state->IsTerminal()) {

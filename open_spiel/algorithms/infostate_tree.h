@@ -531,7 +531,9 @@ class InfostateTree final {
                                           double terminal_utility,
                                           double terminal_ch_reach_prob,
                                           size_t depth,
-                                          const State* originating_state);
+                                          const State* originating_state,
+                                          const std::vector<Action>& given_legal_action = std::vector<Action>(),
+                                          bool terminate = false);
   std::unique_ptr<InfostateNode> MakeRootNode() const;
 
   // Makes sure that all tree leaves are at the same height.

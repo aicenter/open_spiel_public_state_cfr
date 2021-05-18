@@ -197,15 +197,22 @@ std::unique_ptr<InfostateNode> InfostateTree::MakeNode(
     InfostateNode* parent, InfostateNodeType type,
     const std::string& infostate_string, double terminal_utility,
     double terminal_ch_reach_prob, size_t depth,
-    const State* originating_state) {
-  auto legal_actions =
-      originating_state && originating_state->IsPlayerActing(acting_player_)
-          ? originating_state->LegalActions(acting_player_)
-          : std::vector<Action>();
+    const State* originating_state, const std::vector<Action>& given_legal_actions, bool terminate) {
+    std::vector<Action> legal_actions;
+    if (given_legal_actions.empty()) {
+        legal_actions =
+                originating_state && originating_state->IsPlayerActing(acting_player_)
+                ? originating_state->LegalActions(acting_player_)
+                : std::vector<Action>();
+    } else {
+        legal_actions = given_legal_actions;
+    }
   std::vector<Action> terminal_history;
   if (safe_resolving_) {
-      terminal_history = originating_state ? originating_state->History()
-                                                : std::vector<Action>();
+      terminal_history = originating_state ? originating_state->History(): std::vector<Action>();
+      if(terminate) {
+          terminal_history.push_back(Action(-1));
+      }
   } else {
       terminal_history = originating_state && originating_state->IsTerminal()
                               ? originating_state->History()
@@ -263,29 +270,46 @@ void InfostateTree::RecursivelyBuildTree(InfostateNode* parent, size_t depth,
       SPIEL_DCHECK_EQ(parent->type(), kObservationInfostateNode);
       std::string info_state =
               infostate_observer_->StringFrom(state, acting_player_);
-      InfostateNode *node;
-      if (ftplayer_ == acting_player_) {
-           node = parent->AddChild(MakeNode(
-                  parent, kDecisionInfostateNode, "f/t" + info_state,
-                  /*terminal_utility=*/NAN, /*chance_reach_prob=*/NAN, depth, &state));
-      } else {
-          node = parent->AddChild(MakeNode(
-                  parent, kObservationInfostateNode, "f/t" + info_state,
-                  /*terminal_utility=*/NAN, /*chance_reach_prob=*/NAN, depth, &state));
-      }
-      AddCorrespondingState(node, state, chance_reach_prob);
-      parent = node;
-      depth++;
 
-      // Make the terminal node
+      InfostateNode* node = parent->GetChild("f/t" + info_state);
+      InfostateNode *observation_node;
+      if (!node) {
+          if (ftplayer_ == acting_player_) {
+              std::vector<Action> legal_actions = std::vector<Action>{Action(0), Action(1)};
+              node = parent->AddChild(MakeNode(
+                      parent, kDecisionInfostateNode, "f/t" + info_state,
+                      /*terminal_utility=*/NAN, /*chance_reach_prob=*/NAN, depth, &state, legal_actions));
+          } else {
+              node = parent->AddChild(MakeNode(
+                      parent, kObservationInfostateNode, "f/t" + info_state,
+                      /*terminal_utility=*/NAN, /*chance_reach_prob=*/NAN, depth, &state));
+          }
+          AddCorrespondingState(node, state, chance_reach_prob);
+          parent = node;
+          depth++;
+
+          // Make the terminal node
+          observation_node = parent->AddChild(
+                  MakeNode(parent, kObservationInfostateNode,
+                           "observation" + info_state,
+                          /*terminal_utility=*/NAN, /*chance_reach_prob=*/NAN, depth+1, &state));
+          AddCorrespondingState(observation_node, state, chance_reach_prob);
+      } else {
+          AddCorrespondingState(node, state, chance_reach_prob);
+          parent = node;
+          observation_node = parent->GetChild("observation" + info_state);
+          AddCorrespondingState(observation_node, state, chance_reach_prob);
+      }
       std::string cfv_info_state =
               infostate_observer_->StringFrom(state, ftplayer_);
       const double terminal_utility = CFVs_->at(cfv_info_state);
-      InfostateNode* terminal_node = parent->AddChild(
-              MakeNode(parent, kTerminalInfostateNode,
-                       "terminal" + info_state,
-                       terminal_utility, chance_reach_prob, depth, &state));
-      UpdateLeafNode(depth);
+      int children = observation_node->num_children();
+      InfostateNode* terminal_node = observation_node->AddChild(
+              MakeNode(observation_node, kTerminalInfostateNode,
+                       "terminal"+info_state+ std::to_string(children),
+                       terminal_utility, chance_reach_prob, depth+2, &state,
+                       std::vector<Action>(), true));
+      UpdateLeafNode(depth+2);
       AddCorrespondingState(terminal_node, state, chance_reach_prob);
   }
   if (state.IsTerminal()) {
