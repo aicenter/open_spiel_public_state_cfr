@@ -32,7 +32,7 @@ constexpr int kDefaultCfrIterations = 100;
 // Produce a solver given a subgame.
 struct SolverFactory {
   std::shared_ptr<const TerminalEvaluator> terminal_evaluator;
-  std::shared_ptr<const NetEvaluator> leaf_evaluator;
+  std::shared_ptr<const PublicStateEvaluator> leaf_evaluator;
   int cfr_iterations = kDefaultCfrIterations;
   std::string use_bandits_for_cfr = kDefaultDlCfrBandit;
   SaveValuesPolicy save_values_policy = SaveValuesPolicy::kAveragedCfValues;
