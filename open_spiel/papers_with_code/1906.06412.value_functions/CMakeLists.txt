@@ -29,7 +29,8 @@ add_library(paper_value_functions OBJECT
   subgame.h
   subgame_factory.cc
   subgame_factory.h
-)
+  tabularize_bot.h
+  tabularize_bot.cpp)
 
 # Delete -Wall -Werror in
 # - /home/michal/Code/open_spiel/open_spiel/libtorch/libtorch/share/cmake/Caffe2/Caffe2Targets.cmake torch_cpu
@@ -53,3 +54,5 @@ add_paper_executable(subgame_test subgame_test.cc)
 add_test(subgame_test subgame_test)
 add_paper_executable(continual_resolving_test continual_resolving_test.cpp)
 add_test(continual_resolving_test continual_resolving_test)
+add_paper_executable(tabularize_bot_test tabularize_bot_test.cpp)
+add_test(tabularize_bot_test tabularize_bot_test)
