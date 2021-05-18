@@ -40,12 +40,17 @@ void CheckConsistency(const PublicState& s) {
       else num_nonterminals++;
 
       for (const std::unique_ptr<State>& state : node->corresponding_states()) {
-        const auto& h = state->History();
+        std::unique_ptr<std::vector<Action>> h;
+        if (node->type() == algorithms::kTerminalInfostateNode) {
+            h = std::make_unique<std::vector<Action>>(node->TerminalHistory());
+        }  else {
+            h = std::make_unique<std::vector<Action>>(state->History());
+        }
         if (pl == 0) {
-          SPIEL_CHECK_TRUE(state_histories.find(h) == state_histories.end());
-          state_histories.insert(h);
+          SPIEL_CHECK_TRUE(state_histories.find(*h) == state_histories.end());
+          state_histories.insert(*h);
         } else {
-          SPIEL_CHECK_TRUE(state_histories.find(h) != state_histories.end());
+          SPIEL_CHECK_TRUE(state_histories.find(*h) != state_histories.end());
         }
 
 //        if (state->IsTerminal()) num_terminals++;
