@@ -189,10 +189,9 @@ void PublicState::SetBeliefs(
 
 std::unordered_map<std::string, double> PublicState::GetCFVs(Player player) {
     std::unordered_map<std::string, double> CFVs;
-    for (auto& infostate : nodes[player]) {
-        std::string infostate_string = infostate->infostate_string();
-        int value_index = nodes_positions.at(infostate);
-        double cfv = average_values[player][value_index];
+    for (int j = 0; j < nodes[player].size(); j++) {
+        std::string infostate_string = nodes[player][j]->infostate_string();
+        double cfv = average_values[player][j];
         CFVs.emplace(infostate_string, cfv);
     }
     return CFVs;
@@ -592,12 +591,14 @@ CFREvaluator::CFREvaluator(std::shared_ptr<const Game> game, int depth_limit,
                            std::shared_ptr<const PublicStateEvaluator> leaf_evaluator,
                            std::shared_ptr<const PublicStateEvaluator> terminal_evaluator,
                            std::shared_ptr<Observer> public_observer,
-                           std::shared_ptr<Observer> infostate_observer)
+                           std::shared_ptr<Observer> infostate_observer,
+                           int cfr_iterations)
     : game(std::move(game)), depth_limit(depth_limit),
       nonterminal_evaluator(std::move(leaf_evaluator)),
       terminal_evaluator(std::move(terminal_evaluator)),
       public_observer(std::move(public_observer)),
-      infostate_observer(std::move(infostate_observer)) {
+      infostate_observer(std::move(infostate_observer)),
+      num_cfr_iterations(cfr_iterations){
   SPIEL_CHECK_GT(depth_limit, 0);
 }
 

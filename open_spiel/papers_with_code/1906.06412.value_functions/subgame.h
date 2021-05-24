@@ -326,7 +326,7 @@ struct CFREvaluator : public PublicStateEvaluator {
   std::shared_ptr<Observer> public_observer;
   std::shared_ptr<Observer> infostate_observer;
   bool reset_subgames_on_evaluation = true;
-  int num_cfr_iterations = 100;
+  int num_cfr_iterations;
   std::string bandit_name = "RegretMatchingPlus";
   SaveValuesPolicy save_values_policy = SaveValuesPolicy::kAveragedCfValues;
 
@@ -334,7 +334,8 @@ struct CFREvaluator : public PublicStateEvaluator {
                std::shared_ptr<const PublicStateEvaluator> leaf_evaluator,
                std::shared_ptr<const PublicStateEvaluator> terminal_evaluator,
                std::shared_ptr<Observer> public_observer,
-               std::shared_ptr<Observer> infostate_observer);
+               std::shared_ptr<Observer> infostate_observer,
+               int cfr_iterations = 100);
 
   std::unique_ptr<PublicStateContext> CreateContext(
       const PublicState& state) const override;

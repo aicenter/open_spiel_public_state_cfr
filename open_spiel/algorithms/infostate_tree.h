@@ -763,6 +763,8 @@ class InfostateNode final {
   // of (isomorphic) trees.
   std::string MakeCertificate() const;
 
+  std::string MakeCertificate(int precision) const;
+
   // this can differ based on the current infostate tree
   std::string TreePath() const;
 

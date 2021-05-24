@@ -20,6 +20,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <iomanip>
 
 #include "open_spiel/action_view.h"
 
@@ -89,26 +90,38 @@ std::string InfostateNode::TreePath() const {
   return absl::StrCat(parent_->TreePath(), ",", incoming_index_);
 }
 
+std::string InfostateNode::MakeCertificate(int precision) const {
+    if (type_ == kTerminalInfostateNode) {
+        if(precision > -1) {
+            std::stringstream ss;
+            ss << std::fixed << std::setprecision(precision) << terminal_utility_;
+            std::string mystring = ss.str();
+            return "{" + ss.str() + "}";
+        } else {
+            return "{}";
+        }
+    }
+
+    std::vector<std::string> certificates;
+    for (InfostateNode* child : child_iterator()) {
+        certificates.push_back(child->MakeCertificate(precision));
+    }
+    std::sort(certificates.begin(), certificates.end());
+
+    std::string open, close;
+    if (type_ == kDecisionInfostateNode) {
+        open = "[";
+        close = "]";
+    } else if (type_ == kObservationInfostateNode) {
+        open = "(";
+        close = ")";
+    }
+    return absl::StrCat(
+            open, absl::StrJoin(certificates.begin(), certificates.end(), ""), close);
+}
+
 std::string InfostateNode::MakeCertificate() const {
-  if (type_ == kTerminalInfostateNode) return "{}";
-
-  std::vector<std::string> certificates;
-  for (InfostateNode* child : child_iterator()) {
-    certificates.push_back(child->MakeCertificate());
-  }
-  std::sort(certificates.begin(), certificates.end());
-
-  std::string open, close;
-  if (type_ == kDecisionInfostateNode) {
-    open = "[";
-    close = "]";
-  } else if (type_ == kObservationInfostateNode) {
-    open = "(";
-    close = ")";
-  }
-
-  return absl::StrCat(
-      open, absl::StrJoin(certificates.begin(), certificates.end(), ""), close);
+    return this->MakeCertificate(-1);
 }
 
 void InfostateNode::RebalanceSubtree(int target_depth, int current_depth) {
@@ -302,7 +315,7 @@ void InfostateTree::RecursivelyBuildTree(InfostateNode* parent, size_t depth,
       }
       std::string cfv_info_state =
               infostate_observer_->StringFrom(state, ftplayer_);
-      const double terminal_utility = CFVs_->at(cfv_info_state);
+      const double terminal_utility = (ftplayer_ == acting_player_ ? 1 : -1) * CFVs_->at(cfv_info_state);
       int children = observation_node->num_children();
       InfostateNode* terminal_node = observation_node->AddChild(
               MakeNode(observation_node, kTerminalInfostateNode,
