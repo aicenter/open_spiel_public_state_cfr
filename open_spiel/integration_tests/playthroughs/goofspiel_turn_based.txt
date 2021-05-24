@@ -70,7 +70,7 @@ HistoryString() = "2"
 IsChanceNode() = False
 IsSimultaneousNode() = False
 CurrentPlayer() = 1
-InformationStateString(0) = "P0 hand: 1 2 3 4 \nP0 action sequence: \nPoint card sequence: 4 \nWin sequence: \nPoints: 0 0 \nTerminal?: 0\n"
+InformationStateString(0) = "P0 hand: 1 2 3 4 \nP0 action sequence: \nPoint card sequence: 4 \nWin sequence: \nPoints: 0 0 \nTerminal?: 0\n Used action 2"
 InformationStateString(1) = "P1 hand: 1 2 3 4 \nP1 action sequence: \nPoint card sequence: 4 \nWin sequence: \nPoints: 0 0 \nTerminal?: 0\n"
 InformationStateTensor(0): ◯◉◉◯◉◯◯◯◯◯◯◯◯◯◯◉◯◯◯◯◯◯◯◯◯◯◉◉◉◉◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◉◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯
 InformationStateTensor(1): ◯◉◯◉◉◯◯◯◯◯◯◯◯◯◯◉◯◯◯◯◯◯◯◯◯◯◉◉◉◉◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◉◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯
@@ -122,7 +122,7 @@ HistoryString() = "2, 3, 1"
 IsChanceNode() = False
 IsSimultaneousNode() = False
 CurrentPlayer() = 1
-InformationStateString(0) = "P0 hand: 1 2 4 \nP0 action sequence: 2 \nPoint card sequence: 4 3 \nWin sequence: 1 \nPoints: 0 4 \nTerminal?: 0\n"
+InformationStateString(0) = "P0 hand: 1 2 4 \nP0 action sequence: 2 \nPoint card sequence: 4 3 \nWin sequence: 1 \nPoints: 0 4 \nTerminal?: 0\n Used action 1"
 InformationStateString(1) = "P1 hand: 1 2 3 \nP1 action sequence: 3 \nPoint card sequence: 4 3 \nWin sequence: 1 \nPoints: 0 4 \nTerminal?: 0\n"
 InformationStateTensor(0): ◯◉◉◯◉◯◯◯◯◯◯◯◯◯◯◯◯◯◯◉◯◯◯◯◯◯◉◉◯◉◯◉◯◯◯◯◯◯◯◯◯◯◯◯◯◉◯◯◉◯◯◯◯◯◯◯◯◯◯◯◉◯◯◯◯◯◯◯◯◯◯◯◯◯
 InformationStateTensor(1): ◯◉◯◉◯◯◯◯◉◯◯◯◯◯◯◉◯◯◯◯◯◯◯◯◯◯◉◉◉◯◯◉◯◯◯◯◯◯◯◯◯◯◯◯◯◉◯◯◉◯◯◯◯◯◯◯◯◯◯◯◯◉◯◯◯◯◯◯◯◯◯◯◯◯
@@ -174,7 +174,7 @@ HistoryString() = "2, 3, 1, 0, 3"
 IsChanceNode() = False
 IsSimultaneousNode() = False
 CurrentPlayer() = 1
-InformationStateString(0) = "P0 hand: 1 4 \nP0 action sequence: 2 1 \nPoint card sequence: 4 3 2 \nWin sequence: 1 0 \nPoints: 3 4 \nTerminal?: 0\n"
+InformationStateString(0) = "P0 hand: 1 4 \nP0 action sequence: 2 1 \nPoint card sequence: 4 3 2 \nWin sequence: 1 0 \nPoints: 3 4 \nTerminal?: 0\n Used action 3"
 InformationStateString(1) = "P1 hand: 2 3 \nP1 action sequence: 3 0 \nPoint card sequence: 4 3 2 \nWin sequence: 1 0 \nPoints: 3 4 \nTerminal?: 0\n"
 InformationStateTensor(0): ◯◉◉◯◯◯◯◉◯◯◯◯◯◯◯◯◯◯◯◉◯◯◯◯◯◯◉◯◯◉◯◉◉◯◯◯◯◯◯◯◯◯◯◯◯◉◯◯◉◯◯◉◯◯◯◯◯◯◯◯◉◯◯◉◯◯◯◯◯◯◯◯◯◯
 InformationStateTensor(1): ◯◉◯◉◯◯◯◯◉◯◯◯◯◯◯◯◯◯◉◯◯◯◯◯◯◯◯◉◉◯◯◉◉◯◯◯◯◯◯◯◯◯◯◯◯◉◯◯◉◯◯◉◯◯◯◯◯◯◯◯◯◉◉◯◯◯◯◯◯◯◯◯◯◯
