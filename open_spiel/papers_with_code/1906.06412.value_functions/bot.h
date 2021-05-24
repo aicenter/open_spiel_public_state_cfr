@@ -161,6 +161,7 @@ std::unique_ptr<SherlockBot> MakeSherlockBot(
                 int cfr_iterations = GetParameterValue(bot_params, "cfr_iterations", kDefaultCfrIterations);
                 int max_move_ahead_limit = GetParameterValue(bot_params, "max_move_ahead_limit", 1);
                 int max_particles = GetParameterValue(bot_params, "max_particles", 1000);
+                int subgame_cfr_iterations = GetParameterValue(bot_params, "subgame_cfr_iterations", 100);
                 std::string device_spec = GetParameterValue<std::string>(bot_params, "device", "auto");
                 std::string use_bandits_for_cfr = GetParameterValue<std::string>(bot_params, "use_bandits_for_cfr", kDefaultDlCfrBandit);
                 std::string save_values_policy = GetParameterValue<std::string>(bot_params, "save_values_policy", "average");
@@ -213,7 +214,7 @@ std::unique_ptr<SherlockBot> MakeSherlockBot(
                             game->MakeObserver(kInfoStateObsType, {});
 
                     solver_factory->leaf_evaluator = std::make_shared<CFREvaluator>(game, 20,
-                                                                                    nullptr,terminal_evaluator, public_observer,infostate_observer);
+                                                                                    nullptr,terminal_evaluator, public_observer,infostate_observer, subgame_cfr_iterations);
                 }
                 solver_factory->cfr_iterations = cfr_iterations;
                 solver_factory->use_bandits_for_cfr  = use_bandits_for_cfr;

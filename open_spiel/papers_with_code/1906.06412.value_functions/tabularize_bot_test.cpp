@@ -132,12 +132,13 @@ namespace open_spiel {
 
                 BotParameters params{
                         {"seed",                  BotParameter(0)},
-                        {"cfr_iterations",        BotParameter(1000)},
+                        {"cfr_iterations",        BotParameter(100)},
                         {"max_move_ahead_limit",  BotParameter(1)},
                         {"max_particles",         BotParameter(1000)},
                         {"use_bandits_for_cfr",   BotParameter("RegretMatchingPlus")},
                         {"save_values_policy",    BotParameter("average")},
                         {"non_terminal_evaluator",BotParameter("cfr")},
+                        {"subgame_cfr_iterations", BotParameter(10)},
                 };
 
                 std::shared_ptr<TabularPolicy> joint_policy = CreatePolicyFromSetup(params, game);
