@@ -497,14 +497,16 @@ void SubgameSolver::EvaluateLeaf(PublicState* state,
     }
   }
 
-  // 4. Incrementally update average CFVs
-  if(safe_resolving_) {
-      for (int pl = 0; pl < 2; pl++) {
-          const int num_leaves = state->nodes[pl].size();
-          for (int j = 0; j < num_leaves; ++j) {
-              state->average_values[pl][j] += (state->values[pl][j] - state->average_values[pl][j]) / num_iterations_;
-          }
+  // 4. Incrementally update average CFVs.
+  if (safe_resolving_) {
+    for (int pl = 0; pl < 2; pl++) {
+      const int num_leaves = state->nodes[pl].size();
+      for (int j = 0; j < num_leaves; ++j) {
+        state->average_values[pl][j] +=
+            (state->values[pl][j] - state->average_values[pl][j])
+                / num_iterations_;
       }
+    }
   }
 }
 
@@ -529,6 +531,8 @@ void SubgameSolver::Reset() {
         std::fill(state.beliefs[pl].begin(), state.beliefs[pl].end(), 0.);
       }
       std::fill(state.values[pl].begin(), state.values[pl].end(), 0.);
+      std::fill(state.average_values[pl].begin(),
+                state.average_values[pl].end(), 0.);
     }
     if (nonterminal_evaluator_.get()) {
       std::unique_ptr<PublicStateContext>& context = contexts_[i];

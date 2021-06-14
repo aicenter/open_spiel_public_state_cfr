@@ -96,10 +96,11 @@ struct PublicState {
   // For each player, store beliefs for the top-most infostate nodes, which
   // correspond to bottom_nodes of the DL infostate tree.
   std::array<std::vector<double>, 2> beliefs;
-  // For each player, store counterfactual values for the top-most infostate
-  // nodes, which correspond to bottom_nodes of the DL infostate tree.
+  // For each player, store current counterfactual values for the top-most
+  // infostate nodes, which correspond to bottom_nodes of the DL infostate tree.
   std::array<std::vector<double>, 2> values;
-  // For each player store average counterfactual values for leaf infosets
+  // For each player, store average counterfactual values for the same
+  // infostates as the current cf. values.
   std::array<std::vector<double>, 2> average_values;
 
   PublicState(const Observation& public_observation,
