@@ -225,7 +225,7 @@ torch::Tensor ParticleValueNet::PrepareTarget(BatchData* batch) {
     int num_parviews = parviews_counts[i].item<int>();
     target_slices.push_back(batch->target.index({i, Slice(0, num_parviews)}));
   }
-  return torch::cat(target_slices).unsqueeze(/*dim=*/0);
+  return torch::cat(target_slices);
 }
 
 // TODO: test that this indeed initializes weights differently each call.
