@@ -44,8 +44,7 @@ class SherlockBot : public Bot {
 
   Action Step(const State& state) override;
 
-  std::pair<ActionsAndProbs,
-            Action> StepWithPolicy(const State& state) override;
+  std::pair<ActionsAndProbs, Action> StepWithPolicy(const State& state) override;
 
   void SetSeed(int seed);
 
@@ -77,14 +76,10 @@ class SherlockBot : public Bot {
   }
 };
 
-std::unique_ptr<Bot> MakeSherlockBot(std::unique_ptr<SubgameFactory> subgame_factory,
-                                     std::unique_ptr<SolverFactory> solver_factory,
-                                     Player player_id, int seed);
-
-std::unique_ptr<SherlockBot> MakeSherlockBot(
+std::unique_ptr<Bot>  MakeSherlockBot(
     std::unique_ptr<SubgameFactory> subgame_factory,
     std::unique_ptr<SolverFactory> solver_factory,
-    Player player_id, int seed, bool sherlock_type);
+    Player player_id, int seed);
 
 namespace {
 
@@ -267,19 +262,6 @@ class SherlockBotFactory : public BotFactory {
     return MakeSherlockBot(std::move(std::get<0>(params)),
                            std::move(std::get<1>(params)),
                            player_id, std::get<2>(params));
-  }
-
-  std::unique_ptr<SherlockBot> Create(std::shared_ptr<const Game> game,
-                                      Player player_id,
-                                      const GameParameters& bot_params,
-                                      bool sherlock_type) const {
-    std::tuple<std::unique_ptr<SubgameFactory>,
-               std::unique_ptr<SolverFactory>,
-               int>
-        params = ParseParams(std::move(game), player_id, bot_params);
-    return MakeSherlockBot(std::move(std::get<0>(params)),
-                           std::move(std::get<1>(params)),
-                           player_id, std::get<2>(params), true);
   }
 };
 REGISTER_SPIEL_BOT("sherlock", SherlockBotFactory);

@@ -27,7 +27,6 @@ SherlockBot::SherlockBot(std::unique_ptr<SubgameFactory> subgame_factory,
       player_id_(player_id),
       rnd_gen_(seed) {
   subgame_ = subgame_factory_->MakeTrunk(1);
-
 }
 
 SherlockBot::SherlockBot(SherlockBot const& bot)
@@ -35,6 +34,7 @@ SherlockBot::SherlockBot(SherlockBot const& bot)
       solver_factory_(bot.solver_factory_),
       player_id_(bot.player_id_),
       rnd_gen_(bot.rnd_gen_),
+      // Copy the subgame.
       subgame_(std::make_shared<Subgame>(*bot.subgame_)) {
   SPIEL_CHECK_NE(subgame_.get(), bot.subgame_.get());
 }
@@ -53,31 +53,28 @@ void SherlockBot::Restart() {
 
 std::pair<ActionsAndProbs,
           Action> SherlockBot::StepWithPolicy(const State& state) {
-
   SPIEL_CHECK_TRUE(subgame_);
-  // First check if we will play
-  // These should be provided by the referee at some point,
-  // not accessed from the perfect-information State.
-//        std::cout << "# Make observations\n";
-  // infostate observations
+  // Infostate observations.
   Observation infostate_observation
       (*subgame_factory_->game, subgame_factory_->infostate_observer);
   infostate_observation.SetFrom(state, player_id_);
   const std::string infostate =
       subgame_factory_->infostate_observer->StringFrom(state, player_id_);
 
-  // public state observations
+  // Public state observations.
   Observation public_observation
       (*subgame_factory_->game, subgame_factory_->public_observer);
   public_observation.SetFrom(state, 0);
-  PublicState* publicState = nullptr;
-  for (PublicState& pubState : subgame_->public_states) {
-    if (pubState.public_tensor == public_observation) {
-      publicState = &pubState;
+  // We should always be able to localize current public state based
+  // on previous bot steps.
+  PublicState* public_state = nullptr;
+  for (PublicState& maybe_current : subgame_->public_states) {
+    if (maybe_current.public_tensor == public_observation) {
+      public_state = &maybe_current;
       break;
     }
   }
-  SPIEL_CHECK_TRUE(publicState);
+  SPIEL_CHECK_TRUE(public_state);
 
   // TODO: Tabularization of any Bot to compute offline TabularPolicy.
   //       Bot base class will need to add a Clone() method.
@@ -86,13 +83,12 @@ std::pair<ActionsAndProbs,
   //       Currently can work only for one-step lookahead trees.
 //        std::cout << "# Generate particles for current public state\n";
   std::unique_ptr<ParticleSetPartition> partition =
-      MakeParticleSetPartition(*publicState,
+      MakeParticleSetPartition(*public_state,
                                pow(10, 7),
                                pow(10, -9),
-                               false,
-                               rnd_gen_);
-  std::unique_ptr<ParticleSet>
-      set = std::make_unique<ParticleSet>(partition->primary);
+
+                               /*save_secondary=*/false, rnd_gen_);
+  auto set = std::make_unique<ParticleSet>(partition->primary);
   //    std::unique_ptr<ParticleSet> set = GenerateParticles(
   //        infostate_observation,
   //        player_id_,
@@ -105,8 +101,6 @@ std::pair<ActionsAndProbs,
   //        rnd_gen_);
   SPIEL_CHECK_FALSE(set->particles.empty());
 
-  //subgame_factory_->game->NewInitialState();
-
   // TODO: proper management of beliefs between steps. This is just
   //       a dummy initialization. (Not needed when I initialize from public state.)
 
@@ -117,12 +111,10 @@ std::pair<ActionsAndProbs,
   //    }
 
   // We will do the gadget if we are resolving
-//        std::cout << "# Making subgame\n";
   if (state.MoveNumber() > 0) {
-    subgame_ = subgame_factory_->MakeSubgameSafeResolving(*set,
-                                                          player_id_,
-                                                          publicState->GetCFVs(
-                                                              1 - player_id_));
+    subgame_ = subgame_factory_->MakeSubgameSafeResolving(
+        *set,
+                                                          player_id_, public_state->GetCFVs(1 - player_id_));
   } else {
     subgame_ = subgame_factory_->MakeSubgame(*set);
   }
@@ -173,15 +165,6 @@ std::unique_ptr<Bot> MakeSherlockBot(
     std::unique_ptr<SubgameFactory> subgame_factory,
     std::unique_ptr<SolverFactory> solver_factory,
     Player player_id, int seed) {
-  return std::make_unique<SherlockBot>(std::move(subgame_factory),
-                                       std::move(solver_factory),
-                                       player_id, seed);
-}
-
-std::unique_ptr<SherlockBot> MakeSherlockBot(
-    std::unique_ptr<SubgameFactory> subgame_factory,
-    std::unique_ptr<SolverFactory> solver_factory,
-    Player player_id, int seed, bool sherlock_type) {
   return std::make_unique<SherlockBot>(std::move(subgame_factory),
                                        std::move(solver_factory),
                                        player_id, seed);
