@@ -432,12 +432,12 @@ void SubgameSolver::RunSimultaneousIterations(int iterations) {
 //                            -initial_state().Value(1), 1e-6);
 
     if (init_save_values_ == PolicySelection::kAveragePolicy) {
-      IncrementallyAverageValuesInInitialState();
+      IncrementallyAverageValuesInState(&initial_state());
     }
   }
 
   if (init_save_values_ == PolicySelection::kCurrentPolicy) {
-    CopyValuesToInitialState();
+    CopyCurrentValuesToInitialState();
   }
 
   // 5. put average beliefs to the leaf public states so we can reuse them in next step
@@ -553,7 +553,7 @@ void SubgameSolver::Reset() {
 }
 
 
-void SubgameSolver::CopyValuesToInitialState() {
+void SubgameSolver::CopyCurrentValuesToInitialState() {
   for (int pl = 0; pl < 2; ++pl) {
     int branching = subgame()->trees[pl]->root_branching_factor();
     SPIEL_CHECK_EQ(initial_state().values[pl].size(), branching);
@@ -563,18 +563,6 @@ void SubgameSolver::CopyValuesToInitialState() {
 }
 
 void SubgameSolver::IncrementallyAverageValuesInState(PublicState* state) {
-    // Check that we have reset the values, otherwise incremental averaging
-    // will not work properly!
-    SPIEL_DCHECK({
-        if (num_iterations_ == 0) {
-            for (int pl = 0; pl < 2; ++pl) {
-                for (double & value : state->values[pl]) {
-                    SPIEL_CHECK_EQ(value, 0.);
-                }
-            }
-        }
-    });
-
     for (int pl = 0; pl < 2; ++pl) {
         for (int i = 0; i < state->values[pl].size(); ++i) {
             state->values[pl][i] +=
@@ -583,20 +571,6 @@ void SubgameSolver::IncrementallyAverageValuesInState(PublicState* state) {
     }
 }
 
-void SubgameSolver::IncrementallyAverageValuesInInitialState() {
-  // Check that we have reset the values, otherwise incremental averaging
-  // will not work properly!
-  IncrementallyAverageValuesInState(&initial_state());
-}
-
-void DebugPrintPublicFeatures(const std::vector<PublicState>& states) {
-  std::cout << "# Public features:\n";
-  for (int i = 0; i < states.size(); ++i) {
-    std::cout << "#   states[" << i << "].public_tensor\n#     "
-              << ObservationToString(states[i].public_tensor, "\n#     ")
-              << "\n";
-  }
-}
 
 // -- CFR evaluator ------------------------------------------------------------
 
