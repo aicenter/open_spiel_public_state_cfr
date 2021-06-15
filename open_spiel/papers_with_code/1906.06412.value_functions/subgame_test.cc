@@ -135,8 +135,8 @@ void TestRecursiveDepthLimitedSolving(const std::string& game_name) {
       for (int j = 0; j < trunk_iterations; ++j) {
         vec_solver.RunSimultaneousIterations(1);
         dl_solver->RunSimultaneousIterations(1);
-        SPIEL_CHECK_FLOAT_NEAR(
-            vec_solver.RootValue(), dl_solver->initial_state().Value(), 1e-6);
+        SPIEL_CHECK_FLOAT_NEAR(vec_solver.RootValue(),
+                               dl_solver->initial_state().CurrentValue(), 1e-6);
         for (int pl = 0; pl < 2; ++pl) {
           CheckIterationConsistency(*vec_avg, *dl_avg, *trees[pl]);
           CheckIterationConsistency(*vec_cur, *dl_cur, *trees[pl]);

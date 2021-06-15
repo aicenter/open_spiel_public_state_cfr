@@ -171,11 +171,20 @@ bool PublicState::IsReachableByPlayer(int player) const {
   return false;
 }
 
-double PublicState::Value(int player) const {
+double PublicState::CurrentValue(int player) const {
   SPIEL_CHECK_EQ(beliefs[player].size(), values[player].size());
   double acc = 0.;
   for (int i = 0; i < beliefs[player].size(); ++i) {
     acc += beliefs[player][i] * values[player][i];
+  }
+  return acc;
+}
+
+double PublicState::AverageValue(int player) const {
+  SPIEL_CHECK_EQ(beliefs[player].size(), average_values[player].size());
+  double acc = 0.;
+  for (int i = 0; i < beliefs[player].size(); ++i) {
+    acc += beliefs[player][i] * average_values[player][i];
   }
   return acc;
 }

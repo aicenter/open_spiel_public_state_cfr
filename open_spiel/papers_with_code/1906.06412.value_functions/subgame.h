@@ -123,10 +123,14 @@ struct PublicState {
   bool IsReachableBySomePlayer() const {
     return IsReachableByPlayer(0) || IsReachableByPlayer(1);
   };
-  // Compute value of this state (for the given player).
-  double Value(int player = 0) const;
+  // Compute value of this state based on current policy (for the given player).
+  double CurrentValue(int player = 0) const;
+  // Compute value of this state based on average policy (for the given player).
+  double AverageValue(int player = 0) const;
   // Check if the public state is zero-sum.
-  bool IsZeroSum() const { return fabs(Value(0) + Value(1)) < 1e-10; }
+  bool IsZeroSum() const {
+    return fabs(CurrentValue(0) + CurrentValue(1)) < 1e-10;
+  }
   // Set new beliefs and check they have consistent sizes.
   void SetBeliefs(const std::array<std::vector<double>, 2>& new_beliefs);
   std::unordered_map<std::string, double> GetCFVs(Player player);
