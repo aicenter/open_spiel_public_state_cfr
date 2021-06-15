@@ -50,6 +50,12 @@ inline constexpr int kNumBots = 43;
 class RoshamboBot : public Bot {
  public:
   explicit RoshamboBot(int player_id, std::string bot_name);
+  RoshamboBot(const RoshamboBot& other) = default;
+
+  std::unique_ptr<Bot> Clone() const override {
+    return std::make_unique<RoshamboBot>(*this);
+  }
+
   Action Step(const State& state) override;
   void InformActions(const State& state,
                      const std::vector<Action>& actions) override;

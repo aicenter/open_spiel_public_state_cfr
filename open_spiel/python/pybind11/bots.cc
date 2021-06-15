@@ -65,6 +65,10 @@ class PyBot : public Bot {
     );
   }
 
+  std::unique_ptr<Bot> Clone() const override {
+    SpielFatalError("Not implemented!");
+  }
+
   // Restart at the specified state.
   void Restart() override {
     PYBIND11_OVERLOAD_NAME(

@@ -233,23 +233,21 @@ void TestKuhnExploitability() {
 
   SherlockBotFactory bot_factory = SherlockBotFactory();
 
-  std::unique_ptr<SherlockBot>
+  std::unique_ptr<Bot>
       bot_player_one = bot_factory.Create(game,
                                           Player(0),
-                                          params,
-                                          true);
+                                          params);
   std::shared_ptr<TabularPolicy>
       bot_policy_player_one = tabularize_bot::FullBotPolicy(
-      std::move(bot_player_one), Player(0), game);
+      std::move(bot_player_one), Player(0), *game);
 
-  std::unique_ptr<SherlockBot>
+  std::unique_ptr<Bot>
       bot_player_two = bot_factory.Create(game,
                                           Player(1),
-                                          params,
-                                          true);
+                                          params);
   std::shared_ptr<TabularPolicy>
       bot_policy_player_two = tabularize_bot::FullBotPolicy(
-      std::move(bot_player_two), Player(1), game);
+      std::move(bot_player_two), Player(1), *game);
 
   std::unique_ptr<State> root = game->NewInitialState();
   algorithms::TabularBestResponse

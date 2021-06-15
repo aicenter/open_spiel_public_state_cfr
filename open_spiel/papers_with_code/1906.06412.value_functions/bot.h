@@ -42,6 +42,8 @@ class SherlockBot : public Bot {
 
   SherlockBot(SherlockBot const& bot);
 
+  std::unique_ptr<Bot> Clone() const override;
+
   Action Step(const State& state) override;
 
   std::pair<ActionsAndProbs, Action> StepWithPolicy(const State& state) override;

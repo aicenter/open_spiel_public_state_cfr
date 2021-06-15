@@ -35,6 +35,11 @@ class UniformRandomBot : public Bot {
   UniformRandomBot(Player player_id, int seed)
       : player_id_(player_id), rng_(seed) {}
   ~UniformRandomBot() = default;
+  UniformRandomBot(const UniformRandomBot& other) = default;
+
+  std::unique_ptr<Bot> Clone() const override {
+    return std::make_unique<UniformRandomBot>(*this);
+  }
 
   void RestartAt(const State&) override {}
   Action Step(const State& state) override {
@@ -60,7 +65,7 @@ class UniformRandomBot : public Bot {
     return std::make_pair(policy, policy[selection].first);
   }
 
- private:
+ protected:
   const Player player_id_;
   std::mt19937 rng_;
 };
@@ -71,6 +76,12 @@ class StatefulRandomBot : public UniformRandomBot {
  public:
   StatefulRandomBot(const Game& game, Player player_id, int seed)
       : UniformRandomBot(player_id, seed), state_(game.NewInitialState()) {}
+  StatefulRandomBot(const StatefulRandomBot& other)
+      : UniformRandomBot(other), state_(other.state_->Clone()) {}
+
+  std::unique_ptr<Bot> Clone() const override {
+    return std::make_unique<StatefulRandomBot>(*this);
+  }
 
   void Restart() override { state_ = state_->GetGame()->NewInitialState(); }
   void RestartAt(const State& state) override { state_ = state.Clone(); }
@@ -107,7 +118,12 @@ class PolicyBot : public Bot {
  public:
   PolicyBot(int seed, std::shared_ptr<Policy> policy)
       : Bot(), rng_(seed), policy_(std::move(policy)) {}
+  PolicyBot(const PolicyBot& other) = default;
   ~PolicyBot() = default;
+
+  std::unique_ptr<Bot> Clone() const override {
+    return std::make_unique<PolicyBot>(*this);
+  }
 
   void RestartAt(const State&) override {}
   Action Step(const State& state) override {
@@ -133,7 +149,12 @@ class FixedActionPreferenceBot : public Bot {
  public:
   FixedActionPreferenceBot(Player player_id, const std::vector<Action>& actions)
       : Bot(), player_id_(player_id), actions_(actions) {}
+  FixedActionPreferenceBot(const FixedActionPreferenceBot& other) = default;
   ~FixedActionPreferenceBot() = default;
+
+  std::unique_ptr<Bot> Clone() const override {
+    return std::make_unique<FixedActionPreferenceBot>(*this);
+  }
 
   void RestartAt(const State&) override {}
   Action Step(const State& state) override {

@@ -76,9 +76,6 @@ std::pair<ActionsAndProbs,
   }
   SPIEL_CHECK_TRUE(public_state);
 
-  // TODO: Tabularization of any Bot to compute offline TabularPolicy.
-  //       Bot base class will need to add a Clone() method.
-
   // TODO: keep particles from previous step along with beliefs.
   //       Currently can work only for one-step lookahead trees.
 //        std::cout << "# Generate particles for current public state\n";
@@ -159,6 +156,10 @@ std::pair<ActionsAndProbs,
     ActionsAndProbs actions_and_probs;
     return {actions_and_probs, Action(-1)};
   }
+}
+
+std::unique_ptr<Bot> SherlockBot::Clone() const {
+  return std::make_unique<SherlockBot>(*this);
 }
 
 std::unique_ptr<Bot> MakeSherlockBot(

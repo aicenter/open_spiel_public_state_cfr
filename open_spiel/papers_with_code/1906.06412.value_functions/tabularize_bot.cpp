@@ -18,38 +18,41 @@
 #include "action_view.h"
 
 namespace open_spiel {
-    namespace papers_with_code {
-        namespace tabularize_bot{
-            std::shared_ptr<TabularPolicy> FullBotPolicy(std::unique_ptr<SherlockBot> bot, Player player,
-                    const std::shared_ptr<const Game>& game) {
-                std::shared_ptr<TabularPolicy> policy = std::make_shared<TabularPolicy>();
-                SavePolicyFromState(std::move(bot), player, game->NewInitialState(), policy);
-                return policy;
-            }
+namespace papers_with_code {
+namespace tabularize_bot {
 
-            void SavePolicyFromState(std::unique_ptr<SherlockBot> bot, Player player,
-                                     std::unique_ptr<State> state, const std::shared_ptr<TabularPolicy>& policy) {
-                std::pair<ActionsAndProbs, Action> step = bot->StepWithPolicy(*state);
-                if(state->IsPlayerActing(player)) {
-                    policy->SetStatePolicy(state->InformationStateString(player), step.first);
-                } else {
-                    SPIEL_CHECK_TRUE(step.first.empty());
-                }
-                if (state->IsPlayerNode() || state->IsSimultaneousNode()) {
-                    const ActionView action_view(*state);
-                    for(Action action : action_view.flat_joint_actions()) {
-                        std::unique_ptr<SherlockBot> new_bot = std::make_unique<SherlockBot>(*bot);
-                        std::unique_ptr<State> child = state->Child(action);
-                        SavePolicyFromState(std::move(new_bot), player, std::move(child), policy);
-                    }
-                } else if(state->IsChanceNode()){
-                    for(Action action : state->LegalChanceOutcomes()) {
-                        std::unique_ptr<SherlockBot> new_bot = std::make_unique<SherlockBot>(*bot);
-                        std::unique_ptr<State> child = state->Child(action);
-                        SavePolicyFromState(std::move(new_bot), player, std::move(child), policy);
-                    }
-                }
-            }
-        }
-    }
+std::shared_ptr<TabularPolicy> FullBotPolicy(std::unique_ptr<Bot> bot,
+                                             Player player, const Game& game) {
+  std::shared_ptr<TabularPolicy> policy = std::make_shared<TabularPolicy>();
+  SavePolicyFromState(std::move(bot), player, game.NewInitialState(), policy);
+  return policy;
 }
+
+void SavePolicyFromState(std::unique_ptr<Bot> bot, Player player,
+                         std::unique_ptr<State> state,
+                         const std::shared_ptr<TabularPolicy>& policy) {
+  std::pair<ActionsAndProbs, Action> step = bot->StepWithPolicy(*state);
+  if (state->IsPlayerActing(player)) {
+    policy->SetStatePolicy(state->InformationStateString(player), step.first);
+  } else {
+    SPIEL_CHECK_TRUE(step.first.empty());
+  }
+  if (state->IsPlayerNode() || state->IsSimultaneousNode()) {
+    const ActionView action_view(*state);
+    for (Action action : action_view.flat_joint_actions()) {
+      std::unique_ptr<Bot> new_bot = bot->Clone();
+      std::unique_ptr<State> child = state->Child(action);
+      SavePolicyFromState(std::move(new_bot), player, std::move(child), policy);
+    }
+  } else if (state->IsChanceNode()) {
+    for (Action action : state->LegalChanceOutcomes()) {
+      std::unique_ptr<Bot> new_bot = bot->Clone();
+      std::unique_ptr<State> child = state->Child(action);
+      SavePolicyFromState(std::move(new_bot), player, std::move(child), policy);
+    }
+  }
+}
+
+}  // tabularize_bot
+}  // papers_with_code
+}  // open_spiel

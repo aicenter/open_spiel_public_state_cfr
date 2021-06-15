@@ -20,15 +20,18 @@
 #include "bot.h"
 
 namespace open_spiel {
-    namespace papers_with_code {
-        namespace tabularize_bot{
-            std::shared_ptr<TabularPolicy>
-            FullBotPolicy(std::unique_ptr<SherlockBot> bot, Player player, const std::shared_ptr<const Game> &game);
+namespace papers_with_code {
+namespace tabularize_bot {
 
-            void SavePolicyFromState(std::unique_ptr<SherlockBot> bot, Player player,
-                                     std::unique_ptr<State> state, const std::shared_ptr<TabularPolicy>& policy);
-        }
-    } // namespace papers_with_code
+std::shared_ptr<TabularPolicy> FullBotPolicy(std::unique_ptr<Bot> bot,
+                                             Player player, const Game& game);
+
+void SavePolicyFromState(std::unique_ptr<Bot> bot, Player player,
+                         std::unique_ptr<State> state,
+                         const std::shared_ptr<TabularPolicy>& policy);
+}
+
+} // namespace papers_with_code
 } // namespace open_spiel
 
 #endif  // OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_TABULARIZE_BOT_
