@@ -23,6 +23,7 @@
 #include <utility>
 #include <vector>
 
+#include "open_spiel/algorithms/bandits_policy.h"
 #include "open_spiel/algorithms/infostate_cfr.h"
 #include "open_spiel/algorithms/infostate_tree.h"
 #include "open_spiel/spiel.h"
@@ -242,17 +243,9 @@ std::shared_ptr<PublicStateEvaluator> MakeDummyEvaluator();
 
 // -- Subgame solver -----------------------------------------------------------
 
-enum class SaveValuesPolicy {
-  kSaveNothing,
-  kCurrentCfValues,
-  kAveragedCfValues,
-                     // Make an average over the cf values encountered during
-                     // the CFR iterations -- avoid a new call with avg policy
-                     // to the network, as that would be likely too noisy.
-};
-SaveValuesPolicy GetSaveValuesPolicy(const std::string& s);
-constexpr SaveValuesPolicy kDefaultSaveValuesPolicy =
-    SaveValuesPolicy::kAveragedCfValues;
+using PolicySelection = algorithms::PolicySelection;
+PolicySelection GetSaveValuesPolicy(const std::string& s);
+constexpr PolicySelection kDefaultPolicySelection = PolicySelection::kAveragePolicy;
 
 // CFR-based subgame solver that evaluates public leaves using terminal
 // or non-terminal evaluator.
@@ -263,7 +256,7 @@ class SubgameSolver {
       const std::shared_ptr<const PublicStateEvaluator> nonterminal_evaluator,
       const std::shared_ptr<const PublicStateEvaluator> terminal_evaluator,
       const std::string& bandit_name,
-      SaveValuesPolicy save_values_policy = kDefaultSaveValuesPolicy,
+      PolicySelection save_values_policy = kDefaultPolicySelection,
       bool safe_resolving = false);
 
   void RunSimultaneousIterations(int iterations);
@@ -294,7 +287,7 @@ class SubgameSolver {
   std::vector<std::unique_ptr<PublicStateContext>> contexts_;
 
   size_t num_iterations_ = 0;
-  SaveValuesPolicy init_save_values_;
+  PolicySelection init_save_values_;
 
   void EvaluateLeaves();
   void EvaluateLeaf(PublicState* state, PublicStateContext* context);
@@ -333,7 +326,7 @@ struct CFREvaluator : public PublicStateEvaluator {
   bool reset_subgames_on_evaluation = true;
   int num_cfr_iterations;
   std::string bandit_name = "RegretMatchingPlus";
-  SaveValuesPolicy save_values_policy = SaveValuesPolicy::kAveragedCfValues;
+  PolicySelection save_values_policy = kDefaultPolicySelection;
 
   CFREvaluator(std::shared_ptr<const Game> game, int depth_limit,
                std::shared_ptr<const PublicStateEvaluator> leaf_evaluator,

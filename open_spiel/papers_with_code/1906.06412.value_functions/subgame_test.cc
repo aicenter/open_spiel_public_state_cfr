@@ -100,14 +100,14 @@ std::unique_ptr<SubgameSolver> MakeRecursiveDepthLimitedCFR(
   leaf_evaluator->bandit_name = "RegretMatching";
   leaf_evaluator->nonterminal_evaluator = leaf_evaluator;
   leaf_evaluator->num_cfr_iterations = 1;
-  leaf_evaluator->save_values_policy = SaveValuesPolicy::kCurrentCfValues;
+  leaf_evaluator->save_values_policy = PolicySelection::kCurrentPolicy;
 
   // Builds the root leaf public states so that we can call the recursive
   // evaluator.
   auto subgame = std::make_shared<Subgame>(game, trunk_depth_limit);
   return std::make_unique<SubgameSolver>(subgame, leaf_evaluator,
                                          terminal_evaluator, "RegretMatching",
-                                         SaveValuesPolicy::kCurrentCfValues);
+                                         PolicySelection::kCurrentPolicy);
 }
 
 void TestRecursiveDepthLimitedSolving(const std::string& game_name) {

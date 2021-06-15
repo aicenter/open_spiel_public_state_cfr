@@ -209,7 +209,7 @@ void TrainEvalLoop() {
   subgame_factory.max_particles        = absl::GetFlag(FLAGS_max_particles);
   //
   std::cout << "# Making oracle evaluator ..." << std::endl;
-  const SaveValuesPolicy save_values_policy =
+  const PolicySelection save_values_policy =
       GetSaveValuesPolicy(absl::GetFlag(FLAGS_save_values_policy));
   auto terminal_evaluator = std::make_shared<TerminalEvaluator>();
   auto oracle = std::make_shared<CFREvaluator>(

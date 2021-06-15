@@ -85,13 +85,13 @@ namespace open_spiel {
                 leaf_evaluator->bandit_name = "RegretMatching";
                 leaf_evaluator->nonterminal_evaluator = leaf_evaluator;
                 leaf_evaluator->num_cfr_iterations = 1;
-                leaf_evaluator->save_values_policy = SaveValuesPolicy::kCurrentCfValues;
+                leaf_evaluator->save_values_policy = PolicySelection::kCurrentPolicy;
 
 
                 auto subgame = std::make_shared<Subgame>(game, 1);
                 auto subgame_solver = std::make_unique<SubgameSolver>(subgame, leaf_evaluator,
                                                                       terminal_evaluator, "RegretMatching",
-                                                                      SaveValuesPolicy::kCurrentCfValues,
+                                                                      PolicySelection::kCurrentPolicy,
                                                                       true);
 
                 // we do 5 iterations and check the CFVs after each iteration
@@ -141,7 +141,7 @@ namespace open_spiel {
 
                 auto solver = std::make_unique<SubgameSolver>(subgame, nonterminal_evaluator,
                                                               terminal_evaluator, "FixableStrategy",
-                                                              SaveValuesPolicy::kAveragedCfValues, true);
+                                                              PolicySelection::kAveragePolicy, true);
 
 
                 for (int player = 0; player < 2; player++) {

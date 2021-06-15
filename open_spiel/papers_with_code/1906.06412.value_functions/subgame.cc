@@ -376,7 +376,7 @@ SubgameSolver::SubgameSolver(
     const std::shared_ptr<const PublicStateEvaluator> nonterminal_evaluator,
     const std::shared_ptr<const PublicStateEvaluator> terminal_evaluator,
     const std::string& bandit_name,
-    SaveValuesPolicy save_values_policy,
+    PolicySelection save_values_policy,
     bool safe_resolving
 ) : subgame_(subgame),
     nonterminal_evaluator_(nonterminal_evaluator),
@@ -431,12 +431,12 @@ void SubgameSolver::RunSimultaneousIterations(int iterations) {
 //    SPIEL_DCHECK_FLOAT_NEAR(initial_state().Value(0),
 //                            -initial_state().Value(1), 1e-6);
 
-    if (init_save_values_ == SaveValuesPolicy::kAveragedCfValues) {
+    if (init_save_values_ == PolicySelection::kAveragePolicy) {
       IncrementallyAverageValuesInInitialState();
     }
   }
 
-  if (init_save_values_ == SaveValuesPolicy::kCurrentCfValues) {
+  if (init_save_values_ == PolicySelection::kCurrentPolicy) {
     CopyValuesToInitialState();
   }
 
@@ -748,11 +748,10 @@ PublicState* PublicStatesInGame::GetPublicState(
   return &public_states.back();
 }
 
-SaveValuesPolicy GetSaveValuesPolicy(const std::string& s) {
-  if (s == "nothing") return SaveValuesPolicy::kSaveNothing;
-  if (s == "current") return SaveValuesPolicy::kCurrentCfValues;
-  if (s == "average") return SaveValuesPolicy::kAveragedCfValues;
-  SpielFatalError("Exhausted pattern match for SaveValuesPolicy");
+PolicySelection GetSaveValuesPolicy(const std::string& s) {
+  if (s == "current") return PolicySelection::kCurrentPolicy;
+  if (s == "average") return PolicySelection::kAveragePolicy;
+  SpielFatalError("Exhausted pattern match for PolicySelection");
 }
 
 

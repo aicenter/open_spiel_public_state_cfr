@@ -35,7 +35,7 @@ struct SolverFactory {
   std::shared_ptr<const PublicStateEvaluator> leaf_evaluator;
   int cfr_iterations = kDefaultCfrIterations;
   std::string use_bandits_for_cfr = kDefaultDlCfrBandit;
-  SaveValuesPolicy save_values_policy = SaveValuesPolicy::kAveragedCfValues;
+  PolicySelection save_values_policy = kDefaultPolicySelection;
 
   std::unique_ptr<SubgameSolver> MakeSolver(
       std::shared_ptr<Subgame> subgame,
