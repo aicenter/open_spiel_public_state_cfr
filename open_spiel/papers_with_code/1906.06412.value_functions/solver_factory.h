@@ -22,7 +22,6 @@
 #include "open_spiel/papers_with_code/1906.06412.value_functions/subgame.h"
 #include "open_spiel/algorithms/infostate_tree.h"
 
-
 namespace open_spiel {
 namespace papers_with_code {
 
@@ -41,9 +40,8 @@ struct SolverFactory {
       std::shared_ptr<Subgame> subgame,
       std::shared_ptr<const PublicStateEvaluator> custom_leaf_evaluator = nullptr,
       std::string custom_bandits_for_cfr = "",
-      bool save_average_values=false) const;
+      bool save_average_values = false) const;
 };
-
 
 } // namespace papers_with_code
 } // namespace open_spiel

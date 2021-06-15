@@ -245,7 +245,8 @@ std::shared_ptr<PublicStateEvaluator> MakeDummyEvaluator();
 
 using PolicySelection = algorithms::PolicySelection;
 PolicySelection GetSaveValuesPolicy(const std::string& s);
-constexpr PolicySelection kDefaultPolicySelection = PolicySelection::kAveragePolicy;
+constexpr PolicySelection kDefaultPolicySelection =
+    PolicySelection::kAveragePolicy;
 
 // CFR-based subgame solver that evaluates public leaves using terminal
 // or non-terminal evaluator.
@@ -340,7 +341,6 @@ struct CFREvaluator : public PublicStateEvaluator {
   void EvaluatePublicState(PublicState* state,
                            PublicStateContext* context) const override;
 };
-
 
 void PrintPublicStatesStats(const std::vector<PublicState>& public_leaves);
 

@@ -28,230 +28,264 @@ namespace papers_with_code {
 using BotParameters = GameParameters;
 using BotParameter = GameParameter;
 
-    class SherlockBot : public Bot {
-        std::shared_ptr<SubgameFactory> subgame_factory_;
-        std::shared_ptr<SolverFactory> solver_factory_;
-        Player player_id_;
-        std::mt19937 rnd_gen_;
-        std::shared_ptr<Subgame> subgame_;
+class SherlockBot : public Bot {
+  std::shared_ptr<SubgameFactory> subgame_factory_;
+  std::shared_ptr<SolverFactory> solver_factory_;
+  Player player_id_;
+  std::mt19937 rnd_gen_;
+  std::shared_ptr<Subgame> subgame_;
 
-    public:
-        SherlockBot(std::unique_ptr<SubgameFactory> subgame_factory,
-                    std::unique_ptr<SolverFactory> solver_factory,
-                    Player player_id, int seed);
+ public:
+  SherlockBot(std::unique_ptr<SubgameFactory> subgame_factory,
+              std::unique_ptr<SolverFactory> solver_factory,
+              Player player_id, int seed);
 
-        SherlockBot(SherlockBot const &bot);
+  SherlockBot(SherlockBot const& bot);
 
-        Action Step(const State& state) override;
+  Action Step(const State& state) override;
 
-        std::pair<ActionsAndProbs, Action> StepWithPolicy(const State& state) override;
+  std::pair<ActionsAndProbs,
+            Action> StepWithPolicy(const State& state) override;
 
-        void SetSeed(int seed);
+  void SetSeed(int seed);
 
-        void InformAction(const State& state,
-                          Player player_id,
-                          Action action) override {
-            Bot::InformAction(state, player_id, action);
-        }
-        void InformActions(const State& state,
-                                        const std::vector<Action>& actions) override {
-            Bot::InformActions(state, actions);
-        }
-        void Restart() override;
+  void InformAction(const State& state,
+                    Player player_id,
+                    Action action) override {
+    Bot::InformAction(state, player_id, action);
+  }
+  void InformActions(const State& state,
+                     const std::vector<Action>& actions) override {
+    Bot::InformActions(state, actions);
+  }
+  void Restart() override;
 
-        void RestartAt(const State& state) override {
-            Bot::RestartAt(state);
-        }
-        bool ProvidesForceAction() override {
-            return Bot::ProvidesForceAction();
-        }
-        void ForceAction(const State& state, Action action) override {
-            Bot::ForceAction(state, action);
-        }
-        bool ProvidesPolicy() override {
-            return Bot::ProvidesPolicy();
-        }
-        ActionsAndProbs GetPolicy(const State& state) override {
-            return Bot::GetPolicy(state);
-        }
-    };
+  void RestartAt(const State& state) override {
+    Bot::RestartAt(state);
+  }
+  bool ProvidesForceAction() override {
+    return Bot::ProvidesForceAction();
+  }
+  void ForceAction(const State& state, Action action) override {
+    Bot::ForceAction(state, action);
+  }
+  bool ProvidesPolicy() override {
+    return Bot::ProvidesPolicy();
+  }
+  ActionsAndProbs GetPolicy(const State& state) override {
+    return Bot::GetPolicy(state);
+  }
+};
 
 std::unique_ptr<Bot> MakeSherlockBot(std::unique_ptr<SubgameFactory> subgame_factory,
                                      std::unique_ptr<SolverFactory> solver_factory,
                                      Player player_id, int seed);
 
-
 std::unique_ptr<SherlockBot> MakeSherlockBot(
-            std::unique_ptr<SubgameFactory> subgame_factory,
-            std::unique_ptr<SolverFactory> solver_factory,
-            Player player_id, int seed, bool sherlock_type);
+    std::unique_ptr<SubgameFactory> subgame_factory,
+    std::unique_ptr<SolverFactory> solver_factory,
+    Player player_id, int seed, bool sherlock_type);
 
-    namespace {
+namespace {
 
-        template<typename T>
-        T GetParameterValue(const GameParameters& table,
-                            const std::string& key,
-                            const T& default_value);
+template <typename T>
+T GetParameterValue(const GameParameters& table,
+                    const std::string& key,
+                    const T& default_value);
 
-        template <>
-        int GetParameterValue<int>(const GameParameters& table,
-                                   const std::string& key,
-                                   const int& default_value) {
-            auto it = table.find(key);
-            if (it == table.end()) return default_value;
-            if (!it->second.has_int_value()) {
-                SpielFatalError(absl::StrCat(
-                        "Parameter '", key, "' should have int value"));
-            }
-            return it->second.int_value();
-        }
+template <>
+int GetParameterValue<int>(const GameParameters& table,
+                           const std::string& key,
+                           const int& default_value) {
+  auto it = table.find(key);
+  if (it == table.end()) return default_value;
+  if (!it->second.has_int_value()) {
+    SpielFatalError(absl::StrCat(
+        "Parameter '", key, "' should have int value"));
+  }
+  return it->second.int_value();
+}
 
-        template <>
-        bool GetParameterValue<bool>(const GameParameters& table,
-                                     const std::string& key,
-                                     const bool& default_value) {
-            auto it = table.find(key);
-            if (it == table.end()) return default_value;
-            if (!it->second.has_bool_value()) {
-                SpielFatalError(absl::StrCat(
-                        "Parameter '", key, "' should have bool value"));
-            }
-            return it->second.bool_value();
-        }
+template <>
+bool GetParameterValue<bool>(const GameParameters& table,
+                             const std::string& key,
+                             const bool& default_value) {
+  auto it = table.find(key);
+  if (it == table.end()) return default_value;
+  if (!it->second.has_bool_value()) {
+    SpielFatalError(absl::StrCat(
+        "Parameter '", key, "' should have bool value"));
+  }
+  return it->second.bool_value();
+}
 
-        template <>
-        std::string GetParameterValue<std::string>(const GameParameters& table,
-                                                   const std::string& key,
-                                                   const std::string& default_value) {
-            auto it = table.find(key);
-            if (it == table.end()) return default_value;
-            if (!it->second.has_string_value()) {
-                SpielFatalError(absl::StrCat(
-                        "Parameter '", key, "' should have string value"));
-            }
-            return it->second.string_value();
-        }
+template <>
+std::string GetParameterValue<std::string>(const GameParameters& table,
+                                           const std::string& key,
+                                           const std::string& default_value) {
+  auto it = table.find(key);
+  if (it == table.end()) return default_value;
+  if (!it->second.has_string_value()) {
+    SpielFatalError(absl::StrCat(
+        "Parameter '", key, "' should have string value"));
+  }
+  return it->second.string_value();
+}
 
-        class SherlockBotFactory : public BotFactory {
-        public:
-            ~SherlockBotFactory() = default;
+class SherlockBotFactory : public BotFactory {
+ public:
+  ~SherlockBotFactory() = default;
 
-            bool CanPlayGame(const Game& game, Player player_id) const override {
-                const GameType& type = game.GetType();
-                return game.NumPlayers() == 2
-                       && type.utility == GameType::Utility::kZeroSum
-                       && type.reward_model == GameType::RewardModel::kTerminal
-                       && type.provides_information_state_string
-                       && type.provides_information_state_tensor
-                       && type.provides_observation_string
-                       && type.provides_observation_tensor;
-            }
+  bool CanPlayGame(const Game& game, Player player_id) const override {
+    const GameType& type = game.GetType();
+    return game.NumPlayers() == 2
+        && type.utility == GameType::Utility::kZeroSum
+        && type.reward_model == GameType::RewardModel::kTerminal
+        && type.provides_information_state_string
+        && type.provides_information_state_tensor
+        && type.provides_observation_string
+        && type.provides_observation_tensor;
+  }
 
-            std::tuple<std::unique_ptr<SubgameFactory>,
-                    std::unique_ptr<SolverFactory>,
-                    int> ParseParams(std::shared_ptr<const Game> game,
-                                     Player player_id,const GameParameters& bot_params) const {
-                // Extract all param values.
-                int seed = GetParameterValue(bot_params, "seed", 0);
-                int num_layers = GetParameterValue(bot_params, "num_layers", 3);
-                int num_width = GetParameterValue(bot_params, "num_width", 3);
-                int num_inputs_regression =
-                        GetParameterValue(bot_params, "num_inputs_regression", 128);
-                bool zero_sum_regression = GetParameterValue(bot_params, "zero_sum_regression", false);
-                int cfr_iterations = GetParameterValue(bot_params, "cfr_iterations", kDefaultCfrIterations);
-                int max_move_ahead_limit = GetParameterValue(bot_params, "max_move_ahead_limit", 1);
-                int max_particles = GetParameterValue(bot_params, "max_particles", 1000);
-                int subgame_cfr_iterations = GetParameterValue(bot_params, "subgame_cfr_iterations", 100);
-                std::string device_spec = GetParameterValue<std::string>(bot_params, "device", "auto");
-                std::string use_bandits_for_cfr = GetParameterValue<std::string>(bot_params, "use_bandits_for_cfr", kDefaultDlCfrBandit);
-                std::string save_values_policy = GetParameterValue<std::string>(bot_params, "save_values_policy", "average");
-                std::string non_terminal_evaluator = GetParameterValue<std::string>(bot_params, "non_terminal_evaluator", "net");
-                std::string game_model = absl::StrCat(game->GetType().short_name, ".model");
-                std::string load_from = GetParameterValue<std::string>(bot_params, "load_from", game_model);
+  std::tuple<std::unique_ptr<SubgameFactory>,
+             std::unique_ptr<SolverFactory>,
+             int> ParseParams(std::shared_ptr<const Game> game,
+                              Player player_id,
+                              const GameParameters& bot_params) const {
+    // Extract all param values.
+    int seed = GetParameterValue(bot_params, "seed", 0);
+    int num_layers = GetParameterValue(bot_params, "num_layers", 3);
+    int num_width = GetParameterValue(bot_params, "num_width", 3);
+    int num_inputs_regression =
+        GetParameterValue(bot_params, "num_inputs_regression", 128);
+    bool zero_sum_regression =
+        GetParameterValue(bot_params, "zero_sum_regression", false);
+    int cfr_iterations =
+        GetParameterValue(bot_params, "cfr_iterations", kDefaultCfrIterations);
+    int max_move_ahead_limit =
+        GetParameterValue(bot_params, "max_move_ahead_limit", 1);
+    int max_particles = GetParameterValue(bot_params, "max_particles", 1000);
+    int subgame_cfr_iterations =
+        GetParameterValue(bot_params, "subgame_cfr_iterations", 100);
+    std::string device_spec =
+        GetParameterValue<std::string>(bot_params, "device", "auto");
+    std::string use_bandits_for_cfr = GetParameterValue<std::string>(bot_params,
+                                                                     "use_bandits_for_cfr",
+                                                                     kDefaultDlCfrBandit);
+    std::string save_values_policy = GetParameterValue<std::string>(bot_params,
+                                                                    "save_values_policy",
+                                                                    "average");
+    std::string non_terminal_evaluator = GetParameterValue<std::string>(
+        bot_params,
+        "non_terminal_evaluator",
+        "net");
+    std::string game_model = absl::StrCat(game->GetType().short_name, ".model");
+    std::string load_from =
+        GetParameterValue<std::string>(bot_params, "load_from", game_model);
 
-                // -- Create all necessary structures --------------------------------------
-                auto subgame_factory = std::make_unique<SubgameFactory>();
-                subgame_factory->game = game;
-                subgame_factory->infostate_observer   = game->MakeObserver(kInfoStateObsType, {});
-                subgame_factory->public_observer      = game->MakeObserver(kPublicStateObsType, {});
-                subgame_factory->hand_observer        = game->MakeObserver(kHandHistoryObsType, {});
-                subgame_factory->max_move_ahead_limit = max_move_ahead_limit;
-                subgame_factory->max_particles        = max_particles;
-                //
+    // -- Create all necessary structures --------------------------------------
+    auto subgame_factory = std::make_unique<SubgameFactory>();
+    subgame_factory->game = game;
+    subgame_factory->infostate_observer =
+        game->MakeObserver(kInfoStateObsType, {});
+    subgame_factory->public_observer =
+        game->MakeObserver(kPublicStateObsType, {});
+    subgame_factory->hand_observer =
+        game->MakeObserver(kHandHistoryObsType, {});
+    subgame_factory->max_move_ahead_limit = max_move_ahead_limit;
+    subgame_factory->max_particles = max_particles;
+    //
 
-                auto solver_factory = std::make_unique<SolverFactory>();
-                if(non_terminal_evaluator == "net") {
+    auto solver_factory = std::make_unique<SolverFactory>();
+    if (non_terminal_evaluator == "net") {
 
+      torch::Device device(device_spec);
 
-                    torch::Device device(device_spec);
+      std::shared_ptr<BasicDims> dims = DeduceBasicDims(
+          NetArchitecture::kParticle, *game,
+          subgame_factory->public_observer,
+          subgame_factory->hand_observer);
+      auto particle_dims = open_spiel::down_cast<ParticleDims*>(dims.get());
+      particle_dims->max_parviews = subgame_factory->max_particles * 2;
+      //
+      std::shared_ptr<ValueNet> model = MakeModel(
+          NetArchitecture::kParticle,
+          dims,
+          num_layers,
+          num_width,
+          num_inputs_regression,
+          zero_sum_regression);
+      LoadNetSnapshot(model, load_from);
+      model->eval();  // Set only eval mode.
+      //
+      auto eval_batch = std::make_shared<BatchData>(1,
+                                                    dims->point_input_size(),
+                                                    dims->point_output_size());
+      //
+      solver_factory->leaf_evaluator = MakeNetEvaluator(
+          dims,
+          model,
+          eval_batch,
+          device,
+          nullptr,
+          subgame_factory->hand_observer);
 
-                    std::shared_ptr<BasicDims> dims = DeduceBasicDims(
-                            NetArchitecture::kParticle, *game,
-                            subgame_factory->public_observer,
-                            subgame_factory->hand_observer);
-                    auto particle_dims = open_spiel::down_cast<ParticleDims *>(dims.get());
-                    particle_dims->max_parviews = subgame_factory->max_particles * 2;
-                    //
-                    std::shared_ptr<ValueNet> model = MakeModel(
-                            NetArchitecture::kParticle,
-                            dims, num_layers, num_width, num_inputs_regression, zero_sum_regression);
-                    LoadNetSnapshot(model, load_from);
-                    model->eval();  // Set only eval mode.
-                    //
-                    auto eval_batch = std::make_shared<BatchData>(1,
-                                                                  dims->point_input_size(),
-                                                                  dims->point_output_size());
-                    //
-                    solver_factory->leaf_evaluator = MakeNetEvaluator(
-                            dims, model, eval_batch, device, nullptr, subgame_factory->hand_observer);
+    } else {
+      std::shared_ptr<const PublicStateEvaluator> terminal_evaluator =
+          MakeTerminalEvaluator();
+      std::shared_ptr<Observer> public_observer =
+          game->MakeObserver(kPublicStateObsType, {});
+      std::shared_ptr<Observer> infostate_observer =
+          game->MakeObserver(kInfoStateObsType, {});
 
-                } else {
-                    std::shared_ptr<const PublicStateEvaluator> terminal_evaluator =
-                            MakeTerminalEvaluator();
-                    std::shared_ptr<Observer> public_observer =
-                            game->MakeObserver(kPublicStateObsType, {});
-                    std::shared_ptr<Observer> infostate_observer =
-                            game->MakeObserver(kInfoStateObsType, {});
+      solver_factory->leaf_evaluator = std::make_shared<CFREvaluator>(game,
+                                                                      20,
+                                                                      nullptr,
+                                                                      terminal_evaluator,
+                                                                      public_observer,
+                                                                      infostate_observer,
+                                                                      subgame_cfr_iterations);
+    }
+    solver_factory->cfr_iterations = cfr_iterations;
+    solver_factory->use_bandits_for_cfr = use_bandits_for_cfr;
+    solver_factory->save_values_policy =
+        GetSaveValuesPolicy(save_values_policy);
+    solver_factory->terminal_evaluator = std::make_shared<TerminalEvaluator>();
 
-                    solver_factory->leaf_evaluator = std::make_shared<CFREvaluator>(game, 20,
-                                                                                    nullptr,terminal_evaluator, public_observer,infostate_observer, subgame_cfr_iterations);
-                }
-                solver_factory->cfr_iterations = cfr_iterations;
-                solver_factory->use_bandits_for_cfr  = use_bandits_for_cfr;
-                solver_factory->save_values_policy   = GetSaveValuesPolicy(save_values_policy);
-                solver_factory->terminal_evaluator   = std::make_shared<TerminalEvaluator>();
+    return std::tuple<std::unique_ptr<SubgameFactory>,
+                      std::unique_ptr<SolverFactory>,
+                      int>{std::move(subgame_factory),
+                           std::move(solver_factory), seed};
+  }
 
-                return std::tuple<std::unique_ptr<SubgameFactory>,
-                        std::unique_ptr<SolverFactory>,
-                        int>{std::move(subgame_factory), std::move(solver_factory), seed};
-            }
+  std::unique_ptr<Bot> Create(std::shared_ptr<const Game> game,
+                              Player player_id,
+                              const GameParameters& bot_params) const override {
+    std::tuple<std::unique_ptr<SubgameFactory>,
+               std::unique_ptr<SolverFactory>,
+               int> params = ParseParams(game, player_id, bot_params);
+    return MakeSherlockBot(std::move(std::get<0>(params)),
+                           std::move(std::get<1>(params)),
+                           player_id, std::get<2>(params));
+  }
 
-            std::unique_ptr<Bot> Create(std::shared_ptr<const Game> game,
-                                        Player player_id,
-                                        const GameParameters& bot_params) const override {
-                std::tuple<std::unique_ptr<SubgameFactory>,
-                        std::unique_ptr<SolverFactory>,
-                        int> params = ParseParams(game, player_id, bot_params);
-                return MakeSherlockBot(std::move(std::get<0>(params)),
-                                       std::move(std::get<1>(params)),
-                                       player_id, std::get<2>(params));
-            }
+  std::unique_ptr<SherlockBot> Create(std::shared_ptr<const Game> game,
+                                      Player player_id,
+                                      const GameParameters& bot_params,
+                                      bool sherlock_type) const {
+    std::tuple<std::unique_ptr<SubgameFactory>,
+               std::unique_ptr<SolverFactory>,
+               int>
+        params = ParseParams(std::move(game), player_id, bot_params);
+    return MakeSherlockBot(std::move(std::get<0>(params)),
+                           std::move(std::get<1>(params)),
+                           player_id, std::get<2>(params), true);
+  }
+};
+REGISTER_SPIEL_BOT("sherlock", SherlockBotFactory);
+}  // namespace
 
-            std::unique_ptr<SherlockBot> Create(std::shared_ptr<const Game> game,
-                                                Player player_id,
-                                                const GameParameters& bot_params, bool sherlock_type) const {
-                std::tuple<std::unique_ptr<SubgameFactory>,
-                        std::unique_ptr<SolverFactory>,
-                        int> params = ParseParams(std::move(game), player_id, bot_params);
-                return MakeSherlockBot(std::move(std::get<0>(params)),
-                                       std::move(std::get<1>(params)),
-                                       player_id, std::get<2>(params), true);
-            }
-        };
-        REGISTER_SPIEL_BOT("sherlock", SherlockBotFactory);
-    }  // namespace
-
-    std::unique_ptr<Bot> MakeBot();
+std::unique_ptr<Bot> MakeBot();
 
 }  // namespace papers_with_code
 }  // namespace open_spiel

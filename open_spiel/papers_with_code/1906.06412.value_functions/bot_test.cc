@@ -18,7 +18,6 @@
 #include <cmath>
 #include <iostream>
 
-
 namespace open_spiel {
 namespace papers_with_code {
 namespace {
