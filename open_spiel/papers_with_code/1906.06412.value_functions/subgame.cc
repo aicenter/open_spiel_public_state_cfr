@@ -196,7 +196,8 @@ void PublicState::SetBeliefs(
   beliefs = new_beliefs;
 }
 
-std::unordered_map<std::string, double> PublicState::GetCFVs(Player player) {
+std::unordered_map<std::string, double> PublicState::InfostateAvgValues(
+    Player player) const {
   std::unordered_map<std::string, double> CFVs;
   for (int j = 0; j < nodes[player].size(); j++) {
     std::string infostate_string = nodes[player][j]->infostate_string();

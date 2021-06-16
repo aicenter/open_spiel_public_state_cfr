@@ -101,7 +101,7 @@ void TestBasicCFVs() {
     for (auto& public_state : subgame->public_states) {
       if (public_state.IsTerminal()) {
         for (int player = 0; player < 2; player++) {
-          auto CFVs = public_state.GetCFVs(player);
+          auto CFVs = public_state.InfostateAvgValues(player);
           for (int infoset_index = 0; infoset_index < 4; infoset_index++) {
             SPIEL_CHECK_FLOAT_EQ(reference_values[player][infoset_index][i],
                                  CFVs.at(infoset_strings[player][infoset_index]));
@@ -187,7 +187,7 @@ void TestKuhnGadget() {
         auto local_subgame =
             subgame_factory->MakeSubgameSafeResolving(*set,
                                                       player,
-                                                      public_state.GetCFVs(
+                                                      public_state.InfostateAvgValues(
                                                           1 - player),
                                                       20);
 

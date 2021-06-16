@@ -134,7 +134,9 @@ struct PublicState {
   }
   // Set new beliefs and check they have consistent sizes.
   void SetBeliefs(const std::array<std::vector<double>, 2>& new_beliefs);
-  std::unordered_map<std::string, double> GetCFVs(Player player);
+  // Return a map of infostate string: average cf. values.
+  std::unordered_map<std::string, double> InfostateAvgValues(
+      Player player) const;
 };
 
 void DebugPrintPublicFeatures(const std::vector<PublicState>& states);

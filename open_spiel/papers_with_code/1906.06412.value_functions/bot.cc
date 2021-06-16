@@ -107,7 +107,7 @@ std::pair<ActionsAndProbs, Action> SherlockBot::StepWithPolicy(const State& stat
   // We will do the gadget if we are resolving
   if (state.MoveNumber() > 0) {
     subgame_ = subgame_factory_->MakeSubgameSafeResolving(
-        *set, player_id_, public_state->GetCFVs(1 - player_id_));
+        *set, player_id_, public_state->InfostateAvgValues(1 - player_id_));
   } else {
     subgame_ = subgame_factory_->MakeSubgame(*set);
   }
