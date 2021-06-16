@@ -62,7 +62,7 @@ void TestTerminalEvaluatorHasSameIterations(const std::string& game_name) {
       MakeTerminalEvaluator();
   std::shared_ptr<PublicStateEvaluator> nonterminal_evaluator =
       MakeDummyEvaluator();
-  auto subgame = std::make_shared<Subgame>(game, /*depth_limit=*/100);
+  auto subgame = std::make_shared<Subgame>(game, algorithms::kNoMoveAheadLimit);
   SubgameSolver dl_solver(subgame, nonterminal_evaluator, terminal_evaluator,
                           "RegretMatching");
 

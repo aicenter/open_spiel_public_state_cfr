@@ -140,7 +140,7 @@ void TestKuhnGadget() {
 
   std::shared_ptr<PublicStateEvaluator> nonterminal_evaluator =
       std::make_shared<CFREvaluator>(game,
-                                     20,
+                                     algorithms::kNoMoveAheadLimit,
                                      dummy_evaluator,
                                      terminal_evaluator,
                                      public_observer,

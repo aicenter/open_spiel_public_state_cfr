@@ -258,7 +258,9 @@ class Range {
 // Forward declaration.
 class InfostateNode;
 
-constexpr int kDefaultMoveAheadLimit = 1000;
+// A tree that has practically no depth limit (it is infeasible to construct
+// trees this large in practice).
+constexpr int kNoMoveAheadLimit = 1000000;
 
 // Which infostate nodes should store the perfect-information states?
 // Uses bitwise & to determine the policy (and you can use | to set custom spec)
@@ -273,7 +275,7 @@ constexpr int kDefaultStoragePolicy = kStoreStatesInTerminals;
 // of the game, up to some move limit.
 std::shared_ptr<InfostateTree> MakeInfostateTree(
     const Game& game, Player acting_player,
-    int max_move_ahead_limit = kDefaultMoveAheadLimit,
+    int max_move_ahead_limit = kNoMoveAheadLimit,
     int storage_policy = kDefaultStoragePolicy);
 
 // Creates an infostate tree for a player based on some start states,
@@ -282,7 +284,7 @@ std::shared_ptr<InfostateTree> MakeInfostateTree(
     const std::vector<const State*>& start_states,
     const std::vector<double>& chance_reach_probs,
     std::shared_ptr<Observer> infostate_observer, Player acting_player,
-    int max_move_ahead_limit = kDefaultMoveAheadLimit,
+    int max_move_ahead_limit = kNoMoveAheadLimit,
     int storage_policy = kDefaultStoragePolicy);
 
 // Creates an infostate tree for a player based on some start states,
@@ -291,7 +293,7 @@ std::shared_ptr<InfostateTree> MakeInfostateTree(
     const std::vector<std::unique_ptr<State>>& start_states,
     const std::vector<double>& chance_reach_probs,
     std::shared_ptr<Observer> infostate_observer, Player acting_player,
-    int max_move_ahead_limit = kDefaultMoveAheadLimit,
+    int max_move_ahead_limit = kNoMoveAheadLimit,
     int storage_policy = kDefaultStoragePolicy);
 
 // Creates an infostate tree for a player based on some start states,
@@ -302,7 +304,7 @@ std::shared_ptr<InfostateTree> MakeInfostateTreeSafeResolving(
         std::shared_ptr<Observer> infostate_observer, Player acting_player,
         std::unordered_map<std::string, double> CFVs,
         int ftplayer,
-        int max_move_ahead_limit = kDefaultMoveAheadLimit,
+        int max_move_ahead_limit = kNoMoveAheadLimit,
         int storage_policy = kDefaultStoragePolicy);
 
 // Creates an infostate tree based on some leaf infostate nodes coming from
@@ -310,7 +312,7 @@ std::shared_ptr<InfostateTree> MakeInfostateTreeSafeResolving(
 // This is useful for easily constructing (depth-limited) tree continuations.
 std::shared_ptr<InfostateTree> MakeInfostateTree(
     const std::vector<const InfostateNode*>& start_nodes,
-    int max_move_ahead_limit = kDefaultMoveAheadLimit,
+    int max_move_ahead_limit = kNoMoveAheadLimit,
     int storage_policy = kDefaultStoragePolicy);
 
 // C++17 does not allow implicit conversion of non-const pointers to const
@@ -318,28 +320,28 @@ std::shared_ptr<InfostateTree> MakeInfostateTree(
 // This just adds const to the pointers and calls the other MakeInfostateTree.
 std::shared_ptr<InfostateTree> MakeInfostateTree(
     const std::vector<InfostateNode*>& start_nodes,
-    int max_move_ahead_limit = kDefaultMoveAheadLimit,
+    int max_move_ahead_limit = kNoMoveAheadLimit,
     int storage_policy = kDefaultStoragePolicy);
 
 // Same as above, but constructs trees for all players in the game.
 
 std::vector<std::shared_ptr<InfostateTree>> MakeInfostateTrees(
     const Game& game,
-    int max_move_ahead_limit = kDefaultMoveAheadLimit,
+    int max_move_ahead_limit = kNoMoveAheadLimit,
     int storage_policy = kDefaultStoragePolicy);
 
 std::vector<std::shared_ptr<InfostateTree>> MakeInfostateTrees(
     const std::vector<const State*>& start_states,
     const std::vector<double>& chance_reach_probs,
     std::shared_ptr<Observer> infostate_observer,
-    int max_move_ahead_limit = kDefaultMoveAheadLimit,
+    int max_move_ahead_limit = kNoMoveAheadLimit,
     int storage_policy = kDefaultStoragePolicy);
 
 std::vector<std::shared_ptr<InfostateTree>> MakeInfostateTrees(
     const std::vector<std::unique_ptr<State>>& start_states,
     const std::vector<double>& chance_reach_probs,
     std::shared_ptr<Observer> infostate_observer,
-    int max_move_ahead_limit = kDefaultMoveAheadLimit,
+    int max_move_ahead_limit = kNoMoveAheadLimit,
     int storage_policy = kDefaultStoragePolicy);
 
 

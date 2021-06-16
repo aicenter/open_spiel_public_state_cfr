@@ -672,7 +672,7 @@ std::unique_ptr<PublicStatesInGame> MakeAllPublicStates(const Game& game) {
                                  | algorithms::kStoreStatesInBody;
   for (int pl = 0; pl < 2; ++pl) {
     all->infostate_trees.push_back(algorithms::MakeInfostateTree(
-        game, pl, 1000, store_all_states));
+        game, pl, algorithms::kNoMoveAheadLimit, store_all_states));
   }
   std::shared_ptr<Observer> public_observer =
       game.MakeObserver(kPublicStateObsType, {});

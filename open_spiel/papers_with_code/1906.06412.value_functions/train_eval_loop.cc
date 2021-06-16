@@ -213,7 +213,7 @@ void TrainEvalLoop() {
       GetSaveValuesPolicy(absl::GetFlag(FLAGS_save_values_policy));
   auto terminal_evaluator = std::make_shared<TerminalEvaluator>();
   auto oracle = std::make_shared<CFREvaluator>(
-      subgame_factory.game, /*full_subgame_depth=*/1000,
+      subgame_factory.game, algorithms::kNoMoveAheadLimit,
       /*no_leaf_evaluator=*/nullptr, terminal_evaluator,
       subgame_factory.public_observer, subgame_factory.infostate_observer);
   oracle->bandit_name = kDefaultDlCfrBandit;
