@@ -79,10 +79,10 @@ std::pair<ActionsAndProbs, Action> SherlockBot::StepWithPolicy(const State& stat
   // TODO: keep particles from previous step along with beliefs.
   //       Currently can work only for one-step lookahead trees.
 //        std::cout << "# Generate particles for current public state\n";
-  std::unique_ptr<ParticleSetPartition> partition =
-      MakeParticleSetPartition(*public_state, 1e7, 1e-9,
-                               /*save_secondary=*/false, rnd_gen_);
-  auto set = std::make_unique<ParticleSet>(partition->primary);
+
+  // Current work-around.
+  std::unique_ptr<ParticleSet> set = ParticlesFromState(*public_state);
+
   //    std::unique_ptr<ParticleSet> set = GenerateParticles(
   //        infostate_observation,
   //        player_id_,
@@ -164,6 +164,13 @@ std::unique_ptr<Bot> MakeSherlockBot(
   return std::make_unique<SherlockBot>(std::move(subgame_factory),
                                        std::move(solver_factory),
                                        player_id, seed);
+}
+
+std::unique_ptr<ParticleSet> ParticlesFromState(const PublicState& state) {
+  std::mt19937 rnd_gen(0);
+  std::unique_ptr<ParticleSetPartition> partition =
+      MakeParticleSetPartition(state, 1e7, 1e-9, false, rnd_gen);
+  return std::make_unique<ParticleSet>(partition->primary);
 }
 
 }  // namespace papers_with_code

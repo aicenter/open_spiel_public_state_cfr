@@ -242,6 +242,9 @@ class TerminalEvaluator final : public PublicStateEvaluator {
 
 std::shared_ptr<PublicStateEvaluator> MakeTerminalEvaluator();
 std::shared_ptr<PublicStateEvaluator> MakeDummyEvaluator();
+// CFR evaluator that makes a large number of iterations.
+std::shared_ptr<PublicStateEvaluator> MakeApproxOracleEvaluator(
+    std::shared_ptr<const Game> game, int cfr_iterations = 100000);
 
 // -- Subgame solver -----------------------------------------------------------
 

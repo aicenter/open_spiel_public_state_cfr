@@ -303,7 +303,7 @@ std::shared_ptr<InfostateTree> MakeInfostateTreeSafeResolving(
         const std::vector<double>& chance_reach_probs,
         std::shared_ptr<Observer> infostate_observer, Player acting_player,
         std::unordered_map<std::string, double> CFVs,
-        int ftplayer,
+        Player ft_player,
         int max_move_ahead_limit = kNoMoveAheadLimit,
         int storage_policy = kDefaultStoragePolicy);
 
@@ -343,6 +343,13 @@ std::vector<std::shared_ptr<InfostateTree>> MakeInfostateTrees(
     std::shared_ptr<Observer> infostate_observer,
     int max_move_ahead_limit = kNoMoveAheadLimit,
     int storage_policy = kDefaultStoragePolicy);
+
+// Used for construction of resolving trees.
+constexpr Action kActionFollow = 0;
+constexpr Action kActionTerminate = 1;
+constexpr const char* kFtInfostatePrefix = "follow/terminate ";
+constexpr const char* kTerminateObservationPrefix = "terminate obs ";
+constexpr const char* kTerminatePrefix = "terminate ";
 
 
 class InfostateTree final {
@@ -439,11 +446,6 @@ class InfostateTree final {
   std::ostream& operator<<(std::ostream& os) const;
 
  private:
-
-  std::unordered_map<std::string, double> *CFVs_;
-  bool safe_resolving_;
-  int ftplayer_;
-
   // Allow any "pointer-like" State to be passed as argument within
   // std::vector<pointer-like-State>
   template<typename S>
@@ -457,23 +459,24 @@ class InfostateTree final {
 
   template<typename S>
   InfostateTree(const std::vector<S>& start_states,
-                  const std::vector<double>& chance_reach_probs,
-                  std::shared_ptr<Observer> infostate_observer,
-                  Player acting_player, int max_move_ahead_limit,
-                  int storage_policy, bool safe_resolving, std::unordered_map<std::string, double> *CFVs, int ftplayer)
-            : CFVs_(CFVs),
-              safe_resolving_(safe_resolving),
-              ftplayer_(ftplayer),
-              acting_player_(acting_player),
+                const std::vector<double>& chance_reach_probs,
+                std::shared_ptr<Observer> infostate_observer,
+                Player acting_player, int max_move_ahead_limit,
+                int storage_policy, bool safe_resolving,
+                std::unordered_map<std::string, double> *resolving_cfvs,
+                int ft_player)
+            : acting_player_(acting_player),
               infostate_observer_(std::move(infostate_observer)),
               root_(MakeRootNode()),
-              storage_policy_(storage_policy) {
+              storage_policy_(storage_policy),
+              resolving_cfvs_(resolving_cfvs),
+              safe_resolving_(resolving_cfvs_ != nullptr),
+              ft_player_(ft_player) {
         SPIEL_CHECK_FALSE(start_states.empty());
         SPIEL_CHECK_EQ(start_states.size(), chance_reach_probs.size());
         SPIEL_CHECK_GE(acting_player_, 0);
         SPIEL_CHECK_LT(acting_player_, start_states[0]->GetGame()->NumPlayers());
         SPIEL_CHECK_TRUE(infostate_observer_->HasString());
-        SPIEL_CHECK_FALSE(safe_resolving and CFVs_ == nullptr);
 
         int start_max_move_number = 0;
         for (const auto& start_state : start_states) {
@@ -511,12 +514,17 @@ class InfostateTree final {
 
   friend std::shared_ptr<InfostateTree> MakeInfostateTreeSafeResolving(
           const std::vector<std::unique_ptr<State>>&, const std::vector<double>&,
-          std::shared_ptr<Observer>, Player, std::unordered_map<std::string, double>, int, int, int);
+          std::shared_ptr<Observer>, Player,
+          std::unordered_map<std::string, double>, Player, int, int);
 
   const Player acting_player_;
   const std::shared_ptr<Observer> infostate_observer_;
   const std::unique_ptr<InfostateNode> root_;
   const int storage_policy_;
+  // Constraint values.
+  const std::unordered_map<std::string, double>* resolving_cfvs_;
+  const bool safe_resolving_;
+  const int ft_player_;
   /*const*/ int move_limit_;
   /*const*/ size_t tree_height_ = 0;
 
@@ -561,6 +569,9 @@ class InfostateTree final {
                          const State& state, double chance_reach_prob);
   void BuildObservationNode(InfostateNode* parent, size_t depth,
                             const State& state, double chance_reach_prob);
+  std::pair<InfostateNode*, int>  BuildResolvingNodes(
+      InfostateNode* parent, size_t depth, const State& state, double chance_reach_prob);
+
 
   void CollectNodesAtDepth(InfostateNode* node, size_t depth);
   void LabelNodesWithIds();
@@ -764,10 +775,10 @@ class InfostateNode final {
   // Make subtree certificate (string representation) for easy comparison
   // of (isomorphic) trees.
   std::string MakeCertificate() const;
-
+  // Include terminal utilities in the certificate, with specified
+  // double precision. (-1 for no inclusion)
   std::string MakeCertificate(int precision) const;
-
-  // this can differ based on the current infostate tree
+  // Export all incoming indices as a path string.
   std::string TreePath() const;
 
  private:

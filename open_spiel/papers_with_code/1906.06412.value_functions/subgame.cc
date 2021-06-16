@@ -319,6 +319,25 @@ std::shared_ptr<PublicStateEvaluator> MakeDummyEvaluator() {
   return std::make_shared<DummyEvaluator>();
 }
 
+std::shared_ptr<PublicStateEvaluator> MakeApproxOracleEvaluator(
+    std::shared_ptr<const Game> game, int cfr_iterations) {
+
+  std::shared_ptr<const PublicStateEvaluator> dummy_evaluator =
+      MakeDummyEvaluator();
+  std::shared_ptr<Observer> public_observer =
+      game->MakeObserver(kPublicStateObsType, {});
+  std::shared_ptr<Observer> infostate_observer =
+      game->MakeObserver(kInfoStateObsType, {});
+
+  std::shared_ptr<const PublicStateEvaluator> terminal_evaluator =
+      MakeTerminalEvaluator();
+
+  return std::make_shared<CFREvaluator>(game, algorithms::kNoMoveAheadLimit,
+                                        dummy_evaluator, terminal_evaluator,
+                                        public_observer, infostate_observer,
+                                        cfr_iterations);
+}
+
 TerminalPublicStateContext::TerminalPublicStateContext(
     const PublicState& state) {
   SPIEL_CHECK_TRUE(state.IsTerminal());

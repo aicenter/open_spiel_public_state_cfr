@@ -105,10 +105,10 @@ void TestTabularPolicyGoofspielNetBot() {
   current_dir.resize(current_dir.rfind("/"));
 
   std::shared_ptr<const Game> game = LoadGame("goofspiel("
-                                              "players=2,"
-                                              "num_cards=3,"
-                                              "imp_info=True,"
-                                              "points_order=descending"
+                                                "players=2,"
+                                                "num_cards=3,"
+                                                "imp_info=True,"
+                                                "points_order=descending"
                                               ")");
 
   BotParameters params{
@@ -127,15 +127,13 @@ void TestTabularPolicyGoofspielNetBot() {
        BotParameter(
            absl::StrCat(current_dir, "/snapshots/iigs3/random.model"))},
   };
-
   params["seed"] = BotParameter(0);  // Different seeds for different outcomes.
 
   std::shared_ptr<TabularPolicy> joint_policy =
       CreatePolicyFromSetup(params, game);
 
-  ComparePolicyToOnlinePlay(joint_policy, params, game, 10);
-
   ComparePolicySize(joint_policy, game);
+  ComparePolicyToOnlinePlay(joint_policy, params, game, 10);
 }
 
 void TestTabularPolicyKuhnCfrBot() {
@@ -155,9 +153,8 @@ void TestTabularPolicyKuhnCfrBot() {
   std::shared_ptr<TabularPolicy> joint_policy =
       CreatePolicyFromSetup(params, game);
 
-  ComparePolicyToOnlinePlay(joint_policy, params, game, 10);
-
   ComparePolicySize(joint_policy, game);
+  ComparePolicyToOnlinePlay(joint_policy, params, game, 10);
 }
 
 }  // namespace

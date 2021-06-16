@@ -83,6 +83,10 @@ std::unique_ptr<Bot>  MakeSherlockBot(
     std::unique_ptr<SolverFactory> solver_factory,
     Player player_id, int seed);
 
+std::unique_ptr<ParticleSet> ParticlesFromState(const PublicState& state);
+
+
+
 namespace {
 
 template <typename T>

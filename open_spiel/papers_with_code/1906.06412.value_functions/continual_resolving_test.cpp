@@ -29,46 +29,58 @@ namespace open_spiel {
 namespace papers_with_code {
 namespace {
 
-// Tests if CFVs saved in the public states for the continual resolving are the correct ones
+// Tests if CFVs saved in the leaf public states are correct (used in the
+// continual resolving), by emulating CFR iterations and comparing with
+// reference average values.
 void TestBasicCFVs() {
-  // constructs biased matching pennies
+  // Constructs biased matching pennies.
   const char* kSampleNFGString = R"###(
-                        NFG 1 R "Selten (IJGT, 75), Figure 2, normal form"
-                        { "Player 1" "Player 2" } { 2 2 }
+      NFG 1 R ""
+      { "Player 1" "Player 2" } { 2 2 }
 
-                        1 -1 0 0 0 0 2 -2
-                    )###";
+      1 -1 0 0 0 0 2 -2
+  )###";
 
   std::shared_ptr<const Game> game = nfg_game::LoadNFGGame(kSampleNFGString);
   const int trunk_iterations = 5;
 
+  // Prepared infostate values for the test.
+  std::string infoset_strings[2][4] = {
+      {
+          "Observing player: 0. Terminal. History string: 1, 1",
+          "Observing player: 0. Terminal. History string: 1, 0",
+          "Observing player: 0. Terminal. History string: 0, 1",
+          "Observing player: 0. Terminal. History string: 0, 0"
+      },
+      {
+          "Observing player: 1. Terminal. History string: 1, 1",
+          "Observing player: 1. Terminal. History string: 0, 1",
+          "Observing player: 1. Terminal. History string: 1, 0",
+          "Observing player: 1. Terminal. History string: 0, 0"
+      }
+  };
 
-  // prepared values for the test
-  std::string infoset_strings[2][4] = {{
-                                           "Observing player: 0. Terminal. History string: 1, 1",
-                                           "Observing player: 0. Terminal. History string: 1, 0",
-                                           "Observing player: 0. Terminal. History string: 0, 1",
-                                           "Observing player: 0. Terminal. History string: 0, 0"
-                                       },
-                                       {
-                                           "Observing player: 1. Terminal. History string: 1, 1",
-                                           "Observing player: 1. Terminal. History string: 0, 1",
-                                           "Observing player: 1. Terminal. History string: 1, 0",
-                                           "Observing player: 1. Terminal. History string: 0, 0"
-                                       }};
+  // Player - infostate index - trunk iteration number.
+  double reference_values[2][4][5] = {
+      {
+          // Payoff 2
+          {1, 0.5, 1. / 3, 0.25, 0.2},
+          {0, 0, 0, 0, 0},
+          {0, 0, 0, 0, 0},
+          // Payoff 1
+          {0.5, 0.75, 5. / 6, 0.875, 0.9}
+      },
+      {
+          // Payoff -2
+          {-1, -1.5, -7. / 6, -0.875, -0.7},
+          {0, 0, 0, 0, 0},
+          {0, 0, 0, 0, 0},
+          // Payoff -1
+          {-0.5, -0.25, -5. / 12, -0.5625, -0.65}
+      }
+  };
 
-  double reference_values[2][4][5] = {{
-                                          {1, 0.5, 1. / 3, 0.25, 0.2},
-                                          {0, 0, 0, 0, 0},
-                                          {0, 0, 0, 0, 0},
-                                          {0.5, 0.75, 5. / 6, 0.875, 0.9}},
-                                      {{-1, -1.5, -7. / 6, -0.875, -0.7},
-                                       {0, 0, 0, 0, 0},
-                                       {0, 0, 0, 0, 0},
-                                       {-0.5, -0.25, -5. / 12, -0.5625,
-                                        -0.65}}};
-
-  // creating a CFR subgame solver
+  // Create a subgame solver that is essentially just CFR.
   std::shared_ptr<const PublicStateEvaluator> terminal_evaluator =
       MakeTerminalEvaluator();
   std::shared_ptr<PublicStateEvaluator> nonterminal_evaluator =
@@ -87,15 +99,12 @@ void TestBasicCFVs() {
   leaf_evaluator->num_cfr_iterations = 1;
   leaf_evaluator->save_values_policy = PolicySelection::kCurrentPolicy;
 
-  auto subgame = std::make_shared<Subgame>(game, 1);
-  auto subgame_solver = std::make_unique<SubgameSolver>(subgame,
-                                                        leaf_evaluator,
-                                                        terminal_evaluator,
-                                                        "RegretMatching",
-                                                        PolicySelection::kCurrentPolicy,
-                                                        true);
+  auto subgame = std::make_shared<Subgame>(game, /*max_moves=*/1);
+  auto subgame_solver = std::make_unique<SubgameSolver>(
+      subgame, leaf_evaluator, terminal_evaluator, "RegretMatching",
+      PolicySelection::kCurrentPolicy, /*safe_resolving=*/true);
 
-  // we do 5 iterations and check the CFVs after each iteration
+  // We do 5 iterations and check the CFVs after each iteration.
   for (int i = 0; i < trunk_iterations; i++) {
     subgame_solver->RunSimultaneousIterations(1);
     for (auto& public_state : subgame->public_states) {
@@ -112,53 +121,33 @@ void TestBasicCFVs() {
   }
 }
 
+// Creates a fixed trunk for Kuhn with optimal policy, automatically retrieves
+// CFVs for such trunk, constructs a sub-game, solves it and checks if the
+// results are close to optimal.
 void TestKuhnGadget() {
   std::shared_ptr<const Game> game = LoadGame("kuhn_poker");
 
   auto subgame_factory = std::make_unique<SubgameFactory>();
   subgame_factory->game = game;
-  subgame_factory->infostate_observer =
-      game->MakeObserver(kInfoStateObsType, {});
-  subgame_factory->public_observer =
-      game->MakeObserver(kPublicStateObsType, {});
+  subgame_factory->infostate_observer = game->MakeObserver(kInfoStateObsType, {});
+  subgame_factory->public_observer = game->MakeObserver(kPublicStateObsType, {});
   subgame_factory->hand_observer = game->MakeObserver(kHandHistoryObsType, {});
   subgame_factory->max_move_ahead_limit = 1;
   subgame_factory->max_particles = 100;
 
-  TabularPolicy optimal_policy = kuhn_poker::GetOptimalPolicy(0);
-
   auto subgame = subgame_factory->MakeTrunk(3);
+  auto solver = std::make_unique<SubgameSolver>(
+      subgame, MakeApproxOracleEvaluator(game), MakeTerminalEvaluator(),
+      "FixableStrategy", PolicySelection::kAveragePolicy, true);
 
-  std::shared_ptr<const PublicStateEvaluator> terminal_evaluator =
-      MakeTerminalEvaluator();
-  std::shared_ptr<const PublicStateEvaluator> dummy_evaluator =
-      MakeDummyEvaluator();
-  std::shared_ptr<Observer> public_observer =
-      game->MakeObserver(kPublicStateObsType, {});
-  std::shared_ptr<Observer> infostate_observer =
-      game->MakeObserver(kInfoStateObsType, {});
+  TabularPolicy optimal_policy = kuhn_poker::GetOptimalPolicy(/*alpha=*/0);
 
-  std::shared_ptr<PublicStateEvaluator> nonterminal_evaluator =
-      std::make_shared<CFREvaluator>(game,
-                                     algorithms::kNoMoveAheadLimit,
-                                     dummy_evaluator,
-                                     terminal_evaluator,
-                                     public_observer,
-                                     infostate_observer,
-                                     100000);
-
-  auto solver = std::make_unique<SubgameSolver>(subgame,
-                                                nonterminal_evaluator,
-                                                terminal_evaluator,
-                                                "FixableStrategy",
-                                                PolicySelection::kAveragePolicy,
-                                                true);
-
+  // Fix trunk strategies with optimal policy.
   for (int player = 0; player < 2; player++) {
     algorithms::BanditVector& bandits = solver->bandits()[player];
     for (algorithms::DecisionId id : bandits.range()) {
-      algorithms::InfostateNode
-          * node = subgame->trees[player]->decision_infostate(id);
+      algorithms::InfostateNode* node =
+          subgame->trees[player]->decision_infostate(id);
       ActionsAndProbs infostate_policy =
           optimal_policy.GetStatePolicy(node->infostate_string());
       std::vector<double> probs = GetProbs(infostate_policy);
@@ -168,44 +157,38 @@ void TestKuhnGadget() {
     }
   }
 
+  // Compute cf. values in each public state.
   solver->RunSimultaneousIterations(1);
 
-  for (auto& public_state : subgame->public_states) {
+  // Compare resulting policies and game values.
+  // FIXME(David): why only pass?
+  for (const PublicState& public_state : subgame->public_states) {
     if (public_state.IsLeaf()
         && public_state.nodes[0][0]->infostate_string().substr(1) == "p") {
+      std::unique_ptr<ParticleSet> set = ParticlesFromState(public_state);
 
-      std::mt19937 rnd_gen(0);
-      std::unique_ptr<ParticleSetPartition>
-          partition = MakeParticleSetPartition(public_state,
-                                               pow(10, 7),
-                                               pow(10, -9),
-                                               false,
-                                               rnd_gen);
-      std::unique_ptr<ParticleSet>
-          set = std::make_unique<ParticleSet>(partition->primary);
       for (int player = 0; player < 2; player++) {
-        auto local_subgame =
-            subgame_factory->MakeSubgameSafeResolving(*set,
-                                                      player,
-                                                      public_state.InfostateAvgValues(
-                                                          1 - player),
-                                                      20);
+        auto local_subgame = subgame_factory->MakeSubgameSafeResolving(
+            *set, player, public_state.InfostateAvgValues(1 - player),
+            algorithms::kNoMoveAheadLimit);
 
         SequenceFormLpSpecification specification(local_subgame->trees);
         specification.SpecifyLinearProgram(player);
+
         double game_value = specification.Solve();
-        TabularPolicy policy = specification.OptimalPolicy(player);
         SPIEL_CHECK_FLOAT_NEAR(game_value,
                                player == 0 ? -1. / 18 : 1. / 18,
                                0.001);
 
+        TabularPolicy policy = specification.OptimalPolicy(player);
         SPIEL_CHECK_EQ(policy.PolicyTable().size(), 3);
 
-        for (const auto& entry : policy.PolicyTable()) {
-          std::vector<double> slp_state_policy = GetProbs(entry.second);
+        for (const auto&[infostate, actions_and_probs] : policy.PolicyTable()) {
+          std::vector<double> slp_state_policy = GetProbs(actions_and_probs);
           std::vector<double> opt_state_policy = GetProbs(
-              optimal_policy.GetStatePolicy(entry.first));
+              optimal_policy.GetStatePolicy(infostate));
           SPIEL_CHECK_EQ(slp_state_policy.size(), 2);
+
           for (int action_index = 0; action_index < slp_state_policy.size();
                action_index++) {
             SPIEL_CHECK_FLOAT_NEAR(slp_state_policy[action_index],
@@ -217,6 +200,7 @@ void TestKuhnGadget() {
   }
 }
 
+// Compute exploitability of the bot.
 void TestKuhnExploitability() {
   std::shared_ptr<const Game> game = LoadGame("kuhn_poker");
 
@@ -232,45 +216,30 @@ void TestKuhnExploitability() {
   };
 
   SherlockBotFactory bot_factory = SherlockBotFactory();
-
-  std::unique_ptr<Bot>
-      bot_player_one = bot_factory.Create(game,
-                                          Player(0),
-                                          params);
-  std::shared_ptr<TabularPolicy>
-      bot_policy_player_one = tabularize_bot::FullBotPolicy(
-      std::move(bot_player_one), Player(0), *game);
-
-  std::unique_ptr<Bot>
-      bot_player_two = bot_factory.Create(game,
-                                          Player(1),
-                                          params);
-  std::shared_ptr<TabularPolicy>
-      bot_policy_player_two = tabularize_bot::FullBotPolicy(
-      std::move(bot_player_two), Player(1), *game);
-
   std::unique_ptr<State> root = game->NewInitialState();
-  algorithms::TabularBestResponse
-      best_response_one(*game, 1, bot_policy_player_one->PolicyTable());
-  std::cout << best_response_one.Value(*root) << "\n";
 
-  algorithms::TabularBestResponse
-      best_response_two(*game, 0, bot_policy_player_two->PolicyTable());
-  std::cout << best_response_two.Value(*root) << "\n";
-
-  bot_policy_player_two->ImportPolicy(*bot_policy_player_one);
-
-  std::cout << algorithms::Exploitability(*game, *bot_policy_player_two)
-            << "\n";
+  TabularPolicy full_policy;
+  for (int pl = 0; pl < 2; ++pl) {
+    std::unique_ptr<Bot> bot = bot_factory.Create(game, pl, params);
+    std::shared_ptr<TabularPolicy> player_policy =
+        tabularize_bot::FullBotPolicy(std::move(bot), pl, *game);
+    algorithms::TabularBestResponse best_response(
+        *game, 1-pl, player_policy->PolicyTable());
+    std::cout << "BR against PL" << pl << ": "
+              << best_response.Value(*root) << "\n";
+    full_policy.ImportPolicy(*player_policy);
+  }
+  std::cout << "Expl: "
+            << algorithms::Exploitability(*game, full_policy) << "\n";
 }
 
-void RPSCRTest() {
+void TestContinualResolvingOnRPS() {
   const char* kSampleNFGString = R"###(
-                        NFG 1 R "Selten (IJGT, 75), Figure 2, normal form"
-                        { "Player 1" "Player 2" } { 3 3 }
+    NFG 1 R ""
+    { "Player 1" "Player 2" } { 3 3 }
 
-                        0 0   1 -1   -1 1   -1 1   0 0   1 -1   1 -1   -1 1   0 0
-                )###";
+    0 0   1 -1   -1 1   -1 1   0 0   1 -1   1 -1   -1 1   0 0
+  )###";
 
   std::shared_ptr<const Game> game = nfg_game::LoadNFGGame(kSampleNFGString);
   game = ConvertToTurnBased(*game);
@@ -288,16 +257,10 @@ void RPSCRTest() {
     start_states.push_back(std::move(child));
   }
 
-  auto tree_safe_player =
-      algorithms::MakeInfostateTreeSafeResolving(start_states,
-                                                 {1. / 3, 1. / 3, 1. / 3},
-                                                 game->MakeObserver(
-                                                     kInfoStateObsType,
-                                                     {}),
-                                                 1,
-                                                 CFVs,
-                                                 0,
-                                                 10);
+  auto tree_safe_player = algorithms::MakeInfostateTreeSafeResolving(
+      start_states, {1. / 3, 1. / 3, 1. / 3},
+      game->MakeObserver(kInfoStateObsType, {}),
+      1, CFVs, 0, algorithms::kNoMoveAheadLimit);
 
   auto tree_safe_opponent =
       algorithms::MakeInfostateTreeSafeResolving(start_states,
@@ -308,7 +271,7 @@ void RPSCRTest() {
                                                  0,
                                                  CFVs,
                                                  0,
-                                                 10);
+                                                 algorithms::kNoMoveAheadLimit);
 
   std::string tree_safe_player_reference =
       "(((({-0.00})({-0.00})({-0.00}))[({-1.00}{0.00}{1.00})({-1.00}{0.00}{1.00})({-1.00}{0.00}{1.00})]))";
@@ -330,9 +293,9 @@ void RPSCRTest() {
   }
 }
 
-void BRPSCRTest() {
+void TestContinualResolvingOnBiasedRPS() {
   const char* kSampleNFGString = R"###(
-                        NFG 1 R "Selten (IJGT, 75), Figure 2, normal form"
+                        NFG 1 R ""
                         { "Player 1" "Player 2" } { 3 3 }
 
                         0 0   1 -1   -2 2   -1 1   0 0   3 -3   2 -2   -3 3   0 0
@@ -362,7 +325,7 @@ void BRPSCRTest() {
       1,
       CFVs,
       0,
-      10);
+      algorithms::kNoMoveAheadLimit);
 
   auto tree_safe_opponent =
       algorithms::MakeInfostateTreeSafeResolving(start_states,
@@ -373,7 +336,7 @@ void BRPSCRTest() {
                                                  0,
                                                  CFVs,
                                                  0,
-                                                 10);
+                                                 algorithms::kNoMoveAheadLimit);
 
   std::string tree_safe_player_reference =
       "(((({-0.00})({-0.00})({-0.00}))[({-1.00}{0.00}{2.00})({-2.00}{0.00}{3.00})({-3.00}{0.00}{1.00})]))";
@@ -399,7 +362,7 @@ void BRPSCRTest() {
 
 void SmallerEqTest() {
   const char* kSampleNFGString = R"###(
-                        NFG 1 R "Selten (IJGT, 75), Figure 2, normal form"
+                        NFG 1 R ""
                         { "Player 1" "Player 2" } { 3 3 }
 
                         1 -1   0 0   0 0   0 0   1 -1   0 0   1 -1   1 -1   -5 5
@@ -432,7 +395,7 @@ void SmallerEqTest() {
                                                  1,
                                                  CFVs,
                                                  0,
-                                                 10);
+                                                 algorithms::kNoMoveAheadLimit);
 
   auto tree_safe_opponent =
       algorithms::MakeInfostateTreeSafeResolving(start_states,
@@ -443,7 +406,7 @@ void SmallerEqTest() {
                                                  0,
                                                  CFVs,
                                                  0,
-                                                 10);
+                                                 algorithms::kNoMoveAheadLimit);
 
   std::string tree_safe_player_reference =
       "(((({-0.00})({-0.50})({-0.50}))[({-1.00}{-1.00}{5.00})({-1.00}{0.00}{0.00})({-1.00}{0.00}{0.00})]))";
@@ -504,7 +467,7 @@ void KuhnCheckSituation() {
                                                  1,
                                                  CFVs,
                                                  0,
-                                                 10);
+                                                 algorithms::kNoMoveAheadLimit);
 
   auto tree_safe_opponent =
       algorithms::MakeInfostateTreeSafeResolving(start_states,
@@ -517,7 +480,7 @@ void KuhnCheckSituation() {
                                                  0,
                                                  CFVs,
                                                  0,
-                                                 10);
+                                                 algorithms::kNoMoveAheadLimit);
 
   std::string tree_safe_player_reference =
       "((((({-1.17}))(({0.33})))[(({-1.00})({-1.00}))(({-2.00}{-2.00}{1.00}{1.00}))])(((({-1.17}))(({1.00})))[(({-1.00})({1.00}))(({-2.00}{1.00}{1.00}{2.00}))])(((({0.33}))(({1.00})))[(({1.00})({1.00}))(({1.00}{1.00}{2.00}{2.00}))]))";
@@ -589,8 +552,7 @@ void KuhnBetSituation() {
                                                      {}),
                                                  1,
                                                  CFVs,
-                                                 0,
-                                                 10);
+                                                 0);
 
   auto tree_safe_opponent =
       algorithms::MakeInfostateTreeSafeResolving(start_states,
@@ -602,8 +564,7 @@ void KuhnBetSituation() {
                                                      {}),
                                                  0,
                                                  CFVs,
-                                                 0,
-                                                 10);
+                                                 0);
 
   std::string tree_safe_player_reference =
       "(((({-1.17})({0.50}))[({-1.00}{-1.00})({-2.00}{-2.00})])((({-1.17})({1.00}))[({-1.00}{-1.00})({-2.00}{2.00})])((({0.50})({1.00}))[({-1.00}{-1.00})({2.00}{2.00})]))";
@@ -813,22 +774,27 @@ void KuhnLastPublicSituationAlphaMax() {
     }
   }
 }
-}
-}
-}
+
+}  // namespace
+}  // papers_with_code
+}  // open_spiel
 
 int main(int argc, char** argv) {
-  // Test automatic CFV extraction on simple matrix game
+  // Test automatic CFV extraction on a simple matrix game.
   open_spiel::papers_with_code::TestBasicCFVs();
+
   // Creates fixed trunk of Kuhn automatically retrieves CFVs, constructs
-  // a sub-game, solves it and checks if the results are close to optimal
+  // a sub-game, solves it and checks if the results are close to optimal.
   open_spiel::papers_with_code::TestKuhnGadget();
-//    open_spiel::papers_with_code::TestKuhnExploitability();
-  // Tests on matrix game for correct gadget game generations and resolving
-  open_spiel::papers_with_code::RPSCRTest();
-  open_spiel::papers_with_code::BRPSCRTest();
+  open_spiel::papers_with_code::TestKuhnExploitability();
+
+  // Tests on matrix game for correct gadget game generations and resolving.
+  open_spiel::papers_with_code::TestContinualResolvingOnRPS();
+  open_spiel::papers_with_code::TestContinualResolvingOnBiasedRPS();
   open_spiel::papers_with_code::SmallerEqTest();
-  // Tests for correctly resolved Gadget game on kuhn with all the values handcrafted beforehand
+
+  // Tests for correctly resolved Gadget game on Kuhn with all the values
+  // handcrafted beforehand.
   open_spiel::papers_with_code::KuhnCheckSituation();
   open_spiel::papers_with_code::KuhnBetSituation();
   open_spiel::papers_with_code::KuhnLastPublicSituationAlphaMin();
