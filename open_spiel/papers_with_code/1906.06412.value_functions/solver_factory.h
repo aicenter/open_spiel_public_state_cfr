@@ -35,12 +35,12 @@ struct SolverFactory {
   int cfr_iterations = kDefaultCfrIterations;
   std::string use_bandits_for_cfr = kDefaultDlCfrBandit;
   PolicySelection save_values_policy = kDefaultPolicySelection;
+  bool safe_resolving = false;
 
   std::unique_ptr<SubgameSolver> MakeSolver(
       std::shared_ptr<Subgame> subgame,
       std::shared_ptr<const PublicStateEvaluator> custom_leaf_evaluator = nullptr,
-      std::string custom_bandits_for_cfr = "",
-      bool save_average_values = false) const;
+      std::string custom_bandits_for_cfr = "") const;
 };
 
 } // namespace papers_with_code

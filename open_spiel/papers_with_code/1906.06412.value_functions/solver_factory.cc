@@ -20,14 +20,14 @@ namespace papers_with_code {
 std::unique_ptr<SubgameSolver> SolverFactory::MakeSolver(
     std::shared_ptr<Subgame> subgame,
     std::shared_ptr<const PublicStateEvaluator> custom_leaf_evaluator,
-    std::string custom_bandits_for_cfr, bool save_average_values) const {
+    std::string custom_bandits_for_cfr) const {
   auto evaluator = custom_leaf_evaluator == nullptr ? leaf_evaluator
                                                     : custom_leaf_evaluator;
   auto bandits = custom_bandits_for_cfr.empty() ? use_bandits_for_cfr
                                                 : custom_bandits_for_cfr;
   return std::make_unique<SubgameSolver>(subgame, evaluator,
                                          terminal_evaluator, bandits,
-                                         save_values_policy, save_average_values);
+                                         save_values_policy, safe_resolving);
 }
 
 }  // papers_with_code

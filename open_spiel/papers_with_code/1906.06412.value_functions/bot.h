@@ -166,16 +166,15 @@ class SherlockBotFactory : public BotFactory {
         GetParameterValue(bot_params, "subgame_cfr_iterations", 100);
     std::string device_spec =
         GetParameterValue<std::string>(bot_params, "device", "auto");
-    std::string use_bandits_for_cfr = GetParameterValue<std::string>(bot_params,
-                                                                     "use_bandits_for_cfr",
+    std::string use_bandits_for_cfr =
+        GetParameterValue<std::string>(bot_params, "use_bandits_for_cfr",
                                                                      kDefaultDlCfrBandit);
-    std::string save_values_policy = GetParameterValue<std::string>(bot_params,
-                                                                    "save_values_policy",
-                                                                    "average");
-    std::string non_terminal_evaluator = GetParameterValue<std::string>(
-        bot_params,
-        "non_terminal_evaluator",
-        "net");
+    std::string save_values_policy =
+        GetParameterValue<std::string>(bot_params, "save_values_policy",
+                                       "average");
+    std::string non_terminal_evaluator =
+        GetParameterValue<std::string>(bot_params, "non_terminal_evaluator",
+                                       "net");
     std::string game_model = absl::StrCat(game->GetType().short_name, ".model");
     std::string load_from =
         GetParameterValue<std::string>(bot_params, "load_from", game_model);
@@ -220,11 +219,7 @@ class SherlockBotFactory : public BotFactory {
                                                     dims->point_output_size());
       //
       solver_factory->leaf_evaluator = MakeNetEvaluator(
-          dims,
-          model,
-          eval_batch,
-          device,
-          nullptr,
+          dims, model, eval_batch, device, nullptr,
           subgame_factory->hand_observer);
 
     } else {
@@ -235,19 +230,15 @@ class SherlockBotFactory : public BotFactory {
       std::shared_ptr<Observer> infostate_observer =
           game->MakeObserver(kInfoStateObsType, {});
 
-      solver_factory->leaf_evaluator = std::make_shared<CFREvaluator>(game,
-                                                                      20,
-                                                                      nullptr,
-                                                                      terminal_evaluator,
-                                                                      public_observer,
-                                                                      infostate_observer,
-                                                                      subgame_cfr_iterations);
+      solver_factory->leaf_evaluator = std::make_shared<CFREvaluator>(
+          game, 20, nullptr, terminal_evaluator,
+          public_observer, infostate_observer, subgame_cfr_iterations);
     }
     solver_factory->cfr_iterations = cfr_iterations;
     solver_factory->use_bandits_for_cfr = use_bandits_for_cfr;
-    solver_factory->save_values_policy =
-        GetSaveValuesPolicy(save_values_policy);
+    solver_factory->save_values_policy = GetSaveValuesPolicy(save_values_policy);
     solver_factory->terminal_evaluator = std::make_shared<TerminalEvaluator>();
+    solver_factory->safe_resolving = true;
 
     return std::tuple<std::unique_ptr<SubgameFactory>,
                       std::unique_ptr<SolverFactory>,

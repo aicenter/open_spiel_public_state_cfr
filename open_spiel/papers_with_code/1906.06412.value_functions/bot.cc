@@ -51,9 +51,9 @@ void SherlockBot::Restart() {
   subgame_ = subgame_factory_->MakeTrunk(1);
 }
 
-std::pair<ActionsAndProbs,
-          Action> SherlockBot::StepWithPolicy(const State& state) {
+std::pair<ActionsAndProbs, Action> SherlockBot::StepWithPolicy(const State& state) {
   SPIEL_CHECK_TRUE(subgame_);
+
   // Infostate observations.
   Observation infostate_observation
       (*subgame_factory_->game, subgame_factory_->infostate_observer);
@@ -80,10 +80,7 @@ std::pair<ActionsAndProbs,
   //       Currently can work only for one-step lookahead trees.
 //        std::cout << "# Generate particles for current public state\n";
   std::unique_ptr<ParticleSetPartition> partition =
-      MakeParticleSetPartition(*public_state,
-                               pow(10, 7),
-                               pow(10, -9),
-
+      MakeParticleSetPartition(*public_state, 1e7, 1e-9,
                                /*save_secondary=*/false, rnd_gen_);
   auto set = std::make_unique<ParticleSet>(partition->primary);
   //    std::unique_ptr<ParticleSet> set = GenerateParticles(
@@ -110,8 +107,7 @@ std::pair<ActionsAndProbs,
   // We will do the gadget if we are resolving
   if (state.MoveNumber() > 0) {
     subgame_ = subgame_factory_->MakeSubgameSafeResolving(
-        *set,
-                                                          player_id_, public_state->GetCFVs(1 - player_id_));
+        *set, player_id_, public_state->GetCFVs(1 - player_id_));
   } else {
     subgame_ = subgame_factory_->MakeSubgame(*set);
   }
@@ -125,8 +121,7 @@ std::pair<ActionsAndProbs,
   //  MakeSubgame to affect infostate tree construction.
 
 //        std::cout << "# Making solver\n";
-  std::unique_ptr<SubgameSolver>
-      solver = solver_factory_->MakeSolver(subgame_, nullptr, "", true);
+  std::unique_ptr<SubgameSolver> solver = solver_factory_->MakeSolver(subgame_);
 
 //    // Code for opponent fixation:
 //    TabularPolicy opponent_policy;  // Needs to be provided.
