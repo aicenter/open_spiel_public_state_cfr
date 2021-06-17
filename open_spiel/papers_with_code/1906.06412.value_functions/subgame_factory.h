@@ -60,7 +60,7 @@ struct SubgameFactory {
   std::vector<std::shared_ptr<algorithms::InfostateTree>>
   MakeSubgameInfostateTrees(const ParticleSet& set, int depth) const;
   std::vector<std::shared_ptr<algorithms::InfostateTree>>
-  MakeSubgameInfostateTreesSafeResolving(
+  MakeSubgameResolvingInfostateTrees(
       const ParticleSet& set, int depth, int player,
       std::unordered_map<std::string, double> CFVs) const;
 

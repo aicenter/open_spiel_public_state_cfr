@@ -233,13 +233,13 @@ void KuhnExploitabilityBenchmark() {
             << algorithms::Exploitability(*game, full_policy) << "\n";
 }
 
-void CheckGame(const std::string& nfg_string,
-               const std::vector<double>& constraints_values,
-               const std::vector<double>& chance_reach_probs,
-               const std::vector<double>& expected_policy,
-               double expected_game_value,
-               std::string expected_player_certificate,
-               std::string expected_opponent_certificate) {
+void CheckNfgGame(const std::string& nfg_string,
+                  const std::vector<double>& constraints_values,
+                  const std::vector<double>& chance_reach_probs,
+                  const std::vector<double>& expected_policy,
+                  double expected_game_value,
+                  std::string expected_player_certificate,
+                  std::string expected_opponent_certificate) {
   std::shared_ptr<const Game> game = nfg_game::LoadNFGGame(nfg_string);
   game = ConvertToTurnBased(*game);
   std::unique_ptr<State> root_state = game->NewInitialState();
@@ -281,18 +281,18 @@ void CheckGame(const std::string& nfg_string,
 }
 
 void TestResolvingOnRPS() {
-  CheckGame(
-    R"###(
+  CheckNfgGame(
+      R"###(
       NFG 1 R ""
       { "Player 1" "Player 2" } { 3 3 }
 
       0 0   1 -1   -1 1   -1 1   0 0   1 -1   1 -1   -1 1   0 0
     )###",
-    /*constraints_values=*/ {0., 0., 0.},
-    /*chance_reach_probs=*/ {1./3, 1./3, 1./3},
-    /*expected_policy=*/    {1./3, 1./3, 1./3},
-    /*expected_game_value=*/ 0.,
-    /*expected_player_certificate=*/"(("
+      /*constraints_values=*/ {0., 0., 0.},
+      /*chance_reach_probs=*/ {1. / 3, 1. / 3, 1. / 3},
+      /*expected_policy=*/    {1. / 3, 1. / 3, 1. / 3},
+      /*expected_game_value=*/ 0.,
+      /*expected_player_certificate=*/"(("
                                       // Observation of constaints, without the
                                       // ability to change the outcome.
                                       "(({-0.00})({-0.00})({-0.00}))"
@@ -300,405 +300,164 @@ void TestResolvingOnRPS() {
                                       "[({-1.00}{0.00}{1.00})"
                                       "({-1.00}{0.00}{1.00})"
                                       "({-1.00}{0.00}{1.00})]"
-                                    "))",
-    /*expected_opponent_certificat=*/"("
+                                      "))",
+      /*expected_opponent_certificat=*/"("
                                        // Follow / terminate for each action,
                                        // with standard RPS outcomes.
                                        "[(({-1.00})({0.00})({1.00}))(({0.00}))]"
                                        "[(({-1.00})({0.00})({1.00}))(({0.00}))]"
                                        "[(({-1.00})({0.00})({1.00}))(({0.00}))]"
-                                     ")");
+                                       ")");
 
 }
 
 void TestResolvingOnBiasedRPS() {
-  CheckGame(
-    R"###(
+  CheckNfgGame(
+      R"###(
       NFG 1 R ""
       { "Player 1" "Player 2" } { 3 3 }
 
       0 0   1 -1   -2 2   -1 1   0 0   3 -3   2 -2   -3 3   0 0
     )###",
-    /*constraints_values=*/ {0., 0., 0.},
-    /*chance_reach_probs=*/ {0.5, 1. / 3., 1. / 6},
-    /*expected_policy=*/    {0.5, 1. / 3, 1. / 6},
-    /*expected_game_value=*/ 0.,
-    /*expected_player_certificate=*/"(("
+      /*constraints_values=*/ {0., 0., 0.},
+      /*chance_reach_probs=*/ {0.5, 1. / 3., 1. / 6},
+      /*expected_policy=*/    {0.5, 1. / 3, 1. / 6},
+      /*expected_game_value=*/ 0.,
+      /*expected_player_certificate=*/"(("
                                       "(({-0.00})({-0.00})({-0.00}))"
                                       "[({-1.00}{0.00}{2.00})({-2.00}{0.00}{3.00})({-3.00}{0.00}{1.00})]"
-                                    "))",
-    /*expected_opponent_certificat=*/"("
+                                      "))",
+      /*expected_opponent_certificat=*/"("
                                        "[(({-1.00})({0.00})({2.00}))(({0.00}))]"
                                        "[(({-2.00})({0.00})({3.00}))(({0.00}))]"
                                        "[(({-3.00})({0.00})({1.00}))(({0.00}))]"
-                                     ")");
+                                       ")");
 }
 
-void TestResolvingWithSmallerEqSupport() {
-  CheckGame(
-    R"###(
+void TestResolvingNfgWithSmallerEqSupport() {
+  CheckNfgGame(
+      R"###(
       NFG 1 R ""
       { "Player 1" "Player 2" } { 3 3 }
 
       1 -1   0 0   0 0   0 0   1 -1   0 0   1 -1   1 -1   -5 5
     )###",
-    /*constraints_values=*/ {0.5, 0.5, 0},
-    /*chance_reach_probs=*/ {0.5, 0.5, 0},
-    /*expected_policy=*/    {0.5, 0.5, 0},
-    /*expected_game_value=*/-0.5,
-    /*expected_player_certificate=*/"(("
+      /*constraints_values=*/ {0.5, 0.5, 0},
+      /*chance_reach_probs=*/ {0.5, 0.5, 0},
+      /*expected_policy=*/    {0.5, 0.5, 0},
+      /*expected_game_value=*/-0.5,
+      /*expected_player_certificate=*/"(("
                                       "(({-0.00})({-0.50})({-0.50}))"
                                       "[({-1.00}{-1.00}{5.00})({-1.00}{0.00}{0.00})({-1.00}{0.00}{0.00})]"
-                                    "))",
-    /*expected_opponent_certificat=*/"("
+                                      "))",
+      /*expected_opponent_certificat=*/"("
                                        "[(({-5.00})({0.00})({0.00}))(({0.00}))]"
                                        "[(({0.00})({1.00})({1.00}))(({0.50}))]"
                                        "[(({0.00})({1.00})({1.00}))(({0.50}))]"
-                                     ")");
+                                       ")");
 }
 
-void KuhnCheckSituation() {
-  std::shared_ptr<const Game> game = LoadGame("kuhn_poker");
+void CheckKuhnGame(std::vector<std::vector<Action>> start_histories,
+                   const std::unordered_map<std::string, double>& constraints_values,
+                   const std::vector<double>& chance_reach_probs,
+                   double kuhn_alpha_param,
+                   Player ft_player,
+                   const std::vector<double>& expected_game_values,
+                   std::string expected_player_certificate,
+                   std::string expected_opponent_certificate) {
 
-  std::unique_ptr<State> state = game->NewInitialState();
+  std::shared_ptr<const Game> game = LoadGame("kuhn_poker");
+  auto infostate_observer = game->MakeObserver(kInfoStateObsType, {});
 
   std::vector<std::unique_ptr<State>> start_states;
+  for (auto& history : start_histories) {
+    std::unique_ptr<State> s = game->NewInitialState();
+    for (Action a: history) s->ApplyAction(a);
+    start_states.push_back(std::move(s));
+  }
 
-  std::string infoset_one;
-  std::unordered_map<std::string, double> CFVs = {{"0p", -1.},
-                                                  {"1p", -1. / 3},
-                                                  {"2p", 7. / 6}};
-  for (Action action_first_chance_node : state->LegalActions()) {
-    std::unique_ptr<State>
-        child_first_chance_node = state->Child(action_first_chance_node);
-    for (Action
-          action_second_chance_node : child_first_chance_node->LegalActions()) {
-      std::unique_ptr<State>
-          child_player_one_node = child_first_chance_node->Child(
-          action_second_chance_node);
-      std::unique_ptr<State>
-          check_state_player_two = child_player_one_node->Child(Action(0));
-      start_states.push_back(std::move(check_state_player_two));
+  auto trees = algorithms::MakeResolvingInfostateTrees(
+      start_states, chance_reach_probs, infostate_observer,
+      ft_player, constraints_values);
+  auto tree_safe_opponent = trees[ft_player];
+  auto tree_safe_player = trees[1 - ft_player];
+
+  SPIEL_CHECK_EQ(tree_safe_player->root().MakeCertificate(2),
+                 expected_player_certificate);
+  SPIEL_CHECK_EQ(tree_safe_opponent->root().MakeCertificate(2),
+                 expected_opponent_certificate);
+
+  SequenceFormLpSpecification specification(trees);
+  TabularPolicy solved_slp_policy;
+  for (int pl = 0; pl < 2; ++pl) {
+    specification.SpecifyLinearProgram(pl);
+    SPIEL_CHECK_FLOAT_EQ(expected_game_values[pl], specification.Solve());
+    if (pl == 1 - ft_player) {
+      solved_slp_policy = specification.OptimalPolicy(1 - ft_player);
     }
   }
 
-  auto tree_safe_player =
-      algorithms::MakeResolvingInfostateTree(start_states,
-                                             {1. / 6, 1. / 6, 1. / 6,
-                                              1. / 6,
-                                              1. / 6, 1. / 6},
-                                             game->MakeObserver(
-                                                 kInfoStateObsType,
-                                                 {}),
-                                             1,
-                                             0,
-                                             CFVs,
-                                             algorithms::kNoMoveAheadLimit);
-
-  auto tree_safe_opponent =
-      algorithms::MakeResolvingInfostateTree(start_states,
-                                             {1. / 6, 1. / 6, 1. / 6,
-                                              1. / 6,
-                                              1. / 6, 1. / 6},
-                                             game->MakeObserver(
-                                                 kInfoStateObsType,
-                                                 {}),
-                                             0,
-                                             0,
-                                             CFVs,
-                                             algorithms::kNoMoveAheadLimit);
-
-  std::string tree_safe_player_reference =
-      "((((({-1.17}))(({0.33})))[(({-1.00})({-1.00}))(({-2.00}{-2.00}{1.00}{1.00}))])(((({-1.17}))(({1.00})))[(({-1.00})({1.00}))(({-2.00}{1.00}{1.00}{2.00}))])(((({0.33}))(({1.00})))[(({1.00})({1.00}))(({1.00}{1.00}{2.00}{2.00}))]))";
-  std::string tree_safe_opponent_reference =
-      "([((({-0.33}))(({-0.33})))((({-1.00}))(({1.00}))[({-1.00}{-1.00})({-2.00}{2.00})])][((({-1.00}))(({-1.00})))((({-1.00}))(({-1.00}))[({-1.00}{-1.00})({-2.00}{-2.00})])][((({1.00}))(({1.00}))[({-1.00}{-1.00})({2.00}{2.00})])((({1.17}))(({1.17})))])";
-  SPIEL_CHECK_EQ(tree_safe_player->root().MakeCertificate(2),
-                 tree_safe_player_reference);
-  SPIEL_CHECK_EQ(tree_safe_opponent->root().MakeCertificate(2),
-                 tree_safe_opponent_reference);
-
-  SequenceFormLpSpecification
-      specification({tree_safe_opponent, tree_safe_player});
-
-  specification.SpecifyLinearProgram(0);
-  SPIEL_CHECK_FLOAT_EQ(-1. / 18, specification.Solve());
-
-  specification.SpecifyLinearProgram(1);
-  SPIEL_CHECK_FLOAT_EQ(1. / 18, specification.Solve());
-
-  TabularPolicy solved_slp_policy = specification.OptimalPolicy(1);
-
-  TabularPolicy kuhn_optimal_policy = kuhn_poker::GetOptimalPolicy(0);
-
+  TabularPolicy kuhn_optimal_policy =
+      kuhn_poker::GetOptimalPolicy(kuhn_alpha_param);
   SPIEL_CHECK_EQ(solved_slp_policy.PolicyTable().size(), 3);
 
-  for (const auto& info_state_strategy : solved_slp_policy.PolicyTable()) {
-    SPIEL_CHECK_EQ(GetProbs(info_state_strategy.second).size(), 2);
-    ActionsAndProbs state_optimal_policy = kuhn_optimal_policy.GetStatePolicy(
-        info_state_strategy.first);
+  for (const auto&[infostate, strategy] : solved_slp_policy.PolicyTable()) {
+    SPIEL_CHECK_EQ(strategy.size(), 2);
+    ActionsAndProbs state_optimal_policy =
+        kuhn_optimal_policy.GetStatePolicy(infostate);
     for (int i = 0; i < 2; i++) {
       SPIEL_CHECK_FLOAT_EQ(GetProbs(state_optimal_policy)[i],
-                           GetProbs(info_state_strategy.second)[i]);
+                           GetProbs(strategy)[i]);
     }
   }
 }
 
-void KuhnBetSituation() {
-  std::shared_ptr<const Game> game = LoadGame("kuhn_poker");
-
-  std::unique_ptr<State> state = game->NewInitialState();
-
-  std::vector<std::unique_ptr<State>> start_states;
-
-  std::string infoset_one;
-  std::unordered_map<std::string, double> CFVs = {{"0b", -1.},
-                                                  {"1b", -1. / 2},
-                                                  {"2b", 7. / 6}};
-  for (Action action_first_chance_node : state->LegalActions()) {
-    std::unique_ptr<State>
-        child_first_chance_node = state->Child(action_first_chance_node);
-    for (Action
-          action_second_chance_node : child_first_chance_node->LegalActions()) {
-      std::unique_ptr<State>
-          child_player_one_node = child_first_chance_node->Child(
-          action_second_chance_node);
-      std::unique_ptr<State>
-          check_state_player_two = child_player_one_node->Child(Action(1));
-      start_states.push_back(std::move(check_state_player_two));
-    }
-  }
-
-  auto tree_safe_player =
-      algorithms::MakeResolvingInfostateTree(start_states,
-                                             {1. / 6, 1. / 6, 1. / 6,
-                                              1. / 6,
-                                              1. / 6, 1. / 6},
-                                             game->MakeObserver(
-                                                 kInfoStateObsType,
-                                                 {}),
-                                             1,
-                                             0,
-                                             CFVs);
-
-  auto tree_safe_opponent =
-      algorithms::MakeResolvingInfostateTree(start_states,
-                                             {1. / 6, 1. / 6, 1. / 6,
-                                              1. / 6,
-                                              1. / 6, 1. / 6},
-                                             game->MakeObserver(
-                                                 kInfoStateObsType,
-                                                 {}),
-                                             0,
-                                             0,
-                                             CFVs);
-
-  std::string tree_safe_player_reference =
-      "(((({-1.17})({0.50}))[({-1.00}{-1.00})({-2.00}{-2.00})])((({-1.17})({1.00}))[({-1.00}{-1.00})({-2.00}{2.00})])((({0.50})({1.00}))[({-1.00}{-1.00})({2.00}{2.00})]))";
-  std::string tree_safe_opponent_reference =
-      "([(({-0.50})({-0.50}))(({-2.00})({1.00})({1.00})({2.00}))][(({-1.00})({-1.00}))(({-2.00})({-2.00})({1.00})({1.00}))][(({1.00})({1.00})({2.00})({2.00}))(({1.17})({1.17}))])";
-  SPIEL_CHECK_EQ(tree_safe_player->root().MakeCertificate(2),
-                 tree_safe_player_reference);
-  SPIEL_CHECK_EQ(tree_safe_opponent->root().MakeCertificate(2),
-                 tree_safe_opponent_reference);
-
-  SequenceFormLpSpecification
-      specification({tree_safe_opponent, tree_safe_player});
-
-  specification.SpecifyLinearProgram(0);
-  SPIEL_CHECK_FLOAT_EQ(-1. / 9, specification.Solve());
-
-  specification.SpecifyLinearProgram(1);
-  SPIEL_CHECK_FLOAT_EQ(1. / 9, specification.Solve());
-
-  TabularPolicy solved_slp_policy = specification.OptimalPolicy(1);
-
-  TabularPolicy kuhn_optimal_policy = kuhn_poker::GetOptimalPolicy(0);
-
-  SPIEL_CHECK_EQ(solved_slp_policy.PolicyTable().size(), 3);
-
-  for (const auto& info_state_strategy : solved_slp_policy.PolicyTable()) {
-    SPIEL_CHECK_EQ(GetProbs(info_state_strategy.second).size(), 2);
-    ActionsAndProbs state_optimal_policy = kuhn_optimal_policy.GetStatePolicy(
-        info_state_strategy.first);
-    for (int i = 0; i < 2; i++) {
-      SPIEL_CHECK_FLOAT_EQ(GetProbs(state_optimal_policy)[i],
-                           GetProbs(info_state_strategy.second)[i]);
-    }
-  }
+void TestResolvingKuhnPass() {
+  CheckKuhnGame(
+    /*start_histories=*/{{0,1,0}, {0,2,0}, {1,0,0}, {1,2,0}, {2,0,0}, {2,1,0}},
+    /*constraints_values=*/{{"0p", -1.}, {"1p", -1. / 3}, {"2p", 7. / 6}},
+    /*chance_reach_probs=*/{1./6, 1./6, 1./6, 1./6, 1./6, 1./6},
+    /*kuhn_alpha_param=*/0,
+    /*ft_player=*/0,
+    /*expected_game_values=*/{-1./18, 1./18},
+    /*expected_player_certificate=*/"((((({-1.17}))(({0.33})))[(({-1.00})({-1.00}))(({-2.00}{-2.00}{1.00}{1.00}))])(((({-1.17}))(({1.00})))[(({-1.00})({1.00}))(({-2.00}{1.00}{1.00}{2.00}))])(((({0.33}))(({1.00})))[(({1.00})({1.00}))(({1.00}{1.00}{2.00}{2.00}))]))",
+    /*expected_opponent_certificate=*/"([((({-0.33}))(({-0.33})))((({-1.00}))(({1.00}))[({-1.00}{-1.00})({-2.00}{2.00})])][((({-1.00}))(({-1.00})))((({-1.00}))(({-1.00}))[({-1.00}{-1.00})({-2.00}{-2.00})])][((({1.00}))(({1.00}))[({-1.00}{-1.00})({2.00}{2.00})])((({1.17}))(({1.17})))])");
 }
 
-void KuhnLastPublicSituationAlphaMin() {
-  std::shared_ptr<const Game> game = LoadGame("kuhn_poker");
-
-  std::unique_ptr<State> state = game->NewInitialState();
-
-  std::vector<std::unique_ptr<State>> start_states;
-
-  std::string infoset_one;
-  std::unordered_map<std::string, double> CFVs = {{"0pb", -1.},
-                                                  {"1pb", -1. / 2},
-                                                  {"2pb", 7. / 6}};
-  for (Action action_first_chance_node : state->LegalActions()) {
-    std::unique_ptr<State>
-        child_first_chance_node = state->Child(action_first_chance_node);
-    for (Action
-          action_second_chance_node : child_first_chance_node->LegalActions()) {
-      std::unique_ptr<State>
-          child_player_one_node = child_first_chance_node->Child(
-          action_second_chance_node);
-      std::unique_ptr<State> check_state_player_two =
-          child_player_one_node->Child(Action(0))->Child(
-              Action(1));
-      start_states.push_back(std::move(check_state_player_two));
-    }
-  }
-
-  auto tree_safe_player =
-      algorithms::MakeResolvingInfostateTree(start_states,
-                                             {1. / 6, 1. / 6, 1. / 6,
-                                              1. / 6,
-                                              1. / 6, 1. / 6},
-                                             game->MakeObserver(
-                                                 kInfoStateObsType,
-                                                 {}),
-                                             1,
-                                             1,
-                                             CFVs,
-                                             10);
-
-  auto tree_safe_opponent =
-      algorithms::MakeResolvingInfostateTree(start_states,
-                                             {1. / 6, 1. / 6, 1. / 6,
-                                              1. / 6,
-                                              1. / 6, 1. / 6},
-                                             game->MakeObserver(
-                                                 kInfoStateObsType,
-                                                 {}),
-                                             0,
-                                             1,
-                                             CFVs,
-                                             10);
-
-  std::string tree_safe_player_reference =
-      "([(({-0.50})({-0.50}))(({-2.00})({1.00})({1.00})({2.00}))][(({-1.00})({-1.00}))(({-2.00})({-2.00})({1.00})({1.00}))][(({1.00})({1.00})({2.00})({2.00}))(({1.17})({1.17}))])";
-  std::string tree_safe_opponent_reference =
-      "(((({-1.17})({0.50}))[({-1.00}{-1.00})({-2.00}{-2.00})])((({-1.17})({1.00}))[({-1.00}{-1.00})({-2.00}{2.00})])((({0.50})({1.00}))[({-1.00}{-1.00})({2.00}{2.00})]))";
-  SPIEL_CHECK_EQ(tree_safe_player->root().MakeCertificate(2),
-                 tree_safe_player_reference);
-  SPIEL_CHECK_EQ(tree_safe_opponent->root().MakeCertificate(2),
-                 tree_safe_opponent_reference);
-
-  SequenceFormLpSpecification
-      specification({tree_safe_opponent, tree_safe_player});
-
-  specification.SpecifyLinearProgram(0);
-  SPIEL_CHECK_FLOAT_EQ(1. / 9, specification.Solve());
-
-  TabularPolicy solved_slp_policy = specification.OptimalPolicy(0);
-
-  specification.SpecifyLinearProgram(1);
-  SPIEL_CHECK_FLOAT_EQ(-1. / 9, specification.Solve());
-
-  TabularPolicy kuhn_optimal_policy = kuhn_poker::GetOptimalPolicy(0);
-
-  SPIEL_CHECK_EQ(solved_slp_policy.PolicyTable().size(), 3);
-
-  for (const auto& info_state_strategy : solved_slp_policy.PolicyTable()) {
-    SPIEL_CHECK_EQ(GetProbs(info_state_strategy.second).size(), 2);
-    ActionsAndProbs state_optimal_policy = kuhn_optimal_policy.GetStatePolicy(
-        info_state_strategy.first);
-    for (int i = 0; i < 2; i++) {
-      SPIEL_CHECK_FLOAT_EQ(GetProbs(state_optimal_policy)[i],
-                           GetProbs(info_state_strategy.second)[i]);
-    }
-  }
+void TestResolvingKuhnBet() {
+  CheckKuhnGame(
+    /*start_histories=*/{{0,1,1}, {0,2,1}, {1,0,1}, {1,2,1}, {2,0,1}, {2,1,1}},
+    /*constraints_values=*/{{"0b", -1.}, {"1b", -1./2}, {"2b", 7./6}},
+    /*chance_reach_probs=*/{1./6, 1./6, 1./6, 1./6, 1./6, 1./6},
+    /*kuhn_alpha_param=*/0,
+    /*ft_player=*/0,
+    /*expected_game_values=*/{-1./9, 1./9},
+    /*expected_player_certificate=*/"(((({-1.17})({0.50}))[({-1.00}{-1.00})({-2.00}{-2.00})])((({-1.17})({1.00}))[({-1.00}{-1.00})({-2.00}{2.00})])((({0.50})({1.00}))[({-1.00}{-1.00})({2.00}{2.00})]))",
+    /*expected_opponent_certificate=*/"([(({-0.50})({-0.50}))(({-2.00})({1.00})({1.00})({2.00}))][(({-1.00})({-1.00}))(({-2.00})({-2.00})({1.00})({1.00}))][(({1.00})({1.00})({2.00})({2.00}))(({1.17})({1.17}))])");
 }
 
-void KuhnLastPublicSituationAlphaMax() {
-  std::shared_ptr<const Game> game = LoadGame("kuhn_poker");
+void TestResolvingKuhnPassBetAlphaMin() {
+  CheckKuhnGame(
+      /*start_histories=*/{{0,1,0,1}, {0,2,0,1}, {1,0,0,1}, {1,2,0,1}, {2,0,0,1}, {2,1,0,1}},
+      /*constraints_values=*/{{"0pb", -1.}, {"1pb", -1./2}, {"2pb", 7./6}},
+      /*chance_reach_probs=*/{1./6, 1./6, 1./6, 1./6, 1./6, 1./6},
+      /*kuhn_alpha_param=*/0,  // Min alpha
+      /*ft_player=*/1,
+      /*expected_game_values=*/{1./9, -1./9},
+      /*expected_player_certificate=*/"(((({-1.17})({0.50}))[({-1.00}{-1.00})({-2.00}{-2.00})])((({-1.17})({1.00}))[({-1.00}{-1.00})({-2.00}{2.00})])((({0.50})({1.00}))[({-1.00}{-1.00})({2.00}{2.00})]))",
+      /*expected_opponent_certificate=*/"([(({-0.50})({-0.50}))(({-2.00})({1.00})({1.00})({2.00}))][(({-1.00})({-1.00}))(({-2.00})({-2.00})({1.00})({1.00}))][(({1.00})({1.00})({2.00})({2.00}))(({1.17})({1.17}))])");
+}
 
-  std::unique_ptr<State> state = game->NewInitialState();
-
-  std::vector<std::unique_ptr<State>> start_states;
-
-  std::string infoset_one;
-  std::unordered_map<std::string, double> CFVs = {{"0pb", -1.},
-                                                  {"1pb", 1},
-                                                  {"2pb", 7. / 5}};
-  for (Action action_first_chance_node : state->LegalActions()) {
-    std::unique_ptr<State>
-        child_first_chance_node = state->Child(action_first_chance_node);
-    for (Action
-          action_second_chance_node : child_first_chance_node->LegalActions()) {
-      std::unique_ptr<State>
-          child_player_one_node = child_first_chance_node->Child(
-          action_second_chance_node);
-      std::unique_ptr<State> check_state_player_two =
-          child_player_one_node->Child(Action(0))->Child(
-              Action(1));
-      start_states.push_back(std::move(check_state_player_two));
-    }
-  }
-
-  auto tree_safe_player =
-      algorithms::MakeResolvingInfostateTree(start_states,
-                                             {1. / 9, 1. / 9, 1. / 6,
-                                              1. / 6, 0,
-                                              0},
-                                             game->MakeObserver(
-                                                 kInfoStateObsType,
-                                                 {}),
-                                             1,
-                                             1,
-                                             CFVs,
-                                             10);
-
-  auto tree_safe_opponent =
-      algorithms::MakeResolvingInfostateTree(start_states,
-                                             {1. / 9, 1. / 9, 1. / 6,
-                                              1. / 6, 0,
-                                              0},
-                                             game->MakeObserver(
-                                                 kInfoStateObsType,
-                                                 {}),
-                                             0,
-                                             1,
-                                             CFVs,
-                                             10);
-
-  std::string tree_safe_player_reference =
-      "([(({-1.00})({-1.00}))(({-2.00})({-2.00})({1.00})({1.00}))][(({-2.00})({1.00})({1.00})({2.00}))(({1.00})({1.00}))][(({1.00})({1.00})({2.00})({2.00}))(({1.40})({1.40}))])";
-  std::string tree_safe_opponent_reference =
-      "(((({-1.00})({-1.40}))[({-1.00}{-1.00})({-2.00}{-2.00})])((({-1.00})({1.00}))[({-1.00}{-1.00})({2.00}{2.00})])((({-1.40})({1.00}))[({-1.00}{-1.00})({-2.00}{2.00})]))";
-  SPIEL_CHECK_EQ(tree_safe_player->root().MakeCertificate(2),
-                 tree_safe_player_reference);
-  SPIEL_CHECK_EQ(tree_safe_opponent->root().MakeCertificate(2),
-                 tree_safe_opponent_reference);
-
-  SequenceFormLpSpecification
-      specification({tree_safe_opponent, tree_safe_player});
-
-  specification.SpecifyLinearProgram(0);
-  SPIEL_CHECK_FLOAT_EQ(-1. / 3, specification.Solve());
-
-  TabularPolicy solved_slp_policy = specification.OptimalPolicy(0);
-
-  specification.SpecifyLinearProgram(1);
-  SPIEL_CHECK_FLOAT_EQ(1. / 3, specification.Solve());
-
-  TabularPolicy kuhn_optimal_policy = kuhn_poker::GetOptimalPolicy(1. / 3);
-
-  SPIEL_CHECK_EQ(solved_slp_policy.PolicyTable().size(), 3);
-
-  for (const auto& info_state_strategy : solved_slp_policy.PolicyTable()) {
-    SPIEL_CHECK_EQ(GetProbs(info_state_strategy.second).size(), 2);
-    ActionsAndProbs state_optimal_policy = kuhn_optimal_policy.GetStatePolicy(
-        info_state_strategy.first);
-    for (int i = 0; i < 2; i++) {
-      SPIEL_CHECK_FLOAT_EQ(GetProbs(state_optimal_policy)[i],
-                           GetProbs(info_state_strategy.second)[i]);
-    }
-  }
+void TestResolvingKuhnPassBetAlphaMax() {
+  CheckKuhnGame(
+      /*start_histories=*/{{0,1,0,1}, {0,2,0,1}, {1,0,0,1}, {1,2,0,1}, {2,0,0,1}, {2,1,0,1}},
+      /*constraints_values=*/{{"0pb", -1.}, {"1pb", 1}, {"2pb", 7./5}},
+      /*chance_reach_probs=*/{1./9, 1./9, 1./6, 1./6, 0., 0.},
+      /*kuhn_alpha_param=*/1/3.,  // Max alpha
+      /*ft_player=*/1,
+      /*expected_game_values=*/{-1./3, 1./3},
+      /*expected_player_certificate=*/"(((({-1.00})({-1.40}))[({-1.00}{-1.00})({-2.00}{-2.00})])((({-1.00})({1.00}))[({-1.00}{-1.00})({2.00}{2.00})])((({-1.40})({1.00}))[({-1.00}{-1.00})({-2.00}{2.00})]))",
+      /*expected_opponent_certificate=*/"([(({-1.00})({-1.00}))(({-2.00})({-2.00})({1.00})({1.00}))][(({-2.00})({1.00})({1.00})({2.00}))(({1.00})({1.00}))][(({1.00})({1.00})({2.00})({2.00}))(({1.40})({1.40}))])");
 }
 
 }  // namespace
@@ -718,12 +477,12 @@ int main(int argc, char** argv) {
   // Tests on matrix game for correct gadget game generations and resolving.
   open_spiel::papers_with_code::TestResolvingOnRPS();
   open_spiel::papers_with_code::TestResolvingOnBiasedRPS();
-  open_spiel::papers_with_code::TestResolvingWithSmallerEqSupport();
+  open_spiel::papers_with_code::TestResolvingNfgWithSmallerEqSupport();
 
   // Tests for correctly resolved Gadget game on Kuhn with all the values
   // handcrafted beforehand.
-  open_spiel::papers_with_code::KuhnCheckSituation();
-  open_spiel::papers_with_code::KuhnBetSituation();
-  open_spiel::papers_with_code::KuhnLastPublicSituationAlphaMin();
-  open_spiel::papers_with_code::KuhnLastPublicSituationAlphaMax();
+  open_spiel::papers_with_code::TestResolvingKuhnPass();
+  open_spiel::papers_with_code::TestResolvingKuhnBet();
+  open_spiel::papers_with_code::TestResolvingKuhnPassBetAlphaMin();
+  open_spiel::papers_with_code::TestResolvingKuhnPassBetAlphaMax();
 }

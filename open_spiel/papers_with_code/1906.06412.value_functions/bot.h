@@ -41,15 +41,10 @@ class SherlockBot : public Bot {
               Player player_id, int seed);
 
   SherlockBot(SherlockBot const& bot);
-
   std::unique_ptr<Bot> Clone() const override;
-
   Action Step(const State& state) override;
-
   std::pair<ActionsAndProbs, Action> StepWithPolicy(const State& state) override;
-
   void SetSeed(int seed);
-
   void InformAction(const State& state,
                     Player player_id,
                     Action action) override {
@@ -60,19 +55,12 @@ class SherlockBot : public Bot {
     Bot::InformActions(state, actions);
   }
   void Restart() override;
-
-  void RestartAt(const State& state) override {
-    Bot::RestartAt(state);
-  }
-  bool ProvidesForceAction() override {
-    return Bot::ProvidesForceAction();
-  }
+  void RestartAt(const State& state) override { Bot::RestartAt(state); }
+  bool ProvidesForceAction() override { return Bot::ProvidesForceAction(); }
   void ForceAction(const State& state, Action action) override {
     Bot::ForceAction(state, action);
   }
-  bool ProvidesPolicy() override {
-    return Bot::ProvidesPolicy();
-  }
+  bool ProvidesPolicy() override {  return Bot::ProvidesPolicy(); }
   ActionsAndProbs GetPolicy(const State& state) override {
     return Bot::GetPolicy(state);
   }
@@ -84,8 +72,6 @@ std::unique_ptr<Bot>  MakeSherlockBot(
     Player player_id, int seed);
 
 std::unique_ptr<ParticleSet> ParticlesFromState(const PublicState& state);
-
-
 
 namespace {
 
