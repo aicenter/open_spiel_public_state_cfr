@@ -283,7 +283,8 @@ std::shared_ptr<InfostateTree> MakeInfostateTree(
 std::shared_ptr<InfostateTree> MakeInfostateTree(
     const std::vector<const State*>& start_states,
     const std::vector<double>& chance_reach_probs,
-    std::shared_ptr<Observer> infostate_observer, Player acting_player,
+    std::shared_ptr<Observer> infostate_observer,
+    Player acting_player,
     int max_move_ahead_limit = kNoMoveAheadLimit,
     int storage_policy = kDefaultStoragePolicy);
 
@@ -292,20 +293,30 @@ std::shared_ptr<InfostateTree> MakeInfostateTree(
 std::shared_ptr<InfostateTree> MakeInfostateTree(
     const std::vector<std::unique_ptr<State>>& start_states,
     const std::vector<double>& chance_reach_probs,
-    std::shared_ptr<Observer> infostate_observer, Player acting_player,
+    std::shared_ptr<Observer> infostate_observer,
+    Player acting_player,
     int max_move_ahead_limit = kNoMoveAheadLimit,
     int storage_policy = kDefaultStoragePolicy);
 
-// Creates an infostate tree for a player based on some start states,
-// up to some move limit from the deepest start state.
-std::shared_ptr<InfostateTree> MakeInfostateTreeSafeResolving(
-        const std::vector<std::unique_ptr<State>>& start_states,
-        const std::vector<double>& chance_reach_probs,
-        std::shared_ptr<Observer> infostate_observer, Player acting_player,
-        std::unordered_map<std::string, double> CFVs,
-        Player ft_player,
-        int max_move_ahead_limit = kNoMoveAheadLimit,
-        int storage_policy = kDefaultStoragePolicy);
+// Creates an infostate tree for the resolving (gadget) game, see [1].
+//
+// If acting_player == ft_player, the tree contains Follow/Terminate decision
+// nodes, with the cf value constraints as Terminate outcomes.
+// If acting_player != ft_player, the terminate outcomes can occur without the
+// acting_player actually acting in the game (if ft_player decided to terminate
+// the game), and the acting_player receives -cf_values.
+//
+// [1] Solving imperfect information games using decomposition
+//     Burch, Neil and Johanson, Michael and Bowling, Michael
+std::shared_ptr<InfostateTree> MakeResolvingInfostateTree(
+    const std::vector<std::unique_ptr<State>>& start_states,
+    const std::vector<double>& chance_reach_probs,
+    std::shared_ptr<Observer> infostate_observer,
+    Player acting_player,
+    Player ft_player,
+    const std::unordered_map<std::string, double>& cf_value_constraints,
+    int max_move_ahead_limit = kNoMoveAheadLimit,
+    int storage_policy = kDefaultStoragePolicy);
 
 // Creates an infostate tree based on some leaf infostate nodes coming from
 // another infostate tree, up to some move limit.
@@ -341,6 +352,17 @@ std::vector<std::shared_ptr<InfostateTree>> MakeInfostateTrees(
     const std::vector<std::unique_ptr<State>>& start_states,
     const std::vector<double>& chance_reach_probs,
     std::shared_ptr<Observer> infostate_observer,
+    int max_move_ahead_limit = kNoMoveAheadLimit,
+    int storage_policy = kDefaultStoragePolicy);
+
+// See MakeResolvingInfostateTree for explanation.
+// The cf_value_constraints are specified for the ft_player.
+std::vector<std::shared_ptr<InfostateTree>> MakeResolvingInfostateTrees(
+    const std::vector<std::unique_ptr<State>>& start_states,
+    const std::vector<double>& chance_reach_probs,
+    std::shared_ptr<Observer> infostate_observer,
+    Player ft_player,
+    const std::unordered_map<std::string, double>& cf_value_constraints,
     int max_move_ahead_limit = kNoMoveAheadLimit,
     int storage_policy = kDefaultStoragePolicy);
 
@@ -448,53 +470,59 @@ class InfostateTree final {
  private:
   // Allow any "pointer-like" State to be passed as argument within
   // std::vector<pointer-like-State>
-  template<typename S>
-  InfostateTree(const std::vector<S>& start_states,
+  template <typename pState>
+  InfostateTree(const std::vector<pState>& start_states,
                 const std::vector<double>& chance_reach_probs,
                 std::shared_ptr<Observer> infostate_observer,
-                Player acting_player, int max_move_ahead_limit,
-                int storage_policy) : InfostateTree(
-                        start_states, chance_reach_probs, infostate_observer,
-                        acting_player, max_move_ahead_limit, storage_policy, false, nullptr, 0){}
+                Player acting_player,
+                int max_move_ahead_limit,
+                int storage_policy)
+      : InfostateTree(start_states, chance_reach_probs, infostate_observer,
+                      acting_player, max_move_ahead_limit, storage_policy,
+                      {}, kInvalidPlayer) {}
 
-  template<typename S>
-  InfostateTree(const std::vector<S>& start_states,
-                const std::vector<double>& chance_reach_probs,
-                std::shared_ptr<Observer> infostate_observer,
-                Player acting_player, int max_move_ahead_limit,
-                int storage_policy, bool safe_resolving,
-                std::unordered_map<std::string, double> *resolving_cfvs,
-                int ft_player)
-            : acting_player_(acting_player),
-              infostate_observer_(std::move(infostate_observer)),
-              root_(MakeRootNode()),
-              storage_policy_(storage_policy),
-              resolving_cfvs_(resolving_cfvs),
-              safe_resolving_(resolving_cfvs_ != nullptr),
-              ft_player_(ft_player) {
-        SPIEL_CHECK_FALSE(start_states.empty());
-        SPIEL_CHECK_EQ(start_states.size(), chance_reach_probs.size());
-        SPIEL_CHECK_GE(acting_player_, 0);
-        SPIEL_CHECK_LT(acting_player_, start_states[0]->GetGame()->NumPlayers());
-        SPIEL_CHECK_TRUE(infostate_observer_->HasString());
+  template <typename pState>
+  InfostateTree(
+      const std::vector<pState>& start_states,
+      const std::vector<double>& chance_reach_probs,
+      std::shared_ptr<Observer> infostate_observer,
+      Player acting_player,
+      int max_move_ahead_limit,
+      int storage_policy,
+      const std::unordered_map<std::string, double>& cf_value_constraints,
+      int ft_player)
+      : acting_player_(acting_player),
+        infostate_observer_(std::move(infostate_observer)),
+        root_(MakeRootNode()),
+        storage_policy_(storage_policy),
+        cf_value_constraints_(cf_value_constraints),
+        is_resolving_tree_(!cf_value_constraints_.empty()),
+        ft_player_(ft_player) {
+    SPIEL_CHECK_FALSE(start_states.empty());
+    SPIEL_CHECK_EQ(start_states.size(), chance_reach_probs.size());
+    SPIEL_CHECK_GE(acting_player_, 0);
+    SPIEL_CHECK_LT(acting_player_, start_states[0]->GetGame()->NumPlayers());
+    SPIEL_CHECK_TRUE(infostate_observer_->HasString());
 
-        int start_max_move_number = 0;
-        for (const auto& start_state : start_states) {
-            start_max_move_number =
-                    std::max(start_max_move_number, start_state->MoveNumber());
-        }
-        move_limit_ = start_max_move_number + max_move_ahead_limit;
-
-        for (int i = 0; i < start_states.size(); ++i) {
-            RecursivelyBuildTree(root_.get(), /*depth=*/1, *start_states[i], chance_reach_probs[i]);
-        }
-
-        // Operations to make after building the tree.
-        RebalanceTree();
-        nodes_at_depths_.resize(tree_height() + 1);
-        CollectNodesAtDepth(mutable_root(), 0);
-        LabelNodesWithIds();
+    int start_max_move_number = 0;
+    for (const auto& start_state : start_states) {
+      start_max_move_number =
+          std::max(start_max_move_number, start_state->MoveNumber());
     }
+    move_limit_ = start_max_move_number + max_move_ahead_limit;
+
+    for (int i = 0; i < start_states.size(); ++i) {
+      RecursivelyBuildTree(root_.get(), /*depth=*/1,
+                           *start_states[i],
+                           chance_reach_probs[i]);
+    }
+
+    // Operations to make after building the tree.
+    RebalanceTree();
+    nodes_at_depths_.resize(tree_height() + 1);
+    CollectNodesAtDepth(mutable_root(), 0);
+    LabelNodesWithIds();
+  }
 
   // Friend factories.
   // Note that only MakeInfostateTree is allowed to call the constructor
@@ -512,19 +540,32 @@ class InfostateTree final {
   friend std::shared_ptr<InfostateTree> MakeInfostateTree(
       const std::vector<const InfostateNode*>&, int, int);
 
-  friend std::shared_ptr<InfostateTree> MakeInfostateTreeSafeResolving(
-          const std::vector<std::unique_ptr<State>>&, const std::vector<double>&,
-          std::shared_ptr<Observer>, Player,
-          std::unordered_map<std::string, double>, Player, int, int);
+  friend std::shared_ptr<InfostateTree> MakeResolvingInfostateTree(const std::vector<
+      std::unique_ptr<
+          State>>& start_states,
+                                                                   const std::vector<
+                                                                       double>& chance_reach_probs,
+                                                                   std::shared_ptr<
+                                                                       Observer> infostate_observer,
+                                                                   Player acting_player,
+                                                                   Player ft_player,
+                                                                   const std::unordered_map<
+                                                                       std::string,
+                                                                       double>& cf_value_constraints,
+                                                                   int max_move_ahead_limit,
+                                                                   int storage_policy);
 
   const Player acting_player_;
   const std::shared_ptr<Observer> infostate_observer_;
   const std::unique_ptr<InfostateNode> root_;
   const int storage_policy_;
-  // Constraint values.
-  const std::unordered_map<std::string, double>* resolving_cfvs_;
-  const bool safe_resolving_;
+
+  // Constraint values: these are used only during the tree construction,
+  // and possibly become and invalid reference -- for internal use only!
+  const std::unordered_map<std::string, double>& cf_value_constraints_;
+  const bool is_resolving_tree_;
   const int ft_player_;
+
   /*const*/ int move_limit_;
   /*const*/ size_t tree_height_ = 0;
 
@@ -558,10 +599,6 @@ class InfostateTree final {
   // Build the tree.
   void RecursivelyBuildTree(InfostateNode* parent, size_t depth,
                             const State& state, double chance_reach_prob);
-  // Build the tree.
-  void RecursivelyBuildTreeSafeResolving(InfostateNode* parent, size_t depth,
-          const State& state, double chance_reach_prob);
-
 
   void BuildTerminalNode(InfostateNode* parent, size_t depth,
                          const State& state, double chance_reach_prob);

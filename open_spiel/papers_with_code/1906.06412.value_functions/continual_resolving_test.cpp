@@ -233,199 +233,128 @@ void KuhnExploitabilityBenchmark() {
             << algorithms::Exploitability(*game, full_policy) << "\n";
 }
 
-void TestResolvingOnRPS() {
-  std::shared_ptr<const Game> game = LoadGame("matrix_rps");
+void CheckGame(const std::string& nfg_string,
+               const std::vector<double>& constraints_values,
+               const std::vector<double>& chance_reach_probs,
+               const std::vector<double>& expected_policy,
+               double expected_game_value,
+               std::string expected_player_certificate,
+               std::string expected_opponent_certificate) {
+  std::shared_ptr<const Game> game = nfg_game::LoadNFGGame(nfg_string);
   game = ConvertToTurnBased(*game);
   std::unique_ptr<State> root_state = game->NewInitialState();
   auto infostate_observer = game->MakeObserver(kInfoStateObsType, {});
 
-  // Create constraints for each action.
-  std::unordered_map<std::string, double> cf_value_constraints;
+  std::unordered_map<std::string, double> CFVs;
   std::vector<std::unique_ptr<State>> start_states;
-  for (Action action : root_state->LegalActions()) {
-    std::unique_ptr<State> child = root_state->Child(action);
-    cf_value_constraints.emplace(child->InformationStateString(Player{0}), 0);
+
+  std::string infoset_one;
+  auto legal_actions = root_state->LegalActions();
+  SPIEL_CHECK_EQ(constraints_values.size(), legal_actions.size());
+  for (int i = 0; i < constraints_values.size(); i++) {
+    std::unique_ptr<State> child = root_state->Child(legal_actions[i]);
+    CFVs.emplace(child->InformationStateString(0), constraints_values[i]);
+    infoset_one = child->InformationStateString(1);
     start_states.push_back(std::move(child));
   }
-  const std::string infoset_one =
-      root_state->Child(0)->InformationStateString(Player{1});
 
-  auto tree_safe_player = algorithms::MakeInfostateTreeSafeResolving(
-      start_states, {1. / 3, 1. / 3, 1. / 3}, infostate_observer,
-      1, cf_value_constraints, 0, algorithms::kNoMoveAheadLimit);
-  auto tree_safe_opponent = algorithms::MakeInfostateTreeSafeResolving(
-      start_states, {1. / 3, 1. / 3, 1. / 3}, infostate_observer,
-      0, cf_value_constraints, 0, algorithms::kNoMoveAheadLimit);
+  auto trees = algorithms::MakeResolvingInfostateTrees(
+      start_states, chance_reach_probs, infostate_observer,
+      /*ft_player=*/0, CFVs);
+  auto tree_safe_opponent = trees[0];
+  auto tree_safe_player = trees[1];
 
-  std::string tree_safe_player_reference =
-      "(("
-          // Observation of constaints, without the ability
-          // to change the outcome.
-          "(({-0.00})({-0.00})({-0.00}))"
-          // Standard RPS outcomes.
-          "[({-1.00}{0.00}{1.00})"
-           "({-1.00}{0.00}{1.00})"
-           "({-1.00}{0.00}{1.00})]"
-      "))";
-  std::string tree_safe_opponent_reference =
-      "("
-        // Follow / terminate for each action, with standard RPS outcomes.
-        "[(({-1.00})({0.00})({1.00}))"
-         "(({0.00}))]"
-        "[(({-1.00})({0.00})({1.00}))"
-         "(({0.00}))]"
-        "[(({-1.00})({0.00})({1.00}))"
-         "(({0.00}))]"
-     ")";
-  SPIEL_CHECK_EQ(tree_safe_player->root().MakeCertificate(/*precision=*/2),
-                 tree_safe_player_reference);
-  SPIEL_CHECK_EQ(tree_safe_opponent->root().MakeCertificate(/*precision=*/2),
-                 tree_safe_opponent_reference);
+  SPIEL_CHECK_EQ(tree_safe_player->root().MakeCertificate(2),
+                 expected_player_certificate);
+  SPIEL_CHECK_EQ(tree_safe_opponent->root().MakeCertificate(2),
+                 expected_opponent_certificate);
 
-  SequenceFormLpSpecification lp_spec({tree_safe_opponent, tree_safe_player});
+  SequenceFormLpSpecification lp_spec(trees);
   lp_spec.SpecifyLinearProgram(Player{1});
-  SPIEL_CHECK_FLOAT_EQ(0., lp_spec.Solve());
+  SPIEL_CHECK_FLOAT_EQ(expected_game_value, lp_spec.Solve());
 
-  for (const auto&[action, prob] :
-      lp_spec.OptimalPolicy(1).GetStatePolicy(infoset_one)) {
-    SPIEL_CHECK_FLOAT_EQ(prob, 1. / 3);
+  auto solved_policy =
+      GetProbs(lp_spec.OptimalPolicy(1).GetStatePolicy(infoset_one));
+  for (int i = 0; i < expected_policy.size(); i++) {
+    SPIEL_CHECK_FLOAT_EQ(solved_policy[i], expected_policy[i]);
   }
+}
+
+void TestResolvingOnRPS() {
+  CheckGame(
+    R"###(
+      NFG 1 R ""
+      { "Player 1" "Player 2" } { 3 3 }
+
+      0 0   1 -1   -1 1   -1 1   0 0   1 -1   1 -1   -1 1   0 0
+    )###",
+    /*constraints_values=*/ {0., 0., 0.},
+    /*chance_reach_probs=*/ {1./3, 1./3, 1./3},
+    /*expected_policy=*/    {1./3, 1./3, 1./3},
+    /*expected_game_value=*/ 0.,
+    /*expected_player_certificate=*/"(("
+                                      // Observation of constaints, without the
+                                      // ability to change the outcome.
+                                      "(({-0.00})({-0.00})({-0.00}))"
+                                      // Standard RPS outcomes.
+                                      "[({-1.00}{0.00}{1.00})"
+                                      "({-1.00}{0.00}{1.00})"
+                                      "({-1.00}{0.00}{1.00})]"
+                                    "))",
+    /*expected_opponent_certificat=*/"("
+                                       // Follow / terminate for each action,
+                                       // with standard RPS outcomes.
+                                       "[(({-1.00})({0.00})({1.00}))(({0.00}))]"
+                                       "[(({-1.00})({0.00})({1.00}))(({0.00}))]"
+                                       "[(({-1.00})({0.00})({1.00}))(({0.00}))]"
+                                     ")");
+
 }
 
 void TestResolvingOnBiasedRPS() {
-  const char* kBiasedRpsNFGString = R"###(
-    NFG 1 R ""
-    { "Player 1" "Player 2" } { 3 3 }
+  CheckGame(
+    R"###(
+      NFG 1 R ""
+      { "Player 1" "Player 2" } { 3 3 }
 
-    0 0   1 -1   -2 2   -1 1   0 0   3 -3   2 -2   -3 3   0 0
-  )###";
-  std::shared_ptr<const Game> game = nfg_game::LoadNFGGame(kBiasedRpsNFGString);
-  game = ConvertToTurnBased(*game);
-  std::unique_ptr<State> root_state = game->NewInitialState();
-
-  std::unordered_map<std::string, double> CFVs;
-  std::vector<std::unique_ptr<State>> start_states;
-
-  std::string infoset_one;
-  for (Action action : root_state->LegalActions()) {
-    std::unique_ptr<State> child = root_state->Child(action);
-    CFVs.emplace(child->InformationStateString(0), 0);
-    infoset_one = child->InformationStateString(1);
-    start_states.push_back(std::move(child));
-  }
-
-  auto tree_safe_player = algorithms::MakeInfostateTreeSafeResolving(
-      start_states,
-      {0.5, 1. / 3., 1. / 6},
-      game->MakeObserver(kInfoStateObsType,
-                         {}),
-      1,
-      CFVs,
-      0,
-      algorithms::kNoMoveAheadLimit);
-
-  auto tree_safe_opponent =
-      algorithms::MakeInfostateTreeSafeResolving(start_states,
-                                                 {0.5, 1. / 3., 1. / 6},
-                                                 game->MakeObserver(
-                                                     kInfoStateObsType,
-                                                     {}),
-                                                 0,
-                                                 CFVs,
-                                                 0,
-                                                 algorithms::kNoMoveAheadLimit);
-
-  std::string tree_safe_player_reference =
-      "(((({-0.00})({-0.00})({-0.00}))[({-1.00}{0.00}{2.00})({-2.00}{0.00}{3.00})({-3.00}{0.00}{1.00})]))";
-  std::string tree_safe_opponent_reference =
-      "([(({-1.00})({0.00})({2.00}))(({0.00}))][(({-2.00})({0.00})({3.00}))(({0.00}))][(({-3.00})({0.00})({1.00}))(({0.00}))])";
-  SPIEL_CHECK_EQ(tree_safe_player->root().MakeCertificate(2),
-                 tree_safe_player_reference);
-  SPIEL_CHECK_EQ(tree_safe_opponent->root().MakeCertificate(2),
-                 tree_safe_opponent_reference);
-
-  SequenceFormLpSpecification
-      specification({tree_safe_opponent, tree_safe_player});
-  specification.SpecifyLinearProgram(1);
-  SPIEL_CHECK_FLOAT_EQ(0., specification.Solve());
-
-  std::vector<float> expected_policy = {0.5, 1. / 3, 1. / 6};
-  auto solved_policy =
-      GetProbs(specification.OptimalPolicy(1).GetStatePolicy(infoset_one));
-  for (int i = 0; i < expected_policy.size(); i++) {
-    SPIEL_CHECK_FLOAT_EQ(solved_policy[i], expected_policy[i]);
-  }
+      0 0   1 -1   -2 2   -1 1   0 0   3 -3   2 -2   -3 3   0 0
+    )###",
+    /*constraints_values=*/ {0., 0., 0.},
+    /*chance_reach_probs=*/ {0.5, 1. / 3., 1. / 6},
+    /*expected_policy=*/    {0.5, 1. / 3, 1. / 6},
+    /*expected_game_value=*/ 0.,
+    /*expected_player_certificate=*/"(("
+                                      "(({-0.00})({-0.00})({-0.00}))"
+                                      "[({-1.00}{0.00}{2.00})({-2.00}{0.00}{3.00})({-3.00}{0.00}{1.00})]"
+                                    "))",
+    /*expected_opponent_certificat=*/"("
+                                       "[(({-1.00})({0.00})({2.00}))(({0.00}))]"
+                                       "[(({-2.00})({0.00})({3.00}))(({0.00}))]"
+                                       "[(({-3.00})({0.00})({1.00}))(({0.00}))]"
+                                     ")");
 }
 
 void TestResolvingWithSmallerEqSupport() {
-  const char* kSampleNFGString = R"###(
-                        NFG 1 R ""
-                        { "Player 1" "Player 2" } { 3 3 }
+  CheckGame(
+    R"###(
+      NFG 1 R ""
+      { "Player 1" "Player 2" } { 3 3 }
 
-                        1 -1   0 0   0 0   0 0   1 -1   0 0   1 -1   1 -1   -5 5
-                )###";
-
-  std::shared_ptr<const Game> game = nfg_game::LoadNFGGame(kSampleNFGString);
-  game = ConvertToTurnBased(*game);
-
-  std::unique_ptr<State> state = game->NewInitialState();
-
-  std::unordered_map<std::string, double> CFVs;
-  std::vector<std::unique_ptr<State>> start_states;
-
-  std::string infoset_one;
-  std::vector<float> prepared_CFVs = {0.5, 0.5, 0};
-  auto legal_actions = state->LegalActions();
-  for (int i = 0; i < prepared_CFVs.size(); i++) {
-    std::unique_ptr<State> child = state->Child(legal_actions[i]);
-    CFVs.emplace(child->InformationStateString(0), prepared_CFVs[i]);
-    infoset_one = child->InformationStateString(1);
-    start_states.push_back(std::move(child));
-  }
-
-  auto tree_safe_player =
-      algorithms::MakeInfostateTreeSafeResolving(start_states,
-                                                 {0.5, 0.5, 0},
-                                                 game->MakeObserver(
-                                                     kInfoStateObsType,
-                                                     {}),
-                                                 1,
-                                                 CFVs,
-                                                 0,
-                                                 algorithms::kNoMoveAheadLimit);
-
-  auto tree_safe_opponent =
-      algorithms::MakeInfostateTreeSafeResolving(start_states,
-                                                 {0.5, 0.5, 0},
-                                                 game->MakeObserver(
-                                                     kInfoStateObsType,
-                                                     {}),
-                                                 0,
-                                                 CFVs,
-                                                 0,
-                                                 algorithms::kNoMoveAheadLimit);
-
-  std::string tree_safe_player_reference =
-      "(((({-0.00})({-0.50})({-0.50}))[({-1.00}{-1.00}{5.00})({-1.00}{0.00}{0.00})({-1.00}{0.00}{0.00})]))";
-  std::string tree_safe_opponent_reference =
-      "([(({-5.00})({0.00})({0.00}))(({0.00}))][(({0.00})({1.00})({1.00}))(({0.50}))][(({0.00})({1.00})({1.00}))(({0.50}))])";
-  SPIEL_CHECK_EQ(tree_safe_player->root().MakeCertificate(2),
-                 tree_safe_player_reference);
-  SPIEL_CHECK_EQ(tree_safe_opponent->root().MakeCertificate(2),
-                 tree_safe_opponent_reference);
-
-  SequenceFormLpSpecification
-      specification({tree_safe_opponent, tree_safe_player});
-  specification.SpecifyLinearProgram(1);
-
-  SPIEL_CHECK_FLOAT_EQ(-0.5, specification.Solve());
-
-  std::vector<float> expected_policy = {0.5, 0.5, 0};
-  auto solved_policy =
-      GetProbs(specification.OptimalPolicy(1).GetStatePolicy(infoset_one));
-  for (int i = 0; i < expected_policy.size(); i++) {
-    SPIEL_CHECK_FLOAT_EQ(solved_policy[i], expected_policy[i]);
-  }
+      1 -1   0 0   0 0   0 0   1 -1   0 0   1 -1   1 -1   -5 5
+    )###",
+    /*constraints_values=*/ {0.5, 0.5, 0},
+    /*chance_reach_probs=*/ {0.5, 0.5, 0},
+    /*expected_policy=*/    {0.5, 0.5, 0},
+    /*expected_game_value=*/-0.5,
+    /*expected_player_certificate=*/"(("
+                                      "(({-0.00})({-0.50})({-0.50}))"
+                                      "[({-1.00}{-1.00}{5.00})({-1.00}{0.00}{0.00})({-1.00}{0.00}{0.00})]"
+                                    "))",
+    /*expected_opponent_certificat=*/"("
+                                       "[(({-5.00})({0.00})({0.00}))(({0.00}))]"
+                                       "[(({0.00})({1.00})({1.00}))(({0.50}))]"
+                                       "[(({0.00})({1.00})({1.00}))(({0.50}))]"
+                                     ")");
 }
 
 void KuhnCheckSituation() {
@@ -454,30 +383,30 @@ void KuhnCheckSituation() {
   }
 
   auto tree_safe_player =
-      algorithms::MakeInfostateTreeSafeResolving(start_states,
-                                                 {1. / 6, 1. / 6, 1. / 6,
-                                                  1. / 6,
-                                                  1. / 6, 1. / 6},
-                                                 game->MakeObserver(
-                                                     kInfoStateObsType,
-                                                     {}),
-                                                 1,
-                                                 CFVs,
-                                                 0,
-                                                 algorithms::kNoMoveAheadLimit);
+      algorithms::MakeResolvingInfostateTree(start_states,
+                                             {1. / 6, 1. / 6, 1. / 6,
+                                              1. / 6,
+                                              1. / 6, 1. / 6},
+                                             game->MakeObserver(
+                                                 kInfoStateObsType,
+                                                 {}),
+                                             1,
+                                             0,
+                                             CFVs,
+                                             algorithms::kNoMoveAheadLimit);
 
   auto tree_safe_opponent =
-      algorithms::MakeInfostateTreeSafeResolving(start_states,
-                                                 {1. / 6, 1. / 6, 1. / 6,
-                                                  1. / 6,
-                                                  1. / 6, 1. / 6},
-                                                 game->MakeObserver(
-                                                     kInfoStateObsType,
-                                                     {}),
-                                                 0,
-                                                 CFVs,
-                                                 0,
-                                                 algorithms::kNoMoveAheadLimit);
+      algorithms::MakeResolvingInfostateTree(start_states,
+                                             {1. / 6, 1. / 6, 1. / 6,
+                                              1. / 6,
+                                              1. / 6, 1. / 6},
+                                             game->MakeObserver(
+                                                 kInfoStateObsType,
+                                                 {}),
+                                             0,
+                                             0,
+                                             CFVs,
+                                             algorithms::kNoMoveAheadLimit);
 
   std::string tree_safe_player_reference =
       "((((({-1.17}))(({0.33})))[(({-1.00})({-1.00}))(({-2.00}{-2.00}{1.00}{1.00}))])(((({-1.17}))(({1.00})))[(({-1.00})({1.00}))(({-2.00}{1.00}{1.00}{2.00}))])(((({0.33}))(({1.00})))[(({1.00})({1.00}))(({1.00}{1.00}{2.00}{2.00}))]))";
@@ -540,28 +469,28 @@ void KuhnBetSituation() {
   }
 
   auto tree_safe_player =
-      algorithms::MakeInfostateTreeSafeResolving(start_states,
-                                                 {1. / 6, 1. / 6, 1. / 6,
-                                                  1. / 6,
-                                                  1. / 6, 1. / 6},
-                                                 game->MakeObserver(
-                                                     kInfoStateObsType,
-                                                     {}),
-                                                 1,
-                                                 CFVs,
-                                                 0);
+      algorithms::MakeResolvingInfostateTree(start_states,
+                                             {1. / 6, 1. / 6, 1. / 6,
+                                              1. / 6,
+                                              1. / 6, 1. / 6},
+                                             game->MakeObserver(
+                                                 kInfoStateObsType,
+                                                 {}),
+                                             1,
+                                             0,
+                                             CFVs);
 
   auto tree_safe_opponent =
-      algorithms::MakeInfostateTreeSafeResolving(start_states,
-                                                 {1. / 6, 1. / 6, 1. / 6,
-                                                  1. / 6,
-                                                  1. / 6, 1. / 6},
-                                                 game->MakeObserver(
-                                                     kInfoStateObsType,
-                                                     {}),
-                                                 0,
-                                                 CFVs,
-                                                 0);
+      algorithms::MakeResolvingInfostateTree(start_states,
+                                             {1. / 6, 1. / 6, 1. / 6,
+                                              1. / 6,
+                                              1. / 6, 1. / 6},
+                                             game->MakeObserver(
+                                                 kInfoStateObsType,
+                                                 {}),
+                                             0,
+                                             0,
+                                             CFVs);
 
   std::string tree_safe_player_reference =
       "(((({-1.17})({0.50}))[({-1.00}{-1.00})({-2.00}{-2.00})])((({-1.17})({1.00}))[({-1.00}{-1.00})({-2.00}{2.00})])((({0.50})({1.00}))[({-1.00}{-1.00})({2.00}{2.00})]))";
@@ -625,30 +554,30 @@ void KuhnLastPublicSituationAlphaMin() {
   }
 
   auto tree_safe_player =
-      algorithms::MakeInfostateTreeSafeResolving(start_states,
-                                                 {1. / 6, 1. / 6, 1. / 6,
-                                                  1. / 6,
-                                                  1. / 6, 1. / 6},
-                                                 game->MakeObserver(
-                                                     kInfoStateObsType,
-                                                     {}),
-                                                 1,
-                                                 CFVs,
-                                                 1,
-                                                 10);
+      algorithms::MakeResolvingInfostateTree(start_states,
+                                             {1. / 6, 1. / 6, 1. / 6,
+                                              1. / 6,
+                                              1. / 6, 1. / 6},
+                                             game->MakeObserver(
+                                                 kInfoStateObsType,
+                                                 {}),
+                                             1,
+                                             1,
+                                             CFVs,
+                                             10);
 
   auto tree_safe_opponent =
-      algorithms::MakeInfostateTreeSafeResolving(start_states,
-                                                 {1. / 6, 1. / 6, 1. / 6,
-                                                  1. / 6,
-                                                  1. / 6, 1. / 6},
-                                                 game->MakeObserver(
-                                                     kInfoStateObsType,
-                                                     {}),
-                                                 0,
-                                                 CFVs,
-                                                 1,
-                                                 10);
+      algorithms::MakeResolvingInfostateTree(start_states,
+                                             {1. / 6, 1. / 6, 1. / 6,
+                                              1. / 6,
+                                              1. / 6, 1. / 6},
+                                             game->MakeObserver(
+                                                 kInfoStateObsType,
+                                                 {}),
+                                             0,
+                                             1,
+                                             CFVs,
+                                             10);
 
   std::string tree_safe_player_reference =
       "([(({-0.50})({-0.50}))(({-2.00})({1.00})({1.00})({2.00}))][(({-1.00})({-1.00}))(({-2.00})({-2.00})({1.00})({1.00}))][(({1.00})({1.00})({2.00})({2.00}))(({1.17})({1.17}))])";
@@ -712,30 +641,30 @@ void KuhnLastPublicSituationAlphaMax() {
   }
 
   auto tree_safe_player =
-      algorithms::MakeInfostateTreeSafeResolving(start_states,
-                                                 {1. / 9, 1. / 9, 1. / 6,
-                                                  1. / 6, 0,
-                                                  0},
-                                                 game->MakeObserver(
-                                                     kInfoStateObsType,
-                                                     {}),
-                                                 1,
-                                                 CFVs,
-                                                 1,
-                                                 10);
+      algorithms::MakeResolvingInfostateTree(start_states,
+                                             {1. / 9, 1. / 9, 1. / 6,
+                                              1. / 6, 0,
+                                              0},
+                                             game->MakeObserver(
+                                                 kInfoStateObsType,
+                                                 {}),
+                                             1,
+                                             1,
+                                             CFVs,
+                                             10);
 
   auto tree_safe_opponent =
-      algorithms::MakeInfostateTreeSafeResolving(start_states,
-                                                 {1. / 9, 1. / 9, 1. / 6,
-                                                  1. / 6, 0,
-                                                  0},
-                                                 game->MakeObserver(
-                                                     kInfoStateObsType,
-                                                     {}),
-                                                 0,
-                                                 CFVs,
-                                                 1,
-                                                 10);
+      algorithms::MakeResolvingInfostateTree(start_states,
+                                             {1. / 9, 1. / 9, 1. / 6,
+                                              1. / 6, 0,
+                                              0},
+                                             game->MakeObserver(
+                                                 kInfoStateObsType,
+                                                 {}),
+                                             0,
+                                             1,
+                                             CFVs,
+                                             10);
 
   std::string tree_safe_player_reference =
       "([(({-1.00})({-1.00}))(({-2.00})({-2.00})({1.00})({1.00}))][(({-2.00})({1.00})({1.00})({2.00}))(({1.00})({1.00}))][(({1.00})({1.00})({2.00})({2.00}))(({1.40})({1.40}))])";

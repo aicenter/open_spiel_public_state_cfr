@@ -129,9 +129,9 @@ SubgameFactory::MakeSubgameInfostateTreesSafeResolving(
   }
   std::vector<std::shared_ptr<algorithms::InfostateTree>> trees;
   for (int pl = 0; pl < 2; ++pl) {
-    trees.push_back(algorithms::MakeInfostateTreeSafeResolving(
+    trees.push_back(algorithms::MakeResolvingInfostateTree(
         root_histories, chance_reach_probs,
-        infostate_observer, pl, CFVs, 1 - player, depth,
+        infostate_observer, pl, 1 - player, CFVs, depth,
         kDlCfrInfostateTreeStorage
     ));
   }

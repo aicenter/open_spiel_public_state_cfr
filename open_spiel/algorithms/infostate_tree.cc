@@ -221,7 +221,7 @@ std::unique_ptr<InfostateNode> InfostateTree::MakeNode(
         legal_actions = given_legal_actions;
     }
   std::vector<Action> terminal_history;
-  if (safe_resolving_) {
+  if (is_resolving_tree_) {
       terminal_history = originating_state ? originating_state->History(): std::vector<Action>();
       if(terminate) {
           terminal_history.push_back(Action(-1));
@@ -279,7 +279,7 @@ void InfostateTree::RecursivelyBuildTree(InfostateNode* parent, size_t depth,
                                          double chance_reach_prob) {
   // If we are building safe resolving trees, we have to add additional
   // nodes before going into the actual nodes.
-  if(safe_resolving_ and depth == 1) {
+  if(is_resolving_tree_ and depth == 1) {
     auto [next_parent, next_depth] = BuildResolvingNodes(parent, depth, state,
                                                          chance_reach_prob);
     parent = next_parent;
@@ -346,7 +346,7 @@ std::pair<InfostateNode*, int> InfostateTree::BuildResolvingNodes(
   const std::string terminal_infostate =
       kTerminatePrefix + acting_infostate + std::to_string(num_children);
   const double terminal_utility = (ft_player_ == acting_player_ ? 1 : -1)
-      * resolving_cfvs_->at(ft_infostate);
+      * cf_value_constraints_.at(ft_infostate);
 
   // Add terminal node.
   InfostateNode* terminal_node = t_obs_node->AddChild(
@@ -594,16 +594,38 @@ std::shared_ptr<InfostateTree> MakeInfostateTree(
                         storage_policy));
 }
 
-std::shared_ptr<InfostateTree> MakeInfostateTreeSafeResolving(
+std::shared_ptr<InfostateTree> MakeResolvingInfostateTree(
     const std::vector<std::unique_ptr<State>>& start_states,
     const std::vector<double>& chance_reach_probs,
-    std::shared_ptr<Observer> infostate_observer, Player acting_player,
-    std::unordered_map<std::string, double> CFVs,
-    int ft_player, int max_move_ahead_limit, int storage_policy) {
-    return std::shared_ptr<InfostateTree>(
-            new InfostateTree(start_states, chance_reach_probs, infostate_observer,
-                              acting_player, max_move_ahead_limit,
-                              storage_policy, true, &CFVs, ft_player));
+    std::shared_ptr<Observer> infostate_observer,
+    Player acting_player, Player ft_player,
+    const std::unordered_map<std::string, double>& cf_value_constraints,
+    int max_move_ahead_limit, int storage_policy) {
+  SPIEL_CHECK_FALSE(cf_value_constraints.empty());
+  return std::shared_ptr<InfostateTree>(
+      new InfostateTree(start_states, chance_reach_probs,
+                        infostate_observer, acting_player,
+                        max_move_ahead_limit, storage_policy,
+                        cf_value_constraints, ft_player));
+}
+
+std::vector<std::shared_ptr<InfostateTree>> MakeResolvingInfostateTrees(
+    const std::vector<std::unique_ptr<State>>& start_states,
+    const std::vector<double>& chance_reach_probs,
+    std::shared_ptr<Observer> infostate_observer,
+    Player ft_player,
+    const std::unordered_map<std::string, double>& cf_value_constraints,
+    int max_move_ahead_limit, int storage_policy) {
+  SPIEL_CHECK_FALSE(start_states.empty());
+  const Game& game = *start_states[0]->GetGame();
+  std::vector<std::shared_ptr<InfostateTree>> trees;
+  trees.reserve(game.NumPlayers());
+  for (int pl = 0; pl < game.NumPlayers(); ++pl) {
+    trees.push_back(MakeResolvingInfostateTree(
+        start_states, chance_reach_probs, infostate_observer, pl, ft_player,
+        cf_value_constraints, max_move_ahead_limit, storage_policy));
+  }
+  return trees;
 }
 
 std::vector<std::shared_ptr<InfostateTree>> MakeInfostateTrees(
