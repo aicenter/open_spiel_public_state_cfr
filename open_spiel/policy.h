@@ -43,11 +43,15 @@ void SetProb(ActionsAndProbs* actions_and_probs, Action action, double prob);
 Action GetAction(const ActionsAndProbs& action_and_probs);
 
 // Returns a policy where every legal action has probability 1 / (number of
-// legal actions).
+// legal actions) for the current player to play. The overloaded function is
+// similar, and provided to support simultaneous move games.
 ActionsAndProbs UniformStatePolicy(const State& state);
+ActionsAndProbs UniformStatePolicy(const State& state, Player player);
 
-// Returns a policy where the zeroth action has probability 1.
+// Returns a policy where the zeroth action has probability 1. The overloaded
+// function is similar, and provided to support simultaneous move games.
 ActionsAndProbs FirstActionStatePolicy(const State& state);
+ActionsAndProbs FirstActionStatePolicy(const State& state, Player player);
 
 // Returns a policy where a specified action has probability 1 and all other
 // have probability zero.
@@ -288,8 +292,12 @@ class UniformPolicy : public Policy {
  public:
   ActionsAndProbs GetStatePolicy(
       const State& state, Player player) const override {
-    SPIEL_CHECK_TRUE(state.IsPlayerActing(player));
-    return UniformStatePolicy(state);
+    if (state.IsSimultaneousNode()) {
+      return UniformStatePolicy(state, player);
+    } else {
+      SPIEL_CHECK_TRUE(state.IsPlayerActing(player));
+      return UniformStatePolicy(state);
+    }
   }
 
   std::string Serialize(int double_precision = -1,
@@ -304,8 +312,12 @@ class FirstActionPolicy : public Policy {
  public:
   ActionsAndProbs GetStatePolicy(const State& state,
                                  Player player) const override {
-    SPIEL_CHECK_TRUE(state.IsPlayerActing(player));
-    return FirstActionStatePolicy(state);
+    if (state.IsSimultaneousNode()) {
+      return FirstActionStatePolicy(state, player);
+    } else {
+      SPIEL_CHECK_TRUE(state.IsPlayerActing(player));
+      return FirstActionStatePolicy(state);
+    }
   }
 
   std::string Serialize(int double_precision = -1,
