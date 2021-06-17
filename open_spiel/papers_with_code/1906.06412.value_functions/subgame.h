@@ -23,6 +23,7 @@
 #include <utility>
 #include <vector>
 
+#include "open_spiel/algorithms/bandits_policy.h"
 #include "open_spiel/algorithms/infostate_cfr.h"
 #include "open_spiel/algorithms/infostate_tree.h"
 #include "open_spiel/spiel.h"
@@ -96,9 +97,12 @@ struct PublicState {
   // For each player, store beliefs for the top-most infostate nodes, which
   // correspond to bottom_nodes of the DL infostate tree.
   std::array<std::vector<double>, 2> beliefs;
-  // For each player, store counterfactual values for the top-most infostate
-  // nodes, which correspond to bottom_nodes of the DL infostate tree.
+  // For each player, store current counterfactual values for the top-most
+  // infostate nodes, which correspond to bottom_nodes of the DL infostate tree.
   std::array<std::vector<double>, 2> values;
+  // For each player, store average counterfactual values for the same
+  // infostates as the current cf. values.
+  std::array<std::vector<double>, 2> average_values;
 
   PublicState(const Observation& public_observation,
               const PublicStateType state_type, const size_t public_id);
@@ -120,12 +124,19 @@ struct PublicState {
   bool IsReachableBySomePlayer() const {
     return IsReachableByPlayer(0) || IsReachableByPlayer(1);
   };
-  // Compute value of this state (for the given player).
-  double Value(int player = 0) const;
+  // Compute value of this state based on current policy (for the given player).
+  double CurrentValue(int player = 0) const;
+  // Compute value of this state based on average policy (for the given player).
+  double AverageValue(int player = 0) const;
   // Check if the public state is zero-sum.
-  bool IsZeroSum() const { return fabs(Value(0) + Value(1)) < 1e-10; }
+  bool IsZeroSum() const {
+    return fabs(CurrentValue(0) + CurrentValue(1)) < 1e-10;
+  }
   // Set new beliefs and check they have consistent sizes.
   void SetBeliefs(const std::array<std::vector<double>, 2>& new_beliefs);
+  // Return a map of infostate string: average cf. values.
+  std::unordered_map<std::string, double> InfostateAvgValues(
+      Player player) const;
 };
 
 void DebugPrintPublicFeatures(const std::vector<PublicState>& states);
@@ -231,19 +242,16 @@ class TerminalEvaluator final : public PublicStateEvaluator {
 
 std::shared_ptr<PublicStateEvaluator> MakeTerminalEvaluator();
 std::shared_ptr<PublicStateEvaluator> MakeDummyEvaluator();
+// CFR evaluator that makes a large number of iterations.
+std::shared_ptr<PublicStateEvaluator> MakeApproxOracleEvaluator(
+    std::shared_ptr<const Game> game, int cfr_iterations = 100000);
 
 // -- Subgame solver -----------------------------------------------------------
 
-enum class SaveValuesPolicy {
-  kSaveNothing,
-  kCurrentCfValues,
-  kAveragedCfValues  // Make an average over the cf values encountered during
-                     // the CFR iterations -- avoid a new call with avg policy
-                     // to the network, as that would be likely too noisy.
-};
-SaveValuesPolicy GetSaveValuesPolicy(const std::string& s);
-constexpr SaveValuesPolicy kDefaultSaveValuesPolicy =
-    SaveValuesPolicy::kAveragedCfValues;
+using PolicySelection = algorithms::PolicySelection;
+PolicySelection GetSaveValuesPolicy(const std::string& s);
+constexpr PolicySelection kDefaultPolicySelection =
+    PolicySelection::kAveragePolicy;
 
 // CFR-based subgame solver that evaluates public leaves using terminal
 // or non-terminal evaluator.
@@ -254,7 +262,8 @@ class SubgameSolver {
       const std::shared_ptr<const PublicStateEvaluator> nonterminal_evaluator,
       const std::shared_ptr<const PublicStateEvaluator> terminal_evaluator,
       const std::string& bandit_name,
-      SaveValuesPolicy save_values_policy = kDefaultSaveValuesPolicy);
+      PolicySelection save_values_policy = kDefaultPolicySelection,
+      bool safe_resolving = false);
 
   void RunSimultaneousIterations(int iterations);
   void Reset();
@@ -271,6 +280,7 @@ class SubgameSolver {
   const std::shared_ptr<Subgame> subgame_;
   const std::shared_ptr<const PublicStateEvaluator> nonterminal_evaluator_;
   const std::shared_ptr<const PublicStateEvaluator> terminal_evaluator_;
+  const bool safe_resolving_;
 
   // -- Mutable values to keep track of. --
   // These have the size at largest depth of the tree, i.e. the size of the
@@ -283,12 +293,12 @@ class SubgameSolver {
   std::vector<std::unique_ptr<PublicStateContext>> contexts_;
 
   size_t num_iterations_ = 0;
-  SaveValuesPolicy init_save_values_;
+  PolicySelection init_save_values_;
 
   void EvaluateLeaves();
   void EvaluateLeaf(PublicState* state, PublicStateContext* context);
-  void CopyValuesToInitialState();
-  void IncrementallyAverageValuesInInitialState();
+  void CopyCurrentValuesToInitialState();
+  void IncrementallyAverageValuesInState(PublicState* state);
 };
 
 // -- Dummy evaluator ----------------------------------------------------------
@@ -319,15 +329,16 @@ struct CFREvaluator : public PublicStateEvaluator {
   std::shared_ptr<Observer> public_observer;
   std::shared_ptr<Observer> infostate_observer;
   bool reset_subgames_on_evaluation = true;
-  int num_cfr_iterations = 100;
+  int num_cfr_iterations;
   std::string bandit_name = "RegretMatchingPlus";
-  SaveValuesPolicy save_values_policy = SaveValuesPolicy::kAveragedCfValues;
+  PolicySelection save_values_policy = kDefaultPolicySelection;
 
   CFREvaluator(std::shared_ptr<const Game> game, int depth_limit,
                std::shared_ptr<const PublicStateEvaluator> leaf_evaluator,
                std::shared_ptr<const PublicStateEvaluator> terminal_evaluator,
                std::shared_ptr<Observer> public_observer,
-               std::shared_ptr<Observer> infostate_observer);
+               std::shared_ptr<Observer> infostate_observer,
+               int cfr_iterations = 100);
 
   std::unique_ptr<PublicStateContext> CreateContext(
       const PublicState& state) const override;
@@ -335,7 +346,6 @@ struct CFREvaluator : public PublicStateEvaluator {
   void EvaluatePublicState(PublicState* state,
                            PublicStateContext* context) const override;
 };
-
 
 void PrintPublicStatesStats(const std::vector<PublicState>& public_leaves);
 

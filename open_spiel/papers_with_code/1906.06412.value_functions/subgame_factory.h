@@ -23,7 +23,6 @@
 #include "open_spiel/algorithms/infostate_tree.h"
 #include "open_spiel/algorithms/ortools/sequence_form_lp.h"
 
-
 namespace open_spiel {
 namespace papers_with_code {
 
@@ -50,15 +49,22 @@ struct SubgameFactory {
   std::shared_ptr<Subgame> MakeTrunk(int trunk_depth = -1) const;
   std::shared_ptr<Subgame> MakeSubgame(const ParticleSet& set,
                                        int custom_move_ahead_limit = -1) const;
+  std::shared_ptr<Subgame> MakeSubgameSafeResolving(
+      const ParticleSet& set, int player,
+      std::unordered_map<std::string, double> CFVs,
+      int custom_move_ahead_limit = -1) const;
   std::shared_ptr<Subgame> MakeSubgame(const PublicState& state,
                                        int custom_move_ahead_limit = -1) const;
 
  protected:
   std::vector<std::shared_ptr<algorithms::InfostateTree>>
   MakeSubgameInfostateTrees(const ParticleSet& set, int depth) const;
+  std::vector<std::shared_ptr<algorithms::InfostateTree>>
+  MakeSubgameResolvingInfostateTrees(
+      const ParticleSet& set, int depth, int player,
+      std::unordered_map<std::string, double> CFVs) const;
 
 };
-
 
 } // namespace papers_with_code
 } // namespace open_spiel

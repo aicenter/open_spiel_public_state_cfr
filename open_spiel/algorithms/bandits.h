@@ -154,6 +154,9 @@ class FixableStrategy : public Bandit {
   }
   void ComputeStrategy(size_t current_time, double weight = 1.) override {}
   void ObserveRewards(absl::Span<const double> rewards) override {}
+  std::vector<double> AverageStrategy() const override{
+      return current_strategy();
+  };
 };
 
 // A bandit that chooses an action with the highest reward.

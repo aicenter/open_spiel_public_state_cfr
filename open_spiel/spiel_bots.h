@@ -78,6 +78,11 @@ class Bot {
   // safely assumes the action was played.
   virtual Action Step(const State& state) = 0;
 
+  // Make a clone of the bot.
+  virtual std::unique_ptr<Bot> Clone() const {
+    SpielFatalError("Clone() is not implemented.");
+  };
+
   // Let the bot know that a different player made an action at a given state.
   // This is useful for stateful bots so they know that the state of the game
   // has advanced. This should not be called for the bot that generated the

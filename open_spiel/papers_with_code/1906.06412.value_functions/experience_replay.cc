@@ -230,7 +230,8 @@ void ReplayFiller::AddRandomPbsSolution() {
   }
 
   // 3. Build subgame until the end of the game and solve it.
-  std::shared_ptr<Subgame> subgame = subgame_factory->MakeSubgame(*state, 1000);
+  std::shared_ptr<Subgame> subgame = subgame_factory->MakeSubgame(
+      *state, algorithms::kNoMoveAheadLimit);
   std::unique_ptr<SubgameSolver> solver = solver_factory->MakeSolver(subgame);
   solver->RunSimultaneousIterations(100);
 
@@ -246,7 +247,8 @@ void ReplayFiller::AddRandomSparsePbsSolution() {
   std::unique_ptr<ParticleSet> set = PickParticleSet();
 
   // 2. Build subgame until the end of the game and solve it.
-  std::shared_ptr<Subgame> subgame = subgame_factory->MakeSubgame(*set, 1000);
+  std::shared_ptr<Subgame> subgame = subgame_factory->MakeSubgame(
+      *set, algorithms::kNoMoveAheadLimit);
   std::unique_ptr<SubgameSolver> solver = solver_factory->MakeSolver(subgame);
   solver->RunSimultaneousIterations(100);
 

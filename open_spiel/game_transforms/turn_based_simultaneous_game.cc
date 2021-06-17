@@ -178,7 +178,11 @@ std::string TurnBasedSimultaneousState::InformationStateString(
     Player player) const {
   SPIEL_CHECK_GE(player, 0);
   SPIEL_CHECK_LT(player, num_players_);
-  return state_->InformationStateString(player);
+  std::string player_info;
+  if(player < current_player_) {
+      player_info += " Used action " + std::to_string(action_vector_[player]);
+  }
+  return state_->InformationStateString(player) + player_info;
 }
 
 void TurnBasedSimultaneousState::InformationStateTensor(
@@ -296,7 +300,11 @@ class TurnBasedSimultaneousObserver : public Observer {
   std::string StringFrom(const State& state, Player player) const override {
     const TurnBasedSimultaneousState& turn_state =
         open_spiel::down_cast<const TurnBasedSimultaneousState&>(state);
-    return observer_->StringFrom(*turn_state.state_, player);
+    std::string player_info;
+    if(player < turn_state.current_player_) {
+      player_info += " Used action " + std::to_string(turn_state.action_vector_[player]);
+    }
+    return observer_->StringFrom(*turn_state.state_, player) + player_info;
   }
 };
 

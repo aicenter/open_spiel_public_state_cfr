@@ -40,16 +40,21 @@ void CheckConsistency(const PublicState& s) {
       else num_nonterminals++;
 
       for (const std::unique_ptr<State>& state : node->corresponding_states()) {
-        const auto& h = state->History();
-        if (pl == 0) {
-          SPIEL_CHECK_TRUE(state_histories.find(h) == state_histories.end());
-          state_histories.insert(h);
+        std::unique_ptr<std::vector<Action>> h;
+        if (node->type() == algorithms::kTerminalInfostateNode) {
+          h = std::make_unique<std::vector<Action>>(node->TerminalHistory());
         } else {
-          SPIEL_CHECK_TRUE(state_histories.find(h) != state_histories.end());
+          h = std::make_unique<std::vector<Action>>(state->History());
+        }
+        if (pl == 0) {
+          SPIEL_CHECK_TRUE(state_histories.find(*h) == state_histories.end());
+          state_histories.insert(*h);
+        } else {
+          SPIEL_CHECK_TRUE(state_histories.find(*h) != state_histories.end());
         }
 
-        if (state->IsTerminal()) num_terminals++;
-        else num_nonterminals++;
+//        if (state->IsTerminal()) num_terminals++;
+//        else num_nonterminals++;
       }
     }
   }
@@ -94,6 +99,7 @@ void MakeReachesAndValuesForPublicStates(std::vector<PublicState>& states) {
       const int num_nodes = state.nodes[pl].size();
       state.beliefs[pl] = std::vector<double>(num_nodes, 1.);
       state.values[pl] = std::vector<double>(num_nodes, 0.);
+      state.average_values[pl] = std::vector<double>(num_nodes, 0.);
     }
   }
 }
@@ -131,6 +137,7 @@ PublicState::PublicState(const Observation& public_observation,
 bool PublicState::IsTerminal() const {
   // A quick shortcut for checking if the state is terminal: we ensure
   // this indeed holds by calling CheckConsistency() in debug mode.
+  // TODO: find which player has non empty nodes and call type
   SPIEL_DCHECK_FALSE(nodes[0].empty());
   SPIEL_DCHECK_TRUE(nodes[0][0]);
   return nodes[0][0]->type() == algorithms::kTerminalInfostateNode;
@@ -164,11 +171,20 @@ bool PublicState::IsReachableByPlayer(int player) const {
   return false;
 }
 
-double PublicState::Value(int player) const {
+double PublicState::CurrentValue(int player) const {
   SPIEL_CHECK_EQ(beliefs[player].size(), values[player].size());
   double acc = 0.;
   for (int i = 0; i < beliefs[player].size(); ++i) {
     acc += beliefs[player][i] * values[player][i];
+  }
+  return acc;
+}
+
+double PublicState::AverageValue(int player) const {
+  SPIEL_CHECK_EQ(beliefs[player].size(), average_values[player].size());
+  double acc = 0.;
+  for (int i = 0; i < beliefs[player].size(); ++i) {
+    acc += beliefs[player][i] * average_values[player][i];
   }
   return acc;
 }
@@ -178,6 +194,17 @@ void PublicState::SetBeliefs(
   SPIEL_CHECK_EQ(new_beliefs[0].size(), nodes[0].size());
   SPIEL_CHECK_EQ(new_beliefs[1].size(), nodes[1].size());
   beliefs = new_beliefs;
+}
+
+std::unordered_map<std::string, double> PublicState::InfostateAvgValues(
+    Player player) const {
+  std::unordered_map<std::string, double> CFVs;
+  for (int j = 0; j < nodes[player].size(); j++) {
+    std::string infostate_string = nodes[player][j]->infostate_string();
+    double cfv = average_values[player][j];
+    CFVs.emplace(infostate_string, cfv);
+  }
+  return CFVs;
 }
 
 // -- Subgame ------------------------------------------------------------------
@@ -245,7 +272,7 @@ PublicState* Subgame::GetPublicState(Observation& public_observation,
   SPIEL_DCHECK_TRUE(DoStatesProduceEqualPublicObservations(
       *game, public_observer, *node, public_observation.Tensor()));
   PublicState* state = GetPublicState(public_observation, state_type);
-  if(state->move_number == -1) {
+  if (state->move_number == -1) {
     state->move_number = some_state->MoveNumber();
   } else {
     SPIEL_CHECK_EQ(state->move_number, some_state->MoveNumber());
@@ -264,7 +291,6 @@ PublicState* Subgame::GetPublicState(const Observation& public_observation,
                              state_type, public_states.size());
   return &public_states.back();
 }
-
 
 void Subgame::MakeBeliefsAndValues() {
   MakeReachesAndValuesForPublicStates(public_states);
@@ -291,6 +317,25 @@ std::shared_ptr<PublicStateEvaluator> MakeTerminalEvaluator() {
 
 std::shared_ptr<PublicStateEvaluator> MakeDummyEvaluator() {
   return std::make_shared<DummyEvaluator>();
+}
+
+std::shared_ptr<PublicStateEvaluator> MakeApproxOracleEvaluator(
+    std::shared_ptr<const Game> game, int cfr_iterations) {
+
+  std::shared_ptr<const PublicStateEvaluator> dummy_evaluator =
+      MakeDummyEvaluator();
+  std::shared_ptr<Observer> public_observer =
+      game->MakeObserver(kPublicStateObsType, {});
+  std::shared_ptr<Observer> infostate_observer =
+      game->MakeObserver(kInfoStateObsType, {});
+
+  std::shared_ptr<const PublicStateEvaluator> terminal_evaluator =
+      MakeTerminalEvaluator();
+
+  return std::make_shared<CFREvaluator>(game, algorithms::kNoMoveAheadLimit,
+                                        dummy_evaluator, terminal_evaluator,
+                                        public_observer, infostate_observer,
+                                        cfr_iterations);
 }
 
 TerminalPublicStateContext::TerminalPublicStateContext(
@@ -350,10 +395,12 @@ SubgameSolver::SubgameSolver(
     const std::shared_ptr<const PublicStateEvaluator> nonterminal_evaluator,
     const std::shared_ptr<const PublicStateEvaluator> terminal_evaluator,
     const std::string& bandit_name,
-    SaveValuesPolicy save_values_policy
+    PolicySelection save_values_policy,
+    bool safe_resolving
 ) : subgame_(subgame),
     nonterminal_evaluator_(nonterminal_evaluator),
     terminal_evaluator_(terminal_evaluator),
+    safe_resolving_(safe_resolving),
     bandits_(algorithms::MakeBanditVectors(subgame_->trees, bandit_name)),
     reach_probs_({std::vector<double>(subgame_->trees[0]->num_leaves()),
                   std::vector<double>(subgame_->trees[1]->num_leaves())}),
@@ -387,8 +434,8 @@ void SubgameSolver::RunSimultaneousIterations(int iterations) {
 
     // 2. Compute reach probs to the terminals.
     for (int pl = 0; pl < 2; ++pl) {
-      TopDown(*subgame_->trees[pl], bandits_[pl],
-              absl::MakeSpan(reach_probs_[pl]), num_iterations_);
+      TopDownCurrent(*subgame_->trees[pl], bandits_[pl],
+                     absl::MakeSpan(reach_probs_[pl]), num_iterations_);
     }
 
     // 3. Evaluate leaves using current reach probs.
@@ -403,13 +450,29 @@ void SubgameSolver::RunSimultaneousIterations(int iterations) {
 //    SPIEL_DCHECK_FLOAT_NEAR(initial_state().Value(0),
 //                            -initial_state().Value(1), 1e-6);
 
-    if (init_save_values_ == SaveValuesPolicy::kAveragedCfValues) {
-      IncrementallyAverageValuesInInitialState();
+    if (init_save_values_ == PolicySelection::kAveragePolicy) {
+      IncrementallyAverageValuesInState(&initial_state());
     }
   }
 
-  if (init_save_values_ == SaveValuesPolicy::kCurrentCfValues) {
-    CopyValuesToInitialState();
+  if (init_save_values_ == PolicySelection::kCurrentPolicy) {
+    CopyCurrentValuesToInitialState();
+  }
+
+  // 5. put average beliefs to the leaf public states so we can reuse them in next step
+  // 5.1 Prepare initial reach probs, based on beliefs in initial state.
+  if (safe_resolving_) {
+    std::array<std::vector<double>, 2>& beliefs = initial_state().beliefs;
+    for (int pl = 0; pl < 2; ++pl) {
+      std::copy(beliefs[pl].begin(), beliefs[pl].end(),
+                reach_probs_[pl].begin());
+    }
+
+    // 5.2 Compute reach probs to the terminals
+    for (int pl = 0; pl < 2; ++pl) {
+      TopDownAverage(*subgame_->trees[pl], bandits_[pl],
+                     absl::MakeSpan(reach_probs_[pl]), num_iterations_);
+    }
   }
 }
 
@@ -424,7 +487,7 @@ void SubgameSolver::EvaluateLeaves() {
 }
 
 void SubgameSolver::EvaluateLeaf(PublicState* state,
-                           PublicStateContext* context) {
+                                 PublicStateContext* context) {
   SPIEL_CHECK_TRUE(state);
   SPIEL_CHECK_TRUE(state->IsLeaf());
 
@@ -463,6 +526,18 @@ void SubgameSolver::EvaluateLeaf(PublicState* state,
       cf_values_[pl][trunk_position] = state->values[pl][j];
     }
   }
+
+  // 4. Incrementally update average CFVs.
+  if (safe_resolving_) {
+    for (int pl = 0; pl < 2; pl++) {
+      const int num_leaves = state->nodes[pl].size();
+      for (int j = 0; j < num_leaves; ++j) {
+        state->average_values[pl][j] +=
+            (state->values[pl][j] - state->average_values[pl][j])
+                / num_iterations_;
+      }
+    }
+  }
 }
 
 void SubgameSolver::Reset() {
@@ -486,6 +561,8 @@ void SubgameSolver::Reset() {
         std::fill(state.beliefs[pl].begin(), state.beliefs[pl].end(), 0.);
       }
       std::fill(state.values[pl].begin(), state.values[pl].end(), 0.);
+      std::fill(state.average_values[pl].begin(),
+                state.average_values[pl].end(), 0.);
     }
     if (nonterminal_evaluator_.get()) {
       std::unique_ptr<PublicStateContext>& context = contexts_[i];
@@ -496,8 +573,7 @@ void SubgameSolver::Reset() {
   }
 }
 
-
-void SubgameSolver::CopyValuesToInitialState() {
+void SubgameSolver::CopyCurrentValuesToInitialState() {
   for (int pl = 0; pl < 2; ++pl) {
     int branching = subgame()->trees[pl]->root_branching_factor();
     SPIEL_CHECK_EQ(initial_state().values[pl].size(), branching);
@@ -506,37 +582,15 @@ void SubgameSolver::CopyValuesToInitialState() {
   }
 }
 
-void SubgameSolver::IncrementallyAverageValuesInInitialState() {
-  // Check that we have reset the values, otherwise incremental averaging
-  // will not work properly!
-  SPIEL_DCHECK({
-    if (num_iterations_ == 0) {
-       for (int pl = 0; pl < 2; ++pl) {
-         for (double & value : initial_state().values[pl]) {
-           SPIEL_CHECK_EQ(value, 0.);
-         }
-       }
-    }
-  });
-
+void SubgameSolver::IncrementallyAverageValuesInState(PublicState* state) {
   for (int pl = 0; pl < 2; ++pl) {
-    int branching = subgame()->trees[pl]->root_branching_factor();
-    SPIEL_CHECK_EQ(initial_state().values[pl].size(), branching);
-    for (int i = 0; i < branching; ++i) {
-      initial_state().values[pl][i] +=
-          (cf_values_[pl][i] - initial_state().values[pl][i]) / num_iterations_;
+    for (int i = 0; i < state->values[pl].size(); ++i) {
+      state->values[pl][i] +=
+          (cf_values_[pl][i] - state->values[pl][i]) / num_iterations_;
     }
   }
 }
 
-void DebugPrintPublicFeatures(const std::vector<PublicState>& states) {
-  std::cout << "# Public features:\n";
-  for (int i = 0; i < states.size(); ++i) {
-    std::cout << "#   states[" << i << "].public_tensor\n#     "
-              << ObservationToString(states[i].public_tensor, "\n#     ")
-              << "\n";
-  }
-}
 
 // -- CFR evaluator ------------------------------------------------------------
 
@@ -544,12 +598,14 @@ CFREvaluator::CFREvaluator(std::shared_ptr<const Game> game, int depth_limit,
                            std::shared_ptr<const PublicStateEvaluator> leaf_evaluator,
                            std::shared_ptr<const PublicStateEvaluator> terminal_evaluator,
                            std::shared_ptr<Observer> public_observer,
-                           std::shared_ptr<Observer> infostate_observer)
+                           std::shared_ptr<Observer> infostate_observer,
+                           int cfr_iterations)
     : game(std::move(game)), depth_limit(depth_limit),
       nonterminal_evaluator(std::move(leaf_evaluator)),
       terminal_evaluator(std::move(terminal_evaluator)),
       public_observer(std::move(public_observer)),
-      infostate_observer(std::move(infostate_observer)) {
+      infostate_observer(std::move(infostate_observer)),
+      num_cfr_iterations(cfr_iterations) {
   SPIEL_CHECK_GT(depth_limit, 0);
 }
 
@@ -601,8 +657,8 @@ void CFREvaluator::EvaluatePublicState(PublicState* state,
 void PrintPublicStatesStats(const std::vector<PublicState>& public_leaves) {
   for (const PublicState& state : public_leaves) {
     std::array<int, 2>
-        num_nodes = { (int) state.nodes[0].size(),
-                      (int) state.nodes[1].size() },
+        num_nodes = {(int) state.nodes[0].size(),
+                     (int) state.nodes[1].size()},
         largest_infostates = {-1, -1},
         smallest_infostates = {1000000, 1000000};
     int num_states = 0;
@@ -614,16 +670,17 @@ void PrintPublicStatesStats(const std::vector<PublicState>& public_leaves) {
         smallest_infostates[pl] = std::min(smallest_infostates[pl], size);
       }
     }
-    std::cout << "# Public state #"       << state.public_id
+    std::cout << "# Public state #" << state.public_id
               << (state.IsTerminal() ? " (terminal)" : "")
-              << "  states: "             << num_states
-              << "  infostates: "         << num_nodes
-              << "  largest infostate: "  << largest_infostates
+              << "  states: " << num_states
+              << "  infostates: " << num_nodes
+              << "  largest infostate: " << largest_infostates
               << "  smallest infostate: " << smallest_infostates << '\n';
   }
 }
 
-bool contains(std::vector<const algorithms::InfostateNode*>& xs, const algorithms::InfostateNode* x) {
+bool contains(std::vector<const algorithms::InfostateNode*>& xs,
+              const algorithms::InfostateNode* x) {
   return std::find(xs.begin(), xs.end(), x) != xs.end();
 }
 
@@ -635,9 +692,10 @@ std::unique_ptr<PublicStatesInGame> MakeAllPublicStates(const Game& game) {
                                  | algorithms::kStoreStatesInBody;
   for (int pl = 0; pl < 2; ++pl) {
     all->infostate_trees.push_back(algorithms::MakeInfostateTree(
-        game, pl, 1000, store_all_states));
+        game, pl, algorithms::kNoMoveAheadLimit, store_all_states));
   }
-  std::shared_ptr<Observer> public_observer = game.MakeObserver(kPublicStateObsType, {});
+  std::shared_ptr<Observer> public_observer =
+      game.MakeObserver(kPublicStateObsType, {});
   Observation public_observation(game, public_observer);
   for (int pl = 0; pl < 2; ++pl) {
     const std::vector<std::vector<algorithms::InfostateNode*>>& nodes_at_depths =
@@ -655,7 +713,7 @@ std::unique_ptr<PublicStatesInGame> MakeAllPublicStates(const Game& game) {
         SPIEL_DCHECK_TRUE(DoStatesProduceEqualPublicObservations(
             game, public_observer, *node, public_observation.Tensor()));
         PublicState* state = all->GetPublicState(public_observation);
-        if(state->move_number == -1) {
+        if (state->move_number == -1) {
           state->move_number = some_state->MoveNumber();
         } else {
           SPIEL_CHECK_EQ(state->move_number, some_state->MoveNumber());
@@ -686,13 +744,11 @@ PublicState* PublicStatesInGame::GetPublicState(
   return &public_states.back();
 }
 
-SaveValuesPolicy GetSaveValuesPolicy(const std::string& s) {
-  if (s == "nothing") return SaveValuesPolicy::kSaveNothing;
-  if (s == "current") return SaveValuesPolicy::kCurrentCfValues;
-  if (s == "average") return SaveValuesPolicy::kAveragedCfValues;
-  SpielFatalError("Exhausted pattern match for SaveValuesPolicy");
+PolicySelection GetSaveValuesPolicy(const std::string& s) {
+  if (s == "current") return PolicySelection::kCurrentPolicy;
+  if (s == "average") return PolicySelection::kAveragePolicy;
+  SpielFatalError("Exhausted pattern match for PolicySelection");
 }
-
 
 }  // namespace papers_with_code
 }  // namespace open_spiel

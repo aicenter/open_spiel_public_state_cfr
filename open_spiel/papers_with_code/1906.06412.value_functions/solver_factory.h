@@ -22,7 +22,6 @@
 #include "open_spiel/papers_with_code/1906.06412.value_functions/subgame.h"
 #include "open_spiel/algorithms/infostate_tree.h"
 
-
 namespace open_spiel {
 namespace papers_with_code {
 
@@ -32,17 +31,17 @@ constexpr int kDefaultCfrIterations = 100;
 // Produce a solver given a subgame.
 struct SolverFactory {
   std::shared_ptr<const TerminalEvaluator> terminal_evaluator;
-  std::shared_ptr<const NetEvaluator> leaf_evaluator;
+  std::shared_ptr<const PublicStateEvaluator> leaf_evaluator;
   int cfr_iterations = kDefaultCfrIterations;
   std::string use_bandits_for_cfr = kDefaultDlCfrBandit;
-  SaveValuesPolicy save_values_policy = SaveValuesPolicy::kAveragedCfValues;
+  PolicySelection save_values_policy = kDefaultPolicySelection;
+  bool safe_resolving = false;
 
   std::unique_ptr<SubgameSolver> MakeSolver(
       std::shared_ptr<Subgame> subgame,
       std::shared_ptr<const PublicStateEvaluator> custom_leaf_evaluator = nullptr,
       std::string custom_bandits_for_cfr = "") const;
 };
-
 
 } // namespace papers_with_code
 } // namespace open_spiel

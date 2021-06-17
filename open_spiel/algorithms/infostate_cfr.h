@@ -60,13 +60,21 @@ void TopDown(const InfostateTree& tree, absl::Span<double> reach_probs,
              std::function<std::vector<double>(
                  DecisionId, /*current_reach=*/double)> policy_fn);
 
-inline void TopDown(const InfostateTree& tree, BanditVector& bandits,
-                    absl::Span<double> reach_probs, size_t current_time) {
+inline void TopDownCurrent(const InfostateTree& tree, BanditVector& bandits,
+                           absl::Span<double> reach_probs, size_t current_time) {
   TopDown(tree, reach_probs, [&](DecisionId id, double reach_prob) {
       bandits::Bandit* bandit = bandits[id].get();
       bandit->ComputeStrategy(current_time, reach_prob);
       return bandit->current_strategy();
   });
+}
+
+inline void TopDownAverage(const InfostateTree& tree, BanditVector& bandits,
+                        absl::Span<double> reach_probs, size_t current_time) {
+    TopDown(tree, reach_probs, [&](DecisionId id, double reach_prob) {
+        bandits::Bandit* bandit = bandits[id].get();
+        return bandit->AverageStrategy();
+    });
 }
 
 // Make a bottom-up pass, starting with the current cf_values stored

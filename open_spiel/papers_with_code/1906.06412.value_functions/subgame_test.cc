@@ -58,9 +58,11 @@ void TestTerminalEvaluatorHasSameIterations(const std::string& game_name) {
   algorithms::InfostateCFR vec_solver(*game);
 
   // We use only the terminal evaluator.
-  std::shared_ptr<PublicStateEvaluator> terminal_evaluator = MakeTerminalEvaluator();
-  std::shared_ptr<PublicStateEvaluator> nonterminal_evaluator = MakeDummyEvaluator();
-  auto subgame = std::make_shared<Subgame>(game, /*depth_limit=*/100);
+  std::shared_ptr<PublicStateEvaluator> terminal_evaluator =
+      MakeTerminalEvaluator();
+  std::shared_ptr<PublicStateEvaluator> nonterminal_evaluator =
+      MakeDummyEvaluator();
+  auto subgame = std::make_shared<Subgame>(game, algorithms::kNoMoveAheadLimit);
   SubgameSolver dl_solver(subgame, nonterminal_evaluator, terminal_evaluator,
                           "RegretMatching");
 
@@ -100,14 +102,14 @@ std::unique_ptr<SubgameSolver> MakeRecursiveDepthLimitedCFR(
   leaf_evaluator->bandit_name = "RegretMatching";
   leaf_evaluator->nonterminal_evaluator = leaf_evaluator;
   leaf_evaluator->num_cfr_iterations = 1;
-  leaf_evaluator->save_values_policy = SaveValuesPolicy::kCurrentCfValues;
+  leaf_evaluator->save_values_policy = PolicySelection::kCurrentPolicy;
 
   // Builds the root leaf public states so that we can call the recursive
   // evaluator.
   auto subgame = std::make_shared<Subgame>(game, trunk_depth_limit);
   return std::make_unique<SubgameSolver>(subgame, leaf_evaluator,
                                          terminal_evaluator, "RegretMatching",
-                                         SaveValuesPolicy::kCurrentCfValues);
+                                         PolicySelection::kCurrentPolicy);
 }
 
 void TestRecursiveDepthLimitedSolving(const std::string& game_name) {
@@ -135,8 +137,8 @@ void TestRecursiveDepthLimitedSolving(const std::string& game_name) {
       for (int j = 0; j < trunk_iterations; ++j) {
         vec_solver.RunSimultaneousIterations(1);
         dl_solver->RunSimultaneousIterations(1);
-        SPIEL_CHECK_FLOAT_NEAR(
-            vec_solver.RootValue(), dl_solver->initial_state().Value(), 1e-6);
+        SPIEL_CHECK_FLOAT_NEAR(vec_solver.RootValue(),
+                               dl_solver->initial_state().CurrentValue(), 1e-6);
         for (int pl = 0; pl < 2; ++pl) {
           CheckIterationConsistency(*vec_avg, *dl_avg, *trees[pl]);
           CheckIterationConsistency(*vec_cur, *dl_cur, *trees[pl]);
@@ -150,14 +152,14 @@ void TestMakeAllPublicStates(const std::string& game_name) {
   std::shared_ptr<const Game> game = LoadGame(game_name);
   std::unique_ptr<PublicStatesInGame> all = MakeAllPublicStates(*game);
 
-  for(PublicState& s : all->public_states) {
+  for (PublicState& s : all->public_states) {
 // Debug print:
 //    std::cout << "----" << std::endl;
 //    std::cout << "Obs: " << s.public_tensor.Tensor() << "\n";
 //    for (int pl = 0; pl < 2; ++pl) {
 //      std::cout << "Nodes " << pl << ":\n";
 //      for (const InfostateNode* node : s.nodes[pl]) {
-//        std::cout << "  " << node->ToString() << "\n";
+//        std::cout << "  " << node->TreePath() << "\n";
 //        std::cout << "  States:\n";
 //        for (const std::unique_ptr<State> & state
 //            : node->corresponding_states()) {
@@ -177,8 +179,8 @@ void TestMakeAllPublicStates(const std::string& game_name) {
         SPIEL_CHECK_FALSE(node->corresponding_states().empty());
         SPIEL_CHECK_EQ(node->tree().acting_player(), pl);
 
-        for (const std::unique_ptr<State> & state
-             : node->corresponding_states()) {
+        for (const std::unique_ptr<State>& state
+            : node->corresponding_states()) {
           const auto& h = state->History();
           SPIEL_CHECK_EQ(a_state->MoveNumber(), state->MoveNumber());
           if (pl == 0) {
@@ -205,7 +207,8 @@ int main(int argc, char** argv) {
   };
 
   for (const std::string& game_name : test_games) {
-    open_spiel::papers_with_code::TestTerminalEvaluatorHasSameIterations(game_name);
+    open_spiel::papers_with_code::TestTerminalEvaluatorHasSameIterations(
+        game_name);
     open_spiel::papers_with_code::TestRecursiveDepthLimitedSolving(game_name);
     open_spiel::papers_with_code::TestMakeAllPublicStates(game_name);
   }

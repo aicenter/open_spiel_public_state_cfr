@@ -231,11 +231,11 @@ void TrainEvalLoop() {
   subgame_factory.max_particles        = absl::GetFlag(FLAGS_max_particles);
   //
   std::cout << "# Making oracle evaluator ..." << std::endl;
-  const SaveValuesPolicy save_values_policy =
+  const PolicySelection save_values_policy =
       GetSaveValuesPolicy(absl::GetFlag(FLAGS_save_values_policy));
   auto terminal_evaluator = std::make_shared<TerminalEvaluator>();
   auto oracle = std::make_shared<CFREvaluator>(
-      subgame_factory.game, /*full_subgame_depth=*/1000,
+      subgame_factory.game, algorithms::kNoMoveAheadLimit,
       /*no_leaf_evaluator=*/nullptr, terminal_evaluator,
       subgame_factory.public_observer, subgame_factory.infostate_observer);
   oracle->bandit_name = kDefaultDlCfrBandit;
