@@ -45,7 +45,7 @@ void TestBasicCFVs() {
   const int trunk_iterations = 5;
 
   // Prepared infostate values for the test.
-  std::string infoset_strings[2][4] = {
+  std::string infostate_strings[2][4] = {
       {
           "Observing player: 0. Terminal. History string: 1, 1",
           "Observing player: 0. Terminal. History string: 1, 0",
@@ -107,14 +107,14 @@ void TestBasicCFVs() {
   // We do 5 iterations and check the CFVs after each iteration.
   for (int i = 0; i < trunk_iterations; i++) {
     subgame_solver->RunSimultaneousIterations(1);
-    for (auto& public_state : subgame->public_states) {
-      if (public_state.IsTerminal()) {
-        for (int player = 0; player < 2; player++) {
-          auto CFVs = public_state.InfostateAvgValues(player);
-          for (int infoset_index = 0; infoset_index < 4; infoset_index++) {
-            SPIEL_CHECK_FLOAT_EQ(reference_values[player][infoset_index][i],
-                                 CFVs.at(infoset_strings[player][infoset_index]));
-          }
+    for (const auto& public_state : subgame->public_states) {
+      if (!public_state.IsTerminal()) continue;
+
+      for (int player = 0; player < 2; player++) {
+        auto CFVs = public_state.InfostateAvgValues(player);
+        for (int is_index = 0; is_index < 4; is_index++) {
+          SPIEL_CHECK_FLOAT_EQ(reference_values[player][is_index][i],
+                               CFVs.at(infostate_strings[player][is_index]));
         }
       }
     }
@@ -201,7 +201,7 @@ void TestKuhnGadget() {
 }
 
 // Compute exploitability of the bot.
-void TestKuhnExploitability() {
+void KuhnExploitabilityBenchmark() {
   std::shared_ptr<const Game> game = LoadGame("kuhn_poker");
 
   BotParameters params{
@@ -233,85 +233,82 @@ void TestKuhnExploitability() {
             << algorithms::Exploitability(*game, full_policy) << "\n";
 }
 
-void TestContinualResolvingOnRPS() {
-  const char* kSampleNFGString = R"###(
-    NFG 1 R ""
-    { "Player 1" "Player 2" } { 3 3 }
-
-    0 0   1 -1   -1 1   -1 1   0 0   1 -1   1 -1   -1 1   0 0
-  )###";
-
-  std::shared_ptr<const Game> game = nfg_game::LoadNFGGame(kSampleNFGString);
+void TestResolvingOnRPS() {
+  std::shared_ptr<const Game> game = LoadGame("matrix_rps");
   game = ConvertToTurnBased(*game);
+  std::unique_ptr<State> root_state = game->NewInitialState();
+  auto infostate_observer = game->MakeObserver(kInfoStateObsType, {});
 
-  std::unique_ptr<State> state = game->NewInitialState();
-
-  std::unordered_map<std::string, double> CFVs;
+  // Create constraints for each action.
+  std::unordered_map<std::string, double> cf_value_constraints;
   std::vector<std::unique_ptr<State>> start_states;
-
-  std::string infoset_one;
-  for (Action action : state->LegalActions()) {
-    std::unique_ptr<State> child = state->Child(action);
-    CFVs.emplace(child->InformationStateString(0), 0);
-    infoset_one = child->InformationStateString(1);
+  for (Action action : root_state->LegalActions()) {
+    std::unique_ptr<State> child = root_state->Child(action);
+    cf_value_constraints.emplace(child->InformationStateString(Player{0}), 0);
     start_states.push_back(std::move(child));
   }
+  const std::string infoset_one =
+      root_state->Child(0)->InformationStateString(Player{1});
 
   auto tree_safe_player = algorithms::MakeInfostateTreeSafeResolving(
-      start_states, {1. / 3, 1. / 3, 1. / 3},
-      game->MakeObserver(kInfoStateObsType, {}),
-      1, CFVs, 0, algorithms::kNoMoveAheadLimit);
-
-  auto tree_safe_opponent =
-      algorithms::MakeInfostateTreeSafeResolving(start_states,
-                                                 {1. / 3, 1. / 3, 1. / 3},
-                                                 game->MakeObserver(
-                                                     kInfoStateObsType,
-                                                     {}),
-                                                 0,
-                                                 CFVs,
-                                                 0,
-                                                 algorithms::kNoMoveAheadLimit);
+      start_states, {1. / 3, 1. / 3, 1. / 3}, infostate_observer,
+      1, cf_value_constraints, 0, algorithms::kNoMoveAheadLimit);
+  auto tree_safe_opponent = algorithms::MakeInfostateTreeSafeResolving(
+      start_states, {1. / 3, 1. / 3, 1. / 3}, infostate_observer,
+      0, cf_value_constraints, 0, algorithms::kNoMoveAheadLimit);
 
   std::string tree_safe_player_reference =
-      "(((({-0.00})({-0.00})({-0.00}))[({-1.00}{0.00}{1.00})({-1.00}{0.00}{1.00})({-1.00}{0.00}{1.00})]))";
+      "(("
+          // Observation of constaints, without the ability
+          // to change the outcome.
+          "(({-0.00})({-0.00})({-0.00}))"
+          // Standard RPS outcomes.
+          "[({-1.00}{0.00}{1.00})"
+           "({-1.00}{0.00}{1.00})"
+           "({-1.00}{0.00}{1.00})]"
+      "))";
   std::string tree_safe_opponent_reference =
-      "([(({-1.00})({0.00})({1.00}))(({0.00}))][(({-1.00})({0.00})({1.00}))(({0.00}))][(({-1.00})({0.00})({1.00}))(({0.00}))])";
-  SPIEL_CHECK_EQ(tree_safe_player->root().MakeCertificate(2),
+      "("
+        // Follow / terminate for each action, with standard RPS outcomes.
+        "[(({-1.00})({0.00})({1.00}))"
+         "(({0.00}))]"
+        "[(({-1.00})({0.00})({1.00}))"
+         "(({0.00}))]"
+        "[(({-1.00})({0.00})({1.00}))"
+         "(({0.00}))]"
+     ")";
+  SPIEL_CHECK_EQ(tree_safe_player->root().MakeCertificate(/*precision=*/2),
                  tree_safe_player_reference);
-  SPIEL_CHECK_EQ(tree_safe_opponent->root().MakeCertificate(2),
+  SPIEL_CHECK_EQ(tree_safe_opponent->root().MakeCertificate(/*precision=*/2),
                  tree_safe_opponent_reference);
 
-  SequenceFormLpSpecification
-      specification({tree_safe_opponent, tree_safe_player});
-  specification.SpecifyLinearProgram(1);
-  SPIEL_CHECK_FLOAT_EQ(0., specification.Solve());
+  SequenceFormLpSpecification lp_spec({tree_safe_opponent, tree_safe_player});
+  lp_spec.SpecifyLinearProgram(Player{1});
+  SPIEL_CHECK_FLOAT_EQ(0., lp_spec.Solve());
 
-  for (float prob : GetProbs(specification.OptimalPolicy(1).GetStatePolicy(
-      infoset_one))) {
+  for (const auto&[action, prob] :
+      lp_spec.OptimalPolicy(1).GetStatePolicy(infoset_one)) {
     SPIEL_CHECK_FLOAT_EQ(prob, 1. / 3);
   }
 }
 
-void TestContinualResolvingOnBiasedRPS() {
-  const char* kSampleNFGString = R"###(
-                        NFG 1 R ""
-                        { "Player 1" "Player 2" } { 3 3 }
+void TestResolvingOnBiasedRPS() {
+  const char* kBiasedRpsNFGString = R"###(
+    NFG 1 R ""
+    { "Player 1" "Player 2" } { 3 3 }
 
-                        0 0   1 -1   -2 2   -1 1   0 0   3 -3   2 -2   -3 3   0 0
-                )###";
-
-  std::shared_ptr<const Game> game = nfg_game::LoadNFGGame(kSampleNFGString);
+    0 0   1 -1   -2 2   -1 1   0 0   3 -3   2 -2   -3 3   0 0
+  )###";
+  std::shared_ptr<const Game> game = nfg_game::LoadNFGGame(kBiasedRpsNFGString);
   game = ConvertToTurnBased(*game);
-
-  std::unique_ptr<State> state = game->NewInitialState();
+  std::unique_ptr<State> root_state = game->NewInitialState();
 
   std::unordered_map<std::string, double> CFVs;
   std::vector<std::unique_ptr<State>> start_states;
 
   std::string infoset_one;
-  for (Action action : state->LegalActions()) {
-    std::unique_ptr<State> child = state->Child(action);
+  for (Action action : root_state->LegalActions()) {
+    std::unique_ptr<State> child = root_state->Child(action);
     CFVs.emplace(child->InformationStateString(0), 0);
     infoset_one = child->InformationStateString(1);
     start_states.push_back(std::move(child));
@@ -360,7 +357,7 @@ void TestContinualResolvingOnBiasedRPS() {
   }
 }
 
-void SmallerEqTest() {
+void TestResolvingWithSmallerEqSupport() {
   const char* kSampleNFGString = R"###(
                         NFG 1 R ""
                         { "Player 1" "Player 2" } { 3 3 }
@@ -786,12 +783,13 @@ int main(int argc, char** argv) {
   // Creates fixed trunk of Kuhn automatically retrieves CFVs, constructs
   // a sub-game, solves it and checks if the results are close to optimal.
   open_spiel::papers_with_code::TestKuhnGadget();
-  open_spiel::papers_with_code::TestKuhnExploitability();
+  // The evaluation takes a while to run.
+  // open_spiel::papers_with_code::KuhnExploitabilityBenchmark();
 
   // Tests on matrix game for correct gadget game generations and resolving.
-  open_spiel::papers_with_code::TestContinualResolvingOnRPS();
-  open_spiel::papers_with_code::TestContinualResolvingOnBiasedRPS();
-  open_spiel::papers_with_code::SmallerEqTest();
+  open_spiel::papers_with_code::TestResolvingOnRPS();
+  open_spiel::papers_with_code::TestResolvingOnBiasedRPS();
+  open_spiel::papers_with_code::TestResolvingWithSmallerEqSupport();
 
   // Tests for correctly resolved Gadget game on Kuhn with all the values
   // handcrafted beforehand.
