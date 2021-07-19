@@ -92,7 +92,6 @@ class CrowdModelling2dState : public State {
                         const std::vector<double>& distribution);
 
   CrowdModelling2dState(const CrowdModelling2dState&) = default;
-  CrowdModelling2dState& operator=(const CrowdModelling2dState&) = default;
 
   Player CurrentPlayer() const override {
     return IsTerminal() ? kTerminalPlayerId : current_player_;
