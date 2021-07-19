@@ -43,7 +43,8 @@ fi
 # Load all the build settings.
 source "${MYDIR}/open_spiel/scripts/global_variables.sh"
 
-# Specify a download cache directory for external dependencies.
+# Specify a download cache directory for all external dependencies.
+# If a dependency version is updated you may need to clean this directory.
 DEFAULT_DOWNLOAD_CACHE_DIR="$MYDIR/download_cache"
 
 # Use the ENV variable if defined, or the default location otherwise.
@@ -72,6 +73,7 @@ if [[ ! -x `which git` ]]; then
   fi
 fi
 
+# Cache git clone of the dependencies.
 function cached_clone() {
   # Extract args
   ALL_ARGS_EXCEPT_LAST="${@:1:$#-1}"
@@ -79,10 +81,10 @@ function cached_clone() {
   TARGET_DIR="$LAST_ARG"
 
   # Used for naming the cache directory
-  CACHED_TARGET="${DOWNLOAD_CACHE_DIR}/$(basename "$LAST_ARG")"
+  CACHED_TARGET="${DOWNLOAD_CACHE_DIR}/$(basename "$TARGET_DIR")"
 
   if [[ ! -d "$CACHED_TARGET" ]]; then
-    git clone -vv $ALL_ARGS_EXCEPT_LAST "$CACHED_TARGET"
+    git clone $ALL_ARGS_EXCEPT_LAST "$CACHED_TARGET"
   fi
   cp -r "$CACHED_TARGET" "$TARGET_DIR"
 }
