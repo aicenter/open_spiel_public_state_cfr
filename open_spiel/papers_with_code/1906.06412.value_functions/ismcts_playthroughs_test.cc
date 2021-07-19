@@ -30,8 +30,8 @@ void TestSamplingPlaythroughs() {
                           "points_order=descending"
                         ")");
   IsmctsPlaythroughs playthroughs;
-  playthroughs.num_matches = 10;
-  playthroughs.max_simulations = 100;
+  playthroughs.num_matches = 2;
+  playthroughs.max_simulations = 10;
   auto turn_based = ConvertToTurnBased(*game);
   playthroughs.MakeBot(rnd_gen);
   playthroughs.GenerateNodes(*turn_based, rnd_gen);

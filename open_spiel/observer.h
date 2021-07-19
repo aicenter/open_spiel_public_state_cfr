@@ -131,6 +131,14 @@ struct TensorInfo {
     return absl::StrCat("TensorInfo(name='", name, "', shape=(",
                         absl::StrJoin(shape, ","), "))");
   }
+  bool operator==(const TensorInfo& other) const {
+    return name == other.name && shape == other.shape;
+  }
+  size_t size() const {
+    size_t prod = 1;
+    for (int dim_size : shape) prod *= dim_size;
+    return prod;
+  }
 };
 
 struct TensorInfoWithData {
