@@ -29,7 +29,7 @@ InformationStateTensorLayout() = TensorLayout.CHW
 InformationStateTensorSize() = 70
 ObservationTensorShape() = current_point_card: [4], remaining_point_cards: [4], point_totals: [2, 11], player_hand: [4], win_sequence: [4, 2], tie_sequence: [4]
 ObservationTensorLayout() = TensorLayout.CHW
-ObservationTensorSize() = 42
+ObservationTensorSize() = 46
 MaxGameLength() = 4
 ToString() = "goofspiel(imp_info=True,num_cards=4,points_order=descending)"
 

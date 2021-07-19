@@ -147,8 +147,6 @@ class ChessState : public State {
   ChessState(std::shared_ptr<const Game> game, const std::string& fen);
   ChessState(const ChessState&) = default;
 
-  ChessState& operator=(const ChessState&) = default;
-
   Player CurrentPlayer() const override {
     return IsTerminal() ? kTerminalPlayerId : ColorToPlayer(Board().ToPlay());
   }

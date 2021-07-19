@@ -128,8 +128,6 @@ class KriegspielState : public State {
                   bool rule_50_move);
   KriegspielState(const KriegspielState&) = default;
 
-  KriegspielState& operator=(const KriegspielState&) = default;
-
   Player CurrentPlayer() const override {
     return IsTerminal() ? kTerminalPlayerId : ColorToPlayer(Board().ToPlay());
   }
@@ -230,7 +228,7 @@ class KriegspielGame : public Game {
   int MaxGameLength() const override { return kMaxGameLength; }
   std::shared_ptr<Observer> MakeObserver(
       absl::optional<IIGObservationType> iig_obs_type,
-      const GameParameters& params) const;
+      const GameParameters& params) const override;
 
   std::shared_ptr<KriegspielObserver> default_observer_;
 

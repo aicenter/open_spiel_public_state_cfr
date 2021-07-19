@@ -109,7 +109,6 @@ class VPNetModel {
 
   // Move only, not copyable.
   VPNetModel(VPNetModel&& other) = default;
-  VPNetModel& operator=(VPNetModel&& other) = default;
   VPNetModel(const VPNetModel&) = delete;
   VPNetModel& operator=(const VPNetModel&) = delete;
 

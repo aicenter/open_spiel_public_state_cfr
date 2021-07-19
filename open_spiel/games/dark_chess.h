@@ -66,8 +66,6 @@ class DarkChessState : public State {
                  const std::string& fen);
   DarkChessState(const DarkChessState&) = default;
 
-  DarkChessState& operator=(const DarkChessState&) = default;
-
   Player CurrentPlayer() const override {
     return IsTerminal() ? kTerminalPlayerId : ColorToPlayer(Board().ToPlay());
   }
@@ -172,7 +170,7 @@ class DarkChessGame : public Game {
   int MaxGameLength() const override { return chess::MaxGameLength(); }
   std::shared_ptr<Observer> MakeObserver(
       absl::optional<IIGObservationType> iig_obs_type,
-      const GameParameters& params) const;
+      const GameParameters& params) const override;
 
   std::shared_ptr<DarkChessObserver> default_observer_;
 

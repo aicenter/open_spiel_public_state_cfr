@@ -54,7 +54,6 @@ class TicTacToeState : public State {
   TicTacToeState(std::shared_ptr<const Game> game);
 
   TicTacToeState(const TicTacToeState&) = default;
-  TicTacToeState& operator=(const TicTacToeState&) = default;
 
   Player CurrentPlayer() const override {
     return IsTerminal() ? kTerminalPlayerId : current_player_;

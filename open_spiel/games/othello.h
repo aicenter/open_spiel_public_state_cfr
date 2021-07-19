@@ -89,7 +89,6 @@ class OthelloState : public State {
   OthelloState(std::shared_ptr<const Game> game);
 
   OthelloState(const OthelloState&) = default;
-  OthelloState& operator=(const OthelloState&) = default;
 
   Player CurrentPlayer() const override { return current_player_; }
 

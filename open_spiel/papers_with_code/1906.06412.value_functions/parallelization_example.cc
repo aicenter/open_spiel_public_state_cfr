@@ -69,7 +69,7 @@ void RunInference(Batch& batch) {
 }
 
 // Run inference continually in a separate thread.
-[[noreturn]] void ContinualInference(Batch* batch) {
+void ContinualInference(Batch* batch) {
   const auto sleep_step =
       std::chrono::microseconds(TIMEOUT_us / (8 * batch->size()));
 
