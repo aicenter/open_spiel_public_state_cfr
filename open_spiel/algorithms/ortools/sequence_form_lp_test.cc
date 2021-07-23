@@ -14,6 +14,7 @@
 
 #include "open_spiel/algorithms/ortools/sequence_form_lp.h"
 
+#include "open_spiel/algorithms/evaluate_bots.h"
 #include "open_spiel/algorithms/tabular_exploitability.h"
 #include "open_spiel/game_transforms/turn_based_simultaneous_game.h"
 #include "open_spiel/spiel_utils.h"
@@ -55,6 +56,36 @@ void TestGameValueAndExploitability(const std::string& game_name,
                          0., kErrorTolerance);
 }
 
+void PrintOptimalStrategy(const std::string& game_name) {
+  std::shared_ptr<const Game> game = LoadGame(game_name);
+  SequenceFormLpSpecification lp(*game);
+  std::vector<TabularPolicy> policy;
+  for (int pl = 0; pl < 2; ++pl) {
+    lp.SpecifyLinearProgram(pl);
+    std::cout << "Value: " << lp.Solve() << "\n";
+    policy.push_back(lp.OptimalPolicy(pl));
+  }
+
+
+  for (int pl = 0; pl < 2; ++pl) {
+    std::cout << "------------------" << "\n";
+    std::cout << "Player #" << pl << "\n";
+    algorithms::InfostateTree* tree = lp.trees()[pl].get();
+    for (int d = 0; d < tree->depth(); ++d) {
+      std::cout << "Depth " << d << "\n";
+      for (InfostateNode* node : tree->nodes_at_depth(d)) {
+        if (node->type() != kDecisionInfostateNode) continue;
+        std::string one_line_infostate = node->infostate_string();
+        std::replace(one_line_infostate.begin(), one_line_infostate.end(),
+                     '\n', ' ');
+        std::cout << one_line_infostate << ": "
+                  << policy[pl].GetStatePolicy(node->infostate_string())
+                  << "\n";
+      }
+    }
+  }
+}
+
 }  // namespace
 }  // namespace ortools
 }  // namespace algorithms
@@ -69,4 +100,13 @@ int main(int argc, char** argv) {
                                                       -0.085606424078);
   algorithms::ortools::TestGameValueAndExploitability(
       "goofspiel(players=2,num_cards=3,imp_info=True)", 0.);
+
+  algorithms::ortools::PrintOptimalStrategy(
+      "goofspiel("
+        "players=2,"
+        "num_turns=3,"
+        "num_cards=3,"
+        "imp_info=True,"
+        "points_order=descending"
+      ")");
 }

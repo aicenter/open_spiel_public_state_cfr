@@ -454,6 +454,7 @@ class InfostateTree final {
   const std::vector<InfostateNode*>& nodes_at_depth(size_t depth) const {
     return nodes_at_depths_.at(depth);
   }
+  int depth() const { return nodes_at_depths_.size(); }
 
   // -- Tree operations --------------------------------------------------------
   // Compute best response and value based on gradient from opponents.
