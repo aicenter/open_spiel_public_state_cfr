@@ -199,8 +199,8 @@ std::shared_ptr<torch::optim::Optimizer> MakeOptimizer(ValueNet* model) {
   SpielFatalError("Unknown optimizer!");
 }
 
-float size_mb(int replay_size, int input_size, int output_size) {
-  return replay_size * (input_size + output_size) * 4 / 1024. / 1024.;
+double size_mb(double replay_size, double input_size, double output_size) {
+  return replay_size * (input_size + output_size) / 256. / 1024.;
 }
 
 void TrainEvalLoop() {
