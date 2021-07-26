@@ -67,6 +67,7 @@ inline constexpr int kDefaultNumCards = 13;
 inline constexpr int kDefaultNumTurns = kNumTurnsSameAsCards;
 inline constexpr const char* kDefaultPointsOrder = "random";
 inline constexpr const char* kDefaultReturnsType = "win_loss";
+inline constexpr const char* kDefaultOpponentDeck = "";
 inline constexpr const bool kDefaultImpInfo = false;
 
 enum class PointsOrder {
@@ -89,7 +90,7 @@ class GoofspielState : public SimMoveState {
  public:
   explicit GoofspielState(std::shared_ptr<const Game> game, int num_cards,
                           int num_turns, PointsOrder points_order, bool impinfo,
-                          ReturnsType returns_type);
+                          ReturnsType returns_type, const std::string& opponent_deck);
 
   Player CurrentPlayer() const override;
   std::string ActionToString(Player player, Action action_id) const override;
@@ -179,6 +180,7 @@ class GoofspielGame : public Game {
   PointsOrder points_order_;
   ReturnsType returns_type_;
   bool impinfo_;
+  std::string opponent_deck_;
 };
 
 }  // namespace goofspiel
