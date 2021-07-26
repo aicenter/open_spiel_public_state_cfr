@@ -109,6 +109,7 @@ class GoofspielState : public SimMoveState {
   std::vector<Action> LegalActions(Player player) const override;
   std::unique_ptr<State> ResampleFromInfostate(int player_id,
                                                std::function<double()> rng) const override;
+  const std::vector<Player>& win_sequence() const { return win_sequence_; }
  protected:
   void DoApplyAction(Action action_id) override;
   void DoApplyActions(const std::vector<Action>& actions) override;

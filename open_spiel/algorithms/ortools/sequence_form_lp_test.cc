@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <games/goofspiel.h>
 #include "open_spiel/algorithms/ortools/sequence_form_lp.h"
 
 #include "open_spiel/algorithms/evaluate_bots.h"
@@ -56,16 +57,51 @@ void TestGameValueAndExploitability(const std::string& game_name,
                          0., kErrorTolerance);
 }
 
+void PrintReachableStrategy(InfostateNode* node, const TabularPolicy& policy, int d) {
+  if (node->type() == kDecisionInfostateNode) {
+    ActionsAndProbs actions_and_probs =
+        policy.GetStatePolicy(node->infostate_string());
+    std::string one_line_infostate = node->infostate_string();
+    std::replace(one_line_infostate.begin(), one_line_infostate.end(),
+                 '\n', ' ');
+    for (int n = 0; n < d; ++n) std::cout << "  ";
+    auto s = open_spiel::down_cast<goofspiel::GoofspielState*>(
+        node->corresponding_states()[0].get());
+    if (!s->win_sequence().empty()) {
+      Player winner = s->win_sequence().back();
+      if (winner == kInvalidPlayer) std::cout << "tie" << "\n";
+      if (winner == 0) std::cout << "win" << "\n";
+      if (winner == 1) std::cout << "loss" << "\n";
+    }
+
+    for (int i = 0; i < actions_and_probs.size(); ++i) {
+      const auto&[a,p] = actions_and_probs[i];
+      if (p > 0) {
+        for (int n = 0; n < d+1; ++n) std::cout << "  ";
+        std::cout << a << ": " << p << "\n";
+        PrintReachableStrategy(node->child_at(i), policy, d+2);
+      }
+    }
+  } else {
+    for (InfostateNode* child : node->children()) {
+      PrintReachableStrategy(child, policy, d);
+    }
+  }
+}
+
 void PrintOptimalStrategy(const std::string& game_name) {
   std::shared_ptr<const Game> game = LoadGame(game_name);
-  SequenceFormLpSpecification lp(*game);
+
+  SequenceFormLpSpecification lp({
+     MakeInfostateTree(*game, 0, kNoMoveAheadLimit, kStoreAllStatesPolicy),
+     MakeInfostateTree(*game, 1, kNoMoveAheadLimit, kStoreAllStatesPolicy),
+  });
   std::vector<TabularPolicy> policy;
   for (int pl = 0; pl < 2; ++pl) {
     lp.SpecifyLinearProgram(pl);
     std::cout << "Value: " << lp.Solve() << "\n";
     policy.push_back(lp.OptimalPolicy(pl));
   }
-
 
   for (int pl = 0; pl < 2; ++pl) {
     std::cout << "------------------" << "\n";
@@ -84,9 +120,14 @@ void PrintOptimalStrategy(const std::string& game_name) {
       }
     }
   }
+
+  // Print reachable strategy for PL0.
+//  PrintReachableStrategy(lp.trees()[0]->mutable_root(), policy[0], 0);
 }
 
-}  // namespace
+}
+
+// namespace
 }  // namespace ortools
 }  // namespace algorithms
 }  // namespace open_spiel
@@ -101,6 +142,29 @@ int main(int argc, char** argv) {
   algorithms::ortools::TestGameValueAndExploitability(
       "goofspiel(players=2,num_cards=3,imp_info=True)", 0.);
 
+  // PrintReachableStrategy for num_cards=8  (cards are 0-indexed)
+  //  7: 1
+  //    win
+  //      5: 0.5
+  //        win
+  //          0: 1
+  //        tie
+  //          0: 1
+  //        loss
+  //          6: 1
+  //      6: 0.5
+  //        win
+  //          0: 1
+  //        tie
+  //          0: 1
+  //        loss
+  //          3: 1
+  //    tie
+  //      6: 1
+  //        win
+  //          0: 1
+  //        tie
+  //          5: 1
   algorithms::ortools::PrintOptimalStrategy(
       "goofspiel("
         "players=2,"

@@ -270,6 +270,10 @@ constexpr int kStoreStatesInLeaves    = 0x2;
 constexpr int kStoreStatesInRoots     = 0x4;
 constexpr int kStoreStatesInBody      = 0x8;
 constexpr int kDefaultStoragePolicy = kStoreStatesInTerminals;
+constexpr int kStoreAllStatesPolicy = kStoreStatesInTerminals
+                                    | kStoreStatesInLeaves
+                                    | kStoreStatesInRoots
+                                    | kStoreStatesInBody;
 
 // Creates an infostate tree for a player based on the initial state
 // of the game, up to some move limit.
