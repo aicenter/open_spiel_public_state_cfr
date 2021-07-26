@@ -36,7 +36,7 @@ add_library(paper_value_functions OBJECT
         torch_utils.h
         )
 
-find_package(OpenMP)
+#find_package(OpenMP)
 
 # Delete -Wall -Werror in
 # - /home/michal/Code/open_spiel/open_spiel/libtorch/libtorch/share/cmake/Caffe2/Caffe2Targets.cmake torch_cpu
@@ -48,7 +48,8 @@ macro(add_paper_executable NAME SOURCES)
     target_link_libraries(${NAME}
                         ${ORTOOLS_LIBS}
                         ${TORCH_LIBRARIES}
-                        OpenMP::OpenMP_CXX)
+#                        OpenMP::OpenMP_CXX
+      )
 endmacro()
 
 add_paper_executable(train_eval_loop train_eval_loop.cc)
@@ -69,4 +70,4 @@ add_paper_executable(tabularize_bot_test tabularize_bot_test.cpp)
 add_test(tabularize_bot_test tabularize_bot_test)
 
 # High-level example of how batch parallelization is done.
-add_paper_executable(parallelization_example parallelization_example.cc)
+#add_paper_executable(parallelization_example parallelization_example.cc)
