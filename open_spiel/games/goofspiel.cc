@@ -57,8 +57,7 @@ const GameType kGameType{
       GameParameter(static_cast<std::string>(kDefaultPointsOrder))},
      {"returns_type",
       GameParameter(static_cast<std::string>(kDefaultReturnsType))},
-     {"opponent_deck",
-      GameParameter(static_cast<std::string>(kDefaultOpponentDeck))}},
+     {"opponent_br_deck", GameParameter(false)}},
     /*default_loadable=*/true,
     /*provides_factored_observation_string=*/true};
 
@@ -468,7 +467,7 @@ class GoofspielObserver : public Observer {
 GoofspielState::GoofspielState(std::shared_ptr<const Game> game, int num_cards,
                                int num_turns, PointsOrder points_order,
                                bool impinfo, ReturnsType returns_type,
-                               const std::string& opponent_deck)
+                               bool opponent_br_deck)
     : SimMoveState(game),
       num_cards_(num_cards),
       num_turns_(num_turns),
@@ -490,31 +489,19 @@ GoofspielState::GoofspielState(std::shared_ptr<const Game> game, int num_cards,
 
   // Player hands.
   player_hands_.clear();
-  if (opponent_deck.empty()) {
-    for (auto p = Player{0}; p < num_players_; ++p) {
-      std::vector<bool> hand(num_cards_, true);
-      player_hands_.push_back(hand);
-    }
-  } else {
+  if (opponent_br_deck) {
     {  // Player 0
       std::vector<bool> hand(num_cards_, true);
       player_hands_.push_back(hand);
     }
-
     {  // Player 1
       std::vector<bool> hand(num_cards_, false);
-
-      std::vector<std::string_view> str_deck =
-          absl::StrSplit(opponent_deck, ';');
-      for (const auto& str_card : str_deck) {
-        int c;
-        if (!absl::SimpleAtoi(str_card, &c)) {
-          SpielFatalError(
-              absl::StrCat("Error when parsing the deck: ", str_card));
-        }
-        hand.at(c) = true;
-      }
-
+      for (int i = num_cards_ - num_turns_; i < num_cards_; ++i) hand[i] = true;
+      player_hands_.push_back(hand);
+    }
+  } else {
+    for (auto p = Player{0}; p < num_players_; ++p) {
+      std::vector<bool> hand(num_cards_, true);
       player_hands_.push_back(hand);
     }
   }
@@ -827,7 +814,7 @@ GoofspielGame::GoofspielGame(const GameParameters& params)
       returns_type_(
           ParseReturnsType(ParameterValue<std::string>("returns_type"))),
       impinfo_(ParameterValue<bool>("imp_info")),
-      opponent_deck_(ParameterValue<std::string>("opponent_deck"))
+      opponent_br_deck_(ParameterValue<bool>("opponent_br_deck"))
       {
   // Override the zero-sum utility in the game type if general-sum returns.
   if (returns_type_ == ReturnsType::kTotalPoints) {
@@ -855,7 +842,7 @@ GoofspielGame::GoofspielGame(const GameParameters& params)
 std::unique_ptr<State> GoofspielGame::NewInitialState() const {
   return std::make_unique<GoofspielState>(shared_from_this(), num_cards_,
                                           num_turns_, points_order_, impinfo_,
-                                          returns_type_, opponent_deck_);
+                                          returns_type_, opponent_br_deck_);
 }
 
 int GoofspielGame::MaxChanceOutcomes() const {

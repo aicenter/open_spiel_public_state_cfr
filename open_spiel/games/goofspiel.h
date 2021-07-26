@@ -90,7 +90,7 @@ class GoofspielState : public SimMoveState {
  public:
   explicit GoofspielState(std::shared_ptr<const Game> game, int num_cards,
                           int num_turns, PointsOrder points_order, bool impinfo,
-                          ReturnsType returns_type, const std::string& opponent_deck);
+                          ReturnsType returns_type, bool opponent_br_deck);
 
   Player CurrentPlayer() const override;
   std::string ActionToString(Player player, Action action_id) const override;
@@ -180,7 +180,7 @@ class GoofspielGame : public Game {
   PointsOrder points_order_;
   ReturnsType returns_type_;
   bool impinfo_;
-  std::string opponent_deck_;
+  bool opponent_br_deck_;
 };
 
 }  // namespace goofspiel
