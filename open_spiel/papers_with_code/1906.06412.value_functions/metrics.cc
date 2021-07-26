@@ -52,7 +52,8 @@ class FullTrunkExplMetric : public Metric {
     for (int i = 1; i <= evaluate_iters_.back(); ++i) {
       trunk_with_net_->RunSimultaneousIterations(1);
       if (should_evaluate_at_iter(i)) {
-        expls_[j++] = or_algs::TrunkExploitability(whole_game_, *eval_policy);
+        expls_[j++] = or_algs::TrunkExploitability(whole_game_, *eval_policy,
+                                                   /*strategy_epsilon=*/0.);
         progress << '.' << std::flush;
       }
     }

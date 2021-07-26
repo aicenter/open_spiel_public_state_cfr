@@ -87,9 +87,9 @@ void RegretMatching::Reset() {
 
 // RM uses x+ = max(0, x), this constant sets this to 1e-5
 constexpr double kRegretMatchingMinRegret = 1e-5;
-// Pure strategies with prob smaller than this c are cut off
-// and probs are normalized.
-constexpr double kRegretMatchingAvgStratCutoff = 1e-2;
+// Pure strategies with prob smaller than this constant are cut off,
+// and the remaining probs are normalized again.
+constexpr double kRegretMatchingStrategyCutoff = 1e-2;
 
 RegretMatchingPlus::RegretMatchingPlus(int num_actions)
     : Bandit(num_actions),
@@ -107,6 +107,20 @@ void RegretMatchingPlus::ComputeStrategy(size_t current_time, double weight) {
       const double regret = cumulative_regrets_[i];
       current_strategy_[i] =
           (regret > kRegretMatchingMinRegret ? regret : 0.) / positive_regrets_sum;
+    }
+    double renormalization = 0.;
+    for (int i = 0; i < num_actions(); ++i) {
+      if (current_strategy_[i] > kRegretMatchingStrategyCutoff)
+        renormalization += current_strategy_[i];
+    }
+    if (renormalization < 1.) {
+      for (int i = 0; i < num_actions(); ++i) {
+        if (current_strategy_[i] > kRegretMatchingStrategyCutoff) {
+          current_strategy_[i] /= renormalization;
+        } else {
+          current_strategy_[i] = 0.;
+        }
+      }
     }
   } else {
     for (int i = 0; i < num_actions(); ++i) {
@@ -136,14 +150,28 @@ std::vector<double> RegretMatchingPlus::AverageStrategy() const {
   strategy.reserve(num_actions());
   double normalization = 0.;
   for (double action : cumulative_strategy_) {
-    if (action >= kRegretMatchingAvgStratCutoff) normalization += action;
+    if (action >= kRegretMatchingStrategyCutoff) normalization += action;
   }
   if (normalization) {
     for (int i = 0; i < num_actions(); ++i) {
-      if (cumulative_strategy_[i]  >= kRegretMatchingAvgStratCutoff) {
+      if (cumulative_strategy_[i]  >= kRegretMatchingStrategyCutoff) {
         strategy.push_back(cumulative_strategy_[i] / normalization);
       } else {
         strategy.push_back(0.);
+      }
+    }
+    double renormalization = 0.;
+    for (int i = 0; i < num_actions(); ++i) {
+      if (strategy[i] > kRegretMatchingStrategyCutoff)
+        renormalization += strategy[i];
+    }
+    if (renormalization < 1.) {
+      for (int i = 0; i < num_actions(); ++i) {
+        if (strategy[i] > kRegretMatchingStrategyCutoff) {
+          strategy[i] /= renormalization;
+        } else {
+          strategy[i] = 0.;
+        }
       }
     }
   } else {
@@ -446,15 +474,31 @@ std::vector<double> PredictiveRegretMatchingPlus::AverageStrategy() const {
   strategy.reserve(num_actions());
   double normalization = 0.;
   for (double action : cumulative_strategy_) normalization += action;
-
   if (normalization) {
     for (int i = 0; i < num_actions(); ++i) {
       strategy.push_back(cumulative_strategy_[i] / normalization);
+    }
+    double renormalization = 0.;
+    for (int i = 0; i < num_actions(); ++i) {
+      if (strategy[i] > kRegretMatchingStrategyCutoff)
+        renormalization += strategy[i];
+    }
+    if (renormalization < 1.) {
+      for (int i = 0; i < num_actions(); ++i) {
+        if (strategy[i] > kRegretMatchingStrategyCutoff) {
+          strategy[i] /= renormalization;
+        } else {
+          strategy[i] = 0.;
+        }
+      }
     }
   } else {
     for (int i = 0; i < num_actions(); ++i) {
       strategy.push_back(1. / num_actions());
     }
+  }
+  for (int i = 0; i < num_actions(); ++i) {
+    SPIEL_CHECK_TRUE(strategy[i] == 0. || strategy[i] >= kRegretMatchingStrategyCutoff);
   }
   return strategy;
 }
