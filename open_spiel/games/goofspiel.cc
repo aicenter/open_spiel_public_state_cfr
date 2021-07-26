@@ -584,7 +584,7 @@ void GoofspielState::DoApplyActions(const std::vector<Action>& actions) {
   // No choice at the last turn, so we can play it now
   // We use DoApplyAction(s) not to modify the history, as these actions are
   // not available in the tree.
-  if (current_turn_ == num_cards_ - 1) {
+  if (current_turn_ == num_cards_ - 1 && num_cards_ == num_turns_) {
     // There might be a chance event
     if (IsChanceNode()) {
       auto legal_actions = LegalChanceOutcomes();
