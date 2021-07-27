@@ -87,13 +87,13 @@ std::shared_ptr<TabularPolicy> CreatePolicyFromSetup(
 
   std::unique_ptr<Bot> bot_player_one = bot_factory.Create(game, Player(0),
                                                            params);
-  std::shared_ptr<TabularPolicy> bot_policy_player_one =
-      tabularize_bot::FullBotPolicy(std::move(bot_player_one), Player(0), *game);
+  std::unique_ptr<TabularPolicy> bot_policy_player_one =
+      TabularizeOnlinePolicy(bot_player_one.get(), Player(0), *game);
 
   std::unique_ptr<Bot> bot_player_two = bot_factory.Create(game, Player(1),
                                                            params);
-  std::shared_ptr<TabularPolicy> joint_policy =
-      tabularize_bot::FullBotPolicy(std::move(bot_player_two), Player(1), *game);
+  std::unique_ptr<TabularPolicy> joint_policy =
+      TabularizeOnlinePolicy(bot_player_two.get(), Player(1), *game);
 
   joint_policy->ImportPolicy(*bot_policy_player_one);
 

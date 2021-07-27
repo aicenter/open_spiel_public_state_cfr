@@ -29,13 +29,14 @@ SherlockBot::SherlockBot(std::unique_ptr<SubgameFactory> subgame_factory,
   subgame_ = subgame_factory_->MakeTrunk(1);
 }
 
-SherlockBot::SherlockBot(SherlockBot const& bot)
+SherlockBot::SherlockBot(const SherlockBot& bot)
     : subgame_factory_(bot.subgame_factory_),
       solver_factory_(bot.solver_factory_),
       player_id_(bot.player_id_),
       rnd_gen_(bot.rnd_gen_),
       // Copy the subgame.
       subgame_(std::make_shared<Subgame>(*bot.subgame_)) {
+  // Make sure we really made a copy (different memory pointers).
   SPIEL_CHECK_NE(subgame_.get(), bot.subgame_.get());
 }
 

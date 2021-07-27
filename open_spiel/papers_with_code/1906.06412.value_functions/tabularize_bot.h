@@ -21,15 +21,22 @@
 
 namespace open_spiel {
 namespace papers_with_code {
-namespace tabularize_bot {
 
-std::shared_ptr<TabularPolicy> FullBotPolicy(std::unique_ptr<Bot> bot,
-                                             Player player, const Game& game);
-
-void SavePolicyFromState(std::unique_ptr<Bot> bot, Player player,
-                         std::unique_ptr<State> state,
-                         const std::shared_ptr<TabularPolicy>& policy);
-}
+// Create offline tabular policy from an online bot by traversing infostate
+// tree of given player and saving bot's policy for that player at each decision
+// point (infostate).
+//
+// This method assumes that the bot does not "cheat" in imperfect-information games,
+// i.e. it outputs the same policy regardless of the supplied
+// perfect-information state.
+//
+// The bot must implement the Clone() method. This is required to ensure that
+// the bot's internalstate does not get corrupted while traversing the infostate
+// tree.
+std::unique_ptr<TabularPolicy> TabularizeOnlinePolicy(
+    Bot* bot, Player player, const Game& game);
+std::unique_ptr<TabularPolicy> TabularizeOnlinePolicy(
+    Bot* bot, std::shared_ptr<algorithms::InfostateTree> tree);
 
 } // namespace papers_with_code
 } // namespace open_spiel

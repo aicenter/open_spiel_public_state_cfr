@@ -12,18 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "open_spiel/spiel_bots.h"
-#include "open_spiel/papers_with_code/1906.06412.value_functions/bot.h"
-#include "open_spiel/games/nfg_game.h"
-#include "open_spiel/games/kuhn_poker.h"
-#include "open_spiel/algorithms/ortools/sequence_form_lp.h"
-#include "tabularize_bot.h"
-#include "open_spiel/algorithms/tabular_exploitability.h"
-#include "open_spiel/algorithms/best_response.h"
-#include "open_spiel/game_transforms/turn_based_simultaneous_game.h"
-
 #include <cmath>
 #include <iostream>
+
+#include "open_spiel/algorithms/best_response.h"
+#include "open_spiel/algorithms/ortools/sequence_form_lp.h"
+#include "open_spiel/algorithms/tabular_exploitability.h"
+#include "open_spiel/game_transforms/turn_based_simultaneous_game.h"
+#include "open_spiel/games/kuhn_poker.h"
+#include "open_spiel/games/nfg_game.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/bot.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/tabularize_bot.h"
+#include "open_spiel/spiel_bots.h"
 
 namespace open_spiel {
 namespace papers_with_code {
@@ -221,8 +221,8 @@ void KuhnExploitabilityBenchmark() {
   TabularPolicy full_policy;
   for (int pl = 0; pl < 2; ++pl) {
     std::unique_ptr<Bot> bot = bot_factory.Create(game, pl, params);
-    std::shared_ptr<TabularPolicy> player_policy =
-        tabularize_bot::FullBotPolicy(std::move(bot), pl, *game);
+    std::unique_ptr<TabularPolicy> player_policy =
+        TabularizeOnlinePolicy(bot.get(), pl, *game);
     algorithms::TabularBestResponse best_response(
         *game, 1-pl, player_policy->PolicyTable());
     std::cout << "BR against PL" << pl << ": "

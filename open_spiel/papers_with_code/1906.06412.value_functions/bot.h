@@ -40,7 +40,7 @@ class SherlockBot : public Bot {
               std::unique_ptr<SolverFactory> solver_factory,
               Player player_id, int seed);
 
-  SherlockBot(SherlockBot const& bot);
+  SherlockBot(const SherlockBot& bot);
   std::unique_ptr<Bot> Clone() const override;
   Action Step(const State& state) override;
   std::pair<ActionsAndProbs, Action> StepWithPolicy(const State& state) override;
