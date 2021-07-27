@@ -15,6 +15,10 @@
 #include <cmath>
 #include <iostream>
 
+// Include torch before ortools, because of logging macro clash that is solved
+// by different order of includes.
+#include "torch/torch.h"
+
 #include "open_spiel/algorithms/best_response.h"
 #include "open_spiel/algorithms/ortools/sequence_form_lp.h"
 #include "open_spiel/algorithms/tabular_exploitability.h"
