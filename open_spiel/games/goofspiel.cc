@@ -93,106 +93,6 @@ ReturnsType ParseReturnsType(const std::string& returns_type_str) {
   }
 }
 
-// For use in IS-MCTS
-std::unique_ptr<State> Resample(
-    const Game& game,
-    Observation& infostate,
-    int player_hand,
-    std::mt19937& rnd_gen
-) {
-  namespace opr = operations_research;
-
-  const auto point_cards = infostate.Tensor("point_card_sequence");
-  int bet_rounds = std::accumulate(point_cards.begin(), point_cards.end(), -1);
-  if (bet_rounds == 0) {
-    return game.NewInitialState();
-  }
-
-  int num_cards = infostate.Tensor("tie_sequence").size();
-  DimensionedSpan wins = infostate.GetSpan("win_sequence");
-  DimensionedSpan ties = infostate.GetSpan("tie_sequence");
-  DimensionedSpan player_action_sequence = infostate.GetSpan("player_action_sequence");
-
-  SPIEL_CHECK_GE(bet_rounds, 1);
-  SPIEL_CHECK_LE(bet_rounds, num_cards);
-  SPIEL_CHECK_EQ(wins.shape[0], num_cards);
-  SPIEL_CHECK_EQ(ties.shape[0], num_cards);
-
-  opr::sat::CpModelBuilder cp_model;
-  // Init variables.
-  const opr::Domain cards(0, num_cards-1);
-  std::array<std::vector<opr::sat::IntVar>, 2> played;
-  for (int pl = 0; pl < 2; ++pl) {
-    for (int i = 0; i < bet_rounds; ++i) {
-      played[pl].push_back(cp_model.NewIntVar(cards));
-    }
-  }
-  // Players can play each card only once.
-  for (int pl = 0; pl < 2; ++pl) {
-    for (int i = 0; i < bet_rounds; ++i) {
-      for (int j = i + 1; j < bet_rounds; ++j) {
-        cp_model.AddNotEqual(played[pl][i], played[pl][j]);
-      }
-    }
-  }
-  // Encode the outcome constraints.
-  for (int i = 0; i < bet_rounds; ++i) {
-    opr::sat::IntVar& a = played[0][i];
-    opr::sat::IntVar& b = played[1][i];
-    if (ties.at(i)) cp_model.AddEquality(a, b);  // draw: a == b
-    else if (wins.at(i, 0)) cp_model.AddGreaterThan(a, b);  // win : a  > b
-    else if (wins.at(i, 1)) cp_model.AddLessThan(a, b);     // lose: a  < b
-    else SpielFatalError("Unknown outcome");
-  }
-
-  // Store solution.
-  auto card_dist = std::uniform_int_distribution<int>(1, num_cards);
-  auto player_dist = std::uniform_int_distribution<int>(0, 1);
-  auto dir_dist = std::uniform_int_distribution<int>(0, bet_rounds);
-
-  while (true) {
-    opr::sat::CpModelBuilder rnd_model = cp_model;
-
-    for (int i = 0; i < bet_rounds; ++i) {
-      // Set player's actions.
-      int card = -1;
-      for (int c  = 0; c < num_cards; ++c) {
-        if (player_action_sequence.at(i, c)) card = c;
-      }
-      SPIEL_CHECK_GE(card, 0);
-      SPIEL_CHECK_LT(card, num_cards);
-      rnd_model.AddEquality(played[player_hand][i], card);
-
-      // Randomize only through the opponent.
-      int diverse_player = 1 - player_hand;
-
-      int opp_card = card_dist(rnd_gen);
-      int dir = dir_dist(rnd_gen);
-      opr::sat::IntVar& a = played[diverse_player][i];
-      // TODO: make more tuning of the constraints so that we have
-      //       better diversity. Now from 1000 particles ~500 begin with
-      //       first action 1
-      if      (dir == 0) rnd_model.AddLessOrEqual(a, opp_card);
-      else if (dir == 1) rnd_model.AddEquality(a, opp_card);
-      else               rnd_model.AddGreaterOrEqual(a, opp_card);
-    }
-
-    // Solve.
-    opr::sat::CpSolverResponse response = Solve(rnd_model.Build());
-    if (response.status() == opr::sat::OPTIMAL) {
-      std::unique_ptr<State> state = game.NewInitialState();
-      for (int j = 0; j < bet_rounds; ++j) {
-        state->ApplyActions({
-                                SolutionIntegerValue(response, played[0][j]),
-                                SolutionIntegerValue(response, played[1][j]),
-                            });
-      }
-      return state;
-    }
-  }
-
-}
-
 }  // namespace
 
 class GoofspielObserver : public Observer {
@@ -541,6 +441,7 @@ void GoofspielState::DoApplyAction(Action action_id) {
 void GoofspielState::DoApplyActions(const std::vector<Action>& actions) {
   // Check the actions are valid.
   SPIEL_CHECK_EQ(actions.size(), num_players_);
+  SPIEL_CHECK_FALSE(IsTerminal());
   for (auto p = Player{0}; p < num_players_; ++p) {
     const int action = actions[p];
     SPIEL_CHECK_GE(action, 0);
@@ -795,13 +696,30 @@ std::unique_ptr<State> GoofspielState::Clone() const {
   return std::unique_ptr<State>(new GoofspielState(*this));
 }
 
+// Hacked together for a use in IS-MCTS.
+// Brings a wild header dependency to this game and should be refactored later.
 std::unique_ptr<State> GoofspielState::ResampleFromInfostate(
     int player_id, std::function<double()> rng) const {
   auto observer = game_->MakeObserver(kInfoStateObsType, {});
   Observation infostate(*game_, observer);
   infostate.SetFrom(*this, player_id);
-  std::mt19937 mt_rnd(rng());
-  return Resample(*game_, infostate, player_id, mt_rnd);
+  std::mt19937 rnd_gen(rng());
+
+  std::unique_ptr<papers_with_code::ParticleSet> set =
+      papers_with_code::GenerateParticles(infostate, player_id,
+                                          /*max_particles=*/1,
+                                          /*max_rejection_cnt=*/100,
+                                          /*infostate_particles=*/1,
+                                          rnd_gen);
+
+  if (set->particles.empty()) {
+    return Clone();
+  } else {
+    auto& h = set->particles[0].history;
+    std::unique_ptr<State> state = game_->NewInitialState();
+    for (int j = 0; j < h.size(); j += 2) state->ApplyActions({h[j], h[j+1]});
+    return state;
+  }
 }
 
 GoofspielGame::GoofspielGame(const GameParameters& params)

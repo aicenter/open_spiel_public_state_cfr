@@ -105,24 +105,15 @@ std::unique_ptr<ParticleSet> GenerateParticles(
 
       // Add random constraints to generate diverse solutions.
       // Without this we would get exactly the same solution each call.
-      bool make_diverse_constraints =
-          // Make it easy to generate 1 infostate particle
-          // (no collisions due to diversity constraints).
-          infostate_particles > 1
-          // If we are generating only remaining public state particles,
-          // add diversity constraints.
-          || set->particles.size() >= infostate_particles;
-      if (make_diverse_constraints) {
-        int card = card_dist(rnd_gen);
-        int dir = dir_dist(rnd_gen);
-        opr::sat::IntVar& a = played[diverse_player][i];
-        // TODO: make more tuning of the constraints so that we have
-        //       better diversity. Now from 1000 particles ~500 begin with
-        //       first action 1
-        if      (dir == 0) rnd_model.AddLessOrEqual(a, card);
-        else if (dir == 1) rnd_model.AddEquality(a, card);
-        else               rnd_model.AddGreaterOrEqual(a, card);
-      }
+      int card = card_dist(rnd_gen);
+      int dir = dir_dist(rnd_gen);
+      opr::sat::IntVar& a = played[diverse_player][i];
+      // TODO: make more tuning of the constraints so that we have
+      //       better diversity. Now from 1000 particles ~500 begin with
+      //       first action 1
+      if      (dir == 0) rnd_model.AddLessOrEqual(a, card);
+      else if (dir == 1) rnd_model.AddEquality(a, card);
+      else               rnd_model.AddGreaterOrEqual(a, card);
     }
 
     // Solve.
