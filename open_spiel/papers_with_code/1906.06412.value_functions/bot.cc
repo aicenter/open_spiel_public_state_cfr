@@ -19,8 +19,8 @@
 namespace open_spiel {
 namespace papers_with_code {
 
-SherlockBot::SherlockBot(std::unique_ptr<SubgameFactory> subgame_factory,
-                         std::unique_ptr<SolverFactory> solver_factory,
+SherlockBot::SherlockBot(std::shared_ptr<SubgameFactory> subgame_factory,
+                         std::shared_ptr<SolverFactory> solver_factory,
                          Player player_id, int seed)
     : subgame_factory_(std::move(subgame_factory)),
       solver_factory_(std::move(solver_factory)),
@@ -159,8 +159,8 @@ std::unique_ptr<Bot> SherlockBot::Clone() const {
 }
 
 std::unique_ptr<Bot> MakeSherlockBot(
-    std::unique_ptr<SubgameFactory> subgame_factory,
-    std::unique_ptr<SolverFactory> solver_factory,
+    std::shared_ptr<SubgameFactory> subgame_factory,
+    std::shared_ptr<SolverFactory> solver_factory,
     Player player_id, int seed) {
   return std::make_unique<SherlockBot>(std::move(subgame_factory),
                                        std::move(solver_factory),

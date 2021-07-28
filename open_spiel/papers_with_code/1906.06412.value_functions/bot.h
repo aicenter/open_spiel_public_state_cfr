@@ -36,8 +36,8 @@ class SherlockBot : public Bot {
   std::shared_ptr<Subgame> subgame_;
 
  public:
-  SherlockBot(std::unique_ptr<SubgameFactory> subgame_factory,
-              std::unique_ptr<SolverFactory> solver_factory,
+  SherlockBot(std::shared_ptr<SubgameFactory> subgame_factory,
+              std::shared_ptr<SolverFactory> solver_factory,
               Player player_id, int seed);
 
   SherlockBot(const SherlockBot& bot);
@@ -66,9 +66,9 @@ class SherlockBot : public Bot {
   }
 };
 
-std::unique_ptr<Bot>  MakeSherlockBot(
-    std::unique_ptr<SubgameFactory> subgame_factory,
-    std::unique_ptr<SolverFactory> solver_factory,
+std::unique_ptr<Bot> MakeSherlockBot(
+    std::shared_ptr<SubgameFactory> subgame_factory,
+    std::shared_ptr<SolverFactory> solver_factory,
     Player player_id, int seed);
 
 std::unique_ptr<ParticleSet> ParticlesFromState(const PublicState& state);
@@ -134,8 +134,8 @@ class SherlockBotFactory : public BotFactory {
         && type.provides_observation_tensor;
   }
 
-  std::tuple<std::unique_ptr<SubgameFactory>,
-             std::unique_ptr<SolverFactory>,
+  std::tuple<std::shared_ptr<SubgameFactory>,
+             std::shared_ptr<SolverFactory>,
              int> ParseParams(std::shared_ptr<const Game> game,
                               Player player_id,
                               const GameParameters& bot_params) const {
@@ -172,7 +172,7 @@ class SherlockBotFactory : public BotFactory {
         GetParameterValue<std::string>(bot_params, "load_from", game_model);
 
     // -- Create all necessary structures --------------------------------------
-    auto subgame_factory = std::make_unique<SubgameFactory>();
+    auto subgame_factory = std::make_shared<SubgameFactory>();
     subgame_factory->game = game;
     subgame_factory->infostate_observer =
         game->MakeObserver(kInfoStateObsType, {});
@@ -184,7 +184,7 @@ class SherlockBotFactory : public BotFactory {
     subgame_factory->max_particles = max_particles;
     //
 
-    auto solver_factory = std::make_unique<SolverFactory>();
+    auto solver_factory = std::make_shared<SolverFactory>();
     if (non_terminal_evaluator == "net") {
 
       torch::Device device(device_spec);
@@ -236,8 +236,8 @@ class SherlockBotFactory : public BotFactory {
     solver_factory->terminal_evaluator = std::make_shared<TerminalEvaluator>();
     solver_factory->safe_resolving = true;
 
-    return std::tuple<std::unique_ptr<SubgameFactory>,
-                      std::unique_ptr<SolverFactory>,
+    return std::tuple<std::shared_ptr<SubgameFactory>,
+                      std::shared_ptr<SolverFactory>,
                       int>{std::move(subgame_factory),
                            std::move(solver_factory), seed};
   }
@@ -245,8 +245,8 @@ class SherlockBotFactory : public BotFactory {
   std::unique_ptr<Bot> Create(std::shared_ptr<const Game> game,
                               Player player_id,
                               const GameParameters& bot_params) const override {
-    std::tuple<std::unique_ptr<SubgameFactory>,
-               std::unique_ptr<SolverFactory>,
+    std::tuple<std::shared_ptr<SubgameFactory>,
+               std::shared_ptr<SolverFactory>,
                int> params = ParseParams(game, player_id, bot_params);
     return MakeSherlockBot(std::move(std::get<0>(params)),
                            std::move(std::get<1>(params)),

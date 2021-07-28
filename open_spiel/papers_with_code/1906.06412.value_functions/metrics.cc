@@ -13,10 +13,15 @@
 // limitations under the License.
 
 #include "open_spiel/papers_with_code/1906.06412.value_functions/metrics.h"
-#include "open_spiel/papers_with_code/1906.06412.value_functions/subgame_factory.h"
-#include "open_spiel/algorithms/dispatch_policy.h"
 
 #include <chrono>
+
+#include "open_spiel/algorithms/dispatch_policy.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/subgame_factory.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/tabularize_bot.h"
+#include <open_spiel/algorithms/infostate_tree.h>
+#include <algorithms/best_response.h>
+#include <game_transforms/turn_based_simultaneous_game.h>
 
 namespace open_spiel {
 namespace papers_with_code {
@@ -84,6 +89,42 @@ class FullTrunkExplMetric : public Metric {
     return false;
   }
 };
+
+class IigsBrMetric : public Metric {
+  std::unique_ptr<Bot> bot_;
+  std::shared_ptr<const Game> orig_game_;
+  std::shared_ptr<const Game> br_game_;
+  std::shared_ptr<algorithms::InfostateTree> player_tree_;
+  double br_;
+ public:
+  IigsBrMetric(std::unique_ptr<Bot> bot,
+               std::shared_ptr<const goofspiel::GoofspielGame> game)
+      : bot_(std::move(bot)),
+        br_game_(LoadGameAsTurnBased(absl::StrCat("goofspiel("
+          "players=2,"
+          "num_turns=", game->NumTurns(), ","
+          "num_cards=", game->NumCards(), ","
+          "opponent_br_deck=True,"  // <-- This is important change.
+          "imp_info=True,"
+          "points_order=descending"
+        ")"))),
+        player_tree_(algorithms::MakeInfostateTree(
+            *game, Player{0},
+            algorithms::kNoMoveAheadLimit,
+            algorithms::kStoreAllStatesPolicy)) {}
+  std::string name() const override { return "br"; }
+  void Reset() override {}
+  void Evaluate(std::ostream& progress) override {
+    std::shared_ptr<TabularPolicy> policy =
+        TabularizeOnlinePolicy(bot_.get(), player_tree_);
+//    std::cout << policy->ToString() << "\n";
+    algorithms::TabularBestResponse br(*br_game_, Player{1}, policy.get());
+    br_ = br.Value("");
+  }
+  void PrintHeader(std::ostream& os) const override { os << "br"; }
+  void PrintMetric(std::ostream& os) const override { os << br_; }
+};
+
 
 class ReplayVisitsMetric : public Metric {
   ExperienceReplay* replay_;
@@ -157,6 +198,13 @@ std::unique_ptr<Metric> MakeFullTrunkExplMetric(
   return std::make_unique<FullTrunkExplMetric>(std::move(evaluate_iters),
                                                trunk_with_net, whole_game);
 }
+
+std::unique_ptr<Metric> MakeIigsBrMetric(
+    std::unique_ptr<Bot> bot,
+    std::shared_ptr<const goofspiel::GoofspielGame> game) {
+  return std::make_unique<IigsBrMetric>(std::move(bot), game);
+}
+
 
 std::unique_ptr<Metric> MakeReplayVisitsMetric(ExperienceReplay* replay,
                                                int window) {

@@ -106,6 +106,9 @@ ABSL_FLAG(int, replay_visits_window, -1,
           "behind the head in experience replay");
 ABSL_FLAG(bool, track_time, false, "Track time between loops");
 ABSL_FLAG(bool, track_lr, false, "Track time between loops");
+// IigsBrMetric
+ABSL_FLAG(bool, iigs_br_metric, false,
+          "Compute domain-specific BR for IIGS(N,K)");
 
 
 // -----------------------------------------------------------------------------
@@ -119,7 +122,7 @@ ABSL_FLAG(bool, track_lr, false, "Track time between loops");
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_dl_evaluator.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/snapshot.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/ismcts_playthroughs.h"
-
+#include "open_spiel/papers_with_code/1906.06412.value_functions/bot.h"
 
 namespace open_spiel {
 namespace papers_with_code {
@@ -221,29 +224,29 @@ void TrainEvalLoop() {
   randomizer.prob_fully_mixed = absl::GetFlag(FLAGS_prob_fully_mixed);
   //
   std::cout << "# Making subgame subgame_factory ..." << std::endl;
-  SubgameFactory subgame_factory;
-  auto game = subgame_factory.game     = LoadGame(absl::GetFlag(FLAGS_game_name));
-  subgame_factory.infostate_observer   = game->MakeObserver(kInfoStateObsType, {});
-  subgame_factory.public_observer      = game->MakeObserver(kPublicStateObsType, {});
-  subgame_factory.hand_observer        = game->MakeObserver(kHandHistoryObsType, {});
-  subgame_factory.max_move_ahead_limit = absl::GetFlag(FLAGS_max_move_ahead_limit);
-  subgame_factory.max_trunk_depth      = absl::GetFlag(FLAGS_depth);
-  subgame_factory.max_particles        = absl::GetFlag(FLAGS_max_particles);
+  auto subgame_factory = std::make_shared<SubgameFactory>();
+  auto game = subgame_factory->game     = LoadGame(absl::GetFlag(FLAGS_game_name));
+  subgame_factory->infostate_observer   = game->MakeObserver(kInfoStateObsType, {});
+  subgame_factory->public_observer      = game->MakeObserver(kPublicStateObsType, {});
+  subgame_factory->hand_observer        = game->MakeObserver(kHandHistoryObsType, {});
+  subgame_factory->max_move_ahead_limit = absl::GetFlag(FLAGS_max_move_ahead_limit);
+  subgame_factory->max_trunk_depth      = absl::GetFlag(FLAGS_depth);
+  subgame_factory->max_particles        = absl::GetFlag(FLAGS_max_particles);
   //
   std::cout << "# Making oracle evaluator ..." << std::endl;
   const PolicySelection save_values_policy =
       GetSaveValuesPolicy(absl::GetFlag(FLAGS_save_values_policy));
   auto terminal_evaluator = std::make_shared<TerminalEvaluator>();
   auto oracle = std::make_shared<CFREvaluator>(
-      subgame_factory.game, algorithms::kNoMoveAheadLimit,
+      subgame_factory->game, algorithms::kNoMoveAheadLimit,
       /*no_leaf_evaluator=*/nullptr, terminal_evaluator,
-      subgame_factory.public_observer, subgame_factory.infostate_observer);
+      subgame_factory->public_observer, subgame_factory->infostate_observer);
   oracle->bandit_name = kDefaultDlCfrBandit;
   oracle->num_cfr_iterations = absl::GetFlag(FLAGS_cfr_oracle_iterations);
   oracle->save_values_policy = save_values_policy;
   //
   std::cout << "# Init empty reusable structures ..." << std::endl;
-  ReusableStructures reuse(&subgame_factory,
+  ReusableStructures reuse(subgame_factory.get(),
                            /*solver_factory=*/nullptr, // Supplied later.
                            oracle);
   //
@@ -255,27 +258,27 @@ void TrainEvalLoop() {
   const NetArchitecture arch = GetArchitecture(absl::GetFlag(FLAGS_arch));
   std::cout << "# Deducing dimensions ..." << std::endl;
   std::shared_ptr<BasicDims> dims = DeduceBasicDims(
-      arch, *game, subgame_factory.public_observer, subgame_factory.hand_observer);
+      arch, *game, subgame_factory->public_observer, subgame_factory->hand_observer);
   std::cout << "# Public features: " << dims->public_features_size << std::endl;
   std::cout << "# Hand features: " << dims->hand_features_size << std::endl;
   //
   std::cout << "# Deducing dimensions for specific VFs ..." << std::endl;
-  if (subgame_factory.max_particles >= 1) {  // Static setting.
+  if (subgame_factory->max_particles >= 1) {  // Static setting.
     auto particle_dims = open_spiel::down_cast<ParticleDims*>(dims.get());
-    particle_dims->max_parviews = subgame_factory.max_particles * 2;
+    particle_dims->max_parviews = subgame_factory->max_particles * 2;
     std::cout << "# Particle VF (set statically): "
-                 "max_particles = " << subgame_factory.max_particles << ' ' <<
+                 "max_particles = " << subgame_factory->max_particles << ' ' <<
               "max_parviews = " << particle_dims->max_parviews << std::endl;
   }
   std::shared_ptr<HandInfo> hand_info;
-  if (arch == NetArchitecture::kPositional || subgame_factory.max_particles == -1) {
+  if (arch == NetArchitecture::kPositional || subgame_factory->max_particles == -1) {
     std::cout << "# Finding all hands in the game (may take a while) ..."
               << std::endl;
     PublicStatesInGame* all_states = reuse.GetAllPublicStates();
     const std::vector<PublicState>& public_states = all_states->public_states;
     std::cout << "# Number of public states: "
               << all_states->public_states.size() << std::endl;
-    hand_info = MakeHandInfo(*game, subgame_factory.hand_observer, public_states);
+    hand_info = MakeHandInfo(*game, subgame_factory->hand_observer, public_states);
     // Hand info can be computed only based on the trunk, or can be provided
     // in a domain-dependent manner in games where it is possible thanks to
     // the structure of the game (Poker / Liar's dice)
@@ -284,7 +287,7 @@ void TrainEvalLoop() {
 //        trunk_states->public_states();
 //    std::cout << "# Number of public states: "
 //              << trunk_states->public_states().size() << std::endl;
-//    hand_info = MakeHandInfo(*game, subgame_factory.hand_observer,
+//    hand_info = MakeHandInfo(*game, subgame_factory->hand_observer,
 //                             trunk_states->public_states());
 
     if (arch == NetArchitecture::kPositional) {
@@ -297,10 +300,10 @@ void TrainEvalLoop() {
     }
     if (arch == NetArchitecture::kParticle) {
       auto particle_dims = open_spiel::down_cast<ParticleDims*>(dims.get());
-      subgame_factory.max_particles = LargestPublicState(public_states);
+      subgame_factory->max_particles = LargestPublicState(public_states);
       particle_dims->max_parviews = hand_info->num_hands();
       std::cout << "# Particle VF (derived automatically): "
-                   "max_particles = " << subgame_factory.max_particles << ' ' <<
+                   "max_particles = " << subgame_factory->max_particles << ' ' <<
                 "max_parviews = " << particle_dims->max_parviews << "\n";
     }
   }
@@ -355,23 +358,23 @@ void TrainEvalLoop() {
                                                 dims->point_input_size(),
                                                 dims->point_output_size());
   //
-  SolverFactory solver_factory;
+  auto solver_factory = std::make_shared<SolverFactory>();
   std::cout << "# Making net evaluator ..." << std::endl;
-  solver_factory.cfr_iterations = absl::GetFlag(FLAGS_cfr_iterations);
-  solver_factory.use_bandits_for_cfr  = absl::GetFlag(FLAGS_use_bandits_for_cfr);
-  solver_factory.save_values_policy   = save_values_policy;
-  solver_factory.terminal_evaluator   = terminal_evaluator;
-  solver_factory.leaf_evaluator = MakeNetEvaluator(
+  solver_factory->cfr_iterations = absl::GetFlag(FLAGS_cfr_iterations);
+  solver_factory->use_bandits_for_cfr  = absl::GetFlag(FLAGS_use_bandits_for_cfr);
+  solver_factory->save_values_policy   = save_values_policy;
+  solver_factory->terminal_evaluator   = terminal_evaluator;
+  solver_factory->leaf_evaluator = MakeNetEvaluator(
       dims, model, eval_batch, device, &rnd_gen,
       hand_info,  // May be nullptr for particle VF.
-      subgame_factory.hand_observer);
-  reuse.solver_factory = &solver_factory;
+      subgame_factory->hand_observer);
+  reuse.solver_factory = solver_factory.get();
   //
   std::cout << "# Making replay filler ..." << std::endl;
   ReplayFiller filler;
   filler.replay     = &experience_replay;
-  filler.subgame_factory = &subgame_factory;
-  filler.solver_factory  = &solver_factory;
+  filler.subgame_factory = subgame_factory.get();
+  filler.solver_factory  = solver_factory.get();
   filler.dims       = dims.get();
   filler.randomizer = &randomizer;
   filler.reuse      = &reuse;
@@ -407,6 +410,15 @@ void TrainEvalLoop() {
   if (absl::GetFlag(FLAGS_track_time)) {
     std::cout << "# Making tracking time metric ..." << std::endl;
     metrics.push_back(MakeTrackTimeMetric());
+  }
+  if (absl::GetFlag(FLAGS_iigs_br_metric)) {
+    std::cout << "# Making IIGS BR metric ..." << std::endl;
+    std::unique_ptr<Bot> bot = MakeSherlockBot(subgame_factory,
+                                               solver_factory,
+                                               Player{0}, seed);
+    auto goof_game =
+        std::dynamic_pointer_cast<const goofspiel::GoofspielGame>(game);
+    metrics.push_back(MakeIigsBrMetric(std::move(bot), goof_game));
   }
   //
   ReplayFillerPolicy exp_init =

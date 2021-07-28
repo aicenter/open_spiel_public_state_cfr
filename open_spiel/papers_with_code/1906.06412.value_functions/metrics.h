@@ -15,6 +15,7 @@
 #ifndef OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_TRAIN_EVAL_
 #define OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_TRAIN_EVAL_
 
+#include "open_spiel/games/goofspiel.h"
 #include "absl/random/random.h"
 #include "torch/torch.h"
 
@@ -43,6 +44,10 @@ std::unique_ptr<Metric> MakeFullTrunkExplMetric(
     std::vector<int> evaluate_iters,
     SubgameSolver* trunk_with_net,
     algorithms::ortools::SequenceFormLpSpecification* whole_game);
+
+std::unique_ptr<Metric> MakeIigsBrMetric(
+    std::unique_ptr<Bot> bot,
+    std::shared_ptr<const goofspiel::GoofspielGame> game);
 
 std::unique_ptr<Metric> MakeReplayVisitsMetric(
     ExperienceReplay* replay, int window);
