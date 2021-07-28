@@ -28,44 +28,45 @@ std::unique_ptr<ParticleSet> GenerateParticles(
     std::mt19937& rnd_gen
 ) {
   const auto point_cards = infostate.Tensor("point_card_sequence");
-  int bet_rounds = std::accumulate(point_cards.begin(), point_cards.end(), -1);
+  int num_bets = std::accumulate(point_cards.begin(), point_cards.end(), -1);
 
   auto set = std::make_unique<ParticleSet>();
-  if (bet_rounds == 0) {  // Initial state -- no actions made yet.
+  if (num_bets == 0) {  // Initial state -- no actions made yet.
     set->particles.push_back(std::vector<Action>{});
     return set;
   }
 
-  int num_cards = infostate.Tensor("tie_sequence").size();
+  int num_cards = infostate.Tensor("player_hand").size();
   DimensionedSpan wins = infostate.GetSpan("win_sequence");
+  int num_turns = wins.shape[0];
   DimensionedSpan ties = infostate.GetSpan("tie_sequence");
   DimensionedSpan player_action_sequence = infostate.GetSpan("player_action_sequence");
 
   SPIEL_CHECK_LE(infostate_particles, max_particles);
-  SPIEL_CHECK_GE(bet_rounds, 1);
-  SPIEL_CHECK_LE(bet_rounds, num_cards);
-  SPIEL_CHECK_EQ(wins.shape[0], num_cards);
-  SPIEL_CHECK_EQ(ties.shape[0], num_cards);
+  SPIEL_CHECK_GE(num_bets, 1);
+  SPIEL_CHECK_LE(num_bets, num_cards);
+  SPIEL_CHECK_EQ(wins.shape[0], num_turns);
+  SPIEL_CHECK_EQ(ties.shape[0], num_turns);
 
   opr::sat::CpModelBuilder cp_model;
   // Init variables.
   const opr::Domain cards(0, num_cards-1);
   std::array<std::vector<opr::sat::IntVar>, 2> played;
   for (int pl = 0; pl < 2; ++pl) {
-    for (int i = 0; i < bet_rounds; ++i) {
+    for (int i = 0; i < num_bets; ++i) {
       played[pl].push_back(cp_model.NewIntVar(cards));
     }
   }
   // Players can play each card only once.
   for (int pl = 0; pl < 2; ++pl) {
-    for (int i = 0; i < bet_rounds; ++i) {
-      for (int j = i + 1; j < bet_rounds; ++j) {
+    for (int i = 0; i < num_bets; ++i) {
+      for (int j = i + 1; j < num_bets; ++j) {
         cp_model.AddNotEqual(played[pl][i], played[pl][j]);
       }
     }
   }
   // Encode the outcome constraints.
-  for (int i = 0; i < bet_rounds; ++i) {
+  for (int i = 0; i < num_bets; ++i) {
     opr::sat::IntVar& a = played[0][i];
     opr::sat::IntVar& b = played[1][i];
     if (ties.at(i)) cp_model.AddEquality(a, b);  // draw: a == b
@@ -77,14 +78,14 @@ std::unique_ptr<ParticleSet> GenerateParticles(
   // Store solution.
   auto card_dist = std::uniform_int_distribution<int>(1, num_cards);
   auto player_dist = std::uniform_int_distribution<int>(0, 1);
-  auto dir_dist = std::uniform_int_distribution<int>(0, bet_rounds);
+  auto dir_dist = std::uniform_int_distribution<int>(0, num_bets);
 
   int num_rejected = 0;
   while (set->particles.size() < max_particles
       && num_rejected < max_rejection_cnt) {
     opr::sat::CpModelBuilder rnd_model = cp_model;
 
-    for (int i = 0; i < bet_rounds; ++i) {
+    for (int i = 0; i < num_bets; ++i) {
       int diverse_player;
       if (set->particles.size() < infostate_particles) {
         // Set player's actions.
@@ -128,8 +129,8 @@ std::unique_ptr<ParticleSet> GenerateParticles(
     opr::sat::CpSolverResponse response = Solve(rnd_model.Build());
     if (response.status() == opr::sat::OPTIMAL) {
       std::vector<Action> history;
-      history.reserve(bet_rounds * 2);
-      for (int j = 0; j < bet_rounds; ++j) {
+      history.reserve(num_bets * 2);
+      for (int j = 0; j < num_bets; ++j) {
         // -1 due to 0-based indexing in the goofspiel game implementation.
         history.push_back(SolutionIntegerValue(response, played[0][j]));
         history.push_back(SolutionIntegerValue(response, played[1][j]));
