@@ -118,9 +118,11 @@ std::array<float, 2> ParticleDataPoint::NormalizeBeliefsAndValues() {
     SPIEL_DCHECK_TRUE(std::isfinite(belief_normalizers[pl]));
 
     // In-place modifications!
-    player_beliefs[pl].div_(belief_normalizers[pl]).nan_to_num_();
+    player_beliefs[pl].div_(belief_normalizers[pl]).nan_to_num_(
+        /*nan=*/0., /*posinf=*/0., /*neginf=*/0.);
     // Important: Opposite beliefs for values !!!
-    player_values[pl].div_(belief_normalizers[1 - pl]).nan_to_num_();
+    player_values[pl].div_(belief_normalizers[1 - pl]).nan_to_num_(
+        /*nan=*/0., /*posinf=*/0., /*neginf=*/0.);;
 
     SPIEL_DCHECK_TRUE(torch::isfinite(player_beliefs[pl]).all().item<bool>());
     SPIEL_DCHECK_TRUE(torch::isfinite(player_values[pl]).all().item<bool>());

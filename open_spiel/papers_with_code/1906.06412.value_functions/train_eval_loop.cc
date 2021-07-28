@@ -146,7 +146,7 @@ double TrainNetwork(ValueNet* model, torch::Device* device,
   torch::Tensor output = model->forward(data);
   SPIEL_DCHECK_TRUE(torch::isfinite(output).all().item<bool>());
   torch::Tensor loss = torch::mse_loss(output, target);
-  SPIEL_CHECK_FALSE(std::isnan(loss.template item<float>()));
+  SPIEL_CHECK_TRUE(std::isfinite(loss.item<float>()));
   loss.backward();
   optimizer->step();
   return loss.item().to<double>();

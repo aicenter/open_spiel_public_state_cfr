@@ -195,7 +195,8 @@ torch::Tensor ParticleValueNet::forward(torch::Tensor xss) {
     torch::Tensor batch_beliefs = beliefs.squeeze(/*dim=*/2);                   CHECK_SHAPE(batch_beliefs, {batch_size, num_parviews});
     torch::Tensor proj_error = (proj * batch_beliefs).sum(/*dim=*/1)
                              / (batch_beliefs * batch_beliefs).sum(/*dim=*/1);  CHECK_SHAPE(proj_error, {batch_size});
-    proj_error.nan_to_num_();  // Zero-out NaNs due to zero beliefs.
+    // Zero-out NaNs due to zero beliefs.
+    proj_error.nan_to_num_(/*nan=*/0., /*posinf=*/0., /*neginf=*/0.);
 
     torch::Tensor expanded_proj_error =
         proj_error.expand({num_parviews, -1}).permute({1, 0});                  CHECK_SHAPE(expanded_proj_error, {batch_size, num_parviews});
