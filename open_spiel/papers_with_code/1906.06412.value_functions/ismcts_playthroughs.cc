@@ -13,10 +13,64 @@
 // limitations under the License.
 
 
+#include <game_transforms/turn_based_simultaneous_game.h>
 #include "open_spiel/papers_with_code/1906.06412.value_functions/ismcts_playthroughs.h"
+
+#include "open_spiel/papers_with_code/1906.06412.value_functions/particle_regeneration.h"
 
 namespace open_spiel {
 namespace papers_with_code {
+namespace {
+
+// Hacked together for a use in IS-MCTS.
+std::unique_ptr<State> GoofspielInfostateStateResampler(
+    const State& state, int player_id, std::function<double()> rng) {
+
+
+  // The game is after the turn-based transformation.
+  auto turn_state =
+      open_spiel::down_cast<const TurnBasedSimultaneousState*>(&state);
+  auto turn_game =
+      open_spiel::down_cast<const TurnBasedSimultaneousGame*>(state.GetGame().get());
+  auto goof_game = turn_game->wrapped_game();
+  auto goof_state = turn_state->SimultaneousGameState();
+
+  auto observer = goof_game->MakeObserver(kInfoStateObsType, {});
+  Observation infostate(*goof_game, observer);
+  infostate.SetFrom(*goof_state, player_id);
+  std::mt19937 rnd_gen(rng());
+
+  std::unique_ptr<papers_with_code::ParticleSet> set =
+      papers_with_code::GenerateParticles(infostate, player_id,
+                                          /*max_particles=*/1,
+                                          /*max_rejection_cnt=*/100,
+                                          /*infostate_particles=*/1,
+                                          rnd_gen);
+
+  if (set->particles.empty()) {
+    return state.Clone();
+  } else {
+    auto& h = set->particles[0].history;
+    std::unique_ptr<State> sampled_state = turn_game->NewInitialState();
+    for (int j = 0; j < h.size(); ++j) {
+      sampled_state->ApplyAction(h[j]);
+    }
+    // Apply some last action if player 0 made its turn.
+    if (turn_state->CurrentPlayer() == 1) {
+      auto actions = sampled_state->LegalActions(Player{0});
+      std::uniform_int_distribution<int> dist(0, actions.size()-1);
+      sampled_state->ApplyAction(actions[dist(rnd_gen)]);
+    }
+    SPIEL_DCHECK_EQ(sampled_state->CurrentPlayer(), state.CurrentPlayer());
+    SPIEL_DCHECK_EQ(sampled_state->FullHistory().size(),
+                    state.FullHistory().size());
+    SPIEL_DCHECK_EQ(sampled_state->InformationStateString(),
+                    state.InformationStateString());
+    return sampled_state;
+  }
+}
+
+} // namespace
 
 
 void IsmctsPlaythroughs::GenerateNodes(const Game& game, std::mt19937& rnd) {
@@ -100,6 +154,7 @@ void IsmctsPlaythroughs::MakeBot(std::mt19937& rnd_gen) {
                max_simulations, algorithms::kUnlimitedNumWorldSamples, policy_type,
       /*use_observation_string=*/false,
       /*allow_inconsistent_action_sets=*/false);
+  bot->SetResampler(GoofspielInfostateStateResampler);
 }
 
 InfostateStats::iterator IsmctsPlaythroughs::SampleInfostate(

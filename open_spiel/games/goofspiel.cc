@@ -696,32 +696,6 @@ std::unique_ptr<State> GoofspielState::Clone() const {
   return std::unique_ptr<State>(new GoofspielState(*this));
 }
 
-// Hacked together for a use in IS-MCTS.
-// Brings a wild header dependency to this game and should be refactored later.
-std::unique_ptr<State> GoofspielState::ResampleFromInfostate(
-    int player_id, std::function<double()> rng) const {
-  auto observer = game_->MakeObserver(kInfoStateObsType, {});
-  Observation infostate(*game_, observer);
-  infostate.SetFrom(*this, player_id);
-  std::mt19937 rnd_gen(rng());
-
-  std::unique_ptr<papers_with_code::ParticleSet> set =
-      papers_with_code::GenerateParticles(infostate, player_id,
-                                          /*max_particles=*/1,
-                                          /*max_rejection_cnt=*/100,
-                                          /*infostate_particles=*/1,
-                                          rnd_gen);
-
-  if (set->particles.empty()) {
-    return Clone();
-  } else {
-    auto& h = set->particles[0].history;
-    std::unique_ptr<State> state = game_->NewInitialState();
-    for (int j = 0; j < h.size(); j += 2) state->ApplyActions({h[j], h[j+1]});
-    return state;
-  }
-}
-
 GoofspielGame::GoofspielGame(const GameParameters& params)
     : Game(kGameType, params),
       num_cards_(ParameterValue<int>("num_cards")),

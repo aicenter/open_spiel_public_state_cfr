@@ -87,17 +87,6 @@ void ISMCTS_BasicPlayGameTest_Leduc() {
   ISMCTSTest_PlayGame("leduc_poker(players=3)");
 }
 
-void ISMCTS_BasicPlayGameTest_Goofspiel() {
-  ISMCTSTest_PlayGame("turn_based_simultaneous_game("
-                      "game=goofspiel("
-                        "imp_info=True,"
-                        "num_cards=5,"
-                        "players=2,"
-                        "points_order=descending"
-                      ")"
-                      ")");
-}
-
 void ISMCTS_LeducObservationTest() {
   std::mt19937 rng(kSeed);
   std::shared_ptr<const Game> game = LoadGame("leduc_poker");
@@ -115,6 +104,5 @@ void ISMCTS_LeducObservationTest() {
 int main(int argc, char** argv) {
   open_spiel::ISMCTS_BasicPlayGameTest_Kuhn();
   open_spiel::ISMCTS_BasicPlayGameTest_Leduc();
-  open_spiel::ISMCTS_BasicPlayGameTest_Goofspiel();
   open_spiel::ISMCTS_LeducObservationTest();
 }

@@ -63,6 +63,8 @@ struct ISMCTSNode {
 };
 
 class ISMCTSBot : public Bot {
+  using Resampler = std::function<std::unique_ptr<State>(
+      const State& state, Player pl, std::function<double()> rng)>;
  public:
   // Construct an IS-MCTS bot. The parameter max_world_samples controls how many
   // states are sampled (with replacement!) at the root of the search; use
@@ -103,12 +105,17 @@ class ISMCTSBot : public Bot {
   std::vector<std::unique_ptr<ISMCTSNode>>& node_pool() {
     return  node_pool_;
   }
+  // Set a custom resampling function.
+  void SetResampler(Resampler cb) { resampler_cb_ = cb; };
  private:
   void Reset();
   double RandomNumber();
 
   ISMCTSStateKey GetStateKey(const State& state) const;
   std::unique_ptr<State> SampleRootState(const State& state);
+  // Dispatch to either domain-specific implementation,
+  // or a specially supplied one via SetResampler()
+  std::unique_ptr<State> ResampleFromInfostate(const State& state);
   ISMCTSNode* CreateNewNode(const State& state);
   ISMCTSNode* LookupNode(const State& state);
   ISMCTSNode* LookupOrCreateNode(const State& state);
@@ -148,6 +155,7 @@ class ISMCTSBot : public Bot {
   const bool use_observation_string_;
   const bool allow_inconsistent_action_sets_;
   ISMCTSNode* root_node_;
+  Resampler resampler_cb_;
 };
 
 }  // namespace algorithms

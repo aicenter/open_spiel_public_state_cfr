@@ -55,8 +55,6 @@ class TurnBasedSimultaneousState : public State {
                          absl::Span<float> values) const override;
   std::unique_ptr<State> Clone() const override;
   std::vector<std::pair<Action, double>> ChanceOutcomes() const override;
-  std::unique_ptr<State> ResampleFromInfostate(int player_id,
-                                               std::function<double()> rng) const override;
 
   // Access to the wrapped state, used for debugging and in the tests.
   const State* SimultaneousGameState() const { return state_.get(); }
@@ -118,7 +116,7 @@ class TurnBasedSimultaneousGame : public Game {
   }
   std::shared_ptr<Observer> MakeObserver(absl::optional<IIGObservationType> iig_obs_type,
                                          const GameParameters& params) const override;
-
+  std::shared_ptr<const Game> wrapped_game() const { return game_; }
  private:
   std::shared_ptr<const Game> game_;
 };

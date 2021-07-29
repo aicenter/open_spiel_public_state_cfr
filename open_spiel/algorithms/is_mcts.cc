@@ -61,8 +61,6 @@ ISMCTSStateKey ISMCTSBot::GetStateKey(const State& state) const {
 
 ActionsAndProbs ISMCTSBot::RunSearch(const State& state) {
   Reset();
-  SPIEL_CHECK_EQ(state.GetGame()->GetType().dynamics,
-                 GameType::Dynamics::kSequential);
   SPIEL_CHECK_EQ(state.GetGame()->GetType().information,
                  GameType::Information::kImperfectInformation);
 
@@ -181,14 +179,12 @@ ActionsAndProbs ISMCTSBot::GetFinalPolicy(const State& state,
   return policy;
 }
 
-std::unique_ptr<State> ISMCTSBot::ISMCTSBot::SampleRootState(
+std::unique_ptr<State> ISMCTSBot::SampleRootState(
     const State& state) {
   if (max_world_samples_ == kUnlimitedNumWorldSamples) {
-    return state.ResampleFromInfostate(state.CurrentPlayer(),
-                                       [this]() { return RandomNumber(); });
+    return ResampleFromInfostate(state);
   } else if (root_samples_.size() < max_world_samples_) {
-    root_samples_.push_back(state.ResampleFromInfostate(
-        state.CurrentPlayer(), [this]() { return RandomNumber(); }));
+    root_samples_.push_back(ResampleFromInfostate(state));
     return root_samples_.back()->Clone();
   } else if (root_samples_.size() == max_world_samples_) {
     int idx = absl::Uniform(rng_, 0u, root_samples_.size());
@@ -197,6 +193,19 @@ std::unique_ptr<State> ISMCTSBot::ISMCTSBot::SampleRootState(
     SpielFatalError("Case not handled (badly set max_world_samples..?)");
   }
 }
+
+std::unique_ptr<State> ISMCTSBot::ResampleFromInfostate(const State& state) {
+  if (resampler_cb_) {
+    return resampler_cb_(state, state.CurrentPlayer(),
+                         [this]() { return RandomNumber(); });
+  } else {
+    // Try domain-specific implementation
+    // (could be not implemented in some games).
+    return state.ResampleFromInfostate(state.CurrentPlayer(),
+                                       [this]() { return RandomNumber(); });
+  }
+}
+
 
 ISMCTSNode* ISMCTSBot::CreateNewNode(const State& state) {
   auto infostate_key = GetStateKey(state);
