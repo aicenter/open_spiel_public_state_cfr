@@ -60,7 +60,7 @@ void TestBotCanPlayGoofspiel() {
 
   for (int i = 0; i < num_games; i++) {
     for (Player p = 0; p < 2; ++p) bots[p]->Restart();
-    std::cout << "New game:";
+    std::cout << "New game\n";
     std::unique_ptr<State> state = game->NewInitialState();
     while (!state->IsTerminal()) {
       std::vector<std::pair<ActionsAndProbs, Action>> steps {

@@ -82,10 +82,16 @@ ABSL_FLAG(double, learning_rate, 1e-3, "Optimizer learning rate.");
 ABSL_FLAG(double, lr_decay, 1., "Learning rate decay after each loop.");
 ABSL_FLAG(int, max_particles, -1,
           "Max particles to use. Set -1 to find an upper bound automatically.");
+
+// -- Model checkpoints (snapshots) --
 ABSL_FLAG(int, snapshot_loop, -1,
           "When should NN weights be saved to snapshot/ dir? -1 for never.");
-ABSL_FLAG(std::string, snapshot_dir, "snapshots",
+ABSL_FLAG(std::string, snapshot_dir, "snapshots/",
           "Directory to store snapshots of NN weights.");
+ABSL_FLAG(std::string, load_snapshot, "",
+          "Absolute path to the snapshot that should be loaded. "
+          "A special keyword 'automatic' will load the latest snapshot "
+          " found in the snapshot_dir.");
 
 // -- Network --
 ABSL_FLAG(std::string, arch, "particle_vf",
@@ -330,12 +336,34 @@ void TrainEvalLoop() {
               << num_inputs_regression << "\n";
   }
   //
+  std::cout << "# Making eval data ..." << std::endl;
+  auto eval_batch = std::make_shared<BatchData>(1,
+                                                dims->point_input_size(),
+                                                dims->point_output_size());
+  //
   std::cout << "# Creating model ..." << std::endl;
   std::shared_ptr<ValueNet> model = MakeModel(
       arch, dims,
       absl::GetFlag(FLAGS_num_layers), absl::GetFlag(FLAGS_num_width),
       num_inputs_regression, absl::GetFlag(FLAGS_zero_sum_regression),
       absl::GetFlag(FLAGS_normalize_beliefs));
+  //
+  std::string load_snapshot = absl::GetFlag(FLAGS_load_snapshot);
+  const std::string snapshot_dir = absl::GetFlag(FLAGS_snapshot_dir);
+  if (load_snapshot == kLoadAutomaticSnapshot) {
+    std::cout << "# Finding most recent snapshot automatically ..." << std::endl;
+    load_snapshot = FindSnapshot(snapshot_dir);
+    if (!load_snapshot.empty())
+      std::cout << "# A snapshot was found." << std::endl;
+  }
+  if (!load_snapshot.empty()) {
+    std::cout << "# Loading model from snapshot: " << load_snapshot
+              << " ..." << std::endl;
+    LoadNetSnapshot(model, load_snapshot, eval_batch.get());
+  } else {
+    std::cout << "# No snapshot was specified, training from scratch."
+              << std::endl;
+  }
   model->to(device);
   //
   std::cout << "# Creating optimizer ..." << std::endl;
@@ -353,7 +381,7 @@ void TrainEvalLoop() {
   ExperienceReplay experience_replay(replay_size, dims->point_input_size(),
                                      dims->point_output_size());
   //
-  std::cout << "# Making batch train/eval data ..." << std::endl;
+  std::cout << "# Making batch train data ..." << std::endl;
   const int batch_size = absl::GetFlag(FLAGS_batch_size) > 0
                        ? std::min(absl::GetFlag(FLAGS_batch_size),
                                   experience_replay.size())
@@ -361,9 +389,6 @@ void TrainEvalLoop() {
   BatchData train_batch(batch_size,
                         dims->point_input_size(),
                         dims->point_output_size());
-  auto eval_batch = std::make_shared<BatchData>(1,
-                                                dims->point_input_size(),
-                                                dims->point_output_size());
   //
   auto solver_factory = std::make_shared<SolverFactory>();
   std::cout << "# Making net evaluator ..." << std::endl;
@@ -483,8 +508,11 @@ void TrainEvalLoop() {
   }
   //
   const int snapshot_loop = absl::GetFlag(FLAGS_snapshot_loop);
-  const std::string snapshot_dir = absl::GetFlag(FLAGS_snapshot_dir);
+
   // ---------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+
   std::cout << "# Ready to run the train/eval loop!" << std::endl;
   for (int i = 0; i < 80; ++i) std::cout << '#';
   std::cout << std::endl;
@@ -494,7 +522,7 @@ void TrainEvalLoop() {
   //
   for (int loop = 0; loop < num_loops; ++loop) {
     if (snapshot_loop > 0 && (loop+1) % snapshot_loop == 0) {
-      std::string save_as = absl::StrCat(snapshot_dir, "/", loop, ".model");
+      std::string save_as = absl::StrCat(snapshot_dir, "/", loop, kModelExt);
       std::cout << "# Saving snapshot of the neural net to "
                 << save_as << std::endl;
       SaveNetSnapshot(model, save_as);

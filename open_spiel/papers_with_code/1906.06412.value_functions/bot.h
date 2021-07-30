@@ -196,6 +196,10 @@ class SherlockBotFactory : public BotFactory {
       auto particle_dims = open_spiel::down_cast<ParticleDims*>(dims.get());
       particle_dims->max_parviews = subgame_factory->max_particles * 2;
       //
+      auto eval_batch = std::make_shared<BatchData>(1,
+                                                    dims->point_input_size(),
+                                                    dims->point_output_size());
+      //
       std::shared_ptr<ValueNet> model = MakeModel(
           NetArchitecture::kParticle,
           dims,
@@ -204,12 +208,8 @@ class SherlockBotFactory : public BotFactory {
           num_inputs_regression,
           zero_sum_regression,
           normalize_beliefs);
-      LoadNetSnapshot(model, load_from);
+      LoadNetSnapshot(model, load_from, eval_batch.get());
       model->eval();  // Set only eval mode.
-      //
-      auto eval_batch = std::make_shared<BatchData>(1,
-                                                    dims->point_input_size(),
-                                                    dims->point_output_size());
       //
       solver_factory->leaf_evaluator = MakeNetEvaluator(
           dims, model, eval_batch, device,

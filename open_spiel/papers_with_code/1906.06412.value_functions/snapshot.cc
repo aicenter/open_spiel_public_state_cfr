@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <filesystem>
 #include "torch/torch.h"
 
 #include "open_spiel/papers_with_code/1906.06412.value_functions/snapshot.h"
@@ -23,8 +24,33 @@ void SaveNetSnapshot(std::shared_ptr<ValueNet> model, const std::string& path) {
   torch::save(model, path);
 }
 
-void LoadNetSnapshot(std::shared_ptr<ValueNet> model, const std::string& path) {
+void LoadNetSnapshot(std::shared_ptr<ValueNet> model, const std::string& path,
+                     BatchData* try_inference) {
   torch::load(model, path);
+  if (try_inference) {
+    // If the dimensions are not compatible, the program will fail here.
+    model->forward(try_inference->data);
+  }
+}
+
+std::string FindSnapshot(const std::string& snapshot_dir) {
+  // Search for all files that end with kModelExt, and select
+  // a file with the highest loop number.
+
+  namespace fs = std::filesystem;
+  int max_loop = -1;
+  for (const auto& entry : fs::directory_iterator(snapshot_dir)) {
+    if(entry.path().extension() != kModelExt) continue;
+    size_t num_chars;
+    int loop = std::stoi(entry.path().filename(), &num_chars);
+    if (num_chars) max_loop = std::max(max_loop, loop);
+  }
+
+  if (max_loop == -1) return "";  // No snapshot found.
+
+  std::string snapshot = snapshot_dir + "/" + std::to_string(max_loop) + kModelExt;
+  SPIEL_CHECK_TRUE(fs::exists(fs::path(snapshot)));
+  return snapshot;
 }
 
 }  // namespace papers_with_code
