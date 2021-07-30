@@ -23,8 +23,16 @@
 ABSL_FLAG(int, seed, 0, "Seed.");
 ABSL_FLAG(std::string, device, "cpu", "Device used for neural networks.");
 ABSL_FLAG(std::string, game_name, "kuhn_poker", "Game to run.");
+
+// -- Solver --
 ABSL_FLAG(std::string, use_bandits_for_cfr, "RegretMatchingPlus",
           "Which bandit should be used in the trunk.");
+ABSL_FLAG(bool, safe_resolving, true,
+          "Should the online bot use safe resolving? "
+          "(used for br metric, not training)");
+ABSL_FLAG(int, cfr_iterations, 100,
+          "Number of iterations with value function (used in bootstrapping).");
+ABSL_FLAG(int, max_move_ahead_limit, 1, "Size of the lookahead tree.");
 
 // -- Data generation --
 ABSL_FLAG(int, depth, 3, "Depth of the trunk.");
@@ -54,9 +62,6 @@ ABSL_FLAG(bool, bootstrap_reset_nn, false,
           "when final bootstrap is made?");
 ABSL_FLAG(int, bootstrap_from_move, 1,
           "From what depth should the bootstrapping happen?");
-ABSL_FLAG(int, cfr_iterations, 100,
-          "Number of iterations with value function (used in bootstrapping).");
-ABSL_FLAG(int, max_move_ahead_limit, 1, "Size of the lookahead tree.");
 ABSL_FLAG(std::string, save_values_policy, "average",
           "What cf. values should be saved after solving the subgame: "
           " one of {current,average}.");
@@ -362,6 +367,7 @@ void TrainEvalLoop() {
   std::cout << "# Making net evaluator ..." << std::endl;
   solver_factory->cfr_iterations = absl::GetFlag(FLAGS_cfr_iterations);
   solver_factory->use_bandits_for_cfr  = absl::GetFlag(FLAGS_use_bandits_for_cfr);
+  solver_factory->safe_resolving       = false;  // No resolving for training.
   solver_factory->save_values_policy   = save_values_policy;
   solver_factory->terminal_evaluator   = terminal_evaluator;
   solver_factory->leaf_evaluator = MakeNetEvaluator(
@@ -413,8 +419,11 @@ void TrainEvalLoop() {
   }
   if (absl::GetFlag(FLAGS_iigs_br_metric)) {
     std::cout << "# Making IIGS BR metric ..." << std::endl;
+    // Make a separate solver copy that may use safe resolving.
+    auto bot_solver_factory = std::make_shared<SolverFactory>(*solver_factory);
+    bot_solver_factory->safe_resolving = absl::GetFlag(FLAGS_safe_resolving);
     std::unique_ptr<Bot> bot = MakeSherlockBot(subgame_factory,
-                                               solver_factory,
+                                               bot_solver_factory,
                                                Player{0}, seed);
     auto goof_game =
         std::dynamic_pointer_cast<const goofspiel::GoofspielGame>(game);

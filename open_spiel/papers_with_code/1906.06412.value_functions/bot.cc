@@ -106,37 +106,15 @@ std::pair<ActionsAndProbs, Action> SherlockBot::StepWithPolicy(const State& stat
   //    }
 
   // We will do the gadget if we are resolving
-  if (state.MoveNumber() > 0) {
+  if (state.MoveNumber() > 0 && solver_factory_->safe_resolving) {
     subgame_ = subgame_factory_->MakeSubgameSafeResolving(
         *set, player_id_, public_state->InfostateAvgValues(1 - player_id_));
   } else {
     subgame_ = subgame_factory_->MakeSubgame(*set);
   }
 
-  // TODO: implement continual resolving.
-  //  Update subgame's infostate trees: subgame->trees[1-player_id_]
-  //  such that they begin with the choice for the opponent
-  //  to follow or not into this subgame. This could be done by careful
-  //  manipulation with the (already constructed) infostate tree,
-  //  or with changing how the trees are constructed. Plumb this through
-  //  MakeSubgame to affect infostate tree construction.
-
-//        std::cout << "# Making solver\n";
   std::unique_ptr<SubgameSolver> solver = solver_factory_->MakeSolver(subgame_);
 
-//    // Code for opponent fixation:
-//    TabularPolicy opponent_policy;  // Needs to be provided.
-//    int opponent = 1 - player_id_;
-//    algorithms::BanditVector& opponent_bandits = solver->bandits()[opponent];
-//    for (algorithms::DecisionId id : opponent_bandits.range()) {
-//      algorithms::InfostateNode* node = subgame->trees[opponent]->decision_infostate(id);
-//      ActionsAndProbs infostate_policy = opponent_policy.GetStatePolicy(node->infostate_string());
-//      std::vector<double> probs = GetProbs(infostate_policy);
-//      auto fixable_bandit = std::make_unique<algorithms::bandits::FixableStrategy>(probs);
-//      opponent_bandits[id] = std::move(fixable_bandit);
-//    }
-
-//        std::cout << "# Solving!\n";
   solver->RunSimultaneousIterations(solver_factory_->cfr_iterations);
   if (state.IsPlayerActing(player_id_)) {
     auto policy = std::make_shared<algorithms::BanditsAveragePolicy>(
