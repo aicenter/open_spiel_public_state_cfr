@@ -123,7 +123,7 @@ void TestTabularPolicyGoofspielNetBot() {
       {"use_bandits_for_cfr", BotParameter("RegretMatchingPlus")},
       {"save_values_policy", BotParameter("average")},
       {"zero_sum_regression", BotParameter(false)},
-      {"load_from",
+      {"load_snapshot",
        BotParameter(
            absl::StrCat(current_dir, "/snapshots/iigs3/random.model"))},
   };

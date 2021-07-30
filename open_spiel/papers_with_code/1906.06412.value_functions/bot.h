@@ -169,7 +169,7 @@ class SherlockBotFactory : public BotFactory {
                                        "net");
     std::string game_model = absl::StrCat(game->GetType().short_name, ".model");
     std::string load_from =
-        GetParameterValue<std::string>(bot_params, "load_from", game_model);
+        GetParameterValue<std::string>(bot_params, "load_snapshot", game_model);
 
     // -- Create all necessary structures --------------------------------------
     auto subgame_factory = std::make_shared<SubgameFactory>();
