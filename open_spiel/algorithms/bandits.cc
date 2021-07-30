@@ -165,13 +165,11 @@ std::vector<double> RegretMatchingPlus::AverageStrategy() const {
       if (strategy[i] > kRegretMatchingStrategyCutoff)
         renormalization += strategy[i];
     }
-    if (renormalization < 1.) {
-      for (int i = 0; i < num_actions(); ++i) {
-        if (strategy[i] > kRegretMatchingStrategyCutoff) {
-          strategy[i] /= renormalization;
-        } else {
-          strategy[i] = 0.;
-        }
+    for (int i = 0; i < num_actions(); ++i) {
+      if (strategy[i] > kRegretMatchingStrategyCutoff) {
+        strategy[i] /= renormalization;
+      } else {
+        strategy[i] = 0.;
       }
     }
   } else {
@@ -480,16 +478,15 @@ std::vector<double> PredictiveRegretMatchingPlus::AverageStrategy() const {
     }
     double renormalization = 0.;
     for (int i = 0; i < num_actions(); ++i) {
-      if (strategy[i] > kRegretMatchingStrategyCutoff)
+      if (strategy[i] > kRegretMatchingStrategyCutoff) {
         renormalization += strategy[i];
+      }
     }
-    if (renormalization < 1.) {
-      for (int i = 0; i < num_actions(); ++i) {
-        if (strategy[i] > kRegretMatchingStrategyCutoff) {
-          strategy[i] /= renormalization;
-        } else {
-          strategy[i] = 0.;
-        }
+    for (int i = 0; i < num_actions(); ++i) {
+      if (strategy[i] > kRegretMatchingStrategyCutoff) {
+        strategy[i] /= renormalization;
+      } else {
+        strategy[i] = 0.;
       }
     }
   } else {
@@ -498,7 +495,8 @@ std::vector<double> PredictiveRegretMatchingPlus::AverageStrategy() const {
     }
   }
   for (int i = 0; i < num_actions(); ++i) {
-    SPIEL_CHECK_TRUE(strategy[i] == 0. || strategy[i] >= kRegretMatchingStrategyCutoff);
+    SPIEL_CHECK_TRUE(strategy[i] == 0. ||
+                     strategy[i] >= kRegretMatchingStrategyCutoff);
   }
   return strategy;
 }

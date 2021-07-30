@@ -55,7 +55,7 @@ if(${BUILD_TYPE} STREQUAL "Release")
   # Optimized release build: turn off debug runtime checks (assert,
   # SPIEL_DCHECK_*) and turn on highest speed optimizations.
   # The difference in performance can be up to 10x higher.
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNDEBUG -O3 -Werror")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNDEBUG -O3")
 endif()
 
 if(APPLE)
