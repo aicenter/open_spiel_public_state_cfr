@@ -69,6 +69,7 @@ struct StrategyRandomizer {
   std::mt19937* rnd_gen;
   double prob_pure_strat = 0.1;
   double prob_fully_mixed = 0.05;
+  double prob_benford_dist = 0.0;
 
   void Randomize(std::vector<algorithms::BanditVector>& bandits);
   void Randomize(const Game& game, ParticleSet* set,

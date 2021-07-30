@@ -38,6 +38,7 @@ ABSL_FLAG(int, max_move_ahead_limit, 1, "Size of the lookahead tree.");
 ABSL_FLAG(int, depth, 3, "Depth of the trunk.");
 ABSL_FLAG(double, prob_pure_strat, 0.1, "Params for random generation.");
 ABSL_FLAG(double, prob_fully_mixed, 0.05, "Params for random generation.");
+ABSL_FLAG(double, prob_benford_dist, 0.0, "Params for random generation.");
 ABSL_FLAG(int, replay_size, 100,
           "Size of experience replay in terms of public states.");
 ABSL_FLAG(int, cfr_oracle_iterations, 100, "Number of oracle iterations.");
@@ -227,6 +228,7 @@ void TrainEvalLoop() {
   randomizer.rnd_gen = &rnd_gen;
   randomizer.prob_pure_strat = absl::GetFlag(FLAGS_prob_pure_strat);
   randomizer.prob_fully_mixed = absl::GetFlag(FLAGS_prob_fully_mixed);
+  randomizer.prob_benford_dist = absl::GetFlag(FLAGS_prob_benford_dist);
   //
   std::cout << "# Making subgame subgame_factory ..." << std::endl;
   auto subgame_factory = std::make_shared<SubgameFactory>();
@@ -427,7 +429,7 @@ void TrainEvalLoop() {
                                                Player{0}, seed);
     auto goof_game =
         std::dynamic_pointer_cast<const goofspiel::GoofspielGame>(game);
-    metrics.push_back(MakeIigsBrMetric(std::move(bot), goof_game));
+    metrics.push_back(MakeIigsApproxBrMetric(std::move(bot), goof_game));
   }
   //
   ReplayFillerPolicy exp_init =

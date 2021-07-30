@@ -90,15 +90,15 @@ class FullTrunkExplMetric : public Metric {
   }
 };
 
-class IigsBrMetric : public Metric {
+class IigsApproxBrMetric : public Metric {
   std::unique_ptr<Bot> bot_;
   std::shared_ptr<const Game> orig_game_;
   std::shared_ptr<const Game> br_game_;
   std::shared_ptr<algorithms::InfostateTree> player_tree_;
   double br_;
  public:
-  IigsBrMetric(std::unique_ptr<Bot> bot,
-               std::shared_ptr<const goofspiel::GoofspielGame> game)
+  IigsApproxBrMetric(std::unique_ptr<Bot> bot,
+                     std::shared_ptr<const goofspiel::GoofspielGame> game)
       : bot_(std::move(bot)),
         br_game_(LoadGameAsTurnBased(absl::StrCat("goofspiel("
           "players=2,"
@@ -199,10 +199,10 @@ std::unique_ptr<Metric> MakeFullTrunkExplMetric(
                                                trunk_with_net, whole_game);
 }
 
-std::unique_ptr<Metric> MakeIigsBrMetric(
+std::unique_ptr<Metric> MakeIigsApproxBrMetric(
     std::unique_ptr<Bot> bot,
     std::shared_ptr<const goofspiel::GoofspielGame> game) {
-  return std::make_unique<IigsBrMetric>(std::move(bot), game);
+  return std::make_unique<IigsApproxBrMetric>(std::move(bot), game);
 }
 
 

@@ -391,7 +391,8 @@ std::unique_ptr<ParticleSet> ReplayFiller::PickIsmctsParticleSet(int at_depth) {
 
 void StrategyRandomizer::Randomize(std::vector<algorithms::BanditVector>& bandits) {
   SPIEL_CHECK_TRUE(rnd_gen);
-  RandomizeStrategy(bandits, prob_pure_strat, prob_fully_mixed, *rnd_gen);
+  RandomizeStrategy(bandits, prob_pure_strat, prob_fully_mixed,
+                    prob_benford_dist, *rnd_gen);
 }
 
 void StrategyRandomizer::Randomize(
@@ -417,8 +418,10 @@ void StrategyRandomizer::Randomize(
           if (current_policy.empty()) {
             std::vector<Action> actions = s->LegalActions(pl);
             for (Action a : actions) current_policy.push_back({a, 0.});
-            algorithms::RandomizeDecisionPoint(current_policy, prob_pure_strat,
-                                               prob_fully_mixed, *rnd_gen);
+            algorithms::RandomizeDecisionPoint(current_policy,
+                                               prob_pure_strat,
+                                               prob_fully_mixed,
+                                               prob_benford_dist, *rnd_gen);
             tabular_policy.SetStatePolicy(infostate, current_policy);
           }
 

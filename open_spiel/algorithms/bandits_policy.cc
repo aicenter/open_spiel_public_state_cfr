@@ -100,7 +100,7 @@ void AssignSingleAction(ActionsAndProbs& policy, std::mt19937& rnd_gen) {
 }
 
 void AssignMixedStrategy(absl::Span<double> policy, std::mt19937& rnd_gen,
-                         double prob_pure_strat) {
+                         double prob_pure_strat, double prob_benford_dist) {
   // Mixed strategy.
   for (int i = 0; i < policy.size(); ++i) {
     const bool in_support =
@@ -117,9 +117,19 @@ void AssignMixedStrategy(absl::Span<double> policy, std::mt19937& rnd_gen,
                 ? uniform_prob
                 : policy[i] / normalizer;
   }
+  if (prob_benford_dist > 0) {
+    // Mix with Benford-like distribution, with preference for the highest
+    // actions. This is a special case to prefer higher cards in IIGS(K,N).
+    int n = policy.size();
+    const double inv = 1. / log(n + 1);
+    for (int i = 0; i < n; ++i) {
+      policy[i] = (1-prob_benford_dist) * policy[i] +
+                     prob_benford_dist  * log(1 + 1. / (n - i)) * inv;
+    }
+  }
 }
 void AssignMixedStrategy(ActionsAndProbs& policy, std::mt19937& rnd_gen,
-                         double prob_pure_strat) {
+                         double prob_pure_strat, double prob_benford_dist) {
   // Mixed strategy.
   double normalizer = 0.;
   for (int i = 0; i < policy.size(); ++i) {
@@ -137,11 +147,21 @@ void AssignMixedStrategy(ActionsAndProbs& policy, std::mt19937& rnd_gen,
                        ? uniform_prob
                        : policy[i].second / normalizer;
   }
+  if (prob_benford_dist > 0) {
+    // Mix with Benford-like distribution, with preference for the highest
+    // actions. This is a special case to prefer higher cards in IIGS(K,N).
+    int n = policy.size();
+    const double inv = 1. / log(n + 1);
+    for (int i = 0; i < n; ++i) {
+      policy[i].second = (1-prob_benford_dist) * policy[i].second +
+                            prob_benford_dist  * log(1 + 1. / (n - i)) * inv;
+    }
+  }
 }
 
 void RandomizeStrategy(std::vector<BanditVector>& bandits,
                        double prob_pure_strat, double prob_fully_mixed,
-                       std::mt19937& rnd_gen) {
+                       double prob_benford_dist, std::mt19937& rnd_gen) {
   for (int pl = 0; pl < bandits.size(); ++pl) {
     for (DecisionId id : bandits[pl].range()) {
       // Randomize current policy
@@ -150,7 +170,8 @@ void RandomizeStrategy(std::vector<BanditVector>& bandits,
           open_spiel::down_cast<bandits::FixableStrategy*>(bandit);
       absl::Span<double> policy = fixable_bandit->mutable_strategy();
       SPIEL_DCHECK_EQ(policy.size(), bandit->num_actions());
-      RandomizeDecisionPoint(policy, prob_pure_strat, prob_fully_mixed, rnd_gen);
+      RandomizeDecisionPoint(policy, prob_pure_strat, prob_fully_mixed,
+                             prob_benford_dist, rnd_gen);
     }
   }
 }
@@ -158,6 +179,7 @@ void RandomizeStrategy(std::vector<BanditVector>& bandits,
 void RandomizeDecisionPoint(absl::Span<double> policy,
                             double prob_pure_strat,
                             double prob_fully_mixed,
+                            double prob_benford_dist,
                             std::mt19937& rnd_gen) {
   if (std::bernoulli_distribution(prob_fully_mixed)(rnd_gen)) {
     // Special case since uniform random is a starting point of CFR.
@@ -165,12 +187,13 @@ void RandomizeDecisionPoint(absl::Span<double> policy,
   } else if (std::bernoulli_distribution(prob_pure_strat)(rnd_gen)) {
     AssignSingleAction(policy, rnd_gen);
   } else {
-    AssignMixedStrategy(policy, rnd_gen, prob_pure_strat);
+    AssignMixedStrategy(policy, rnd_gen, prob_pure_strat, prob_benford_dist);
   }
 }
 void RandomizeDecisionPoint(ActionsAndProbs& policy,
                             double prob_pure_strat,
                             double prob_fully_mixed,
+                            double prob_benford_dist,
                             std::mt19937& rnd_gen) {
   if (std::bernoulli_distribution(prob_fully_mixed)(rnd_gen)) {
     // Special case since uniform random is a starting point of CFR.
@@ -178,7 +201,7 @@ void RandomizeDecisionPoint(ActionsAndProbs& policy,
   } else if (std::bernoulli_distribution(prob_pure_strat)(rnd_gen)) {
     AssignSingleAction(policy, rnd_gen);
   } else {
-    AssignMixedStrategy(policy, rnd_gen, prob_pure_strat);
+    AssignMixedStrategy(policy, rnd_gen, prob_pure_strat, prob_benford_dist);
   }
 }
 
