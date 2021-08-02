@@ -26,10 +26,18 @@ void SaveNetSnapshot(std::shared_ptr<ValueNet> model, const std::string& path) {
 
 void LoadNetSnapshot(std::shared_ptr<ValueNet> model, const std::string& path,
                      BatchData* try_inference) {
-  torch::load(model, path);
-  if (try_inference) {
-    // If the dimensions are not compatible, the program will fail here.
-    model->forward(try_inference->data);
+
+  try {
+    torch::load(model, path);
+    if (try_inference) {
+      // If the dimensions are not compatible, the program will fail here.
+      try_inference->data.zero_();
+      model->forward(try_inference->data);
+    }
+  } catch (std::exception e) {
+    std::cerr << "Could not load the network snapshot! At "
+              << path << std::endl;
+    throw std::move(e);
   }
 }
 
