@@ -51,6 +51,10 @@ struct ParticleSet {
   bool has(const std::vector<Action>& history) const;
 
   void AssignBeliefs(PublicState& state) const;
+  void ImportSet(const ParticleSet& other) {
+    particles.insert(particles.end(),
+                     other.particles.begin(), other.particles.end());
+  }
 };
 
 // See explanation below.

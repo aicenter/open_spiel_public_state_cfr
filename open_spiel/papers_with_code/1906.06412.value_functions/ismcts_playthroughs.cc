@@ -28,11 +28,10 @@ std::unique_ptr<State> GoofspielInfostateStateResampler(
 
 
   // The game is after the turn-based transformation.
-  auto turn_state =
-      open_spiel::down_cast<const TurnBasedSimultaneousState*>(&state);
-  auto turn_game =
-      open_spiel::down_cast<const TurnBasedSimultaneousGame*>(state.GetGame().get());
-  auto goof_game = turn_game->wrapped_game();
+  auto turn_state = down_cast<const TurnBasedSimultaneousState*>(&state);
+  auto turn_game = down_cast<const TurnBasedSimultaneousGame*>(state.GetGame().get());
+  auto goof_game = std::dynamic_pointer_cast<const goofspiel::GoofspielGame>(
+      turn_game->wrapped_game());
   auto goof_state = turn_state->SimultaneousGameState();
 
   auto observer = goof_game->MakeObserver(kInfoStateObsType, {});
@@ -40,12 +39,11 @@ std::unique_ptr<State> GoofspielInfostateStateResampler(
   infostate.SetFrom(*goof_state, player_id);
   std::mt19937 rnd_gen(rng());
 
+  ParticleGenerator generator(goof_game, rnd_gen);
+  generator.SetInfoState(infostate, player_id);
   std::unique_ptr<papers_with_code::ParticleSet> set =
-      papers_with_code::GenerateParticles(infostate, player_id,
-                                          /*max_particles=*/1,
-                                          /*max_rejection_cnt=*/100,
-                                          /*infostate_particles=*/1,
-                                          rnd_gen);
+      generator.GenerateParticles(/*max_particles=*/1,
+                                  /*max_rejection_cnt=*/100);
 
   if (set->particles.empty()) {
     return state.Clone();

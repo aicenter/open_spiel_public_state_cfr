@@ -58,6 +58,7 @@ enum ReplayFillerPolicy {
   kTrunkRandom,
   kPbsRandom,
   kSparsePbsRandom,
+  kIigsKnPbsRandom,
   kBootstrap,
   kIsmctsBootstrap
 };
@@ -110,6 +111,7 @@ struct ReplayFiller {
   void AddTrunkRandomPbsSolution();
   void AddRandomPbsSolution();
   void AddRandomSparsePbsSolution();
+  void AddIigsKnRandomPbsSolution();
   void AddBootstrappedSolution();
   void AddIsmctsBootstrapedSolution();
   void FillReplayWithTrunkDlCfrPbsSolutions();

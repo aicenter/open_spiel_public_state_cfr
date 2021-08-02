@@ -93,6 +93,38 @@ struct DimensionedSpan {
   }
 };
 
+struct ConstDimensionedSpan {
+  absl::InlinedVector<int, 4> shape;
+  absl::Span<const float> data;
+
+  ConstDimensionedSpan(absl::Span<const float> data, absl::InlinedVector<int, 4> shape)
+      : shape(std::move(shape)), data(data) {
+    int m = std::accumulate(
+        this->shape.begin(), this->shape.end(), 1, std::multiplies<int>());
+    SPIEL_CHECK_EQ(m, data.size());
+  }
+
+  const float& at(int idx) const {
+    SPIEL_DCHECK_EQ(shape.size(), 1);
+    return data[idx];
+  }
+
+  const float& at(int idx1, int idx2) const {
+    SPIEL_DCHECK_EQ(shape.size(), 2);
+    return data[idx1 * shape[1] + idx2];
+  }
+
+  const float& at(int idx1, int idx2, int idx3) const {
+    SPIEL_DCHECK_EQ(shape.size(), 3);
+    return data[(idx1 * shape[1] + idx2) * shape[2] + idx3];
+  }
+
+  const float& at(int idx1, int idx2, int idx3, int idx4) const {
+    SPIEL_DCHECK_EQ(shape.size(), 4);
+    return data[((idx1 * shape[1] + idx2) * shape[2] + idx3) * shape[3] + idx4];
+  }
+};
+
 // An Allocator is responsible for returning memory for an Observer.
 class Allocator {
  public:
@@ -361,6 +393,21 @@ class Observation {
       size = tensor.size();
       if (tensor.name == name) {
         return DimensionedSpan(
+          absl::MakeSpan(&buffer_[offset], size),
+          absl::InlinedVector<int, 4>(tensor.shape.begin(), tensor.shape.end())
+        );
+      }
+      offset += size;
+    }
+    SpielFatalError("Tensor not found");
+  }
+  ConstDimensionedSpan GetConstSpan(const std::string& name) const {
+    size_t offset = 0;
+    size_t size = 0;
+    for (const TensorInfo& tensor : tensors_) {
+      size = tensor.size();
+      if (tensor.name == name) {
+        return ConstDimensionedSpan(
           absl::MakeSpan(&buffer_[offset], size),
           absl::InlinedVector<int, 4>(tensor.shape.begin(), tensor.shape.end())
         );

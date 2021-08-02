@@ -19,95 +19,85 @@
 namespace open_spiel {
 namespace papers_with_code {
 
-std::unique_ptr<ParticleSet> GenerateParticles(
-    Observation& infostate,
-    Player player_hand,
-    int max_particles,
-    int max_rejection_cnt,
-    int infostate_particles,
-    std::mt19937& rnd_gen
-) {
-  const auto point_cards = infostate.Tensor("point_card_sequence");
-  int num_bets = std::accumulate(point_cards.begin(), point_cards.end(), -1);
+void ParticleGenerator::SetPublicOutcomes(const std::vector<int>& outcomes) {
+  ResetModel(/*num_bets=*/outcomes.size());
+
+  for (int i = 0; i < num_bets_; ++i) {
+    opr::sat::IntVar& a = played_[0][i];
+    opr::sat::IntVar& b = played_[1][i];
+    switch(outcomes[i]) {
+      case  0: cp_model_->AddEquality(a, b);    break;  // draw: a == b
+      case  1: cp_model_->AddGreaterThan(a, b); break;  // win : a  > b
+      case -1: cp_model_->AddLessThan(a, b);    break;  // lose: a  < b
+      default: SpielFatalError("Unknown outcome");
+    }
+  }
+}
+
+void ParticleGenerator::SetPublicState(const Observation& public_state) {
+  // Build up public outcomes.
+  const auto point_cards = public_state.Tensor("point_card_sequence");
+  const int num_bets = std::accumulate(point_cards.begin(),
+                                       point_cards.end(), -1);
+  ConstDimensionedSpan wins = public_state.GetConstSpan("win_sequence");
+  ConstDimensionedSpan ties = public_state.GetConstSpan("tie_sequence");
+  std::vector<int> outcomes(num_bets, 0);
+  for (int i = 0; i < num_bets; ++i) {
+    if(ties.at(i)) outcomes[i] = 0;
+    else if (wins.at(i, 0)) outcomes[i] = 1;
+    else if (wins.at(i, 1)) outcomes[i] = -1;
+    else SpielFatalError("Unknown outcome");
+  }
+  SetPublicOutcomes(outcomes);
+}
+
+void ParticleGenerator::SetInfoState(const Observation& infostate,
+                                     Player player_hand) {
+  SetPublicState(infostate);
+  current_player_ = player_hand;
+  ConstDimensionedSpan bets = infostate.GetConstSpan("player_action_sequence");
+  for (int i = 0; i < num_bets_; ++i) {
+    // Set player's actions.
+    int card = -1;
+    for (int c = 0; c < game_->NumCards(); ++c) {
+      if (bets.at(i, c)) card = c;
+    }
+    SPIEL_CHECK_NE(card, -1);
+    cp_model_->AddEquality(played_[player_hand][i], card);
+  }
+}
+
+std::unique_ptr<ParticleSet> ParticleGenerator::GenerateParticles(
+    int max_particles, int max_rejection_cnt) {
 
   auto set = std::make_unique<ParticleSet>();
-  if (num_bets == 0) {  // Initial state -- no actions made yet.
+  if (num_bets_ == 0) {  // Initial state -- no actions made yet.
     set->particles.push_back(std::vector<Action>{});
     return set;
   }
 
-  int num_cards = infostate.Tensor("player_hand").size();
-  DimensionedSpan wins = infostate.GetSpan("win_sequence");
-  int num_turns = wins.shape[0];
-  DimensionedSpan ties = infostate.GetSpan("tie_sequence");
-  DimensionedSpan player_action_sequence = infostate.GetSpan("player_action_sequence");
-
-  SPIEL_CHECK_LE(infostate_particles, max_particles);
-  SPIEL_CHECK_GE(num_bets, 1);
-  SPIEL_CHECK_LE(num_bets, num_cards);
-  SPIEL_CHECK_EQ(wins.shape[0], num_turns);
-  SPIEL_CHECK_EQ(ties.shape[0], num_turns);
-
-  opr::sat::CpModelBuilder cp_model;
-  // Init variables.
-  const opr::Domain cards(0, num_cards-1);
-  std::array<std::vector<opr::sat::IntVar>, 2> played;
-  for (int pl = 0; pl < 2; ++pl) {
-    for (int i = 0; i < num_bets; ++i) {
-      played[pl].push_back(cp_model.NewIntVar(cards));
-    }
-  }
-  // Players can play each card only once.
-  for (int pl = 0; pl < 2; ++pl) {
-    for (int i = 0; i < num_bets; ++i) {
-      for (int j = i + 1; j < num_bets; ++j) {
-        cp_model.AddNotEqual(played[pl][i], played[pl][j]);
-      }
-    }
-  }
-  // Encode the outcome constraints.
-  for (int i = 0; i < num_bets; ++i) {
-    opr::sat::IntVar& a = played[0][i];
-    opr::sat::IntVar& b = played[1][i];
-    if (ties.at(i)) cp_model.AddEquality(a, b);  // draw: a == b
-    else if (wins.at(i, 0)) cp_model.AddGreaterThan(a, b);  // win : a  > b
-    else if (wins.at(i, 1)) cp_model.AddLessThan(a, b);     // lose: a  < b
-    else SpielFatalError("Unknown outcome");
-  }
-
-  // Store solution.
-  auto card_dist = std::uniform_int_distribution<int>(1, num_cards);
+  auto card_dist = std::uniform_int_distribution<int>(1, game_->NumCards());
   auto player_dist = std::uniform_int_distribution<int>(0, 1);
-  auto dir_dist = std::uniform_int_distribution<int>(0, num_bets);
-
+  auto dir_dist = std::uniform_int_distribution<int>(0, num_bets_);
   int num_rejected = 0;
+
   while (set->particles.size() < max_particles
-      && num_rejected < max_rejection_cnt) {
-    opr::sat::CpModelBuilder rnd_model = cp_model;
+         && num_rejected < max_rejection_cnt) {
+    opr::sat::CpModelBuilder rnd_model = *cp_model_;
 
-    for (int i = 0; i < num_bets; ++i) {
+    for (int i = 0; i < num_bets_; ++i) {
       int diverse_player;
-      if (set->particles.size() < infostate_particles) {
-        // Set player's actions.
-        int card = -1;
-        for (int c  = 0; c < num_cards; ++c) {
-          if (player_action_sequence.at(i, c)) card = c;
-        }
-        SPIEL_CHECK_GE(card, 0);
-        SPIEL_CHECK_LT(card, num_cards);
-        rnd_model.AddEquality(played[player_hand][i], card);
-
-        // Randomize only through the opponent.
-        diverse_player = 1 - player_hand;
+      if (current_player_ == kInvalidPlayer) {
+        diverse_player = player_dist(rnd_gen_);
       } else {
-        diverse_player = player_dist(rnd_gen);
+        diverse_player = 1 - current_player_;
       }
 
       // Add random constraints to generate diverse solutions.
       // Without this we would get exactly the same solution each call.
-      int card = card_dist(rnd_gen);
-      int dir = dir_dist(rnd_gen);
-      opr::sat::IntVar& a = played[diverse_player][i];
+      int card = card_dist(rnd_gen_);
+      int dir = dir_dist(rnd_gen_);
+      opr::sat::IntVar& a = played_[diverse_player][i];
       // TODO: make more tuning of the constraints so that we have
       //       better diversity. Now from 1000 particles ~500 begin with
       //       first action 1
@@ -120,11 +110,11 @@ std::unique_ptr<ParticleSet> GenerateParticles(
     opr::sat::CpSolverResponse response = Solve(rnd_model.Build());
     if (response.status() == opr::sat::OPTIMAL) {
       std::vector<Action> history;
-      history.reserve(num_bets * 2);
-      for (int j = 0; j < num_bets; ++j) {
+      history.reserve(num_bets_ * 2);
+      for (int j = 0; j < num_bets_; ++j) {
         // -1 due to 0-based indexing in the goofspiel game implementation.
-        history.push_back(SolutionIntegerValue(response, played[0][j]));
-        history.push_back(SolutionIntegerValue(response, played[1][j]));
+        history.push_back(SolutionIntegerValue(response, played_[0][j]));
+        history.push_back(SolutionIntegerValue(response, played_[1][j]));
       }
       // (Possibly) increases particles size.
       if (set->has(history)) {
@@ -138,8 +128,33 @@ std::unique_ptr<ParticleSet> GenerateParticles(
   }
 
   SPIEL_CHECK_TRUE(set->particles.size() == max_particles
-                  || num_rejected == max_rejection_cnt);
+                   || num_rejected == max_rejection_cnt);
   return set;
+
+}
+
+void ParticleGenerator::ResetModel(int num_bets) {
+  SPIEL_CHECK_GE(num_bets, 0);
+  SPIEL_CHECK_LE(num_bets, game_->NumCards());
+  cp_model_ = std::make_unique<opr::sat::CpModelBuilder>();
+  num_bets_ = num_bets;
+  current_player_ = kInvalidPlayer;
+
+  // Init variables.
+  for (int pl = 0; pl < 2; ++pl) {
+    played_[pl].clear();
+    for (int i = 0; i < num_bets; ++i) {
+      played_[pl].push_back(cp_model_->NewIntVar(cards_));
+    }
+  }
+  // Players can play each card only once.
+  for (int pl = 0; pl < 2; ++pl) {
+    for (int i = 0; i < num_bets; ++i) {
+      for (int j = i + 1; j < num_bets; ++j) {
+        cp_model_->AddNotEqual(played_[pl][i], played_[pl][j]);
+      }
+    }
+  }
 }
 
 }  // papers_with_code

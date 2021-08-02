@@ -40,13 +40,6 @@ void TestSamplingPlaythroughs() {
     auto& cdf = playthroughs.cdfs[i];
     if (!cdf.empty()) {
       SPIEL_CHECK_FLOAT_NEAR((--cdf.end())->first, 1., 1e-8);
-      InfostateStats::iterator iter =
-          playthroughs.SampleInfostate(i, rnd_gen);
-      Observation& infostate = const_cast<Observation&>(iter->first);
-      auto particle_set = GenerateParticles(infostate, 0,
-                                            1000, 1000, 0, rnd_gen);
-      SPIEL_CHECK_FALSE(particle_set->particles.empty());
-
       // Check each collected infostate for move number it claims to be.
       for(auto& [cumul, it] : cdf) {
         const auto point_cards = it->first.Tensor("point_card_sequence");

@@ -15,22 +15,23 @@
 #include "open_spiel/papers_with_code/1906.06412.value_functions/particle_regeneration.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/subgame.h"
 
-
 namespace open_spiel {
 namespace papers_with_code {
 namespace {
 
-
-
 void TestGenerateParticles() {
   std::shared_ptr<const Game> game = LoadGame(
       "goofspiel(imp_info=true,players=2,points_order=descending,num_cards=3)");
-  auto observer = game->MakeObserver(kInfoStateObsType, {});
+  auto observer = game->MakeObserver(kPublicStateObsType, {});
   auto observation = Observation(*game, observer);
   std::mt19937 rnd_gen;
+  ParticleGenerator generator(
+      std::dynamic_pointer_cast<const goofspiel::GoofspielGame>(game), rnd_gen);
+
   auto check_particle_count = [&](const State& s, int expected_count) {
     observation.SetFrom(s, 0);
-    auto particle_set = GenerateParticles(observation, 0, 1000, 1000, 0, rnd_gen);
+    generator.SetPublicState(observation);
+    auto particle_set = generator.GenerateParticles(1000, 1000);
     SPIEL_CHECK_EQ(particle_set->particles.size(), expected_count);
   };
 
@@ -62,6 +63,8 @@ void ShowParticleDiversity() {
   auto public_observation = Observation(*game, public_observer);
   const int player = 0;
   std::mt19937 rnd_gen;
+  ParticleGenerator generator(
+      std::dynamic_pointer_cast<const goofspiel::GoofspielGame>(game), rnd_gen);
 
   auto state = game->NewInitialState();
   state->ApplyActions({1, 2});
@@ -74,8 +77,8 @@ void ShowParticleDiversity() {
   public_observation.SetFrom(*state, 0);
 
   const absl::Time start = absl::Now();
-  auto particle_set = GenerateParticles(infostate_observation, player,
-                                        1000, 1000, 1, rnd_gen);
+  generator.SetInfoState(infostate_observation, player);
+  auto particle_set = generator.GenerateParticles(1000, 1000);
   const absl::Time end = absl::Now();
   const double milis = absl::ToDoubleMilliseconds(end - start);
 
@@ -89,8 +92,6 @@ void ShowParticleDiversity() {
   std::cout << "Generated " << particle_set->particles.size()
             << " particles in " << milis << "ms";
 }
-
-
 
 }  // namespace
 }  // namespace papers_with_code

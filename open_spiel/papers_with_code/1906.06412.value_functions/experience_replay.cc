@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "open_spiel/algorithms/bandits_policy.h"
+#include "open_spiel/games/goofspiel.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/experience_replay.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/particle_regeneration.h"
 
@@ -98,6 +99,7 @@ ReplayFillerPolicy GetReplayFillerPolicy(const std::string& s) {
   if (s == "trunk_random")      return kTrunkRandom;
   if (s == "pbs_random")        return kPbsRandom;
   if (s == "sparse_pbs_random") return kSparsePbsRandom;
+  if (s == "iigskn_pbs_random") return kIigsKnPbsRandom;
   if (s == "bootstrap")         return kBootstrap;
   if (s == "ismcts_bootstrap")  return kIsmctsBootstrap;
   SpielFatalError("Exhausted pattern match: ReplayFillerPolicy.");
@@ -259,6 +261,40 @@ void ReplayFiller::AddRandomSparsePbsSolution() {
   AddExperience(result, net_context);
 }
 
+void ReplayFiller::AddIigsKnRandomPbsSolution() {
+  const auto goof_game = std::dynamic_pointer_cast<
+      const goofspiel::GoofspielGame>(subgame_factory->game);
+  // 1. Pick a public state
+  std::uniform_int_distribution<int> dist_turns(0, goof_game->NumTurns() - 1);
+  std::uniform_int_distribution<int> dist_outcome(-1, 1);
+  std::vector<int> outcomes(dist_turns(*randomizer->rnd_gen));
+  for (int i = 0; i < outcomes.size(); ++i) {
+    outcomes[i] = dist_outcome(*randomizer->rnd_gen);
+  }
+
+  // 2. Generate particle set.
+  ParticleGenerator generator(goof_game, *randomizer->rnd_gen);
+  generator.SetPublicOutcomes(outcomes);
+  std::unique_ptr<ParticleSet> set = generator.GenerateParticles(
+      subgame_factory->max_particles, max_rejection_cnt);
+
+  // 3. Assign randomized beliefs.
+  randomizer->Randomize(*subgame_factory->game, set.get(),
+                        subgame_factory->infostate_observer);
+
+  // 4. Build subgame until the end of the game and solve it.
+  std::shared_ptr<Subgame> subgame = subgame_factory->MakeSubgame(
+      *set, algorithms::kNoMoveAheadLimit);
+  std::unique_ptr<SubgameSolver> solver = solver_factory->MakeSolver(subgame);
+  solver->RunSimultaneousIterations(100);
+
+  // 5. Add solution to the experiences.
+  PublicState& result = subgame->initial_state();
+  auto context = solver_factory->leaf_evaluator->CreateContext(result);
+  auto net_context = open_spiel::down_cast<NetContext*>(context.get());
+  AddExperience(result, net_context);
+}
+
 void ReplayFiller::AddBootstrappedSolution() {
   // 1. Pick a particle set.
   std::unique_ptr<ParticleSet> set = PickParticleSet(bootstrap_move_number);
@@ -319,6 +355,7 @@ void ReplayFiller::CreateExperiences(ReplayFillerPolicy fill_policy,
       case kTrunkRandom:      AddTrunkRandomPbsSolution();     break;
       case kPbsRandom:        AddRandomPbsSolution();          break;
       case kSparsePbsRandom:  AddRandomSparsePbsSolution();    break;
+      case kIigsKnPbsRandom:  AddIigsKnRandomPbsSolution();    break;
       case kBootstrap:        AddBootstrappedSolution();       break;
       case kIsmctsBootstrap:  AddIsmctsBootstrapedSolution();  break;
       default: SpielFatalError("Exhausted pattern match on ReplayFillerPolicy");
@@ -374,14 +411,18 @@ std::unique_ptr<ParticleSet> ReplayFiller::PickIsmctsParticleSet(int at_depth) {
   InfostateStats::iterator it =
       playthroughs->SampleInfostate(at_depth, *randomizer->rnd_gen);
 
-  // 2. Generate particles compatible with the infostate.
-  std::unique_ptr<ParticleSet> set =
-      GenerateParticles(const_cast<Observation&>(it->first),
-                        it->second.player,
-                        subgame_factory->max_particles,
-                        max_rejection_cnt,
-                        infostate_particles,
-                        *randomizer->rnd_gen);
+  // 2. Generate particles compatible with the public state and infostate.
+  ParticleGenerator generator(
+      std::dynamic_pointer_cast<const goofspiel::GoofspielGame>(subgame_factory->game),
+      *randomizer->rnd_gen);
+  //
+  generator.SetPublicState(it->first);
+  std::unique_ptr<ParticleSet> set = generator.GenerateParticles(
+      subgame_factory->max_particles, max_rejection_cnt);
+  //
+  generator.SetInfoState(it->first, it->second.player);
+  set->ImportSet(*generator.GenerateParticles(
+      infostate_particles, max_rejection_cnt));
 
   // 3. Assign randomized beliefs.
   randomizer->Randomize(*subgame_factory->game, set.get(),

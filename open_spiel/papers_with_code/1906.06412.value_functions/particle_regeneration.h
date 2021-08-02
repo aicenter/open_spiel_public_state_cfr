@@ -16,6 +16,7 @@
 #ifndef OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_PARTICLE_REGENERATION_
 #define OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_PARTICLE_REGENERATION_
 
+#include "open_spiel/games/goofspiel.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/subgame.h"
 #include "open_spiel/algorithms/infostate_tree.h"
 #include "open_spiel/spiel.h"
@@ -34,14 +35,33 @@ namespace papers_with_code {
 namespace opr = operations_research;
 
 // Implemented only for imp. info GoofSpiel.
-std::unique_ptr<ParticleSet> GenerateParticles(
-    Observation& infostate,
-    Player player_hand,
-    int max_particles,
-    int max_rejection_cnt,
-    int infostate_particles,
-    std::mt19937& rnd_gen);
+class ParticleGenerator {
+  std::shared_ptr<const goofspiel::GoofspielGame> game_;
+  const opr::Domain cards_;
+  std::mt19937& rnd_gen_;
 
+  std::unique_ptr<opr::sat::CpModelBuilder> cp_model_ = nullptr;
+  std::array<std::vector<opr::sat::IntVar>, 2> played_;
+  int num_bets_;
+  Player current_player_;
+ public:
+  ParticleGenerator(std::shared_ptr<const goofspiel::GoofspielGame> game,
+                    std::mt19937& rnd_gen)
+      : game_(game), cards_(0, game->NumCards() - 1), rnd_gen_(rnd_gen) {};
+
+  //  0: a tie
+  // -1: a loss (of player 0)
+  //  1: a win  (of player 0)
+  void SetPublicOutcomes(const std::vector<int>& outcomes);
+  void SetInfoState(const Observation& infostate, Player player_hand);
+  void SetPublicState(const Observation& public_state);
+
+  std::unique_ptr<ParticleSet> GenerateParticles(int max_particles,
+                                                 int max_rejection_cnt);
+
+ private:
+  void ResetModel(int num_bets);
+};
 
 } // namespace papers_with_code
 } // namespace open_spiel
