@@ -45,9 +45,10 @@ std::unique_ptr<Metric> MakeFullTrunkExplMetric(
     SubgameSolver* trunk_with_net,
     algorithms::ortools::SequenceFormLpSpecification* whole_game);
 
-std::unique_ptr<Metric> MakeIigsApproxBrMetric(
+std::unique_ptr<Metric> MakeIigsBrMetric(
     std::unique_ptr<Bot> bot,
-    std::shared_ptr<const goofspiel::GoofspielGame> game);
+    std::shared_ptr<const goofspiel::GoofspielGame> game,
+    bool approx_response);
 
 std::unique_ptr<Metric> MakeReplayVisitsMetric(
     ExperienceReplay* replay, int window);

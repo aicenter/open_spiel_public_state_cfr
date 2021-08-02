@@ -283,6 +283,24 @@ class TabularPolicy : public Policy {
   std::unordered_map<std::string, ActionsAndProbs> policy_table_;
 };
 
+class TabularPolicyWithUniformDefault : public TabularPolicy {
+ public:
+  using TabularPolicy::TabularPolicy;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Woverloaded-virtual"
+  ActionsAndProbs GetStatePolicy(
+      const State& state, Player player) const override {
+    auto policy =
+        TabularPolicy::GetStatePolicy(state.InformationStateString(player));
+    if (policy.empty()) {
+      return UniformStatePolicy(state, player);
+    } else {
+      return policy;
+    }
+  }
+#pragma clang diagnostic pop
+};
+
 std::unique_ptr<TabularPolicy> DeserializeTabularPolicy(
     const std::string& serialized, std::string delimiter = "<~>");
 

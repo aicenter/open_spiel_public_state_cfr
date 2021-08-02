@@ -24,13 +24,13 @@ void ComparePolicySize(const std::shared_ptr<TabularPolicy>& joint_policy,
                        const std::shared_ptr<const Game>& game) {
   TabularPolicy full_policy = GetUniformPolicy(*game);
 
-  SPIEL_CHECK_EQ(full_policy.PolicyTable().size(),
-                 joint_policy->PolicyTable().size());
+  // The tabular joint policy is pruned for unreachable infostates.
+  //  SPIEL_CHECK_EQ(full_policy.PolicyTable().size(),
+  //                 joint_policy->PolicyTable().size());
 
-  for (const auto& info_state_policy : full_policy.PolicyTable()) {
-    SPIEL_CHECK_EQ(info_state_policy.second.size(),
-                   joint_policy->GetStatePolicy(
-                       info_state_policy.first).size());
+  for (const auto&[info_state, policy] : joint_policy->PolicyTable()) {
+    SPIEL_CHECK_EQ(
+        policy.size(), full_policy.GetStatePolicy(info_state).size());
   }
 }
 

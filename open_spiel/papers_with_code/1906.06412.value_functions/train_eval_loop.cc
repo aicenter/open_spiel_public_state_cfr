@@ -121,6 +121,8 @@ ABSL_FLAG(bool, track_lr, false, "Track time between loops");
 // IigsBrMetric
 ABSL_FLAG(bool, iigs_br_metric, false,
           "Compute domain-specific BR for IIGS(N,K)");
+ABSL_FLAG(bool, iigs_approx_response, true,
+          "Make an approximate version of the response, faster to compute.");
 
 
 // -----------------------------------------------------------------------------
@@ -454,7 +456,9 @@ void TrainEvalLoop() {
                                                Player{0}, seed);
     auto goof_game =
         std::dynamic_pointer_cast<const goofspiel::GoofspielGame>(game);
-    metrics.push_back(MakeIigsApproxBrMetric(std::move(bot), goof_game));
+    bool approx_response = absl::GetFlag(FLAGS_iigs_approx_response);
+    metrics.push_back(
+        MakeIigsBrMetric(std::move(bot), goof_game, approx_response));
   }
   //
   ReplayFillerPolicy exp_init =

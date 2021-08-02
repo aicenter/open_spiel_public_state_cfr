@@ -34,9 +34,11 @@ namespace papers_with_code {
 // the bot's internalstate does not get corrupted while traversing the infostate
 // tree.
 std::unique_ptr<TabularPolicy> TabularizeOnlinePolicy(
-    Bot* bot, Player player, const Game& game);
+    Bot* bot, Player player, const Game& game,
+    absl::optional<int> max_actions = absl::nullopt);
 std::unique_ptr<TabularPolicy> TabularizeOnlinePolicy(
-    Bot* bot, std::shared_ptr<algorithms::InfostateTree> tree);
+    Bot* bot, std::shared_ptr<algorithms::InfostateTree> tree,
+    absl::optional<int> max_actions = absl::nullopt);
 
 } // namespace papers_with_code
 } // namespace open_spiel

@@ -90,24 +90,33 @@ class FullTrunkExplMetric : public Metric {
   }
 };
 
-class IigsApproxBrMetric : public Metric {
+class IigsBrMetric : public Metric {
   std::unique_ptr<Bot> bot_;
-  std::shared_ptr<const Game> orig_game_;
+  std::shared_ptr<const goofspiel::GoofspielGame> game_;
   std::shared_ptr<const Game> br_game_;
+  absl::optional<int> max_actions_ = {};
   std::shared_ptr<algorithms::InfostateTree> player_tree_;
   double br_;
  public:
-  IigsApproxBrMetric(std::unique_ptr<Bot> bot,
-                     std::shared_ptr<const goofspiel::GoofspielGame> game)
+  IigsBrMetric(std::unique_ptr<Bot> bot,
+               std::shared_ptr<const goofspiel::GoofspielGame> game,
+               bool approx_response)
       : bot_(std::move(bot)),
-        br_game_(LoadGameAsTurnBased(absl::StrCat("goofspiel("
-          "players=2,"
-          "num_turns=", game->NumTurns(), ","
-          "num_cards=", game->NumCards(), ","
-          "opponent_br_deck=True,"  // <-- This is important change.
-          "imp_info=True,"
-          "points_order=descending"
-        ")"))),
+        game_(game),
+        br_game_(approx_response
+          ? LoadGameAsTurnBased(absl::StrCat("goofspiel("
+                "players=2,"
+                "num_turns=", game->NumTurns(), ","
+                "num_cards=", game->NumCards(), ","
+                "opponent_br_deck=True,"  // <-- This is important change.
+                "imp_info=True,"
+                "points_order=descending"
+              ")"))
+          : ConvertToTurnBased(*game)
+        ),
+        max_actions_(approx_response
+          ? absl::optional<int>{game->NumTurns() + 1}
+          : absl::optional<int>{}),
         player_tree_(algorithms::MakeInfostateTree(
             *game, Player{0},
             algorithms::kNoMoveAheadLimit,
@@ -116,8 +125,7 @@ class IigsApproxBrMetric : public Metric {
   void Reset() override {}
   void Evaluate(std::ostream& progress) override {
     std::shared_ptr<TabularPolicy> policy =
-        TabularizeOnlinePolicy(bot_.get(), player_tree_);
-//    std::cout << policy->ToString() << "\n";
+        TabularizeOnlinePolicy(bot_.get(), player_tree_, max_actions_);
     algorithms::TabularBestResponse br(*br_game_, Player{1}, policy.get());
     br_ = br.Value("");
   }
@@ -199,10 +207,11 @@ std::unique_ptr<Metric> MakeFullTrunkExplMetric(
                                                trunk_with_net, whole_game);
 }
 
-std::unique_ptr<Metric> MakeIigsApproxBrMetric(
+std::unique_ptr<Metric> MakeIigsBrMetric(
     std::unique_ptr<Bot> bot,
-    std::shared_ptr<const goofspiel::GoofspielGame> game) {
-  return std::make_unique<IigsApproxBrMetric>(std::move(bot), game);
+    std::shared_ptr<const goofspiel::GoofspielGame> game,
+    bool approx_response) {
+  return std::make_unique<IigsBrMetric>(std::move(bot), game, approx_response);
 }
 
 
