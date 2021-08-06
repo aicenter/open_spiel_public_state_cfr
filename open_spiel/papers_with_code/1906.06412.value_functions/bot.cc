@@ -27,6 +27,7 @@ SherlockBot::SherlockBot(std::shared_ptr<SubgameFactory> subgame_factory,
       player_id_(player_id),
       rnd_gen_(seed) {
   subgame_ = subgame_factory_->MakeTrunk(1);
+  first_step_ = true;
 }
 
 SherlockBot::SherlockBot(const SherlockBot& bot)
@@ -34,8 +35,8 @@ SherlockBot::SherlockBot(const SherlockBot& bot)
       solver_factory_(bot.solver_factory_),
       player_id_(bot.player_id_),
       rnd_gen_(bot.rnd_gen_),
-      // Copy the subgame.
-      subgame_(std::make_shared<Subgame>(*bot.subgame_)) {
+      subgame_(std::make_shared<Subgame>(*bot.subgame_)),  // Copy the subgame.
+      first_step_(bot.first_step_) {
   // Make sure we really made a copy (different memory pointers).
   SPIEL_CHECK_NE(subgame_.get(), bot.subgame_.get());
 }
@@ -50,6 +51,7 @@ void SherlockBot::SetSeed(int seed) {
 
 void SherlockBot::Restart() {
   subgame_ = subgame_factory_->MakeTrunk(1);
+  first_step_ = true;
 }
 
 std::pair<ActionsAndProbs, Action> SherlockBot::StepWithPolicy(const State& state) {
@@ -65,7 +67,8 @@ std::pair<ActionsAndProbs, Action> SherlockBot::StepWithPolicy(const State& stat
   // Public state observations.
   Observation public_observation
       (*subgame_factory_->game, subgame_factory_->public_observer);
-  public_observation.SetFrom(state, 0);
+  public_observation.SetFrom(state, kDefaultPlayerId);
+
   // We should always be able to localize current public state based
   // on previous bot steps.
   PublicState* public_state = nullptr;
@@ -76,6 +79,12 @@ std::pair<ActionsAndProbs, Action> SherlockBot::StepWithPolicy(const State& stat
     }
   }
   SPIEL_CHECK_TRUE(public_state);
+  SPIEL_CHECK_TRUE(
+      // In the first step, the public state comes from the trunk,
+      // and is the initial public state.
+      (first_step_ && public_state->IsInitial())
+      // All subsequent steps are leaves from lookahead subgames.
+      || public_state->IsLeaf());
 
   // TODO: keep particles from previous step along with beliefs.
   //       Currently can work only for one-step lookahead trees.
@@ -106,19 +115,19 @@ std::pair<ActionsAndProbs, Action> SherlockBot::StepWithPolicy(const State& stat
   //    }
 
   // We will do the gadget if we are resolving
-  if (state.MoveNumber() > 0 && solver_factory_->safe_resolving) {
+  if (!first_step_ && solver_factory_->safe_resolving) {
     subgame_ = subgame_factory_->MakeSubgameSafeResolving(
         *set, player_id_, public_state->InfostateAvgValues(1 - player_id_));
   } else {
     subgame_ = subgame_factory_->MakeSubgame(*set);
   }
+  first_step_ = false;
 
   std::unique_ptr<SubgameSolver> solver = solver_factory_->MakeSolver(subgame_);
 
   solver->RunSimultaneousIterations(solver_factory_->cfr_iterations);
   if (state.IsPlayerActing(player_id_)) {
-    auto policy = std::make_shared<algorithms::BanditsAveragePolicy>(
-        subgame_->trees, solver->bandits());
+    auto policy = solver->AveragePolicy();
     ActionsAndProbs actions_and_probs = policy->GetStatePolicy(infostate);
     SPIEL_CHECK_FALSE(actions_and_probs.empty());
 
@@ -126,9 +135,8 @@ std::pair<ActionsAndProbs, Action> SherlockBot::StepWithPolicy(const State& stat
     std::pair<Action, double> outcome = SampleAction(actions_and_probs, p);
     return {actions_and_probs, outcome.first};
   } else {
-    // And we return empty actions and probs and -1 action
-    ActionsAndProbs actions_and_probs;
-    return {actions_and_probs, Action(-1)};
+    // We're not acting: return empty actions and probs and invalid action.
+    return {{}, kInvalidAction};
   }
 }
 

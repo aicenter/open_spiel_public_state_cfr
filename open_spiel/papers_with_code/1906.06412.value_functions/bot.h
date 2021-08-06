@@ -34,6 +34,7 @@ class SherlockBot : public Bot {
   Player player_id_;
   std::mt19937 rnd_gen_;
   std::shared_ptr<Subgame> subgame_;
+  bool first_step_ = true;
 
  public:
   SherlockBot(std::shared_ptr<SubgameFactory> subgame_factory,
