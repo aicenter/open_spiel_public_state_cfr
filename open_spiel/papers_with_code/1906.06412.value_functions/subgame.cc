@@ -458,20 +458,38 @@ void SubgameSolver::RunSimultaneousIterations(int iterations) {
   if (init_save_values_ == PolicySelection::kCurrentPolicy) {
     CopyCurrentValuesToInitialState();
   }
+}
 
-  // 5. put average beliefs to the leaf public states so we can reuse them in next step
-  // 5.1 Prepare initial reach probs, based on beliefs in initial state.
-  if (safe_resolving_) {
-    std::array<std::vector<double>, 2>& beliefs = initial_state().beliefs;
-    for (int pl = 0; pl < 2; ++pl) {
-      std::copy(beliefs[pl].begin(), beliefs[pl].end(),
-                reach_probs_[pl].begin());
-    }
+void SubgameSolver::SetAverageBeliefsInLeaves() {
+  // 1. Prepare initial reach probs, based on beliefs in initial state.
+  std::array<std::vector<double>, 2>& beliefs = initial_state().beliefs;
+  for (int pl = 0; pl < 2; ++pl) {
+    std::copy(beliefs[pl].begin(), beliefs[pl].end(),
+              reach_probs_[pl].begin());
+  }
 
-    // 5.2 Compute reach probs to the terminals
-    for (int pl = 0; pl < 2; ++pl) {
-      TopDownAverage(*subgame_->trees[pl], bandits_[pl],
-                     absl::MakeSpan(reach_probs_[pl]), num_iterations_);
+  // 2. Compute reach probs of avg strategy to the terminals.
+  for (int pl = 0; pl < 2; ++pl) {
+    TopDownAverage(*subgame_->trees[pl], bandits_[pl],
+                   absl::MakeSpan(reach_probs_[pl]));
+  }
+
+  // 3. Copy them into leaf public states from the reach_probs_.
+  for (int i = 0; i < subgame()->public_states.size(); ++i) {
+    PublicState* state = &subgame()->public_states[i];
+    if (!state->IsLeaf()) continue;
+
+    for (int pl = 0; pl < 2; pl++) {
+      const int num_leaves = state->nodes[pl].size();
+      for (int j = 0; j < num_leaves; ++j) {
+        const algorithms::InfostateNode* leaf_node = state->nodes[pl][j];
+        const int trunk_position = state->nodes_positions.at(leaf_node);
+        SPIEL_DCHECK_GE(trunk_position, 0);
+        SPIEL_DCHECK_LT(trunk_position, subgame()->trees[pl]->num_leaves());
+        // Copy reach prob (player belief) from the trunk
+        // to the leaf public state->
+        state->beliefs[pl][j] = reach_probs_[pl][trunk_position];
+      }
     }
   }
 }

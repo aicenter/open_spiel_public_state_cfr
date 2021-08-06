@@ -266,6 +266,7 @@ class SubgameSolver {
       bool safe_resolving = false);
 
   void RunSimultaneousIterations(int iterations);
+  void SetAverageBeliefsInLeaves();
   void Reset();
 
   // Accessors.

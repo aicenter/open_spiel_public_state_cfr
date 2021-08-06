@@ -70,7 +70,7 @@ inline void TopDownCurrent(const InfostateTree& tree, BanditVector& bandits,
 }
 
 inline void TopDownAverage(const InfostateTree& tree, BanditVector& bandits,
-                        absl::Span<double> reach_probs, size_t current_time) {
+                        absl::Span<double> reach_probs) {
     TopDown(tree, reach_probs, [&](DecisionId id, double reach_prob) {
         bandits::Bandit* bandit = bandits[id].get();
         return bandit->AverageStrategy();
