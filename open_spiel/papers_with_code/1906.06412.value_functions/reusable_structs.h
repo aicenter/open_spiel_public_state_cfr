@@ -15,6 +15,7 @@
 #ifndef OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_REUSABLE_STRUCTS_
 #define OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_REUSABLE_STRUCTS_
 
+#include "open_spiel/papers_with_code/1906.06412.value_functions/include_libs_ordered.h"
 #include "open_spiel/algorithms/bandits_policy.h"
 #include "open_spiel/algorithms/ortools/trunk_exploitability.h"
 

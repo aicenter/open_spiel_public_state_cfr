@@ -5,6 +5,7 @@ add_library(paper_value_functions OBJECT
         experience_replay.h
         hand_table.cc
         hand_table.h
+        include_libs_ordered.h
         ismcts_playthroughs.cc
         ismcts_playthroughs.h
         metrics.cc

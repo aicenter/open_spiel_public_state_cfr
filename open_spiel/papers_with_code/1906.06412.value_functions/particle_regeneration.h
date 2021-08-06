@@ -16,18 +16,11 @@
 #ifndef OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_PARTICLE_REGENERATION_
 #define OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_PARTICLE_REGENERATION_
 
-#include "open_spiel/games/goofspiel.h"
-#include "open_spiel/papers_with_code/1906.06412.value_functions/subgame.h"
-#include "open_spiel/algorithms/infostate_tree.h"
-#include "open_spiel/spiel.h"
-
 #include "ortools/sat/cp_model.h"
-#include "ortools/sat/model.h"
-#include "ortools/sat/sat_parameters.pb.h"
-#include "ortools/util/time_limit.h"
+
+#include "open_spiel/games/goofspiel.h"
 
 #include "open_spiel/papers_with_code/1906.06412.value_functions/particle.h"
-
 
 namespace open_spiel {
 namespace papers_with_code {

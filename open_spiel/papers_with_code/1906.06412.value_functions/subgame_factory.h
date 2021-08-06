@@ -16,10 +16,13 @@
 #ifndef OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_SUBGAME_FACTORY_
 #define OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_SUBGAME_FACTORY_
 
+
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_data.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_dl_evaluator.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/particle.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/particle_regeneration.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/subgame.h"
+
 #include "open_spiel/algorithms/infostate_tree.h"
 #include "open_spiel/algorithms/ortools/sequence_form_lp.h"
 
@@ -40,10 +43,12 @@ struct SubgameFactory {
   std::shared_ptr<Observer> infostate_observer;  // For infostate strings.
   std::shared_ptr<Observer> public_observer;     // For public tensor.
   std::shared_ptr<Observer> hand_observer;       // For hand tensor.
+  std::shared_ptr<ParticleGenerator> particle_generator;
 
   int max_trunk_depth = kDefaultMaxTrunkDepth;
   int max_move_ahead_limit = kDefaultMaxMoveAheadLimit;
-  int max_particles = kDefaultMaxParticles;
+  int max_particles = kDefaultMaxParticles;  // Must be always >= 1.
+  double particle_epsilon = 0.1;
 
   // Subgame from game's initial state.
   std::shared_ptr<Subgame> MakeTrunk(int trunk_depth = -1) const;

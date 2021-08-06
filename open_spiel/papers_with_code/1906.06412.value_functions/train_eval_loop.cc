@@ -128,7 +128,7 @@ ABSL_FLAG(bool, iigs_approx_response, true,
 // -----------------------------------------------------------------------------
 
 #include "absl/random/random.h"
-#include "torch/torch.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/include_libs_ordered.h"
 
 #include "open_spiel/game_transforms/turn_based_simultaneous_game.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/experience_replay.h"
