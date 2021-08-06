@@ -24,10 +24,6 @@
 namespace open_spiel {
 namespace papers_with_code {
 
-using PublicState = PublicState;
-using PublicStateContext = PublicStateContext;
-using PublicStateEvaluator = PublicStateEvaluator;
-
 // A bijection within the scope of a public state. This is a mapping between
 // PublicState::ranges coming from the tree (x) and the input position
 // of the neural network (y) which is assigned according to player's private

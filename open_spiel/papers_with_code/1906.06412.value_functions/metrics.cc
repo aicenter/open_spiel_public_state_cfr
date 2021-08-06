@@ -94,6 +94,7 @@ class IigsBrMetric : public Metric {
   std::unique_ptr<Bot> bot_;
   std::shared_ptr<const goofspiel::GoofspielGame> game_;
   std::shared_ptr<const Game> br_game_;
+  std::shared_ptr<const Game> turn_br_game_;
   absl::optional<int> max_actions_ = {};
   std::shared_ptr<algorithms::InfostateTree> player_tree_;
   double br_;
@@ -104,7 +105,7 @@ class IigsBrMetric : public Metric {
       : bot_(std::move(bot)),
         game_(game),
         br_game_(approx_response
-          ? LoadGameAsTurnBased(absl::StrCat("goofspiel("
+          ? LoadGame(absl::StrCat("goofspiel("
                 "players=2,"
                 "num_turns=", game->NumTurns(), ","
                 "num_cards=", game->NumCards(), ","
@@ -112,13 +113,14 @@ class IigsBrMetric : public Metric {
                 "imp_info=True,"
                 "points_order=descending"
               ")"))
-          : ConvertToTurnBased(*game)
+          : game
         ),
+        turn_br_game_(ConvertToTurnBased(*br_game_)),
         max_actions_(approx_response
           ? absl::optional<int>{game->NumTurns() + 1}
           : absl::optional<int>{}),
         player_tree_(algorithms::MakeInfostateTree(
-            *game, Player{0},
+            *br_game_, Player{0},
             algorithms::kNoMoveAheadLimit,
             algorithms::kStoreAllStatesPolicy)) {}
   std::string name() const override { return "br"; }
@@ -126,7 +128,7 @@ class IigsBrMetric : public Metric {
   void Evaluate(std::ostream& progress) override {
     std::shared_ptr<TabularPolicy> policy =
         TabularizeOnlinePolicy(bot_.get(), player_tree_, max_actions_);
-    algorithms::TabularBestResponse br(*br_game_, Player{1}, policy.get());
+    algorithms::TabularBestResponse br(*turn_br_game_, Player{1}, policy.get());
     br_ = br.Value("");
   }
   void PrintHeader(std::ostream& os) const override { os << "br"; }

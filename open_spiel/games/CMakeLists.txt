@@ -334,9 +334,7 @@ add_executable(go_test go_test.cc ${OPEN_SPIEL_OBJECTS}
 add_test(go_test go_test)
 
 add_executable(goofspiel_test goofspiel_test.cc ${OPEN_SPIEL_OBJECTS}
-               $<TARGET_OBJECTS:tests> $<TARGET_OBJECTS:paper_value_functions>
-               $<TARGET_OBJECTS:open_spiel_ortools>)
-target_link_libraries(goofspiel_test ${ORTOOLS_LIBS} ${TORCH_LIBRARIES})
+               $<TARGET_OBJECTS:tests>)
 add_test(goofspiel_test goofspiel_test)
 
 add_executable(havannah_test havannah_test.cc ${OPEN_SPIEL_OBJECTS}
