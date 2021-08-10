@@ -265,7 +265,7 @@ void ReplayFiller::AddIigsKnRandomPbsSolution() {
   const auto goof_game = std::dynamic_pointer_cast<
       const goofspiel::GoofspielGame>(subgame_factory->game);
   // 1. Pick a public state
-  std::uniform_int_distribution<int> dist_turns(0, goof_game->NumTurns() - 1);
+  std::uniform_int_distribution<int> dist_turns(1, goof_game->NumTurns());
   std::uniform_int_distribution<int> dist_outcome(-1, 1);
   std::vector<int> outcomes(dist_turns(*randomizer->rnd_gen));
   for (int i = 0; i < outcomes.size(); ++i) {
