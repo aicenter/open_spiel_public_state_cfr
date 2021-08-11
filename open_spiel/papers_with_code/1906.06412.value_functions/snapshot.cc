@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <filesystem>
 #include "torch/torch.h"
+#include <dirent.h>
 
 #include "open_spiel/papers_with_code/1906.06412.value_functions/snapshot.h"
+#include "open_spiel/utils/file.h"
 
 namespace open_spiel {
 namespace papers_with_code {
@@ -45,19 +46,28 @@ std::string FindSnapshot(const std::string& snapshot_dir) {
   // Search for all files that end with kModelExt, and select
   // a file with the highest loop number.
 
-  namespace fs = std::filesystem;
   int max_loop = -1;
-  for (const auto& entry : fs::directory_iterator(snapshot_dir)) {
-    if(entry.path().extension() != kModelExt) continue;
-    size_t num_chars;
-    int loop = std::stoi(entry.path().filename(), &num_chars);
-    if (num_chars) max_loop = std::max(max_loop, loop);
+
+  DIR *dir;
+  struct dirent *ent;
+  const int ext_len = strlen(kModelExt);
+
+  if ((dir = opendir(snapshot_dir.c_str())) != NULL) {
+    while ((ent = readdir (dir)) != NULL) {
+      std::string name = ent->d_name;
+      if(name.size() < ext_len) continue;
+      if(name.substr(name.size() - ext_len) != kModelExt) continue;
+      size_t num_chars;
+      int loop = std::stoi(name, &num_chars);
+      if (num_chars) max_loop = std::max(max_loop, loop);
+    }
+    closedir (dir);
   }
 
   if (max_loop == -1) return "";  // No snapshot found.
 
   std::string snapshot = snapshot_dir + "/" + std::to_string(max_loop) + kModelExt;
-  SPIEL_CHECK_TRUE(fs::exists(fs::path(snapshot)));
+  SPIEL_CHECK_TRUE(file::Exists((snapshot)));
   return snapshot;
 }
 

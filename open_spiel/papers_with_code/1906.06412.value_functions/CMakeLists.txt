@@ -69,6 +69,8 @@ add_paper_executable(continual_resolving_test continual_resolving_test.cpp)
 add_test(continual_resolving_test continual_resolving_test)
 add_paper_executable(tabularize_bot_test tabularize_bot_test.cpp)
 add_test(tabularize_bot_test tabularize_bot_test)
+add_paper_executable(snapshot_test snapshot_test.cc)
+add_test(snapshot_test snapshot_test)
 
 # High-level example of how batch parallelization is done.
 #add_paper_executable(parallelization_example parallelization_example.cc)
