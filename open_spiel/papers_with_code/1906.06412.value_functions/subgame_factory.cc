@@ -107,24 +107,29 @@ SubgameFactory::MakeSubgameResolvingInfostateTrees(
   SPIEL_CHECK_LE(set.particles.size(), max_particles);
   SPIEL_DCHECK(CheckParticleSetConsistency(*game, public_observer,
                                            hand_observer, set));
+
   std::vector<std::unique_ptr<State>> root_histories;
   std::vector<double> chance_reach_probs;
   std::unordered_map<std::string, double> info_state_reaches;
+
   for (const Particle& particle : set.particles) {
+    double resolving_reach = particle.chance_reach
+                           * particle.player_reach[player];
+    if (resolving_reach == 0) continue;
+
     auto state = particle.MakeState(*game);
     std::string info_state = state->InformationStateString(1 - player);
     if (info_state_reaches.find(info_state) == info_state_reaches.end()) {
       info_state_reaches.emplace(info_state, 0.);
     }
+
     root_histories.push_back(std::move(state));
-    double
-        resolving_reach = particle.chance_reach * particle.player_reach[player];
     chance_reach_probs.push_back(resolving_reach);
     info_state_reaches[info_state] += resolving_reach;
   }
   for (const auto& entry : info_state_reaches) {
     if (entry.second > 0) {
-      CFVs[entry.first] /= entry.second;
+      CFVs.at(entry.first) /= entry.second;
     }
   }
   std::vector<std::shared_ptr<algorithms::InfostateTree>> trees =
