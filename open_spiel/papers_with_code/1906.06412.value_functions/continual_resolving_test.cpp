@@ -351,14 +351,13 @@ void TestResolvingNfgWithSmallerEqSupport() {
       /*expected_policy=*/    {0.5, 0.5, 0},
       /*expected_game_value=*/-0.5,
       /*expected_player_certificate=*/"(("
-                                      "(({-0.00})({-0.50})({-0.50}))"
-                                      "[({-1.00}{-1.00}{5.00})({-1.00}{0.00}{0.00})({-1.00}{0.00}{0.00})]"
+                                      "(({-0.50})({-0.50}))"
+                                      "[({-1.00}{-1.00})({-1.00}{0.00})({-1.00}{0.00})]"
                                       "))",
-      /*expected_opponent_certificat=*/"("
-                                       "[(({-5.00})({0.00})({0.00}))(({0.00}))]"
-                                       "[(({0.00})({1.00})({1.00}))(({0.50}))]"
-                                       "[(({0.00})({1.00})({1.00}))(({0.50}))]"
-                                       ")");
+                                      /*expected_opponent_certificat=*/"("
+                                                                       "[(({0.00})({1.00})({1.00}))(({0.50}))]"
+                                                                       "[(({0.00})({1.00})({1.00}))(({0.50}))]"
+                                                                       ")");
 }
 
 void CheckKuhnGame(std::vector<std::vector<Action>> start_histories,
@@ -403,7 +402,6 @@ void CheckKuhnGame(std::vector<std::vector<Action>> start_histories,
 
   TabularPolicy kuhn_optimal_policy =
       kuhn_poker::GetOptimalPolicy(kuhn_alpha_param);
-  SPIEL_CHECK_EQ(solved_slp_policy.PolicyTable().size(), 3);
 
   for (const auto&[infostate, strategy] : solved_slp_policy.PolicyTable()) {
     SPIEL_CHECK_EQ(strategy.size(), 2);
@@ -460,8 +458,8 @@ void TestResolvingKuhnPassBetAlphaMax() {
       /*kuhn_alpha_param=*/1/3.,  // Max alpha
       /*ft_player=*/1,
       /*expected_game_values=*/{-1./3, 1./3},
-      /*expected_player_certificate=*/"(((({-1.00})({-1.40}))[({-1.00}{-1.00})({-2.00}{-2.00})])((({-1.00})({1.00}))[({-1.00}{-1.00})({2.00}{2.00})])((({-1.40})({1.00}))[({-1.00}{-1.00})({-2.00}{2.00})]))",
-      /*expected_opponent_certificate=*/"([(({-1.00})({-1.00}))(({-2.00})({-2.00})({1.00})({1.00}))][(({-2.00})({1.00})({1.00})({2.00}))(({1.00})({1.00}))][(({1.00})({1.00})({2.00})({2.00}))(({1.40})({1.40}))])");
+      /*expected_player_certificate=*/"(((({-1.00})({-1.40}))[({-1.00}{-1.00})({-2.00}{-2.00})])((({-1.40})({1.00}))[({-1.00}{-1.00})({-2.00}{2.00})]))",
+      /*expected_opponent_certificate=*/"([(({-1.00}))(({-2.00})({1.00}))][(({1.00})({1.00})({2.00})({2.00}))(({1.40})({1.40}))][(({1.00})({2.00}))(({1.00}))])");
 }
 
 }  // namespace

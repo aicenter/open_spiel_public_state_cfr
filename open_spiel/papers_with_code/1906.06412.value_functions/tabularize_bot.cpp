@@ -82,7 +82,8 @@ void RecursivelySavePolicyForInfostate(Bot* bot,
     }
 
     std::unique_ptr<Bot> new_bot = bot->Clone();
-    RecursivelySavePolicyForInfostate(new_bot.get(), child, policy, max_actions);
+    RecursivelySavePolicyForInfostate(new_bot.get(), child, policy,
+                                      max_actions);
   }
 }
 

@@ -517,9 +517,11 @@ class InfostateTree final {
     move_limit_ = start_max_move_number + max_move_ahead_limit;
 
     for (int i = 0; i < start_states.size(); ++i) {
-      RecursivelyBuildTree(root_.get(), /*depth=*/1,
-                           *start_states[i],
-                           chance_reach_probs[i]);
+      if (chance_reach_probs[i] > 0) {
+        RecursivelyBuildTree(root_.get(), /*depth=*/1,
+                             *start_states[i],
+                             chance_reach_probs[i]);
+      }
     }
 
     // Operations to make after building the tree.
@@ -544,21 +546,10 @@ class InfostateTree final {
       std::shared_ptr<Observer>, Player, int, int);
   friend std::shared_ptr<InfostateTree> MakeInfostateTree(
       const std::vector<const InfostateNode*>&, int, int);
-
-  friend std::shared_ptr<InfostateTree> MakeResolvingInfostateTree(const std::vector<
-      std::unique_ptr<
-          State>>& start_states,
-                                                                   const std::vector<
-                                                                       double>& chance_reach_probs,
-                                                                   std::shared_ptr<
-                                                                       Observer> infostate_observer,
-                                                                   Player acting_player,
-                                                                   Player ft_player,
-                                                                   const std::unordered_map<
-                                                                       std::string,
-                                                                       double>& cf_value_constraints,
-                                                                   int max_move_ahead_limit,
-                                                                   int storage_policy);
+  friend std::shared_ptr<InfostateTree> MakeResolvingInfostateTree(
+      const std::vector<std::unique_ptr<State>>&, const std::vector<double>&,
+      std::shared_ptr<Observer>, Player, Player,
+      const std::unordered_map<std::string, double>&, int, int);
 
   const Player acting_player_;
   const std::shared_ptr<Observer> infostate_observer_;
