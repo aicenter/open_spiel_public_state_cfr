@@ -34,7 +34,7 @@ struct Particle {
 
   // Full reach prob.
   float reach() const {
-    return chance_reach * player_reach[0] * player_reach[1];
+    return chance_reach * player_reach[0]; //* player_reach[1];
   }
   // Rollout a state based on particle history.
   std::unique_ptr<State> MakeState(const Game& game) const;
@@ -49,11 +49,13 @@ struct ParticleSet {
   const Particle& at(const std::vector<Action>& history) const;
   Particle& add(const std::vector<Action>& history);
   bool has(const std::vector<Action>& history) const;
+  int size() const { return particles.size(); }
 
   void AssignBeliefs(PublicState& state) const;
   void ImportSet(const ParticleSet& other) {
-    particles.insert(particles.end(),
-                     other.particles.begin(), other.particles.end());
+    for (const Particle& candidate : other.particles) {
+      if (!has(candidate.history)) particles.push_back(candidate);
+    }
   }
 };
 

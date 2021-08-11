@@ -34,6 +34,7 @@ class SherlockBot : public Bot {
   Player player_id_;
   std::mt19937 rnd_gen_;
   std::shared_ptr<Subgame> subgame_;
+  TabularPolicy past_policy_;
   bool first_step_ = true;
 
  public:
@@ -65,6 +66,10 @@ class SherlockBot : public Bot {
   ActionsAndProbs GetPolicy(const State& state) override {
     return Bot::GetPolicy(state);
   }
+ private:
+  void StorePastPolicy(const std::shared_ptr<algorithms::InfostateTree> tree,
+                       const Policy& policy);
+  void AssignBeliefs(ParticleSet* set) const;
 };
 
 std::unique_ptr<Bot> MakeSherlockBot(

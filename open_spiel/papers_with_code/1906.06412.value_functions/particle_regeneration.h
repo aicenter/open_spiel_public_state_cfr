@@ -16,6 +16,7 @@
 #ifndef OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_PARTICLE_REGENERATION_
 #define OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_PARTICLE_REGENERATION_
 
+
 #include "ortools/sat/cp_model.h"
 
 #include "open_spiel/games/goofspiel.h"

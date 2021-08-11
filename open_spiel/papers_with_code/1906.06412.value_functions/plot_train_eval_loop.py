@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 
 # base_dir="./experiments/snapshot_pbs_training"
-base_dir="./experiments/bootstraped_learning"
+base_dir="./experiments/iigs_kn"
 
 select = dict(
     randomization=".*",
@@ -19,21 +19,23 @@ select = dict(
     seed=".*",
     save_values_policy="average",
     zero_sum_regression=".*",
+    safe="false",
+    kn="3-5$",
     norm=".*",
 )
 pipeline = [
     process.read,
     # process.average("seed"),
     # process.concat("zero_sum_regression"),
-    process.concat("norm"),
+    process.concat("safe"),
 ]
 layout = dict(
-    x=[],
-    y=["game_name"]
+    y=[],
+    x=["kn"]
     # y=["game_name", "depth", "num_loops", "bootstrap_from_move"]
     # y=["game_name", "depth", "save_values_policy", "seed"]
 )
-cell_size = [2, 1]
+cell_size = [3, 1]
 
 
 
@@ -101,16 +103,25 @@ def plot_cell(axes, params, data):
                             label=f"normalize={normalize} mse loss", alpha=1)
 
 def plot_cell2(axes, params, data):
-    df = data[0]
-    axes[0, 0].plot(df.loop, df["expl[100]"],
-                    label=f"expl", alpha=1)
-    axes[1, 0].semilogy(df.loop, df.avg_loss,
-                        label=f"mse loss", alpha=1)
+    x = data[0][1][0]
+    axes[0, 0].semilogy(x.loop, x["expl[10]"], label=f"expl 10", alpha=1)
+    axes[0, 0].semilogy(x.loop, x["expl[50]"], label=f"expl 50", alpha=1)
+    axes[0, 0].semilogy(x.loop, x["expl[100]"], label=f"expl 100", alpha=1)
+    axes[0, 0].legend(loc="lower left")
+    axes[2, 0].semilogy(x.loop, x.avg_loss, label=f"mse loss", alpha=1)
+    axes[2, 0].legend(loc="lower left")
+
+    for safe, df in data:
+        df = df[0]
+        axes[1, 0].semilogy(df.loop, df["br"].rolling(20).mean(), label=f"br safe={safe} (mean)", alpha=1)
+        axes[1, 0].semilogy(df.loop, df["br"], label=f"br safe={safe}", alpha=0.3)
+    axes[1, 0].legend(loc="lower left")
+
 
 
 
 lazy_pipeline = process.make_lazy_pipeline(base_dir, select, pipeline)
 # print(lazy_pipeline)
-plot.display(lazy_pipeline, layout, cell_size, plot_cell, translation_map)
-# plot.display(lazy_pipeline, layout, cell_size, plot_cell2, translation_map)
+# plot.display(lazy_pipeline, layout, cell_size, plot_cell, translation_map)
+plot.display(lazy_pipeline, layout, cell_size, plot_cell2, translation_map)
 # plot.display(lazy_pipeline, layout, cell_size, plot_bootstrap, translation_map)

@@ -166,14 +166,17 @@ void TestKuhnGadget() {
 
   // Compare resulting policies and game values.
   // FIXME(David): why only pass?
+  std::mt19937 rnd(0);
   for (const PublicState& public_state : subgame->public_states) {
     if (public_state.IsLeaf()
         && public_state.nodes[0][0]->infostate_string().substr(1) == "p") {
-      std::unique_ptr<ParticleSet> set = ParticlesFromState(public_state);
+      std::unique_ptr<ParticleSetPartition> partition =
+          MakeParticleSetPartition(public_state, 1e7, 1e-9, false, rnd);
+      const ParticleSet& set = partition->primary;
 
       for (int player = 0; player < 2; player++) {
         auto local_subgame = subgame_factory->MakeSubgameSafeResolving(
-            *set, player, public_state.InfostateAvgValues(1 - player),
+            set, player, public_state.InfostateAvgValues(1 - player),
             algorithms::kNoMoveAheadLimit);
 
         SequenceFormLpSpecification specification(local_subgame->trees);

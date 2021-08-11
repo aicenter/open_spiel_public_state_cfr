@@ -247,6 +247,12 @@ void TrainEvalLoop() {
   subgame_factory->max_move_ahead_limit = absl::GetFlag(FLAGS_max_move_ahead_limit);
   subgame_factory->max_trunk_depth      = absl::GetFlag(FLAGS_depth);
   subgame_factory->max_particles        = absl::GetFlag(FLAGS_max_particles);
+  if (game->GetType().short_name == "goofspiel") {
+    auto goof_game =
+        std::dynamic_pointer_cast<const goofspiel::GoofspielGame>(game);
+    subgame_factory->particle_generator =
+        std::make_shared<ParticleGenerator>(goof_game, rnd_gen);
+  }
   //
   std::cout << "# Making oracle evaluator ..." << std::endl;
   const PolicySelection save_values_policy =

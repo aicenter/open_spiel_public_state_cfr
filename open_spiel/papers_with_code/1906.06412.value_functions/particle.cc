@@ -167,7 +167,7 @@ std::unique_ptr<ParticleSetPartition> MakeParticleSetPartition(
     const PublicState& state,
     int primary_max_particles, double epsilon,
     bool save_secondary, std::mt19937& rnd_gen) {
-
+  // TODO: make work well for case "primary_max_particles == 0"
   ParticleSet all;
   all.particles.reserve(primary_max_particles);
 
@@ -176,6 +176,9 @@ std::unique_ptr<ParticleSetPartition> MakeParticleSetPartition(
       for (int k = 0; k < state.nodes[pl][i]->corresponding_states_size(); ++k) {
         const std::unique_ptr<State>& s = state.nodes[pl][i]->corresponding_states()[k];
         const double chn = state.nodes[pl][i]->corresponding_chance_reach_probs()[k];
+        // While technically possible, no game makes zero chance transitions.
+        SPIEL_CHECK_GT(chn, 0.);
+
         Particle& particle = pl == 0 ? all.add(s->History())
                                      : all.at(s->History());
         particle.player_reach[pl] = state.beliefs[pl][i];
@@ -225,9 +228,9 @@ std::unique_ptr<ParticleSetPartition> MakeParticleSetPartition(
 
   // However, some particles could have had (near) zero probability:
   // we omit those choices.
-  if (k > n - zero_entries) {  // Fast track return.
+  if (k >= n - zero_entries) {  // Fast track return.
     SPIEL_CHECK_GT(n, zero_entries);
-    // Keep only non-zero reach entries.
+    // Keep only the non-zero reach entries.
     for(auto& [cumul, particle_index] : cdf) {
       partition->primary.particles.push_back(all.particles[particle_index]);
     }
@@ -235,12 +238,21 @@ std::unique_ptr<ParticleSetPartition> MakeParticleSetPartition(
   }
 
   // Finally, pick the indices iteratively based on the CDF.
+  // We remove the selected choices from the CDF (otherwise it may take a long
+  // time for the while loop to terminate).
   std::set<int> pick;
   std::uniform_real_distribution<double> unif(0., 1.);  // Interval [0,1)
   while (pick.size() != k) {
     double p = unif(rnd_gen);
-    int particle_index = cdf.upper_bound(p)->second;
+    auto it = cdf.upper_bound(p);
+    if (it == cdf.end()) {
+      // This can happen due to iterative removal from cdf.
+      SPIEL_CHECK_FALSE(cdf.empty());
+      --it;
+    }
+    int particle_index = it->second;
     pick.insert(particle_index);
+    cdf.erase(it);  // TODO: think about more if this is indeed correct.
   }
 
   // Construct primary set based on the pick.

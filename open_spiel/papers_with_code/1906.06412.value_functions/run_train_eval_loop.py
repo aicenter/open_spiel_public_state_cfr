@@ -1,5 +1,5 @@
 import sys
-import grid_experiments.run as run
+import grid_plot.sweep as run
 
 # home = "/storage/praha1/home/sustrmic"
 # backend = "meta"
@@ -313,11 +313,54 @@ def snapshot_pbs_training():
               comb_param_fn=param_fn,
               save_snapshot=True)
 
+def iigs_kn_training():
+    base_params = dict(
+        arch="particle_vf",
+        batch_size="64",
+        cfr_oracle_iterations="1000",
+        depth="2",
+        device="cpu",
+        exp_init="pbs_random",
+        learning_rate="0.001",
+        lr_decay="0.9999",
+        num_inputs_regression="64",
+        num_layers="5",
+        num_width="5",
+        num_loops="512",
+        optimizer="adam",
+        prob_pure_strat="0.1",
+        prob_fully_mixed=0.05,
+        replay_size="10000",
+        train_batches="64",
+        trunk_expl_iterations="100",
+        use_bandits_for_cfr="PredictiveRegretMatchingPlus",
+        snapshot_loop="64",
+        zero_sum_regression="true",
+        normalize_beliefs="true"
+    )
+
+    def param_fn(param, context):
+        if param == "game_name":
+            return [f"goofspiel(players=2,num_cards={c},num_turns=4,imp_info=True,points_order=descending)"
+                    for c in range(4, 6)]
+        elif param == "max_particles":
+            return [-1, 64]
+        elif param == "seed":
+            return list(range(3))
+
+    run.run_sweep(backend, backend_params, binary_path,
+                  base_output_dir=f"{home}/experiments/iigs_kn_training",
+                  base_params=base_params,
+                  comb_params=["game_name", "max_particles", "seed"],
+                  comb_param_fn=param_fn)
+
+
 EXPERIMENTS_ = dict(vf_comparison=vf_comparison,
                     sparse_roots=sparse_roots,
                     training_dynamics=training_dynamics,
                     bootstraped_learning=bootstraped_learning,
-                    snapshot_pbs_training=snapshot_pbs_training
+                    snapshot_pbs_training=snapshot_pbs_training,
+                    iigs_kn_training=iigs_kn_training
                     )
 
 if __name__ == '__main__':
