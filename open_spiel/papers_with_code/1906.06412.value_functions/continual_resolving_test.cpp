@@ -172,7 +172,7 @@ void TestKuhnGadget() {
         && public_state.nodes[0][0]->infostate_string().substr(1) == "p") {
       std::unique_ptr<ParticleSetPartition> partition =
           MakeParticleSetPartition(public_state, 1e7, 1e-9, false, rnd);
-      const ParticleSet& set = partition->primary;
+      const ParticleSet& set = *partition->primary;
 
       for (int player = 0; player < 2; player++) {
         auto local_subgame = subgame_factory->MakeSubgameSafeResolving(

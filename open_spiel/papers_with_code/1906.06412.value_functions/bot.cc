@@ -89,44 +89,19 @@ std::pair<ActionsAndProbs, Action> SherlockBot::StepWithPolicy(const State& stat
       || public_state->IsLeaf());
 
   // Select particles to keep from the previous step along with their beliefs.
-  // Currently works only for one-step lookahead trees.
-  std::unique_ptr<ParticleSetPartition> partition =
-        MakeParticleSetPartition(*public_state, subgame_factory_->max_particles - 1,
-                                 subgame_factory_->particle_epsilon, false, rnd_gen_);
-  ParticleSet& set = partition->primary;
-  AssignBeliefs(&set);
-
-  // We will augment the current particle set using the particle generator.
-  ParticleGenerator* particle_generator = subgame_factory_->particle_generator.get();
-  SPIEL_CHECK_TRUE(particle_generator);
-
-  // Make sure we always have 1 particle in the current infostate.
-  // Using this removes the strong global consistency guarantee,
-  // but it makes the algorithm always capable of playing the game.
-  particle_generator->SetInfoState(infostate_observation, player_id_);
-  std::unique_ptr<ParticleSet> infostate_targeted_set =
-      particle_generator->GenerateParticles(1, /*max_rejection_cnt=*/100);
-  SPIEL_CHECK_FALSE(infostate_targeted_set->particles.empty());
-  AssignBeliefs(infostate_targeted_set.get());
-  set.ImportSet(*infostate_targeted_set);
-
-  // Generate even more particles if we starved too many of them between steps.
-  if (set.size() < subgame_factory_->max_particles) {
-    int num_new = subgame_factory_->max_particles - set.particles.size();
-    particle_generator->SetPublicState(public_observation);
-    std::unique_ptr<ParticleSet> pubstate_targeted_set =
-        particle_generator->GenerateParticles(num_new, 10*num_new);
-    AssignBeliefs(pubstate_targeted_set.get());
-    set.ImportSet(*infostate_targeted_set);
-  }
-  SPIEL_CHECK_FALSE(set.particles.empty());
+  // Currently, this works only for one-step lookahead trees.
+  std::unique_ptr<ParticleSet> set =
+      GetParticles(public_state, infostate_observation, public_observation);
+  SPIEL_CHECK_FALSE(set->particles.empty());
 
   // We will do the gadget if we are resolving
   if (!first_step_ && solver_factory_->safe_resolving) {
     subgame_ = subgame_factory_->MakeSubgameSafeResolving(
-        set, player_id_, public_state->InfostateAvgValues(1 - player_id_));
+        *set,  // Includes reach probs.
+        player_id_,
+        /*opponent_CFVs=*/public_state->InfostateAvgValues(1 - player_id_));
   } else {
-    subgame_ = subgame_factory_->MakeSubgame(set);
+    subgame_ = subgame_factory_->MakeSubgame(*set);
   }
   first_step_ = false;
 
@@ -162,6 +137,42 @@ void SherlockBot::StorePastPolicy(
   }
 }
 
+std::unique_ptr<ParticleSet> SherlockBot::GetParticles(
+    PublicState* for_state,
+    const Observation& infostate_observation,
+    const Observation& public_observation) {
+  std::unique_ptr<ParticleSetPartition> partition =
+      MakeParticleSetPartition(*for_state, subgame_factory_->max_particles - 1,
+                               subgame_factory_->particle_epsilon, false, rnd_gen_);
+  std::unique_ptr<ParticleSet> set = std::move(partition->primary);
+  AssignBeliefs(set.get());
+
+  // We will augment the current particle set using the particle generator.
+  ParticleGenerator* particle_generator = subgame_factory_->particle_generator.get();
+  if (particle_generator) {  // Implemented currently only for goofspiel.
+    // Make sure we always have 1 particle in the current infostate.
+    // Using this removes the strong global consistency guarantee,
+    // but it makes the algorithm always capable of playing the game.
+    particle_generator->SetInfoState(infostate_observation, player_id_);
+    std::unique_ptr<ParticleSet> infostate_targeted_set =
+        particle_generator->GenerateParticles(1, /*max_rejection_cnt=*/100);
+    SPIEL_CHECK_FALSE(infostate_targeted_set->particles.empty());
+    AssignBeliefs(infostate_targeted_set.get());
+    set->ImportSet(*infostate_targeted_set);
+
+    // Generate even more particles if we starved too many of them between steps.
+    if (set->size() < subgame_factory_->max_particles) {
+      int num_new = subgame_factory_->max_particles - set->particles.size();
+      particle_generator->SetPublicState(public_observation);
+      std::unique_ptr<ParticleSet> pubstate_targeted_set =
+          particle_generator->GenerateParticles(num_new, 10*num_new);
+      AssignBeliefs(pubstate_targeted_set.get());
+      set->ImportSet(*infostate_targeted_set);
+    }
+  }
+  return set;
+}
+
 void SherlockBot::AssignBeliefs(ParticleSet* set) const {
   Observer* obs = subgame_factory_->infostate_observer.get();
 
@@ -172,20 +183,35 @@ void SherlockBot::AssignBeliefs(ParticleSet* set) const {
 
     std::unique_ptr<State> s = subgame_factory_->game->NewInitialState();
     for (int i = 0; i < p.history.size(); ++i) {
-      for (int pl = 0; pl < 2; ++pl) {
+      if (s->IsChanceNode()) {
+        ActionsAndProbs policy = s->ChanceOutcomes();
+        Action a = p.history[i];
+        double prob = GetProb(policy, a);
+        p.chance_reach *= prob;
+        s->ApplyAction(a);
+      } else if (s->IsSimultaneousNode()) {
+        for (int pl = 0; pl < 2; ++pl) {
+          ActionsAndProbs policy = past_policy_.GetStatePolicy(obs->StringFrom(*s, pl));
+          if (policy.empty()) {  // Such infostate was not visited in the past.
+            policy = UniformStatePolicy(*s, pl);
+          }
+          Action a = p.history[i+pl];
+          double prob = GetProb(policy, a);
+          p.player_reach[pl] *= prob;
+        }
+
+        s->ApplyActions({p.history[i], p.history.at(++i)});
+      } else {
+        SPIEL_CHECK_FALSE(s->IsTerminal());
+        Player pl = s->CurrentPlayer();
         ActionsAndProbs policy = past_policy_.GetStatePolicy(obs->StringFrom(*s, pl));
         if (policy.empty()) {  // Such infostate was not visited in the past.
           policy = UniformStatePolicy(*s, pl);
         }
-        Action a = p.history[i+pl];
+        Action a = p.history[i];
         double prob = GetProb(policy, a);
         p.player_reach[pl] *= prob;
-      }
-
-      if (s->IsSimultaneousNode()) {
-        s->ApplyActions({p.history[i], p.history.at(++i)});
-      } else {
-        SpielFatalError("not implemented");
+        s->ApplyAction(a);
       }
     }
   }
@@ -198,13 +224,6 @@ std::unique_ptr<Bot> MakeSherlockBot(
   return std::make_unique<SherlockBot>(std::move(subgame_factory),
                                        std::move(solver_factory),
                                        player_id, seed);
-}
-
-std::unique_ptr<ParticleSet> ParticlesFromState(const PublicState& state) {
-  std::mt19937 rnd_gen(0);
-  std::unique_ptr<ParticleSetPartition> partition =
-      MakeParticleSetPartition(state, 1e7, 1e-9, false, rnd_gen);
-  return std::make_unique<ParticleSet>(partition->primary);
 }
 
 }  // namespace papers_with_code

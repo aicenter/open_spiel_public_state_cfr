@@ -168,8 +168,8 @@ std::unique_ptr<ParticleSetPartition> MakeParticleSetPartition(
     int primary_max_particles, double epsilon,
     bool save_secondary, std::mt19937& rnd_gen) {
   // TODO: make work well for case "primary_max_particles == 0"
-  ParticleSet all;
-  all.particles.reserve(primary_max_particles);
+  auto all = std::make_unique<ParticleSet>();
+  all->particles.reserve(primary_max_particles);
 
   for (int pl = 0; pl < 2; ++pl) {
     for (int i = 0; i < state.nodes[pl].size(); ++i) {
@@ -179,8 +179,8 @@ std::unique_ptr<ParticleSetPartition> MakeParticleSetPartition(
         // While technically possible, no game makes zero chance transitions.
         SPIEL_CHECK_GT(chn, 0.);
 
-        Particle& particle = pl == 0 ? all.add(s->History())
-                                     : all.at(s->History());
+        Particle& particle = pl == 0 ? all->add(s->History())
+                                     : all->at(s->History());
         particle.player_reach[pl] = state.beliefs[pl][i];
         particle.chance_reach = chn;
       }
@@ -188,7 +188,7 @@ std::unique_ptr<ParticleSetPartition> MakeParticleSetPartition(
   }
 
   auto partition = std::make_unique<ParticleSetPartition>();
-  if (all.particles.size() <= primary_max_particles) {  // Fast track return.
+  if (all->particles.size() <= primary_max_particles) {  // Fast track return.
     partition->primary = std::move(all);
     return partition;  // Secondary is empty.
   }
@@ -201,18 +201,18 @@ std::unique_ptr<ParticleSetPartition> MakeParticleSetPartition(
 
   // Compute normalization factor of reach probs distribution R.
   double norm_r = 0.;
-  for (const Particle& p : all.particles) norm_r += p.reach();
+  for (const Particle& p : all->particles) norm_r += p.reach();
   SPIEL_CHECK_GT(norm_r, 0.);
 
   // Prepare CDF of distribution D.
   std::map</*cumul=*/double, /*particle_index=*/int> cdf;
   double cumul = 0.;
-  int n = all.particles.size();
+  int n = all->particles.size();
   int zero_entries = 0;
   for (int i = 0; i < n; ++i) {
     // D = U + R
     double p = epsilon / n
-             + (1-epsilon) * all.particles[i].reach() / norm_r;
+             + (1-epsilon) * all->particles[i].reach() / norm_r;
     if (cumul + p == cumul) {
       // Do not add this to the cdf, as it cannot be sampled.
       ++zero_entries;
@@ -232,7 +232,7 @@ std::unique_ptr<ParticleSetPartition> MakeParticleSetPartition(
     SPIEL_CHECK_GT(n, zero_entries);
     // Keep only the non-zero reach entries.
     for(auto& [cumul, particle_index] : cdf) {
-      partition->primary.particles.push_back(all.particles[particle_index]);
+      partition->primary->particles.push_back(all->particles[particle_index]);
     }
     return partition;  // Secondary is empty.
   }
@@ -256,15 +256,16 @@ std::unique_ptr<ParticleSetPartition> MakeParticleSetPartition(
   }
 
   // Construct primary set based on the pick.
-  partition->primary.particles.reserve(primary_max_particles);
+  partition->primary->particles.reserve(primary_max_particles);
   for(int particle_index : pick) {
-    partition->primary.particles.push_back(all.particles[particle_index]);
+    partition->primary->particles.push_back(all->particles[particle_index]);
   }
   // Construct secondary set as all the other particles.
   if (save_secondary) {
+    partition->secondary = std::make_unique<ParticleSet>();
     for (int i = 0; i < n; ++i) {
       if (pick.count(i) != 0) continue;
-      partition->secondary.particles.push_back(all.particles[i]);
+      partition->secondary->particles.push_back(all->particles[i]);
     }
   }
 

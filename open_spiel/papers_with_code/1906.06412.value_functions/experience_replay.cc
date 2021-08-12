@@ -400,7 +400,7 @@ std::unique_ptr<ParticleSet> ReplayFiller::PickParticleSet(int at_depth) {
                                sparse_epsilon, /*save_secondary=*/false,
                                *randomizer->rnd_gen);
 
-  return std::make_unique<ParticleSet>(std::move(particle_partition->primary));
+  return std::move(particle_partition->primary);
 }
 
 std::unique_ptr<ParticleSet> ReplayFiller::PickIsmctsParticleSet(int at_depth) {

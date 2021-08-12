@@ -69,6 +69,9 @@ class SherlockBot : public Bot {
  private:
   void StorePastPolicy(const std::shared_ptr<algorithms::InfostateTree> tree,
                        const Policy& policy);
+  std::unique_ptr<ParticleSet> GetParticles(PublicState* for_state,
+                                            const Observation& infostate_observation,
+                                            const Observation& public_observation);
   void AssignBeliefs(ParticleSet* set) const;
 };
 
@@ -76,8 +79,6 @@ std::unique_ptr<Bot> MakeSherlockBot(
     std::shared_ptr<SubgameFactory> subgame_factory,
     std::shared_ptr<SolverFactory> solver_factory,
     Player player_id, int seed);
-
-std::unique_ptr<ParticleSet> ParticlesFromState(const PublicState& state);
 
 namespace {
 
@@ -188,11 +189,16 @@ class SherlockBotFactory : public BotFactory {
         game->MakeObserver(kHandHistoryObsType, {});
     subgame_factory->max_move_ahead_limit = max_move_ahead_limit;
     subgame_factory->max_particles = max_particles;
+    // TODO: requires refactor with random num generator
+//    if (game->GetType().short_name == "goofspiel") {
+//      auto goof_game =
+//          std::dynamic_pointer_cast<const goofspiel::GoofspielGame>(game);
+//      subgame_factory->particle_generator =
+//          std::make_shared<ParticleGenerator>(goof_game, seed);
+//    }
     //
-
     auto solver_factory = std::make_shared<SolverFactory>();
     if (non_terminal_evaluator == "net") {
-
       torch::Device device(device_spec);
 
       std::shared_ptr<BasicDims> dims = DeduceBasicDims(
@@ -244,8 +250,10 @@ class SherlockBotFactory : public BotFactory {
 
     return std::tuple<std::shared_ptr<SubgameFactory>,
                       std::shared_ptr<SolverFactory>,
-                      int>{std::move(subgame_factory),
-                           std::move(solver_factory), seed};
+                      int>
+                      {std::move(subgame_factory),
+                       std::move(solver_factory),
+                       seed};
   }
 
   std::unique_ptr<Bot> Create(std::shared_ptr<const Game> game,

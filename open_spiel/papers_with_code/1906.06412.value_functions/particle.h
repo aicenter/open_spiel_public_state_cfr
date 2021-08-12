@@ -61,8 +61,11 @@ struct ParticleSet {
 
 // See explanation below.
 struct ParticleSetPartition {
-  ParticleSet primary;
-  ParticleSet secondary;
+  std::unique_ptr<ParticleSet> primary;
+  std::unique_ptr<ParticleSet> secondary;
+  ParticleSetPartition()
+      : primary(std::make_unique<ParticleSet>()),
+        secondary(std::make_unique<ParticleSet>()) {}
 };
 
 // `PublicState` maintains all of its corresponding `State`s. For a given
