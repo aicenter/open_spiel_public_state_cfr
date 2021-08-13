@@ -73,6 +73,9 @@ void ParticleNetEvaluator::EvaluatePublicState(
     belief_normalizers = point.NormalizeBeliefsAndValues();
   }
 
+  // No weird values.
+  SPIEL_DCHECK_FALSE(torch::isfinite(point.data).logical_not().any().item<bool>());
+
   // Input must be batched.
   torch::Tensor input = point.data.to(device_).unsqueeze(/*dim=*/0);
   // The output must be "unbatched".

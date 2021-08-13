@@ -54,6 +54,7 @@ macro(add_paper_executable NAME SOURCES)
 endmacro()
 
 add_paper_executable(train_eval_loop train_eval_loop.cc)
+add_paper_executable(br_against_uniform br_against_uniform.cc)
 
 add_paper_executable(bot_test bot_test.cc)
 add_test(bot_test bot_test)

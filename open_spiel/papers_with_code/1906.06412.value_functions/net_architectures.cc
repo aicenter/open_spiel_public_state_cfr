@@ -145,6 +145,7 @@ torch::Tensor ParticleValueNet::forward(torch::Tensor xss) {
   const auto Batch = Slice();
   const auto Parviews = Slice();
   CHECK_SHAPE(xss, {batch_size, dims->point_input_size()});
+  SPIEL_DCHECK_TRUE(torch::isfinite(xss).all().item<bool>());
 
   torch::Tensor public_features = xss.index({Batch,
       // Skip the num_parviews item.
@@ -187,6 +188,7 @@ torch::Tensor ParticleValueNet::forward(torch::Tensor xss) {
   torch::Tensor ys = regression(context)
       .expand({num_parviews, -1, -1}).permute({1, 0, 2});                       CHECK_SHAPE(ys, {batch_size, num_parviews, regression_size()});
   torch::Tensor proj = (ys * bs).sum(/*dim=*/2);                                CHECK_SHAPE(proj, {batch_size, num_parviews});
+  SPIEL_DCHECK_TRUE(torch::isfinite(proj).all().item<bool>());
 
   if (zero_sum_regression) {
     // beliefs * values = 0 (because game is zero-sum) and vectors are
@@ -204,7 +206,7 @@ torch::Tensor ParticleValueNet::forward(torch::Tensor xss) {
   }
 
   // No weird values anywhere.
-  SPIEL_DCHECK_FALSE(torch::isfinite(proj).logical_not().any().item<bool>());
+  SPIEL_DCHECK_TRUE(torch::isfinite(proj).all().item<bool>());
   return proj;
 }
 

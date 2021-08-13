@@ -30,7 +30,10 @@ namespace {
 void LimitPolicy(ActionsAndProbs* policy, int max_actions) {
   std::sort(policy->begin(), policy->end(),
             [](std::pair<Action, double>& a, std::pair<Action, double>& b) {
-                return a.second > b.second;
+                if (a.second != b.second) return a.second > b.second;
+                // Special-case for equal probs (typicall uniform strategies).
+                // Prefer higher actions (goofspiel cards).
+                return a.first > a.second;
             });
   int n = std::min(max_actions, (int) policy->size());
   double normalize = 0.;

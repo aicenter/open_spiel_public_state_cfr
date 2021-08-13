@@ -136,6 +136,9 @@ void ReplayFiller::AddParticleExperience(const PublicState& leaf,
   if (normalize_beliefs) {
     data_point.NormalizeBeliefsAndValues();
   }
+  // No weird values
+  SPIEL_DCHECK_FALSE(torch::isfinite(data_point.data).logical_not().any().item<bool>());
+  SPIEL_DCHECK_FALSE(torch::isfinite(data_point.target).logical_not().any().item<bool>());
 }
 
 void ReplayFiller::AddPositionalExperience(const PublicState& leaf,

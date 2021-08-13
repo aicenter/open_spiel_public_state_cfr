@@ -103,7 +103,6 @@ class IigsBrMetric : public Metric {
                std::shared_ptr<const goofspiel::GoofspielGame> game,
                bool approx_response)
       : bot_(std::move(bot)),
-        game_(game),
         br_game_(approx_response
           ? LoadGame(absl::StrCat("goofspiel("
                 "players=2,"
