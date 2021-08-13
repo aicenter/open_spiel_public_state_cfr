@@ -49,10 +49,9 @@ std::shared_ptr<Subgame> SubgameFactory::MakeSubgameSafeResolving(
   SPIEL_CHECK_LE(set.particles.size(), max_particles);
   int depth = custom_move_ahead_limit > 0 ? custom_move_ahead_limit
                                           : max_move_ahead_limit;
-  auto trees = MakeSubgameResolvingInfostateTrees(set,
-                                                  depth,
-                                                  player,
-                                                  std::move(opponent_CFVs));
+  auto trees = MakeSubgameResolvingInfostateTrees(
+      set, depth, player, std::move(opponent_CFVs),
+      use_max_cfv_in_missing_infostates);
   auto out = std::make_unique<Subgame>(game, public_observer, trees);
   set.AssignBeliefs(out->initial_state());  // Compute initial beliefs.
   return out;
@@ -103,7 +102,8 @@ SubgameFactory::MakeSubgameInfostateTrees(const ParticleSet& set,
 std::vector<std::shared_ptr<algorithms::InfostateTree>>
 SubgameFactory::MakeSubgameResolvingInfostateTrees(
     const ParticleSet& set, int depth, int player,
-    std::unordered_map<std::string, double> opponent_CFVs) const {
+    std::unordered_map<std::string, double> opponent_CFVs,
+    bool use_max_cfv_in_missing_infostates) const {
   SPIEL_CHECK_LE(set.particles.size(), max_particles);
   SPIEL_DCHECK(CheckParticleSetConsistency(*game, public_observer,
                                            hand_observer, set));
@@ -131,16 +131,26 @@ SubgameFactory::MakeSubgameResolvingInfostateTrees(
     info_state_reaches[info_state] += resolving_reach;
   }
 
-  double max_cfv = std::numeric_limits<double>::min();
-  for(const auto&[_, cfv] : opponent_CFVs) {
+  double max_cfv = std::numeric_limits<double>::lowest();
+  for(const auto&[is, cfv] : opponent_CFVs) {
     max_cfv = std::max(max_cfv, cfv);
   }
+  SPIEL_CHECK_GT(max_cfv, std::numeric_limits<double>::lowest());  // We found some.
 
+  // Normalize the CFVs based on sum of reach probs.
   for (const auto&[infostate, resolving_reach] : info_state_reaches) {
     if (resolving_reach > 0) {
       auto it = opponent_CFVs.find(infostate);
       if (it == opponent_CFVs.end()) {
-        opponent_CFVs[infostate] = max_cfv / resolving_reach; // FIXME!
+        if (use_max_cfv_in_missing_infostates) {
+          // If the infostate does not exist, offer the opponent
+          // the highest existing cf value.
+          opponent_CFVs[infostate] = max_cfv / resolving_reach;
+        } else {
+          SpielFatalError(absl::StrCat(
+              "The infostate '", infostate,
+              "' does not have an opponent counterfactual value defined."));
+        }
       } else {
         it->second /= resolving_reach;
       }

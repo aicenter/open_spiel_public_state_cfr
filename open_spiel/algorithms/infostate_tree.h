@@ -517,6 +517,7 @@ class InfostateTree final {
     move_limit_ = start_max_move_number + max_move_ahead_limit;
 
     for (int i = 0; i < start_states.size(); ++i) {
+      SPIEL_CHECK_PROB(chance_reach_probs[i]);
       if (chance_reach_probs[i] > 0) {
         RecursivelyBuildTree(root_.get(), /*depth=*/1,
                              *start_states[i],

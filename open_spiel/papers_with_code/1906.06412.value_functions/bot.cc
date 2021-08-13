@@ -81,12 +81,11 @@ std::pair<ActionsAndProbs, Action> SherlockBot::StepWithPolicy(const State& stat
     }
   }
   SPIEL_CHECK_TRUE(public_state);
-  SPIEL_CHECK_TRUE(
-      // In the first step, the public state comes from the trunk,
-      // and is the initial public state.
-      (first_step_ && public_state->IsInitial())
-      // All subsequent steps are leaves from lookahead subgames.
-      || public_state->IsLeaf());
+  SPIEL_CHECK_TRUE( // In the first step, the public state comes from the trunk,
+                    // and is the initial public state.
+                    (first_step_ && public_state->IsInitial())
+                    // All subsequent steps are leaves from lookahead subgames.
+                    || public_state->IsLeaf());
 
   // Select particles to keep from the previous step along with their beliefs.
   // Currently, this works only for one-step lookahead trees.
@@ -103,6 +102,8 @@ std::pair<ActionsAndProbs, Action> SherlockBot::StepWithPolicy(const State& stat
   } else {
     subgame_ = subgame_factory_->MakeSubgame(*set);
   }
+
+  // We used up this variable in previous step, so set it to false now.
   first_step_ = false;
 
   std::unique_ptr<SubgameSolver> solver = solver_factory_->MakeSolver(subgame_);

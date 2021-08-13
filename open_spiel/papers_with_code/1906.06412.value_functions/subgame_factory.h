@@ -49,6 +49,7 @@ struct SubgameFactory {
   int max_move_ahead_limit = kDefaultMaxMoveAheadLimit;
   int max_particles = kDefaultMaxParticles;  // Must be always >= 1.
   double particle_epsilon = 0.1;
+  bool use_max_cfv_in_missing_infostates = true;
 
   // Subgame from game's initial state.
   std::shared_ptr<Subgame> MakeTrunk(int trunk_depth = -1) const;
@@ -67,7 +68,8 @@ struct SubgameFactory {
   std::vector<std::shared_ptr<algorithms::InfostateTree>>
   MakeSubgameResolvingInfostateTrees(
       const ParticleSet& set, int depth, int player,
-      std::unordered_map<std::string, double> opponent_CFVs) const;
+      std::unordered_map<std::string, double> opponent_CFVs,
+      bool use_max_cfv_in_missing_infostates) const;
 
 };
 

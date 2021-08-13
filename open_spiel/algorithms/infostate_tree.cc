@@ -47,11 +47,17 @@ InfostateNode::InfostateNode(const InfostateTree& tree, InfostateNode* parent,
       legal_actions_(std::move(legal_actions)),
       terminal_history_(std::move(terminal_history)) {
   // Implications for kTerminalNode
-  SPIEL_DCHECK_TRUE(type_ != kTerminalInfostateNode || parent_);
+  SPIEL_CHECK_TRUE(type_ != kTerminalInfostateNode || parent_);
+  SPIEL_CHECK_TRUE(type_ != kTerminalInfostateNode
+                   || std::isfinite(terminal_utility));
+  SPIEL_CHECK_TRUE(type_ != kTerminalInfostateNode
+                       || (std::isfinite(terminal_ch_reach_prob)
+                           && terminal_ch_reach_prob >= 0
+                           && terminal_ch_reach_prob <= 1));
   // Implications for kDecisionNode
-  SPIEL_DCHECK_TRUE(type_ != kDecisionInfostateNode || parent_);
+  SPIEL_CHECK_TRUE(type_ != kDecisionInfostateNode || parent_);
   // Implications for kObservationNode
-  SPIEL_DCHECK_TRUE(!(type_ == kObservationInfostateNode && parent_ &&
+  SPIEL_CHECK_TRUE(!(type_ == kObservationInfostateNode && parent_ &&
                       parent_->type() == kDecisionInfostateNode) ||
                     (incoming_index_ >= 0 &&
                      incoming_index_ < parent_->legal_actions().size()));
