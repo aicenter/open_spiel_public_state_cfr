@@ -166,6 +166,7 @@ double TrainNetwork(ValueNet* model, torch::Device* device,
   SPIEL_CHECK_TRUE(std::isfinite(loss.item<float>()));
   loss.backward();
   optimizer->step();
+  SPIEL_DCHECK_TRUE(model->isfinite());
   return loss.item().to<double>();
 }
 

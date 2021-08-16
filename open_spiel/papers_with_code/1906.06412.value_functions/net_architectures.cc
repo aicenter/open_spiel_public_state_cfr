@@ -37,6 +37,21 @@ void ValueNet::RegisterLayers(const std::vector<torch::nn::Linear>& layers,
   }
 }
 
+bool ValueNet::isfinite() const {
+  for (const std::shared_ptr<torch::nn::Module>& m : modules()) {
+      auto p = m->named_parameters(false);
+      auto w = p.find("weight");
+      auto b = p.find("bias");
+      if (w != nullptr) {
+        if (!w->isfinite().all().item<bool>()) return false;
+      }
+      if (b != nullptr) {
+        if (!b->isfinite().all().item<bool>()) return false;
+      }
+  }
+  return true;
+}
+
 // -- PositionalValueNet -------------------------------------------------------
 
 PositionalValueNet::PositionalValueNet(std::shared_ptr<PositionalDims> positional_dims,
