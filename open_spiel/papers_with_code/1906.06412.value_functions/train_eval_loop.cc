@@ -127,6 +127,7 @@ ABSL_FLAG(bool, iigs_approx_response, true,
 
 // -----------------------------------------------------------------------------
 
+#include <fenv.h>
 #include "absl/random/random.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/include_libs_ordered.h"
 
@@ -631,5 +632,7 @@ void TrainEvalLoop() {
 
 int main(int argc, char** argv) {
   INIT_EXPERIMENT();
+  // Enable float error signals.
+  feenableexcept(FE_INVALID);
   open_spiel::papers_with_code::TrainEvalLoop();
 }

@@ -125,7 +125,6 @@ struct PositionalDims final : public BasicDims {
 // perspective of the player (i.e. its Action-PrivateObservation history).
 //
 // The data is arranged as:
-// - public_features
 // - hand_features
 // - player_features
 // - range
@@ -155,6 +154,11 @@ struct ParviewDataPoint final : DataPoint {
 };
 
 // Parviews for one public state, collected into a single data point.
+//
+// The data is arranged as:
+// - number of parviews for each player [2]
+// - public features
+// - the individual parviews.
 struct ParticleDataPoint final : DataPoint {
   const ParticleDims& dims;
   ParticleDataPoint(const ParticleDims& particle_dims,
@@ -165,9 +169,10 @@ struct ParticleDataPoint final : DataPoint {
   ParviewDataPoint parview_at(int parview_index);
   std::array<torch::Tensor, 2> beliefs();
   std::array<torch::Tensor, 2> values();
+
   std::array<float, 2> NormalizeBeliefsAndValues();
   void DenormalizeValues(const std::array<float, 2>& belief_normalizers);
- private:
+
   // Offsets for number of parviews and the storage.
   int num_parviews_offset() const { return 0; }
   int public_features_offset() const { return 2; }

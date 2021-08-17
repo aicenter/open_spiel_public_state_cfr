@@ -152,8 +152,9 @@ torch::Tensor ParticleValueNet::regression(torch::Tensor xs) {                  
 }
 
 torch::Tensor ParticleValueNet::forward(torch::Tensor xss) {
+  const torch::Device device = xss.device();
   const int batch_size = xss.size(0);
-  const int num_parviews = dims->max_parviews;
+  const int max_parviews = dims->max_parviews;
   // FIXME: offsets coming from basic structures!
   const int pub_features_offset = 2;
   const int num_parviews_offset = 2 + dims->public_features_size;
@@ -170,22 +171,22 @@ torch::Tensor ParticleValueNet::forward(torch::Tensor xss) {
   torch::Tensor parviews = xss.index({Batch,
       // Skip the num_parviews + public features item.
       Slice(num_parviews_offset,
-            num_parviews_offset + num_parviews * dims->parview_size())
+            num_parviews_offset + max_parviews * dims->parview_size())
     // Rearrange into parviews.
-    }).view({batch_size, num_parviews, dims->parview_size()});                  CHECK_SHAPE(parviews, {batch_size, num_parviews, dims->parview_size()});
+    }).view({batch_size, max_parviews, dims->parview_size()});                  CHECK_SHAPE(parviews, {batch_size, max_parviews, dims->parview_size()});
 
   torch::Tensor hand_fs = parviews
       // Skip the range input (as the last value).
-      .index({Batch, Parviews, Slice(0, dims->features_size())});               CHECK_SHAPE(hand_fs, {batch_size, num_parviews, dims->features_size()});
+      .index({Batch, Parviews, Slice(0, dims->features_size())});               CHECK_SHAPE(hand_fs, {batch_size, max_parviews, dims->features_size()});
   torch::Tensor beliefs = parviews  // Skip all features.
       .index({Batch, Parviews,
-              Slice(dims->features_size(), dims->parview_size())});             CHECK_SHAPE(beliefs, {batch_size, num_parviews, 1});
+              Slice(dims->features_size(), dims->parview_size())});             CHECK_SHAPE(beliefs, {batch_size, max_parviews, 1});
 
   // Construct full features by concatenating hands with public features.
   torch::Tensor pf_per_parview = public_features
-      .expand({num_parviews, -1, -1}).permute({1, 0, 2});                       CHECK_SHAPE(pf_per_parview, {batch_size, num_parviews, dims->public_features_size});
+      .expand({max_parviews, -1, -1}).permute({1, 0, 2});                       CHECK_SHAPE(pf_per_parview, {batch_size, max_parviews, dims->public_features_size});
   torch::Tensor infostate_fs =
-      torch::cat({pf_per_parview, hand_fs}, /*dim=*/2);                         CHECK_SHAPE(infostate_fs, {batch_size, num_parviews, dims->full_features_size()});
+      torch::cat({pf_per_parview, hand_fs}, /*dim=*/2);                         CHECK_SHAPE(infostate_fs, {batch_size, max_parviews, dims->full_features_size()});
 
   // Zero-out public state features for non-full sets.
   torch::Tensor parview_counts =
@@ -193,30 +194,32 @@ torch::Tensor ParticleValueNet::forward(torch::Tensor xss) {
   torch::Tensor parview_sum = parview_counts.sum(/*dim=*/1);                    CHECK_SHAPE(parview_sum, {batch_size});
   for (int i = 0; i < batch_size; ++i) {
     infostate_fs.index_put_(
-        {i, Slice(parview_sum[i].item<int>(), num_parviews), Slice()}, 0);
+        {i, Slice(parview_sum[i].item<int>(), max_parviews), Slice()}, 0);
   }
 
-  torch::Tensor bs = change_of_basis(infostate_fs);                             CHECK_SHAPE(bs, {batch_size, num_parviews, pooled_size()});
-  torch::Tensor cs = base_coordinates(bs, beliefs);                             CHECK_SHAPE(cs, {batch_size, num_parviews, pooled_size()});
+  torch::Tensor bs = change_of_basis(infostate_fs);                             CHECK_SHAPE(bs, {batch_size, max_parviews, pooled_size()});
+  torch::Tensor cs = base_coordinates(bs, beliefs);                             CHECK_SHAPE(cs, {batch_size, max_parviews, pooled_size()});
   torch::Tensor pooled = pool(cs);                                              CHECK_SHAPE(pooled, {batch_size, pooled_size()});
   torch::Tensor context = torch::cat({pooled, public_features}, /*dim=*/1);     CHECK_SHAPE(context, {batch_size, context_size()});
   torch::Tensor ys = regression(context)
-      .expand({num_parviews, -1, -1}).permute({1, 0, 2});                       CHECK_SHAPE(ys, {batch_size, num_parviews, regression_size()});
-  torch::Tensor proj = (ys * bs).sum(/*dim=*/2);                                CHECK_SHAPE(proj, {batch_size, num_parviews});
+      .expand({max_parviews, -1, -1}).permute({1, 0, 2});                       CHECK_SHAPE(ys, {batch_size, max_parviews, regression_size()});
+  torch::Tensor proj = (ys * bs).sum(/*dim=*/2);                                CHECK_SHAPE(proj, {batch_size, max_parviews});
   SPIEL_DCHECK_TRUE(torch::isfinite(proj).all().item<bool>());
 
   if (zero_sum_regression) {
     // beliefs * values = 0 (because game is zero-sum) and vectors are
     // therefore perpendicular. If values are off and are not zero-sum,
     // we project them to the beliefs plane (beliefs are the normal vector).
-    torch::Tensor batch_beliefs = beliefs.squeeze(/*dim=*/2);                   CHECK_SHAPE(batch_beliefs, {batch_size, num_parviews});
-    torch::Tensor proj_error = (proj * batch_beliefs).sum(/*dim=*/1)
-                             / (batch_beliefs * batch_beliefs).sum(/*dim=*/1);  CHECK_SHAPE(proj_error, {batch_size});
-    // Zero-out NaNs due to zero beliefs.
-    proj_error.nan_to_num_(/*nan=*/0., /*posinf=*/0., /*neginf=*/0.);
+    torch::Tensor batch_beliefs = beliefs.squeeze(/*dim=*/2);                   CHECK_SHAPE(batch_beliefs, {batch_size, max_parviews});
+    torch::Tensor numer = (proj * batch_beliefs).sum(/*dim=*/1);                CHECK_SHAPE(numer, {batch_size});
+    torch::Tensor denum = (batch_beliefs * batch_beliefs).sum(/*dim=*/1);       CHECK_SHAPE(denum, {batch_size});
+    torch::Tensor proj_error = torch::zeros({batch_size}).to(device);
+    proj_error.index_put_(
+        {denum != 0},
+        numer.index({denum != 0}).div(denum.index({denum != 0})));              CHECK_SHAPE(proj_error, {batch_size});
 
     torch::Tensor expanded_proj_error =
-        proj_error.expand({num_parviews, -1}).permute({1, 0});                  CHECK_SHAPE(expanded_proj_error, {batch_size, num_parviews});
+        proj_error.expand({max_parviews, -1}).permute({1, 0});                  CHECK_SHAPE(expanded_proj_error, {batch_size, max_parviews});
     proj = proj - expanded_proj_error * batch_beliefs;
   }
 

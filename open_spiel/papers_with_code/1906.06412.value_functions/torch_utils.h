@@ -17,6 +17,7 @@
 #define OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_TORCH_UTILS_
 
 #include <iterator>
+#include <fenv.h>
 
 #include "torch/torch.h"
 
@@ -50,6 +51,12 @@ inline void CHECK_SHAPE(const torch::Tensor& tensor,
 inline void CHECK_SHAPE(const torch::Tensor& tensor,
                         std::initializer_list<int64_t> shape) {}
 #endif
+
+
+#define WITH_FLOAT_ERRORS_DISABLED(x) \
+  fedisableexcept(FE_INVALID);        \
+  x                                   \
+  feenableexcept(FE_INVALID);
 
 } // namespace open_spiel
 } // namespace papers_with_code

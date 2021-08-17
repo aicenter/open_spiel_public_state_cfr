@@ -179,6 +179,7 @@ void WriteParticleDataPoint(const PublicState& state,
       ContiguousAllocator allocator(parview.hand_features());
       hand_observer->WriteTensor(repr_state, pl, &allocator);
       // Player features.
+      parview.player_features()[1-pl] = 0.;
       parview.player_features()[pl] = 1.;
       // Hand beliefs.
       SPIEL_DCHECK_TRUE(std::isfinite(state.beliefs[pl][j]));
