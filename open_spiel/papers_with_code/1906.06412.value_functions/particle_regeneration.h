@@ -41,7 +41,7 @@ class ParticleGenerator {
  public:
   ParticleGenerator(std::shared_ptr<const goofspiel::GoofspielGame> game,
                     std::mt19937& rnd_gen)
-      : game_(game), cards_(0, game->NumCards() - 1), rnd_gen_(rnd_gen) {};
+    : game_(game), cards_(-(game->NumCards() - 1), 0), rnd_gen_(rnd_gen) {};
 
   //  0: a tie
   // -1: a loss (of player 0)

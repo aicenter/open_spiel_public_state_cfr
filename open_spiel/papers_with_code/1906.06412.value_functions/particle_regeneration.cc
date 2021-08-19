@@ -25,8 +25,8 @@ void ParticleGenerator::SetPublicOutcomes(const std::vector<int>& outcomes) {
     opr::sat::IntVar& b = played_[1][i];
     switch(outcomes[i]) {
       case  0: cp_model_->AddEquality(a, b);    break;  // draw: a == b
-      case  1: cp_model_->AddGreaterThan(a, b); break;  // win : a  > b
-      case -1: cp_model_->AddLessThan(a, b);    break;  // lose: a  < b
+      case -1: cp_model_->AddGreaterThan(a, b); break;  // win : a  > b
+      case  1: cp_model_->AddLessThan(a, b);    break;  // lose: a  < b
       default: SpielFatalError("Unknown outcome");
     }
   }
@@ -61,7 +61,7 @@ void ParticleGenerator::SetInfoState(const Observation& infostate,
       if (bets.at(i, c)) card = c;
     }
     SPIEL_CHECK_NE(card, -1);
-    cp_model_->AddEquality(played_[player_hand][i], card);
+    cp_model_->AddEquality(played_[player_hand][i], -card);
   }
 }
 
@@ -74,7 +74,7 @@ std::unique_ptr<ParticleSet> ParticleGenerator::GenerateParticles(
     return set;
   }
 
-  auto card_dist = std::uniform_int_distribution<int>(1, game_->NumCards());
+  auto card_dist = std::uniform_int_distribution<int>(cards_.Min(), cards_.Max());
   auto player_dist = std::uniform_int_distribution<int>(0, 1);
   auto dir_dist = std::uniform_int_distribution<int>(0, num_bets_);
   int num_rejected = 0;
@@ -99,9 +99,9 @@ std::unique_ptr<ParticleSet> ParticleGenerator::GenerateParticles(
       // TODO: make more tuning of the constraints so that we have
       //       better diversity. Now from 1000 particles ~500 begin with
       //       first action 1
-      if      (dir == 0) rnd_model.AddLessOrEqual(a, card);
+      if      (dir == 0) rnd_model.AddGreaterOrEqual(a, card);
       else if (dir == 1) rnd_model.AddEquality(a, card);
-      else               rnd_model.AddGreaterOrEqual(a, card);
+      else               rnd_model.AddLessOrEqual(a, card);
     }
 
     // Solve.
@@ -111,8 +111,8 @@ std::unique_ptr<ParticleSet> ParticleGenerator::GenerateParticles(
       history.reserve(num_bets_ * 2);
       for (int j = 0; j < num_bets_; ++j) {
         // -1 due to 0-based indexing in the goofspiel game implementation.
-        history.push_back(SolutionIntegerValue(response, played_[0][j]));
-        history.push_back(SolutionIntegerValue(response, played_[1][j]));
+        history.push_back(-SolutionIntegerValue(response, played_[0][j]));
+        history.push_back(-SolutionIntegerValue(response, played_[1][j]));
       }
       // (Possibly) increases particles size.
       if (set->has(history)) {
