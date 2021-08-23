@@ -107,6 +107,7 @@ ABSL_FLAG(bool, zero_sum_regression, false,
           "layer (does not introduce any new weights)");
 ABSL_FLAG(bool, normalize_beliefs, false,
           "Normalize the per-player beliefs and values accordingly.");
+ABSL_FLAG(bool, bot_use_oracle, false, "Use oracle as leaf evaluator.");
 
 // -- Metrics --
 // FullTrunkExplMetric
@@ -459,6 +460,9 @@ void TrainEvalLoop() {
     // Make a separate solver copy that may use safe resolving.
     auto bot_solver_factory = std::make_shared<SolverFactory>(*solver_factory);
     bot_solver_factory->safe_resolving = absl::GetFlag(FLAGS_safe_resolving);
+    if (absl::GetFlag(FLAGS_bot_use_oracle)) {
+      bot_solver_factory->leaf_evaluator = oracle;
+    }
     std::unique_ptr<Bot> bot = MakeSherlockBot(subgame_factory,
                                                bot_solver_factory,
                                                Player{0}, seed);
