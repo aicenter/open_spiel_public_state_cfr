@@ -248,6 +248,7 @@ void Subgame::MakePublicStates() {
   // the infostate trees are rooted in a single initial state.
   // While more initial states are possible, we don't do this as it would
   // complicate the code unnecessarily.
+  SPIEL_CHECK_FALSE(public_states.empty());
   SPIEL_CHECK_EQ(public_states.size(), 1);
 
   // Save node positions for leaf public states.

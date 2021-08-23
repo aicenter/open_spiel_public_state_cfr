@@ -16,6 +16,7 @@ add_library(paper_value_functions OBJECT
         net_data.h
         net_dl_evaluator.cc
         net_dl_evaluator.h
+        pareto_frontier.h
         particle.cc
         particle.h
         particle_regeneration.cc
@@ -64,6 +65,8 @@ add_paper_executable(ismcts_playthroughs_test ismcts_playthroughs_test.cc)
 add_test(ismcts_playthroughs_test ismcts_playthroughs_test)
 add_paper_executable(particle_regeneration_test particle_regeneration_test.cc)
 add_test(particle_regeneration_test particle_regeneration_test)
+add_paper_executable(pareto_frontier_test pareto_frontier_test.cc)
+add_test(pareto_frontier_test pareto_frontier_test)
 add_paper_executable(subgame_test subgame_test.cc)
 add_test(subgame_test subgame_test)
 add_paper_executable(continual_resolving_test continual_resolving_test.cpp)

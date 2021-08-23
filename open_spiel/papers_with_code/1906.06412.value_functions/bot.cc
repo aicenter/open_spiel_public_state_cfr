@@ -14,7 +14,9 @@
 
 
 #include <utility>
-#include "bot.h"
+
+#include "open_spiel/papers_with_code/1906.06412.value_functions/bot.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/pareto_frontier.h"
 
 namespace open_spiel {
 namespace papers_with_code {
@@ -89,16 +91,18 @@ std::pair<ActionsAndProbs, Action> SherlockBot::StepWithPolicy(const State& stat
 
   // Select particles to keep from the previous step along with their beliefs.
   // Currently, this works only for one-step lookahead trees.
+  std::unordered_map<std::string, double> opponent_CFVs =
+      public_state->InfostateAvgValues(1 - player_id_);
   std::unique_ptr<ParticleSet> set =
-      GetParticles(public_state, infostate_observation, public_observation);
+      GetParticles(*public_state, infostate_observation, public_observation,
+                   opponent_CFVs);
   SPIEL_CHECK_FALSE(set->particles.empty());
 
   // We will do the gadget if we are resolving
   if (!first_step_ && solver_factory_->safe_resolving) {
-    subgame_ = subgame_factory_->MakeSubgameSafeResolving(
-        *set,  // Includes reach probs.
-        player_id_,
-        /*opponent_CFVs=*/public_state->InfostateAvgValues(1 - player_id_));
+    // The particle set includes reach probs.
+    subgame_ = subgame_factory_->MakeSubgameSafeResolving(*set, player_id_,
+                                                          opponent_CFVs);
   } else {
     subgame_ = subgame_factory_->MakeSubgame(*set);
   }
@@ -139,14 +143,13 @@ void SherlockBot::StorePastPolicy(
 }
 
 std::unique_ptr<ParticleSet> SherlockBot::GetParticles(
-    PublicState* for_state,
+    const PublicState& for_state,
     const Observation& infostate_observation,
-    const Observation& public_observation) {
-  std::unique_ptr<ParticleSetPartition> partition =
-      MakeParticleSetPartition(*for_state, subgame_factory_->max_particles - 1,
-                               subgame_factory_->particle_epsilon, false, rnd_gen_);
-  std::unique_ptr<ParticleSet> set = std::move(partition->primary);
-  AssignBeliefs(set.get());
+    const Observation& public_observation,
+    const std::unordered_map<std::string, double>& opponent_CFVs) {
+
+  std::unique_ptr<ParticleSet> set =
+      PickParticlesFromPublicState(for_state, opponent_CFVs);
 
   // We will augment the current particle set using the particle generator.
   ParticleGenerator* particle_generator = subgame_factory_->particle_generator.get();
@@ -172,6 +175,87 @@ std::unique_ptr<ParticleSet> SherlockBot::GetParticles(
     }
   }
   return set;
+}
+
+std::unique_ptr<ParticleSet> SherlockBot::PickParticlesFromPublicState(
+    const PublicState& state,
+    const std::unordered_map<std::string, double>& opponent_CFVs) {
+
+  auto all = std::make_unique<ParticleSet>();
+  std::vector<std::array<double, 2>> reach_cfvs;
+
+  for (int i = 0; i < state.nodes[player_id_].size(); ++i) {
+    for (int k = 0; k < state.nodes[player_id_][i]->corresponding_states_size(); ++k) {
+      const std::unique_ptr<State>& s = state.nodes[player_id_][i]->corresponding_states()[k];
+      double reach = ComputeReach(s->History());
+      if (reach > 0) {
+        all->add(s->History());
+        reach_cfvs.push_back({reach, 0.});
+      }
+    }
+  }
+
+  for (int i = 0; i < state.nodes[1-player_id_].size(); ++i) {
+    for (int k = 0; k < state.nodes[1-player_id_][i]->corresponding_states_size(); ++k) {
+      const std::unique_ptr<State>& s = state.nodes[1-player_id_][i]->corresponding_states()[k];
+      int pos = all->index_of(s->History());
+      if (pos > -1) {
+        auto it = opponent_CFVs.find(state.nodes[1-player_id_][i]->infostate_string());
+        SPIEL_CHECK_TRUE(it != opponent_CFVs.end());
+        reach_cfvs[pos][1] = it->second;
+      }
+    }
+  }
+
+  auto chosen = std::make_unique<ParticleSet>();
+  std::vector<int> ordering =
+      SortByParetoFrontier(reach_cfvs, subgame_factory_->max_particles - 1);
+  for (int pos: ordering) {
+    chosen->particles.push_back(all->particles[pos]);
+  }
+  AssignBeliefs(chosen.get());
+  return chosen;
+}
+
+double SherlockBot::ComputeReach(const std::vector<Action>& history) {
+  Observer* obs = subgame_factory_->infostate_observer.get();
+  std::unique_ptr<State> s = subgame_factory_->game->NewInitialState();
+  double reach = 1.0;
+
+  for (int i = 0; i < history.size(); ++i) {
+    if (s->IsChanceNode()) {
+      ActionsAndProbs policy = s->ChanceOutcomes();
+      Action a = history[i];
+      double prob = GetProb(policy, a);
+      reach *= prob;
+      s->ApplyAction(a);
+    } else if (s->IsSimultaneousNode()) {
+      int pl = player_id_;
+      ActionsAndProbs policy =
+          past_policy_.GetStatePolicy(obs->StringFrom(*s, pl));
+      if (policy.empty()) {  // Such infostate was not visited in the past.
+        policy = UniformStatePolicy(*s, pl);
+      }
+      Action a = history[i+pl];
+      double prob = GetProb(policy, a);
+      reach *= prob;
+      s->ApplyActions({history[i], history.at(++i)});
+    } else {
+      SPIEL_CHECK_FALSE(s->IsTerminal());
+      Player pl = s->CurrentPlayer();
+      Action a = history[i];
+      if (pl == player_id_) {
+        ActionsAndProbs policy = past_policy_.GetStatePolicy(obs->StringFrom(*s, pl));
+        if (policy.empty()) {  // Such infostate was not visited in the past.
+          policy = UniformStatePolicy(*s, pl);
+        }
+        double prob = GetProb(policy, a);
+        reach *= prob;
+      }
+      s->ApplyAction(a);
+    }
+  }
+  return reach;
 }
 
 void SherlockBot::AssignBeliefs(ParticleSet* set) const {

@@ -64,6 +64,19 @@ Particle& ParticleSet::at(const std::vector<Action>& history) {
   }
   SpielFatalError("Particle not found");
 }
+
+int ParticleSet::index_of(const std::vector<Action>& history) const {
+  for (int i = 0; i < particles.size(); ++i) {
+    auto& particle = particles[i];
+    // Maybe should be SPIEL_CHECK_EQ in most games.
+    if (particle.history.size() != history.size()) continue;
+    // Compare in reverse, as the endings are where they will not be equal.
+    if (std::equal(particle.history.rbegin(), particle.history.rend(),
+                   history.rbegin())) return i;
+  }
+  return -1;
+}
+
 const Particle& ParticleSet::at(const std::vector<Action>& history) const {
   for (const Particle& particle : particles) {
     // Maybe should be SPIEL_CHECK_EQ in most games.

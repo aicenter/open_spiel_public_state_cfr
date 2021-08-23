@@ -45,6 +45,7 @@ struct Particle {
 struct ParticleSet {
   std::vector<Particle> particles;
 
+  int index_of(const std::vector<Action>& history) const;
   Particle& at(const std::vector<Action>& history);
   const Particle& at(const std::vector<Action>& history) const;
   Particle& add(const std::vector<Action>& history);

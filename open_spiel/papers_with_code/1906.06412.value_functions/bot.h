@@ -69,10 +69,16 @@ class SherlockBot : public Bot {
  private:
   void StorePastPolicy(const std::shared_ptr<algorithms::InfostateTree> tree,
                        const Policy& policy);
-  std::unique_ptr<ParticleSet> GetParticles(PublicState* for_state,
-                                            const Observation& infostate_observation,
-                                            const Observation& public_observation);
+  std::unique_ptr<ParticleSet> GetParticles(
+      const PublicState& for_state,
+      const Observation& infostate_observation,
+      const Observation& public_observation,
+      const std::unordered_map<std::string, double>& opponent_CFVs);
+  std::unique_ptr<ParticleSet> PickParticlesFromPublicState(
+      const PublicState& for_state,
+      const std::unordered_map<std::string, double>& opponent_CFVs);
   void AssignBeliefs(ParticleSet* set) const;
+  double ComputeReach(const std::vector<Action>& history);
 };
 
 std::unique_ptr<Bot> MakeSherlockBot(
