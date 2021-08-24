@@ -17,6 +17,7 @@
 #include <chrono>
 
 #include "open_spiel/algorithms/dispatch_policy.h"
+#include "open_spiel/algorithms/expected_returns.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/subgame_factory.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/tabularize_bot.h"
 #include <open_spiel/algorithms/infostate_tree.h>
@@ -92,12 +93,12 @@ class FullTrunkExplMetric : public Metric {
 
 class IigsBrMetric : public Metric {
   std::unique_ptr<Bot> bot_;
-  std::shared_ptr<const goofspiel::GoofspielGame> game_;
   std::shared_ptr<const Game> br_game_;
   std::shared_ptr<const Game> turn_br_game_;
   absl::optional<int> max_actions_ = {};
   std::shared_ptr<algorithms::InfostateTree> player_tree_;
   double br_;
+  double returns_;
  public:
   IigsBrMetric(std::unique_ptr<Bot> bot,
                std::shared_ptr<const goofspiel::GoofspielGame> game,
@@ -127,11 +128,21 @@ class IigsBrMetric : public Metric {
   void Evaluate(std::ostream& progress) override {
     std::shared_ptr<TabularPolicy> policy =
         TabularizeOnlinePolicy(bot_.get(), player_tree_, max_actions_);
+    progress << '.';
+
     algorithms::TabularBestResponse br(*turn_br_game_, Player{1}, policy.get());
     br_ = br.Value("");
+    progress << '.';
+
+    auto uniform = GetUniformPolicy(*turn_br_game_);
+    std::vector<double> returns =
+        algorithms::ExpectedReturns(*turn_br_game_->NewInitialState(),
+                                    {policy.get(), &uniform}, 1000);
+    returns_ = returns[0];
+    progress << '.';
   }
-  void PrintHeader(std::ostream& os) const override { os << "br"; }
-  void PrintMetric(std::ostream& os) const override { os << br_; }
+  void PrintHeader(std::ostream& os) const override { os << "br,returns"; }
+  void PrintMetric(std::ostream& os) const override { os << br_ << ',' << returns_; }
 };
 
 
