@@ -52,6 +52,16 @@ bool ValueNet::isfinite() const {
   return true;
 }
 
+int ValueNet::num_parameters() const  {
+  int total = 0;
+  for(const auto& named_param : named_parameters()) {
+    if (named_param->requires_grad()) {
+      total += named_param->numel();
+    }
+  }
+  return total;
+}
+
 // -- PositionalValueNet -------------------------------------------------------
 
 PositionalValueNet::PositionalValueNet(std::shared_ptr<PositionalDims> positional_dims,

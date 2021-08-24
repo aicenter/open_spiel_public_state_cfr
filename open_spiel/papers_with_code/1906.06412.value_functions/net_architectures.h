@@ -36,6 +36,7 @@ struct ValueNet : public torch::nn::Module {
                       const std::string& layer_name);
   // Check all weights & biases are finite.
   bool isfinite() const;
+  int num_parameters() const;
 };
 
 enum ActivationFunction { kNone, kRelu, kLeakyRelu, kSigmoid };

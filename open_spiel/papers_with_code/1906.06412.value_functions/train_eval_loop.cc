@@ -358,6 +358,8 @@ void TrainEvalLoop() {
       absl::GetFlag(FLAGS_num_layers), absl::GetFlag(FLAGS_num_width),
       num_inputs_regression, absl::GetFlag(FLAGS_zero_sum_regression),
       absl::GetFlag(FLAGS_normalize_beliefs));
+  std::cout << "# Model has " << model->num_parameters()
+            << " trainable params" << std::endl;
   //
   std::string load_snapshot = absl::GetFlag(FLAGS_load_snapshot);
   const std::string snapshot_dir = absl::GetFlag(FLAGS_snapshot_dir);
