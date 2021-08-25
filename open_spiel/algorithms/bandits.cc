@@ -186,6 +186,13 @@ void RegretMatchingPlus::Reset() {
   std::fill(cumulative_strategy_.begin(), cumulative_strategy_.end(), 0.);
 }
 
+void RegretMatchingPlus::RandomizeRegrets(std::mt19937& rnd, double min, double max) {
+  std::uniform_real_distribution<double> dist(min, max);
+  for (int i = 0; i < cumulative_regrets_.size(); ++i) {
+    cumulative_regrets_[i] = dist(rnd);
+  }
+}
+
 // -- RegretMatchingPlus -------------------------------------------------------
 
 RMPlusWithEps::RMPlusWithEps(int num_actions)

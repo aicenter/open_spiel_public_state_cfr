@@ -211,6 +211,7 @@ class RegretMatchingPlus final : public Bandit {
   void ObserveRewards(absl::Span<const double> rewards) override;
   std::vector<double> AverageStrategy() const override;
   void Reset() override;
+  void RandomizeRegrets(std::mt19937& rnd, double min, double max);
 };
 
 // TODO(sustr): RM+ with epsilon convex combination with uniform strategy.
