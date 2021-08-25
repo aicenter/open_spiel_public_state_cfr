@@ -226,7 +226,7 @@ class SherlockBotFactory : public BotFactory {
           num_inputs_regression,
           zero_sum_regression,
           normalize_beliefs);
-      LoadNetSnapshot(model, load_from, eval_batch.get());
+      LoadNetSnapshot(model, load_from);
       model->eval();  // Set only eval mode.
       //
       solver_factory->leaf_evaluator = MakeNetEvaluator(
@@ -245,7 +245,8 @@ class SherlockBotFactory : public BotFactory {
           game->MakeObserver(kInfoStateObsType, {});
 
       solver_factory->leaf_evaluator = std::make_shared<CFREvaluator>(
-          game, 20, nullptr, terminal_evaluator,
+          game, algorithms::kNoMoveAheadLimit,
+          /*leaf_evaluator=*/nullptr, terminal_evaluator,
           public_observer, infostate_observer, subgame_cfr_iterations);
     }
     solver_factory->cfr_iterations = cfr_iterations;

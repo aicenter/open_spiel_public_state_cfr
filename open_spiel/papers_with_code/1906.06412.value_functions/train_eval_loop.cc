@@ -375,7 +375,7 @@ void TrainEvalLoop() {
   if (!load_snapshot.empty()) {
     std::cout << "# Loading model from snapshot: " << load_snapshot
               << " ..." << std::endl;
-    LoadNetSnapshot(model, load_snapshot, eval_batch.get());
+    LoadNetSnapshot(model, load_snapshot);
   } else {
     std::cout << "# No snapshot was specified, training from scratch."
               << std::endl;

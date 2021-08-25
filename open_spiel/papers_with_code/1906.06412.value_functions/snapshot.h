@@ -25,8 +25,7 @@ constexpr const char* kLoadAutomaticSnapshot = "automatic";
 constexpr const char* kModelExt = ".model";
 
 void SaveNetSnapshot(std::shared_ptr<ValueNet> model, const std::string& path);
-void LoadNetSnapshot(std::shared_ptr<ValueNet> model, const std::string& path,
-                     BatchData* try_inference);
+void LoadNetSnapshot(std::shared_ptr<ValueNet> model, const std::string& path);
 std::string FindSnapshot(const std::string& snapshot_dir);
 
 }  // namespace papers_with_code
