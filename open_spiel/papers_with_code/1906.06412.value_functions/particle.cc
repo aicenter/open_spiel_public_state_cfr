@@ -285,6 +285,68 @@ std::unique_ptr<ParticleSetPartition> MakeParticleSetPartition(
   return partition;
 }
 
+void GetStatesInSupport(const State* s, const Policy& policy,
+                        std::vector<std::unique_ptr<State>>& out) {
+  if (s->IsChanceNode()) {
+    for (Action a:  s->LegalActions()) {
+      std::unique_ptr<State> c = s->Child(a);
+      GetStatesInSupport(c.get(), policy, out);
+      out.push_back(std::move(c));
+    }
+  } else if (s->IsSimultaneousNode()) {
+    std::array<std::vector<Action>, 2> play_actions;
+    for (int pl = 0; pl < 2; ++pl) {
+      ActionsAndProbs local_policy =
+          policy.GetStatePolicy(s->InformationStateString(pl));
+      std::vector<Action> actions =
+          s->LegalActions(pl);
+      SPIEL_CHECK_TRUE(local_policy.empty()
+                       || actions.size() == local_policy.size());
+      for (int i = 0; i < actions.size(); ++i) {
+        if (local_policy.empty() || local_policy[i].second > 0.) {
+          play_actions[pl].push_back(actions[i]);
+        }
+      }
+    }
+    SPIEL_CHECK_FALSE(play_actions[0].empty());
+    SPIEL_CHECK_FALSE(play_actions[1].empty());
+    for (int i = 0; i < play_actions[0].size(); ++i) {
+      for (int j = 0; j < play_actions[1].size(); ++j) {
+        std::unique_ptr<State> c = s->Clone();
+        c->ApplyActions({play_actions[0][i], play_actions[1][j]});
+        GetStatesInSupport(c.get(), policy, out);
+        out.push_back(std::move(c));
+      }
+    }
+  } else if (s->IsPlayerNode()) {
+    Player pl = s->CurrentPlayer();
+    ActionsAndProbs local_policy =
+        policy.GetStatePolicy(s->InformationStateString(pl));
+    std::vector<Action> actions =
+        s->LegalActions(pl);
+    SPIEL_CHECK_TRUE(local_policy.empty()
+                     || actions.size() == local_policy.size());
+    for (int i = 0; i < actions.size(); ++i) {
+      if (local_policy.empty() || local_policy[i].second > 0.) {
+        std::unique_ptr<State> c = s->Child(actions[i]);
+        GetStatesInSupport(c.get(), policy, out);
+        out.push_back(std::move(c));
+      }
+    }
+  } else {
+    SPIEL_CHECK_TRUE(s->IsTerminal());
+  }
+}
+
+std::vector<std::unique_ptr<State>> GetStatesInSupport(const Game& game,
+                                                       const Policy& policy) {
+  std::vector<std::unique_ptr<State>> out;
+  std::unique_ptr<State> s = game.NewInitialState();
+  GetStatesInSupport(s.get(), policy, out);
+  return out;
+}
+
+
 }  // papers_with_code
 
 std::ostream& operator<<(std::ostream& os,

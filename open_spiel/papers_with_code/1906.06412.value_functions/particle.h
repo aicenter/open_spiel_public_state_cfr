@@ -96,6 +96,9 @@ void CheckParticleSetConsistency(const Game& game,
                                  std::vector<std::vector<algorithms::InfostateNode*>> infostate_nodes,
                                  const ParticleSet& set);
 
+std::vector<std::unique_ptr<State>> GetStatesInSupport(const Game& game,
+                                                       const Policy& policy);
+
 } // namespace papers_with_code
 
 std::ostream& operator<<(std::ostream& os,
