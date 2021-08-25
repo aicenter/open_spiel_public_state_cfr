@@ -146,6 +146,48 @@ class IigsBrMetric : public Metric {
 };
 
 
+class BrMetric : public Metric {
+  std::unique_ptr<Bot> bot_;
+  std::shared_ptr<const Game> br_game_;
+  std::shared_ptr<const Game> turn_br_game_;
+  std::shared_ptr<algorithms::InfostateTree> player_tree_;
+  double br_;
+  double returns_;
+ public:
+  BrMetric(std::unique_ptr<Bot> bot, std::shared_ptr<const Game> game)
+      : bot_(std::move(bot)),
+        br_game_(game),
+        turn_br_game_(game->GetType().dynamics == GameType::Dynamics::kSimultaneous
+                      ? ConvertToTurnBased(*br_game_)
+                      : br_game_),
+        player_tree_(algorithms::MakeInfostateTree(
+            *br_game_, Player{0},
+            algorithms::kNoMoveAheadLimit,
+            algorithms::kStoreAllStatesPolicy)) {}
+  std::string name() const override { return "br"; }
+  void Reset() override {}
+  void Evaluate(std::ostream& progress) override {
+    std::shared_ptr<TabularPolicy> policy =
+        TabularizeOnlinePolicy(bot_.get(), player_tree_, absl::nullopt);
+    progress << '.';
+
+    algorithms::TabularBestResponse br(*turn_br_game_, Player{1},
+                                       policy->PolicyTable());
+    br_ = br.Value("");
+    progress << '.';
+
+    auto uniform = GetUniformPolicy(*turn_br_game_);
+    std::vector<double> returns =
+        algorithms::ExpectedReturns(*turn_br_game_->NewInitialState(),
+                                    {policy.get(), &uniform}, 1000);
+    returns_ = returns[0];
+    progress << '.';
+  }
+  void PrintHeader(std::ostream& os) const override { os << "br,returns"; }
+  void PrintMetric(std::ostream& os) const override { os << br_ << ',' << returns_; }
+};
+
+
 class ReplayVisitsMetric : public Metric {
   ExperienceReplay* replay_;
   int window_;
@@ -224,6 +266,11 @@ std::unique_ptr<Metric> MakeIigsBrMetric(
     std::shared_ptr<const goofspiel::GoofspielGame> game,
     bool approx_response) {
   return std::make_unique<IigsBrMetric>(std::move(bot), game, approx_response);
+}
+
+std::unique_ptr<Metric> MakeBrMetric(std::unique_ptr<Bot> bot,
+                                     std::shared_ptr<const Game> game) {
+  return std::make_unique<BrMetric>(std::move(bot), game);
 }
 
 

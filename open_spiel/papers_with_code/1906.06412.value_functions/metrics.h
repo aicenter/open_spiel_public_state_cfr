@@ -50,6 +50,9 @@ std::unique_ptr<Metric> MakeIigsBrMetric(
     std::shared_ptr<const goofspiel::GoofspielGame> game,
     bool approx_response);
 
+std::unique_ptr<Metric> MakeBrMetric(std::unique_ptr<Bot> bot,
+                                     std::shared_ptr<const Game> game);
+
 std::unique_ptr<Metric> MakeReplayVisitsMetric(
     ExperienceReplay* replay, int window);
 

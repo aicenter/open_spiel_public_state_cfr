@@ -124,6 +124,9 @@ ABSL_FLAG(bool, iigs_br_metric, false,
           "Compute domain-specific BR for IIGS(N,K)");
 ABSL_FLAG(bool, iigs_approx_response, true,
           "Make an approximate version of the response, faster to compute.");
+// BrMetric
+ABSL_FLAG(bool, br_metric, false,
+          "Compute domain-agnostic BR (can be very slow)");
 
 
 // -----------------------------------------------------------------------------
@@ -265,7 +268,7 @@ void TrainEvalLoop() {
       subgame_factory->game, algorithms::kNoMoveAheadLimit,
       /*no_leaf_evaluator=*/nullptr, terminal_evaluator,
       subgame_factory->public_observer, subgame_factory->infostate_observer);
-  oracle->bandit_name = kDefaultDlCfrBandit;
+  oracle->bandit_name = absl::GetFlag(FLAGS_use_bandits_for_cfr);
   oracle->num_cfr_iterations = absl::GetFlag(FLAGS_cfr_oracle_iterations);
   oracle->save_values_policy = save_values_policy;
   //
@@ -474,6 +477,19 @@ void TrainEvalLoop() {
     metrics.push_back(
         MakeIigsBrMetric(std::move(bot), goof_game, approx_response));
   }
+  if (absl::GetFlag(FLAGS_br_metric)) {
+    std::cout << "# Making BR metric ..." << std::endl;
+    // Make a separate solver copy that may use safe resolving.
+    auto bot_solver_factory = std::make_shared<SolverFactory>(*solver_factory);
+    bot_solver_factory->safe_resolving = absl::GetFlag(FLAGS_safe_resolving);
+    if (absl::GetFlag(FLAGS_bot_use_oracle)) {
+      bot_solver_factory->leaf_evaluator = oracle;
+    }
+    std::unique_ptr<Bot> bot = MakeSherlockBot(subgame_factory,
+                                               bot_solver_factory,
+                                               Player{0}, seed);
+    metrics.push_back(MakeBrMetric(std::move(bot), game));
+  }
   //
   ReplayFillerPolicy exp_init =
       GetReplayFillerPolicy(absl::GetFlag(FLAGS_exp_init));
@@ -577,8 +593,9 @@ void TrainEvalLoop() {
     std::cout << "# Evaluating " << std::endl;
     model->eval();  // Eval mode.
     ComputeMetrics(metrics);
+    std::cout << loop;
     // Always print avg loss.
-    std::cout << loop << ',' << cumul_loss / train_batches;
+    std::cout << ',' << (train_batches > 0 ? cumul_loss / train_batches : 0.);
     PrintMetrics(metrics);
     std::cout << std::endl;
     DecayLearningRate(optimizer.get(), lr_decay);
@@ -624,8 +641,9 @@ void TrainEvalLoop() {
       std::cout << "# Evaluating " << std::endl;
       model->eval();  // Eval mode.
       ComputeMetrics(metrics);
+      std::cout << loop;
       // Always print avg loss.
-      std::cout << loop << ',' << cumul_loss / train_batches;
+      std::cout << ',' << (train_batches > 0 ? cumul_loss / train_batches : 0.);
       PrintMetrics(metrics);
       std::cout << std::endl;
       DecayLearningRate(optimizer.get(), lr_decay);
