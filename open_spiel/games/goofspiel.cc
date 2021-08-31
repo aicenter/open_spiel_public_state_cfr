@@ -396,7 +396,7 @@ GoofspielState::GoofspielState(std::shared_ptr<const Game> game, int num_cards,
     }
     {  // Player 1
       std::vector<bool> hand(num_cards_, false);
-      for (int i = num_cards_ - num_turns_; i < num_cards_; ++i) hand[i] = true;
+      for (int i = num_cards_ - (num_turns_ + 1); i < num_cards_; ++i) hand[i] = true;
       player_hands_.push_back(hand);
     }
   } else {
