@@ -16,6 +16,7 @@
 
 #include <cmath>
 #include <iostream>
+#include <absl/strings/str_replace.h>
 
 #include "open_spiel/abseil-cpp/absl/hash/hash.h"
 #include "open_spiel/algorithms/expected_returns.h"
@@ -195,6 +196,37 @@ void TestMakeAllPublicStates(const std::string& game_name) {
   }
 }
 
+std::unique_ptr<Subgame> Player0lossSubgame() {
+  std::shared_ptr<const Game> game = LoadGame(
+      "goofspiel(players=2,num_turns=3,num_cards=4,imp_info=True,points_order=descending)");
+  std::unique_ptr<PublicStatesInGame> all = MakeAllPublicStates(*game);
+  // Pick public state with PL0 loss.
+  for (PublicState& s : all->public_states) {
+    absl::Span<const float> wins = s.public_tensor.Tensor("win_sequence");
+    if (wins == std::vector<float>{0, 1, 0, 0, 0, 0}) {
+      SPIEL_CHECK_EQ(s.nodes[0].size(), 3);
+      SPIEL_CHECK_EQ(s.nodes[1].size(), 3);
+      return MakeSubgame(s);
+    }
+  }
+}
+
+void TestValuesInLimitedGoofspiel() {
+  std::shared_ptr<Subgame> subgame = Player0lossSubgame();
+  auto solver = std::make_unique<SubgameSolver>(subgame,
+                                                /*nonterminal_evaluator=*/nullptr,
+                                                MakeTerminalEvaluator(),
+                                                "PredictiveRegretMatchingPlus");
+  subgame->initial_state().beliefs[0] = {0., 0., 0.};  // PL0 doesn't want to play here.
+  subgame->initial_state().beliefs[1] = {0., 0., 1.};  // PL1 plays here with the highest card (4).
+
+  solver->RunSimultaneousIterations(10000);
+  // 1/3, 1/3, -1/3
+  std::cout << subgame->initial_state().values[0] << "\n";
+  // 0, 0, 0
+  std::cout << subgame->initial_state().values[1] << "\n";
+}
+
 }  // namespace
 }  // namespace papers_with_code
 }  // namespace open_spiel
@@ -212,4 +244,6 @@ int main(int argc, char** argv) {
     open_spiel::papers_with_code::TestRecursiveDepthLimitedSolving(game_name);
     open_spiel::papers_with_code::TestMakeAllPublicStates(game_name);
   }
+
+  open_spiel::papers_with_code::TestValuesInLimitedGoofspiel();
 }

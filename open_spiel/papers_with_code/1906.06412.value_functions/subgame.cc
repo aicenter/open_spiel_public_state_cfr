@@ -312,6 +312,34 @@ PublicState* Subgame::PickRandomLeaf(std::mt19937& rnd_gen) {
   return state;
 }
 
+std::unique_ptr<Subgame> MakeSubgame(const PublicState& state,
+                                     std::shared_ptr<const Game> game,
+                                     std::shared_ptr<Observer> public_observer,
+                                     int custom_move_ahead_limit) {
+  if (!game) {
+    SPIEL_CHECK_FALSE(state.nodes[0].empty());
+    const algorithms::InfostateNode* node = state.nodes[0][0];
+    SPIEL_CHECK_TRUE(node);
+    SPIEL_CHECK_FALSE(node->corresponding_states().empty());
+    const State* a_state = node->corresponding_states()[0].get();
+    SPIEL_CHECK_TRUE(a_state);
+    game = a_state->GetGame();
+  }
+  if (!public_observer) {
+    public_observer = game->MakeObserver(kPublicStateObsType, {});
+  }
+
+  std::vector<std::shared_ptr<algorithms::InfostateTree>> trees;
+  for (int pl = 0; pl < 2; ++pl) {
+    trees.push_back(MakeInfostateTree(state.nodes[pl],
+                                      custom_move_ahead_limit, kDlCfrInfostateTreeStorage
+    ));
+  }
+  auto out = std::make_unique<Subgame>(game, public_observer, trees);
+  out->initial_state().SetBeliefs(state.beliefs);
+  return out;
+}
+
 std::shared_ptr<PublicStateEvaluator> MakeTerminalEvaluator() {
   return std::make_shared<TerminalEvaluator>();
 }

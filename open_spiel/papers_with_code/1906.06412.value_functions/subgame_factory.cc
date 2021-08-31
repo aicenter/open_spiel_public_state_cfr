@@ -59,16 +59,11 @@ std::shared_ptr<Subgame> SubgameFactory::MakeSubgameSafeResolving(
 
 std::shared_ptr<Subgame> SubgameFactory::MakeSubgame(
     const PublicState& state, int custom_move_ahead_limit) const {
-  std::vector<std::shared_ptr<algorithms::InfostateTree>> trees;
-  for (int pl = 0; pl < 2; ++pl) {
-    trees.push_back(MakeInfostateTree(
-        state.nodes[pl],
-        custom_move_ahead_limit > 0 ? custom_move_ahead_limit
-                                    : max_move_ahead_limit,
-        kDlCfrInfostateTreeStorage
-    ));
-  }
-  auto out = std::make_unique<Subgame>(game, public_observer, trees);
+  std::unique_ptr<Subgame> out =
+      open_spiel::papers_with_code::MakeSubgame(
+          state, game, public_observer,
+          custom_move_ahead_limit > 0 ? custom_move_ahead_limit
+                                      : max_move_ahead_limit);
   out->initial_state().SetBeliefs(state.beliefs);
   return out;
 }

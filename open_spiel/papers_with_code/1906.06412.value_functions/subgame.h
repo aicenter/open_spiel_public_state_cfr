@@ -193,6 +193,11 @@ struct Subgame {
                               algorithms::InfostateNode* node);
 };
 
+std::unique_ptr<Subgame> MakeSubgame(
+    const PublicState& state,
+    std::shared_ptr<const Game> game = nullptr,
+    std::shared_ptr<Observer> public_observer = nullptr,
+    int custom_move_ahead_limit = algorithms::kNoMoveAheadLimit);
 
 // Derived classes specify members as they need for their specific
 // public state evaluators.
