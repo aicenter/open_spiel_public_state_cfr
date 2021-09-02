@@ -290,6 +290,7 @@ PublicState* Subgame::GetPublicState(const Observation& public_observation,
   // None found: create and return the pointer.
   public_states.emplace_back(public_observation,
                              state_type, public_states.size());
+  public_states.back().trees = trees;
   return &public_states.back();
 }
 

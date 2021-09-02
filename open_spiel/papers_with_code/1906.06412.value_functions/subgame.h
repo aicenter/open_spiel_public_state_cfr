@@ -79,6 +79,8 @@ struct PublicState {
   const PublicStateType state_type;
   // Position in the vector of Subgame::public_states()
   const size_t public_id;
+  // TODO
+  /*const*/ std::vector<std::shared_ptr<algorithms::InfostateTree>> trees;
   // For each player, store a pointer to the infostate nodes for this public
   // state, within the depth-limited infostate tree. If needed, you can get
   // access to underlying perfect-information `State`s

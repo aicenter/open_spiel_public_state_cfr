@@ -724,6 +724,8 @@ class InfostateNode final {
   friend class InfostateTree;
 
  public:
+  double cumul_value = 0.;
+
   // -- Node accessors. --------------------------------------------------------
   const InfostateTree& tree() const { return tree_; }
   InfostateNode* parent() const { return parent_; }

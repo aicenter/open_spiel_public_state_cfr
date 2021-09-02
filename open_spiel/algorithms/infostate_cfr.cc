@@ -91,7 +91,7 @@ void BottomUp(
     // Loop over all parents of current nodes.
     for (int parent_idx = 0; parent_idx < nodes_at_depths[d].size();
          parent_idx++) {
-      const InfostateNode* node = nodes_at_depths[d][parent_idx];
+      InfostateNode* node = nodes_at_depths[d][parent_idx];
       const int num_children = node->num_children();
       double node_expected_value = 0.;
       if (node->type() == kDecisionInfostateNode) {
@@ -109,7 +109,7 @@ void BottomUp(
           node_expected_value += cf_values[left_offset + i];
         }
       }
-
+      node->cumul_value += node_expected_value;
       cf_values[parent_idx] = node_expected_value;
       left_offset += num_children;
     }

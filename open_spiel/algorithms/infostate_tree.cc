@@ -213,29 +213,35 @@ std::ostream& InfostateTree::operator<<(std::ostream& os) const {
 }
 
 std::unique_ptr<InfostateNode> InfostateTree::MakeNode(
-    InfostateNode* parent, InfostateNodeType type,
-    const std::string& infostate_string, double terminal_utility,
+    InfostateNode* parent,
+    InfostateNodeType type,
+    const std::string& infostate_string,
+    double terminal_utility,
     double terminal_ch_reach_prob, size_t depth,
-    const State* originating_state, const std::vector<Action>& given_legal_actions, bool terminate) {
-    std::vector<Action> legal_actions;
-    if (given_legal_actions.empty()) {
-        legal_actions =
-                originating_state && originating_state->IsPlayerActing(acting_player_)
-                ? originating_state->LegalActions(acting_player_)
-                : std::vector<Action>();
-    } else {
-        legal_actions = given_legal_actions;
-    }
+    const State* originating_state,
+    const std::vector<Action>& given_legal_actions,
+    bool terminate) {
+
+  std::vector<Action> legal_actions;
+  if (given_legal_actions.empty()) {
+    legal_actions =
+        originating_state && originating_state->IsPlayerActing(acting_player_)
+        ? originating_state->LegalActions(acting_player_)
+        : std::vector<Action>();
+  } else {
+    legal_actions = given_legal_actions;
+  }
   std::vector<Action> terminal_history;
   if (is_resolving_tree_) {
-      terminal_history = originating_state ? originating_state->History(): std::vector<Action>();
-      if(terminate) {
-          terminal_history.push_back(Action(-1));
-      }
+    terminal_history = originating_state ? originating_state->History()
+                                         : std::vector<Action>();
+    if (terminate) {
+      terminal_history.push_back(Action(-1));
+    }
   } else {
-      terminal_history = originating_state && originating_state->IsTerminal()
-                              ? originating_state->History()
-                              : std::vector<Action>();
+    terminal_history = originating_state && originating_state->IsTerminal()
+                       ? originating_state->History()
+                       : std::vector<Action>();
   }
 
   // Instantiate node using new to make sure that we can call
