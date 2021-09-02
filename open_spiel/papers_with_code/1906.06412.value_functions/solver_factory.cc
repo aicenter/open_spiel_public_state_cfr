@@ -27,7 +27,8 @@ std::unique_ptr<SubgameSolver> SolverFactory::MakeSolver(
                                                 : custom_bandits_for_cfr;
   return std::make_unique<SubgameSolver>(subgame, evaluator,
                                          terminal_evaluator, bandits,
-                                         save_values_policy, safe_resolving);
+                                         save_values_policy, safe_resolving,
+                                         beliefs_for_average);
 }
 
 }  // papers_with_code

@@ -268,10 +268,10 @@ class SubgameSolver {
       const std::shared_ptr<const PublicStateEvaluator> terminal_evaluator,
       const std::string& bandit_name,
       PolicySelection save_values_policy = kDefaultPolicySelection,
-      bool safe_resolving = false);
+      bool safe_resolving = false,
+      bool beliefs_for_average = false);
 
   void RunSimultaneousIterations(int iterations);
-  void SetAverageBeliefsInLeaves();
   void Reset();
 
   // Accessors.
@@ -287,6 +287,7 @@ class SubgameSolver {
   const std::shared_ptr<const PublicStateEvaluator> nonterminal_evaluator_;
   const std::shared_ptr<const PublicStateEvaluator> terminal_evaluator_;
   const bool safe_resolving_;
+  const bool beliefs_for_average_;
 
   // -- Mutable values to keep track of. --
   // These have the size at largest depth of the tree, i.e. the size of the

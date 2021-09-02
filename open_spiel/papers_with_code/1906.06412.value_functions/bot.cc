@@ -111,9 +111,8 @@ std::pair<ActionsAndProbs, Action> SherlockBot::StepWithPolicy(const State& stat
   first_step_ = false;
 
   std::unique_ptr<SubgameSolver> solver = solver_factory_->MakeSolver(subgame_);
-
   solver->RunSimultaneousIterations(solver_factory_->cfr_iterations);
-  solver->SetAverageBeliefsInLeaves();
+
   if (state.IsPlayerActing(player_id_)) {
     auto policy = solver->AveragePolicy();
     ActionsAndProbs actions_and_probs = policy->GetStatePolicy(infostate);

@@ -425,11 +425,13 @@ SubgameSolver::SubgameSolver(
     const std::shared_ptr<const PublicStateEvaluator> terminal_evaluator,
     const std::string& bandit_name,
     PolicySelection save_values_policy,
-    bool safe_resolving
+    bool safe_resolving,
+    bool beliefs_for_average
 ) : subgame_(subgame),
     nonterminal_evaluator_(nonterminal_evaluator),
     terminal_evaluator_(terminal_evaluator),
     safe_resolving_(safe_resolving),
+    beliefs_for_average_(beliefs_for_average),
     bandits_(algorithms::MakeBanditVectors(subgame_->trees, bandit_name)),
     reach_probs_({std::vector<double>(subgame_->trees[0]->num_leaves()),
                   std::vector<double>(subgame_->trees[1]->num_leaves())}),
@@ -467,6 +469,25 @@ void SubgameSolver::RunSimultaneousIterations(int iterations) {
                      absl::MakeSpan(reach_probs_[pl]), num_iterations_);
     }
 
+    // Optionally instead of current reach probs, use average reach probs.
+    // This corresponds to using CFR-AVE in [Appendix E, 1].
+    //
+    // [1] Combining Deep Reinforcement Learning and Search
+    //     for Imperfect-Information Games
+    //     Noam Brown, Anton Bakhtin, Adam Lerer, Qucheng Gong
+    if (beliefs_for_average_) {
+      // 1. Prepare initial reach probs, based on beliefs in initial state.
+      for (int pl = 0; pl < 2; ++pl) {
+        std::copy(beliefs[pl].begin(), beliefs[pl].end(),
+                  reach_probs_[pl].begin());
+      }
+      // 2. Compute reach probs of avg strategy to the terminals.
+      for (int pl = 0; pl < 2; ++pl) {
+        TopDownAverage(*subgame_->trees[pl], bandits_[pl],
+                       absl::MakeSpan(reach_probs_[pl]));
+      }
+    }
+
     // 3. Evaluate leaves using current reach probs.
     EvaluateLeaves();
 
@@ -486,40 +507,6 @@ void SubgameSolver::RunSimultaneousIterations(int iterations) {
 
   if (init_save_values_ == PolicySelection::kCurrentPolicy) {
     CopyCurrentValuesToInitialState();
-  }
-}
-
-void SubgameSolver::SetAverageBeliefsInLeaves() {
-  // 1. Prepare initial reach probs, based on beliefs in initial state.
-  std::array<std::vector<double>, 2>& beliefs = initial_state().beliefs;
-  for (int pl = 0; pl < 2; ++pl) {
-    std::copy(beliefs[pl].begin(), beliefs[pl].end(),
-              reach_probs_[pl].begin());
-  }
-
-  // 2. Compute reach probs of avg strategy to the terminals.
-  for (int pl = 0; pl < 2; ++pl) {
-    TopDownAverage(*subgame_->trees[pl], bandits_[pl],
-                   absl::MakeSpan(reach_probs_[pl]));
-  }
-
-  // 3. Copy them into leaf public states from the reach_probs_.
-  for (int i = 0; i < subgame()->public_states.size(); ++i) {
-    PublicState* state = &subgame()->public_states[i];
-    if (!state->IsLeaf()) continue;
-
-    for (int pl = 0; pl < 2; pl++) {
-      const int num_leaves = state->nodes[pl].size();
-      for (int j = 0; j < num_leaves; ++j) {
-        const algorithms::InfostateNode* leaf_node = state->nodes[pl][j];
-        const int trunk_position = state->nodes_positions.at(leaf_node);
-        SPIEL_DCHECK_GE(trunk_position, 0);
-        SPIEL_DCHECK_LT(trunk_position, subgame()->trees[pl]->num_leaves());
-        // Copy reach prob (player belief) from the trunk
-        // to the leaf public state->
-        state->beliefs[pl][j] = reach_probs_[pl][trunk_position];
-      }
-    }
   }
 }
 
@@ -699,6 +686,12 @@ void CFREvaluator::EvaluatePublicState(PublicState* state,
     std::copy(resulting_values[pl].begin(), resulting_values[pl].end(),
               state->values[pl].begin());
   }
+//  for (const algorithms::InfostateNode* node : state->nodes[0]) {
+//    std::cout << node->infostate_string() << "\n";
+//  }
+//  std::cout << state->public_id << " "
+//            << " " << " beliefs: " << state->beliefs[0]
+//            << " " << " values: " << state->values[0]  << "\n";
 }
 
 void PrintPublicStatesStats(const std::vector<PublicState>& public_leaves) {

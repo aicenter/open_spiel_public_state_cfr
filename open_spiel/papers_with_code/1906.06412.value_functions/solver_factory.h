@@ -36,6 +36,7 @@ struct SolverFactory {
   std::string use_bandits_for_cfr = kDefaultDlCfrBandit;
   PolicySelection save_values_policy = kDefaultPolicySelection;
   bool safe_resolving = false;
+  bool beliefs_for_average = false;
 
   std::unique_ptr<SubgameSolver> MakeSolver(
       std::shared_ptr<Subgame> subgame,

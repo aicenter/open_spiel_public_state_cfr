@@ -33,6 +33,8 @@ ABSL_FLAG(bool, safe_resolving, true,
 ABSL_FLAG(int, cfr_iterations, 100,
           "Number of iterations with value function (used in bootstrapping).");
 ABSL_FLAG(int, max_move_ahead_limit, 1, "Size of the lookahead tree.");
+ABSL_FLAG(bool, beliefs_for_average, false,
+          "Use average beliefs for leaf evaluation instead of current beliefs.");
 
 // -- Data generation --
 ABSL_FLAG(int, depth, 3, "Depth of the trunk.");
@@ -411,6 +413,7 @@ void TrainEvalLoop() {
   solver_factory->cfr_iterations = absl::GetFlag(FLAGS_cfr_iterations);
   solver_factory->use_bandits_for_cfr  = absl::GetFlag(FLAGS_use_bandits_for_cfr);
   solver_factory->safe_resolving       = false;  // No resolving for training.
+  solver_factory->beliefs_for_average  = absl::GetFlag(FLAGS_beliefs_for_average);
   solver_factory->save_values_policy   = save_values_policy;
   solver_factory->terminal_evaluator   = terminal_evaluator;
   solver_factory->leaf_evaluator = MakeNetEvaluator(
