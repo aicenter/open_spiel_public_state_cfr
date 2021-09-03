@@ -18,6 +18,12 @@
 namespace open_spiel {
 namespace papers_with_code {
 
+NetArchitecture GetArchitecture(const std::string& arch) {
+  if (arch == "particle_vf")        return NetArchitecture::kParticle;
+  else if (arch == "positional_vf") return NetArchitecture::kPositional;
+  else SpielFatalError("Exhausted pattern match! Architecture not recognized.");
+}
+
 std::shared_ptr<BasicDims> DeduceBasicDims(
     NetArchitecture arch,
     const Game& game,

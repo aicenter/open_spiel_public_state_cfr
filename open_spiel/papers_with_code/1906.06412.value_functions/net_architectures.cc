@@ -94,10 +94,12 @@ ParticleValueNet::ParticleValueNet(std::shared_ptr<ParticleDims> particle_dims,
                                    size_t num_inputs_regression,
                                    bool zero_sum_regression,
                                    bool normalize_beliefs,
+                                   SetPoolingOp set_pooling_op,
                                    ActivationFunction activation)
     : dims(particle_dims),
       zero_sum_regression(zero_sum_regression),
       normalize_beliefs(normalize_beliefs),
+      set_pooling_op(set_pooling_op),
       activation_fn(activation),
       num_inputs_regression(num_inputs_regression) {
   int num_layers_kernel = 4;
@@ -148,7 +150,13 @@ torch::Tensor ParticleValueNet::pool(torch::Tensor cs) {
   const int num_parviews = dims->max_parviews;
 
   CHECK_SHAPE(cs, {batch_size, num_parviews, pooled_size()});
-  torch::Tensor context = torch::sum(cs, {1});                                  CHECK_SHAPE(context, {batch_size, pooled_size()});
+  torch::Tensor context;
+  if (set_pooling_op == SetPoolingOp::kSum) {
+    context = torch::sum(cs, {1});
+  } else if (set_pooling_op == SetPoolingOp::kMean) {
+    context = torch::mean(cs, {1});
+  }
+  CHECK_SHAPE(context, {batch_size, pooled_size()});
   return context;
 }
 
@@ -255,14 +263,10 @@ void InitWeights(torch::nn::Module& m) {
   }
 }
 
-NetArchitecture GetArchitecture(const std::string& arch) {
-  if (arch == "particle_vf") {
-    return NetArchitecture::kParticle;
-  } else  if (arch == "positional_vf") {
-    return NetArchitecture::kPositional;
-  } else {
-    SpielFatalError("Exhausted pattern match! Architecture not recognized.");
-  }
+SetPoolingOp GetPoolingOp(const std::string& op) {
+  if (op == "sum")        return SetPoolingOp::kSum;
+  else if (op == "mean")  return SetPoolingOp::kMean;
+  else SpielFatalError("Exhausted pattern match! Pooling op not recognized.");
 }
 
 torch::Tensor Activation(ActivationFunction f, torch::Tensor x) {
@@ -284,7 +288,8 @@ std::shared_ptr<ValueNet> MakeModel(
     int num_width_regression,
     int num_inputs_regression,
     bool zero_sum_regression,
-    bool normalize_beliefs
+    bool normalize_beliefs,
+    SetPoolingOp set_pooling_op
 ) {
   SPIEL_CHECK_GE(num_layers_regression, 1);
   SPIEL_CHECK_GE(num_width_regression, 1);
@@ -294,7 +299,7 @@ std::shared_ptr<ValueNet> MakeModel(
       auto model = std::make_shared<ParticleValueNet>(
           particle_dims,
           num_layers_regression, num_width_regression, num_inputs_regression,
-          zero_sum_regression, normalize_beliefs,
+          zero_sum_regression, normalize_beliefs, set_pooling_op,
           ActivationFunction::kRelu);
       return model;
     }

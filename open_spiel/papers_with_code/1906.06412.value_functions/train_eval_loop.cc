@@ -85,16 +85,6 @@ ABSL_FLAG(double, lr_decay, 1., "Learning rate decay after each loop.");
 ABSL_FLAG(int, max_particles, -1,
           "Max particles to use. Set -1 to find an upper bound automatically.");
 
-// -- Model checkpoints (snapshots) --
-ABSL_FLAG(int, snapshot_loop, -1,
-          "When should NN weights be saved to snapshot/ dir? -1 for never.");
-ABSL_FLAG(std::string, snapshot_dir, "snapshots/",
-          "Directory to store snapshots of NN weights.");
-ABSL_FLAG(std::string, load_snapshot, "",
-          "Absolute path to the snapshot that should be loaded. "
-          "A special keyword 'automatic' will load the latest snapshot "
-          " found in the snapshot_dir.");
-
 // -- Network --
 ABSL_FLAG(std::string, arch, "particle_vf",
           "Which architecture of the value function should be used.");
@@ -110,7 +100,22 @@ ABSL_FLAG(bool, zero_sum_regression, false,
           "layer (does not introduce any new weights)");
 ABSL_FLAG(bool, normalize_beliefs, false,
           "Normalize the per-player beliefs and values accordingly.");
-ABSL_FLAG(bool, bot_use_oracle, false, "Use oracle as leaf evaluator.");
+ABSL_FLAG(std::string, set_pooling, "sum",
+          "Pooling operation for deep sets (sum/mean).");
+
+// -- Model checkpoints (snapshots) --
+ABSL_FLAG(int, snapshot_loop, -1,
+          "When should NN weights be saved to snapshot/ dir? -1 for never.");
+ABSL_FLAG(std::string, snapshot_dir, "snapshots/",
+          "Directory to store snapshots of NN weights.");
+ABSL_FLAG(std::string, load_snapshot, "",
+          "Absolute path to the snapshot that should be loaded. "
+          "A special keyword 'automatic' will load the latest snapshot "
+          " found in the snapshot_dir.");
+
+// -- Bot --
+ABSL_FLAG(bool, bot_use_oracle, false,
+          "Use oracle instead of net as leaf evaluator.");
 
 // -- Metrics --
 // FullTrunkExplMetric
@@ -376,7 +381,8 @@ void TrainEvalLoop() {
       arch, dims,
       absl::GetFlag(FLAGS_num_layers), absl::GetFlag(FLAGS_num_width),
       num_inputs_regression, absl::GetFlag(FLAGS_zero_sum_regression),
-      absl::GetFlag(FLAGS_normalize_beliefs));
+      absl::GetFlag(FLAGS_normalize_beliefs),
+      GetPoolingOp(absl::GetFlag(FLAGS_set_pooling)));
   std::cout << "# Model has " << model->num_parameters()
             << " trainable params" << std::endl;
   //

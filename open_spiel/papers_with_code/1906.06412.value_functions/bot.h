@@ -160,6 +160,8 @@ class SherlockBotFactory : public BotFactory {
         GetParameterValue(bot_params, "zero_sum_regression", false);
     bool normalize_beliefs =
         GetParameterValue(bot_params, "normalize_beliefs", false);
+    SetPoolingOp set_pooling_op = GetPoolingOp(
+        GetParameterValue<std::string>(bot_params, "set_pooling_op", "sum"));
     int cfr_iterations =
         GetParameterValue(bot_params, "cfr_iterations", kDefaultCfrIterations);
     int max_move_ahead_limit =
@@ -223,7 +225,8 @@ class SherlockBotFactory : public BotFactory {
           num_width,
           num_inputs_regression,
           zero_sum_regression,
-          normalize_beliefs);
+          normalize_beliefs,
+          set_pooling_op);
       LoadNetSnapshot(model, load_from);
       model->eval();  // Set only eval mode.
       //

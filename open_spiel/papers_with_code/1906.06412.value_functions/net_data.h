@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_NET_BATCH_
-#define OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_NET_BATCH_
+#ifndef OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_NET_DATA_
+#define OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_NET_DATA_
 
 #include <iterator>
 
@@ -27,10 +27,7 @@ namespace papers_with_code {
 using float_net = float;    // Floats used in the neural network.
 using float_tree = double;  // Floats used in the cfr computation.
 
-enum class NetArchitecture {
-  kPositional,
-  kParticle
-};
+enum class NetArchitecture { kPositional, kParticle };
 NetArchitecture GetArchitecture(const std::string& arch);  // Enum from string.
 
 // Our base class. Data points are always a view
@@ -216,4 +213,4 @@ struct BatchData {
 }  // namespace open_spiel
 
 
-#endif  // OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_NET_BATCH_
+#endif  // OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_NET_DATA_

@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_NEURAL_NETS_
-#define OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_NEURAL_NETS_
+#ifndef OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_NET_ARCHITECTURES_
+#define OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_NET_ARCHITECTURES_
 
 #include "torch/torch.h"
 #include "open_spiel/spiel.h"
@@ -59,11 +59,15 @@ struct PositionalValueNet final : public ValueNet {
   }
 };
 
+enum class SetPoolingOp { kSum, kMean };
+SetPoolingOp GetPoolingOp(const std::string& op);  // Enum from string.
+
 // A particle neural network that uses MLPs for regression and change of basis.
 struct ParticleValueNet final : public ValueNet {
   std::shared_ptr<ParticleDims> dims;
   bool zero_sum_regression;
   bool normalize_beliefs;
+  SetPoolingOp set_pooling_op;
   ActivationFunction activation_fn;
   std::vector<torch::nn::Linear> fc_regression;
   std::vector<torch::nn::Linear> fc_basis;
@@ -75,6 +79,7 @@ struct ParticleValueNet final : public ValueNet {
                    size_t num_inputs_regression,
                    bool zero_sum_regression,
                    bool normalize_beliefs,
+                   SetPoolingOp set_pooling_op,
                    ActivationFunction activation = kRelu);
   torch::Tensor forward(torch::Tensor xss) override;
   torch::Tensor PrepareTarget(BatchData* batch) override;
@@ -100,11 +105,12 @@ std::shared_ptr<ValueNet> MakeModel(NetArchitecture arch,
                                     int num_width_regression,
                                     int num_inputs_regression,
                                     bool zero_sum_regression,
-                                    bool normalize_beliefs);
+                                    bool normalize_beliefs,
+                                    SetPoolingOp set_pooling_op);
 
 
 }  // namespace papers_with_code
 }  // namespace open_spiel
 
 
-#endif  // OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_NEURAL_NETS_
+#endif  // OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_NET_ARCHITECTURES_
