@@ -101,9 +101,10 @@ ABSL_FLAG(std::string, arch, "particle_vf",
 ABSL_FLAG(int, num_layers, 3, "Number of hidden layers.");
 ABSL_FLAG(int, num_width, 3, "Multiplicative constant of the number of neurons "
                              "per layer compared to the input size.");
-ABSL_FLAG(int, num_inputs_regression, 128,
-          "Size of the regression input for particle VF. -1 means it will be"
-          "the same as max_parviews");
+ABSL_FLAG(std::string, num_inputs_regression, "128",
+          "Size of the regression input for particle VF. "
+          "'max' means it will be the same as max_parviews."
+          "'2x' means it will be twice the number of particle features.");
 ABSL_FLAG(bool, zero_sum_regression, false,
           "Make the regressed values automatically zero-sum through special "
           "layer (does not introduce any new weights)");
@@ -334,6 +335,8 @@ void TrainEvalLoop() {
       std::cout << "# Particle VF (derived automatically): "
                    "max_particles = " << subgame_factory->max_particles << ' ' <<
                 "max_parviews = " << particle_dims->max_parviews << "\n";
+      std::cout << "# Full features for a particle: "
+                << particle_dims->full_features_size() << "\n";
     }
   }
   std::cout << "# Point input size: " << dims->point_input_size() << "\n";
@@ -342,14 +345,25 @@ void TrainEvalLoop() {
   std::cout << "# Using device: " << absl::GetFlag(FLAGS_device) << "\n";
   torch::Device device(absl::GetFlag(FLAGS_device));
   //
-  int num_inputs_regression = absl::GetFlag(FLAGS_num_inputs_regression);;
+  int num_inputs_regression = -1;
   if (arch == NetArchitecture::kParticle) {
-    if(num_inputs_regression == -1) {
+    auto num_inputs_regression_str = absl::GetFlag(FLAGS_num_inputs_regression);
+    if(num_inputs_regression_str == "max") {
       auto particle_dims = open_spiel::down_cast <ParticleDims*>(dims.get());
       num_inputs_regression = particle_dims->max_parviews;
+    } else if(absl::EndsWith(num_inputs_regression_str, "x")) {
+      auto particle_dims = open_spiel::down_cast <ParticleDims*>(dims.get());
+      int multiplicative_factor = std::stoi(num_inputs_regression_str);
+      std::cout << "# Using multiplicative factor for num regression inputs: "
+                << multiplicative_factor << std::endl;
+      num_inputs_regression = particle_dims->full_features_size()
+                            * multiplicative_factor;
+    } else {
+      num_inputs_regression = std::stoi(num_inputs_regression_str);
     }
     std::cout << "# Size of the input for regression component: "
               << num_inputs_regression << "\n";
+    SPIEL_CHECK_GE(num_inputs_regression, 1);  // Must be provided!
   }
   //
   std::cout << "# Making eval data ..." << std::endl;

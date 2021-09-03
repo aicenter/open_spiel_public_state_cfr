@@ -277,7 +277,7 @@ class VFTest(parameterized.TestCase, absltest.TestCase):
       args = dict(
           arch="particle_vf", batch_size="1", cfr_oracle_iterations="100",
           depth="7", device="cpu", exp_init="pbs_random",
-          game_name="leduc_poker", num_inputs_regression=-1,
+          game_name="leduc_poker", num_inputs_regression="max",
           num_layers=5, num_loops=1, num_width=5, prob_pure_strat=0.1,
           replay_size=1, seed=0, train_batches=256,
           trunk_expl_iterations="1,5,10,50,100",
@@ -302,7 +302,7 @@ class VFTest(parameterized.TestCase, absltest.TestCase):
           arch="particle_vf", batch_size="1",
           cfr_oracle_iterations="100", depth="7", exp_init="bootstrap",
           exp_loop="bootstrap", exp_loop_new="2", exp_update_size=-1,
-          game_name="leduc_poker", num_inputs_regression=-1, num_layers="5",
+          game_name="leduc_poker", num_inputs_regression="max", num_layers="5",
           num_loops="18", bootstrap_from_move=10,
           num_width="5", prob_pure_strat="0.1", replay_size="1",
           seed="0", max_particles=30, train_batches="1",
