@@ -114,6 +114,9 @@ ABSL_FLAG(std::string, load_snapshot, "",
           " found in the snapshot_dir.");
 
 // -- Bot --
+ABSL_FLAG(int, bot_particles, -1,
+          "Number of particles the bot should use when stepping to the next "
+          "public state. -1 to set the limit same as max_particles.");
 ABSL_FLAG(bool, bot_use_oracle, false,
           "Use oracle instead of net as leaf evaluator.");
 
@@ -456,6 +459,23 @@ void TrainEvalLoop() {
   filler.eval_iters =
       ItersFromString(absl::GetFlag(FLAGS_trunk_expl_iterations));
   //
+  std::cout << "# Making bot for online play ..." << std::endl;
+  // Make a separate solver/subgame copies for the bot,
+  // so they can have custom settings.
+  auto bot_subgame_factory = std::make_shared<SubgameFactory>(*subgame_factory);
+  int bot_particles = absl::GetFlag(FLAGS_bot_particles);
+  if (bot_particles > -1) {
+    bot_subgame_factory->max_particles = bot_particles;
+  }
+  auto bot_solver_factory = std::make_shared<SolverFactory>(*solver_factory);
+  bot_solver_factory->safe_resolving = absl::GetFlag(FLAGS_safe_resolving);
+  if (absl::GetFlag(FLAGS_bot_use_oracle)) {
+    bot_solver_factory->leaf_evaluator = oracle;
+  }
+  std::unique_ptr<Bot> bot = MakeSherlockBot(bot_subgame_factory,
+                                             bot_solver_factory,
+                                             Player{0}, seed);
+  //
   std::cout << "# Making evaluation metrics ..." << std::endl;
   std::vector<std::unique_ptr<Metric>> metrics;
   {
@@ -485,33 +505,14 @@ void TrainEvalLoop() {
   }
   if (absl::GetFlag(FLAGS_iigs_br_metric)) {
     std::cout << "# Making IIGS BR metric ..." << std::endl;
-    // Make a separate solver copy that may use safe resolving.
-    auto bot_solver_factory = std::make_shared<SolverFactory>(*solver_factory);
-    bot_solver_factory->safe_resolving = absl::GetFlag(FLAGS_safe_resolving);
-    if (absl::GetFlag(FLAGS_bot_use_oracle)) {
-      bot_solver_factory->leaf_evaluator = oracle;
-    }
-    std::unique_ptr<Bot> bot = MakeSherlockBot(subgame_factory,
-                                               bot_solver_factory,
-                                               Player{0}, seed);
     auto goof_game =
         std::dynamic_pointer_cast<const goofspiel::GoofspielGame>(game);
     bool approx_response = absl::GetFlag(FLAGS_iigs_approx_response);
-    metrics.push_back(
-        MakeIigsBrMetric(std::move(bot), goof_game, approx_response));
+    metrics.push_back(MakeIigsBrMetric(bot->Clone(), goof_game, approx_response));
   }
   if (absl::GetFlag(FLAGS_br_metric)) {
     std::cout << "# Making BR metric ..." << std::endl;
-    // Make a separate solver copy that may use safe resolving.
-    auto bot_solver_factory = std::make_shared<SolverFactory>(*solver_factory);
-    bot_solver_factory->safe_resolving = absl::GetFlag(FLAGS_safe_resolving);
-    if (absl::GetFlag(FLAGS_bot_use_oracle)) {
-      bot_solver_factory->leaf_evaluator = oracle;
-    }
-    std::unique_ptr<Bot> bot = MakeSherlockBot(subgame_factory,
-                                               bot_solver_factory,
-                                               Player{0}, seed);
-    metrics.push_back(MakeBrMetric(std::move(bot), game));
+    metrics.push_back(MakeBrMetric(bot->Clone(), game));
   }
   //
   ReplayFillerPolicy exp_init =
