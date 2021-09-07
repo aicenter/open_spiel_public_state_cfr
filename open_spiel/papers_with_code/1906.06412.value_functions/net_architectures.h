@@ -89,7 +89,8 @@ struct ParticleValueNet final : public ValueNet {
 
   torch::Tensor change_of_basis(torch::Tensor fs);
   torch::Tensor base_coordinates(torch::Tensor bs, torch::Tensor scales);
-  torch::Tensor pool(torch::Tensor xs);
+  torch::Tensor pool(torch::Tensor cs,
+                     torch::Tensor parview_sum);
   torch::Tensor regression(torch::Tensor xs);
 
   int context_size() { return pooled_size() + dims->public_features_size; }

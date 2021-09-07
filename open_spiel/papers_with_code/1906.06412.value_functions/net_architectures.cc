@@ -145,16 +145,21 @@ torch::Tensor ParticleValueNet::base_coordinates(torch::Tensor bs,
   return cs;
 }
 
-torch::Tensor ParticleValueNet::pool(torch::Tensor cs) {
+torch::Tensor ParticleValueNet::pool(torch::Tensor cs,
+                                     torch::Tensor parview_sum) {
   const int batch_size = cs.size(0);
-  const int num_parviews = dims->max_parviews;
+  const int max_parviews = dims->max_parviews;
 
-  CHECK_SHAPE(cs, {batch_size, num_parviews, pooled_size()});
+  CHECK_SHAPE(cs, {batch_size, max_parviews, pooled_size()});
+  CHECK_SHAPE(parview_sum, {batch_size});
+
   torch::Tensor context;
   if (set_pooling_op == SetPoolingOp::kSum) {
     context = torch::sum(cs, {1});
   } else if (set_pooling_op == SetPoolingOp::kMean) {
-    context = torch::mean(cs, {1});
+    torch::Tensor expanded_counts =
+        parview_sum.expand({pooled_size(), batch_size}).permute({1, 0});        CHECK_SHAPE(expanded_counts, {batch_size, pooled_size()});
+    context = torch::sum(cs, {1}).div_(expanded_counts);
   }
   CHECK_SHAPE(context, {batch_size, pooled_size()});
   return context;
@@ -206,18 +211,21 @@ torch::Tensor ParticleValueNet::forward(torch::Tensor xss) {
   torch::Tensor infostate_fs =
       torch::cat({pf_per_parview, hand_fs}, /*dim=*/2);                         CHECK_SHAPE(infostate_fs, {batch_size, max_parviews, dims->full_features_size()});
 
-  // Zero-out public state features for non-full sets.
+  // Zero-out features for non-full sets.
   torch::Tensor parview_counts =
       xss.index({Batch, Slice(0, pub_features_offset)});                        CHECK_SHAPE(parview_counts, {batch_size, 2});
   torch::Tensor parview_sum = parview_counts.sum(/*dim=*/1);                    CHECK_SHAPE(parview_sum, {batch_size});
   for (int i = 0; i < batch_size; ++i) {
-    infostate_fs.index_put_(
-        {i, Slice(parview_sum[i].item<int>(), max_parviews), Slice()}, 0);
+    infostate_fs.index_put_({
+      /*batch_index=*/i,
+      /*empty_elemnts=*/Slice(parview_sum[i].item<int>(), max_parviews),
+      /*features=*/Slice()
+    }, 0);
   }
 
   torch::Tensor bs = change_of_basis(infostate_fs);                             CHECK_SHAPE(bs, {batch_size, max_parviews, pooled_size()});
   torch::Tensor cs = base_coordinates(bs, beliefs);                             CHECK_SHAPE(cs, {batch_size, max_parviews, pooled_size()});
-  torch::Tensor pooled = pool(cs);                                              CHECK_SHAPE(pooled, {batch_size, pooled_size()});
+  torch::Tensor pooled = pool(cs, parview_sum);                                 CHECK_SHAPE(pooled, {batch_size, pooled_size()});
   torch::Tensor context = torch::cat({pooled, public_features}, /*dim=*/1);     CHECK_SHAPE(context, {batch_size, context_size()});
   torch::Tensor ys = regression(context)
       .expand({max_parviews, -1, -1}).permute({1, 0, 2});                       CHECK_SHAPE(ys, {batch_size, max_parviews, regression_size()});
