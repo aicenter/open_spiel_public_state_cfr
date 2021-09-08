@@ -41,7 +41,7 @@ class ExperienceReplay : public BatchData {
   PositionalDataPoint AddExperience(const PositionalDims& dims);
 
   // Fill batch with randomly sampled data points.
-  void SampleBatch(BatchData* batch, std::mt19937& rnd_gen);
+  void SampleBatch(BatchData* batch, std::mt19937* rnd_gen);
   bool IsFilled() const { return overflow_cnt_ > 0; }
   bool IsAtBeginning() const { return head_ == 0; }
   void ResetHead() { head_ = 0; }
@@ -67,7 +67,7 @@ ReplayFillerPolicy GetReplayFillerPolicy(const std::string& s);  // From string.
 // Helper struct so we don't need to pass so many parameters
 // for bandit randomization.
 struct StrategyRandomizer {
-  std::mt19937* rnd_gen;
+  std::shared_ptr<std::mt19937> rnd_gen;
   double prob_pure_strat = 0.1;
   double prob_fully_mixed = 0.05;
   double prob_benford_dist = 0.0;

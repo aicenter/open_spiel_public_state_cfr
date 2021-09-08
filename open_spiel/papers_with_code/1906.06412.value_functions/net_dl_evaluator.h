@@ -61,7 +61,7 @@ class ParticleNetEvaluator final : public NetEvaluator {
   std::shared_ptr<ParticleDims> const dims_;
   std::shared_ptr<Observer> hand_observer_;
   bool normalize_beliefs_;
-  std::mt19937* rnd_gen_;
+  std::shared_ptr<std::mt19937> rnd_gen_;
  public:
   ParticleNetEvaluator(std::shared_ptr<ParticleValueNet> model,
                        std::shared_ptr<ParticleDims> const dims,
@@ -69,7 +69,7 @@ class ParticleNetEvaluator final : public NetEvaluator {
                        torch::Device device,
                        std::shared_ptr<Observer> hand_observer,
                        bool normalize_beliefs,
-                       std::mt19937* rnd_gen)
+                       std::shared_ptr<std::mt19937> rnd_gen)
       : model_(model), device_(device), batch_(batch), dims_(dims),
         hand_observer_(hand_observer), normalize_beliefs_(normalize_beliefs),
         rnd_gen_(rnd_gen) {}
@@ -98,11 +98,14 @@ class PositionalNetEvaluator final : public NetEvaluator {
 };
 
 std::shared_ptr<NetEvaluator> MakeNetEvaluator(
-    std::shared_ptr<BasicDims> dims, std::shared_ptr<ValueNet> model,
-    std::shared_ptr<BatchData> eval_batch, torch::Device device,
-    std::mt19937* rnd_gen,
+    std::shared_ptr<BasicDims> dims,
+    std::shared_ptr<ValueNet> model,
+    std::shared_ptr<BatchData> eval_batch,
+    torch::Device device,
+    std::shared_ptr<std::mt19937> rnd_gen,
     // One of:
-    std::shared_ptr<HandInfo> hand_info, std::shared_ptr<Observer> hand_observer);
+    std::shared_ptr<HandInfo> hand_info,
+    std::shared_ptr<Observer> hand_observer);
 
 std::array<std::vector<int>, 2> RandomParviewPermutation(
     const PublicState& state, int max_parviews, std::mt19937& rnd_gen);

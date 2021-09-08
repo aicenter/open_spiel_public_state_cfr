@@ -37,7 +37,7 @@ std::unique_ptr<State> GoofspielInfostateStateResampler(
   auto observer = goof_game->MakeObserver(kInfoStateObsType, {});
   Observation infostate(*goof_game, observer);
   infostate.SetFrom(*goof_state, player_id);
-  std::mt19937 rnd_gen(rng());
+  auto rnd_gen = std::make_shared<std::mt19937>(/*seed=*/rng());
 
   ParticleGenerator generator(goof_game, rnd_gen);
   generator.SetInfoState(infostate, player_id);
@@ -57,7 +57,7 @@ std::unique_ptr<State> GoofspielInfostateStateResampler(
     if (turn_state->CurrentPlayer() == 1) {
       auto actions = sampled_state->LegalActions(Player{0});
       std::uniform_int_distribution<int> dist(0, actions.size()-1);
-      sampled_state->ApplyAction(actions[dist(rnd_gen)]);
+      sampled_state->ApplyAction(actions[dist(*rnd_gen)]);
     }
     SPIEL_DCHECK_EQ(sampled_state->CurrentPlayer(), state.CurrentPlayer());
     SPIEL_DCHECK_EQ(sampled_state->FullHistory().size(),
@@ -71,7 +71,7 @@ std::unique_ptr<State> GoofspielInfostateStateResampler(
 } // namespace
 
 
-void IsmctsPlaythroughs::GenerateNodes(const Game& game, std::mt19937& rnd) {
+void IsmctsPlaythroughs::GenerateNodes(const Game& game, std::mt19937* rnd) {
   // 1. Capture visited infostates along with visit statistics.
   std::cout << "# Making IS-MCTS play ... (this takes a while)\n# ";
 
@@ -82,7 +82,7 @@ void IsmctsPlaythroughs::GenerateNodes(const Game& game, std::mt19937& rnd) {
     while (!state->IsTerminal()) {
       Action chosen_action;
       if (state->IsChanceNode()) {
-        chosen_action = SampleAction(state->ChanceOutcomes(), rnd).first;
+        chosen_action = SampleAction(state->ChanceOutcomes(), *rnd).first;
       } else {
         chosen_action = bot->Step(*state);
 
@@ -144,21 +144,21 @@ void IsmctsPlaythroughs::GenerateNodes(const Game& game, std::mt19937& rnd) {
   }
 }
 
-void IsmctsPlaythroughs::MakeBot(std::mt19937& rnd_gen) {
+void IsmctsPlaythroughs::MakeBot(int seed) {
   auto evaluator = std::make_shared<algorithms::RandomRolloutEvaluator>(
-      /*n_rollouts=*/1, /*seed=*/rnd_gen());
+      /*n_rollouts=*/1, seed);
   bot = std::make_unique<algorithms::ISMCTSBot>(
-      /*seed=*/rnd_gen(), evaluator, uct_c,
-               max_simulations, algorithms::kUnlimitedNumWorldSamples, policy_type,
+      seed, evaluator, uct_c,
+      max_simulations, algorithms::kUnlimitedNumWorldSamples, policy_type,
       /*use_observation_string=*/false,
       /*allow_inconsistent_action_sets=*/false);
   bot->SetResampler(GoofspielInfostateStateResampler);
 }
 
 InfostateStats::iterator IsmctsPlaythroughs::SampleInfostate(
-    int move_number, std::mt19937& rnd_gen) {
+    int move_number, std::mt19937* rnd_gen) {
   std::uniform_real_distribution<double> unif(0., 1.);  // Interval [0,1)
-  double p = unif(rnd_gen);
+  double p = unif(*rnd_gen);
   InfostateStats::iterator it = cdfs.at(move_number).upper_bound(p)->second;
   return it;
 }

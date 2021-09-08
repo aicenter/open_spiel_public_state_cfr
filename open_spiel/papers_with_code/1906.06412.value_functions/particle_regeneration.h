@@ -32,7 +32,7 @@ namespace opr = operations_research;
 class ParticleGenerator {
   std::shared_ptr<const goofspiel::GoofspielGame> game_;
   const opr::Domain cards_;
-  std::mt19937& rnd_gen_;
+  std::shared_ptr<std::mt19937> rnd_gen_;
 
   std::unique_ptr<opr::sat::CpModelBuilder> cp_model_ = nullptr;
   std::array<std::vector<opr::sat::IntVar>, 2> played_;
@@ -40,7 +40,7 @@ class ParticleGenerator {
   Player current_player_;
  public:
   ParticleGenerator(std::shared_ptr<const goofspiel::GoofspielGame> game,
-                    std::mt19937& rnd_gen)
+                    std::shared_ptr<std::mt19937> rnd_gen)
     : game_(game), cards_(-(game->NumCards() - 1), 0), rnd_gen_(rnd_gen) {};
 
   //  0: a tie

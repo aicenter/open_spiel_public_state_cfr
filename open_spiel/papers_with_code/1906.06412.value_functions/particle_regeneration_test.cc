@@ -24,7 +24,7 @@ void TestGenerateParticles() {
       "goofspiel(imp_info=true,players=2,points_order=descending,num_cards=3)");
   auto observer = game->MakeObserver(kPublicStateObsType, {});
   auto observation = Observation(*game, observer);
-  std::mt19937 rnd_gen;
+  auto rnd_gen = std::make_shared<std::mt19937>();
   ParticleGenerator generator(
       std::dynamic_pointer_cast<const goofspiel::GoofspielGame>(game), rnd_gen);
 
@@ -62,7 +62,7 @@ void ShowParticleDiversity() {
   auto public_observer = game->MakeObserver(kPublicStateObsType, {});
   auto public_observation = Observation(*game, public_observer);
   const int player = 0;
-  std::mt19937 rnd_gen;
+  auto rnd_gen = std::make_shared<std::mt19937>();
   ParticleGenerator generator(
       std::dynamic_pointer_cast<const goofspiel::GoofspielGame>(game), rnd_gen);
 

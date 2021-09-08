@@ -23,11 +23,10 @@ namespace papers_with_code {
 
 SherlockBot::SherlockBot(std::shared_ptr<SubgameFactory> subgame_factory,
                          std::shared_ptr<SolverFactory> solver_factory,
-                         Player player_id, int seed)
+                         Player player_id)
     : subgame_factory_(std::move(subgame_factory)),
       solver_factory_(std::move(solver_factory)),
-      player_id_(player_id),
-      rnd_gen_(seed) {
+      player_id_(player_id) {
   subgame_ = subgame_factory_->MakeTrunk(1);
   first_step_ = true;
 }
@@ -36,7 +35,6 @@ SherlockBot::SherlockBot(const SherlockBot& bot)
     : subgame_factory_(bot.subgame_factory_),
       solver_factory_(bot.solver_factory_),
       player_id_(bot.player_id_),
-      rnd_gen_(bot.rnd_gen_),
       subgame_(std::make_shared<Subgame>(*bot.subgame_)),  // Copy the subgame.
       past_policy_(bot.past_policy_),
       first_step_(bot.first_step_) {
@@ -49,7 +47,7 @@ Action SherlockBot::Step(const State& state) {
 }
 
 void SherlockBot::SetSeed(int seed) {
-  rnd_gen_.seed(seed);
+  rnd_gen().seed(seed);
 }
 
 void SherlockBot::Restart() {
@@ -118,7 +116,7 @@ std::pair<ActionsAndProbs, Action> SherlockBot::StepWithPolicy(const State& stat
     SPIEL_CHECK_FALSE(actions_and_probs.empty());
     for (int pl = 0; pl < 2; ++pl) StorePastPolicy(subgame_->trees[pl], *policy);
 
-    double p = std::uniform_real_distribution<>(0., 1.)(rnd_gen_);
+    double p = std::uniform_real_distribution<>(0., 1.)(rnd_gen());
     std::pair<Action, double> outcome = SampleAction(actions_and_probs, p);
     return {actions_and_probs, outcome.first};
   } else {
@@ -344,10 +342,11 @@ void SherlockBot::AssignBeliefs(ParticleSet* set) const {
 std::unique_ptr<Bot> MakeSherlockBot(
     std::shared_ptr<SubgameFactory> subgame_factory,
     std::shared_ptr<SolverFactory> solver_factory,
-    Player player_id, int seed) {
+    Player player_id
+) {
   return std::make_unique<SherlockBot>(std::move(subgame_factory),
                                        std::move(solver_factory),
-                                       player_id, seed);
+                                       player_id);
 }
 
 }  // namespace papers_with_code

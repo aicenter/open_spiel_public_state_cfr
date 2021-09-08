@@ -114,10 +114,15 @@ void PositionalNetEvaluator::EvaluatePublicState(
 }
 
 std::shared_ptr<NetEvaluator> MakeNetEvaluator(
-    std::shared_ptr<BasicDims> dims, std::shared_ptr<ValueNet> model,
-    std::shared_ptr<BatchData> eval_batch, torch::Device device, std::mt19937* rnd_gen,
+    std::shared_ptr<BasicDims> dims,
+    std::shared_ptr<ValueNet> model,
+    std::shared_ptr<BatchData> eval_batch,
+    torch::Device device,
+    std::shared_ptr<std::mt19937> rnd_gen,
     // One of:
-    std::shared_ptr<HandInfo> hand_info, std::shared_ptr<Observer> hand_observer) {
+    std::shared_ptr<HandInfo> hand_info,
+    std::shared_ptr<Observer> hand_observer
+) {
   switch (model->architecture()) {
     case NetArchitecture::kParticle: {
       auto particle_model = std::dynamic_pointer_cast<ParticleValueNet>(model);

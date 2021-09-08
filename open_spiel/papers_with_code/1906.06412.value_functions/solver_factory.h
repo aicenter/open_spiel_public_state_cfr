@@ -32,6 +32,7 @@ constexpr int kDefaultCfrIterations = 100;
 struct SolverFactory {
   std::shared_ptr<const TerminalEvaluator> terminal_evaluator;
   std::shared_ptr<const PublicStateEvaluator> leaf_evaluator;
+  std::shared_ptr<std::mt19937> rnd_gen;
   int cfr_iterations = kDefaultCfrIterations;
   std::string use_bandits_for_cfr = kDefaultDlCfrBandit;
   PolicySelection save_values_policy = kDefaultPolicySelection;

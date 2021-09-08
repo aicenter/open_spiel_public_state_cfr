@@ -48,9 +48,9 @@ struct IsmctsPlaythroughs {
     std::map</*cumul=*/double,
              /*stats_ref=*/InfostateStats::iterator>> cdfs;
 
-  void MakeBot(std::mt19937& rnd_gen);;
-  void GenerateNodes(const Game& game, std::mt19937& rnd_gen);
-  InfostateStats::iterator SampleInfostate(int move_number, std::mt19937& rnd_gen);
+  void MakeBot(int seed);;
+  void GenerateNodes(const Game& game, std::mt19937* rnd_gen);
+  InfostateStats::iterator SampleInfostate(int move_number, std::mt19937* rnd_gen);
 };
 
 }  // namespace papers_with_code

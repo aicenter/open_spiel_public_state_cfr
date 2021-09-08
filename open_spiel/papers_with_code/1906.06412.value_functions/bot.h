@@ -29,10 +29,10 @@ using BotParameters = GameParameters;
 using BotParameter = GameParameter;
 
 class SherlockBot : public Bot {
-  std::shared_ptr<SubgameFactory> subgame_factory_;
-  std::shared_ptr<SolverFactory> solver_factory_;
-  Player player_id_;
-  std::mt19937 rnd_gen_;
+  const std::shared_ptr<SubgameFactory> subgame_factory_;
+  const std::shared_ptr<SolverFactory> solver_factory_;
+  const Player player_id_;
+
   std::shared_ptr<Subgame> subgame_;
   TabularPolicy past_policy_;
   bool first_step_ = true;
@@ -40,7 +40,7 @@ class SherlockBot : public Bot {
  public:
   SherlockBot(std::shared_ptr<SubgameFactory> subgame_factory,
               std::shared_ptr<SolverFactory> solver_factory,
-              Player player_id, int seed);
+              Player player_id);
 
   SherlockBot(const SherlockBot& bot);
   std::unique_ptr<Bot> Clone() const override;
@@ -67,6 +67,8 @@ class SherlockBot : public Bot {
     return Bot::GetPolicy(state);
   }
  private:
+  std::mt19937& rnd_gen() { return *solver_factory_->rnd_gen; }
+
   void StorePastPolicy(const std::shared_ptr<algorithms::InfostateTree> tree,
                        const Policy& policy);
   std::unique_ptr<ParticleSet> GetParticles(
@@ -82,7 +84,7 @@ class SherlockBot : public Bot {
 std::unique_ptr<Bot> MakeSherlockBot(
     std::shared_ptr<SubgameFactory> subgame_factory,
     std::shared_ptr<SolverFactory> solver_factory,
-    Player player_id, int seed);
+    Player player_id);
 
 namespace {
 
@@ -145,11 +147,9 @@ class SherlockBotFactory : public BotFactory {
         && type.provides_observation_tensor;
   }
 
-  std::tuple<std::shared_ptr<SubgameFactory>,
-             std::shared_ptr<SolverFactory>,
-             int> ParseParams(std::shared_ptr<const Game> game,
+  std::unique_ptr<Bot> Create(std::shared_ptr<const Game> game,
                               Player player_id,
-                              const GameParameters& bot_params) const {
+                              const GameParameters& bot_params) const override {
     // Extract all param values.
     int seed = GetParameterValue(bot_params, "seed", 0);
     int num_layers = GetParameterValue(bot_params, "num_layers", 3);
@@ -173,7 +173,7 @@ class SherlockBotFactory : public BotFactory {
         GetParameterValue<std::string>(bot_params, "device", "auto");
     std::string use_bandits_for_cfr =
         GetParameterValue<std::string>(bot_params, "use_bandits_for_cfr",
-                                                                     kDefaultDlCfrBandit);
+                                       kDefaultDlCfrBandit);
     std::string save_values_policy =
         GetParameterValue<std::string>(bot_params, "save_values_policy",
                                        "average");
@@ -185,6 +185,7 @@ class SherlockBotFactory : public BotFactory {
         GetParameterValue<std::string>(bot_params, "load_snapshot", game_model);
 
     // -- Create all necessary structures --------------------------------------
+    auto rnd_gen = std::make_shared<std::mt19937>(seed);
     auto subgame_factory = std::make_shared<SubgameFactory>();
     subgame_factory->game = game;
     subgame_factory->infostate_observer =
@@ -195,15 +196,15 @@ class SherlockBotFactory : public BotFactory {
         game->MakeObserver(kHandHistoryObsType, {});
     subgame_factory->max_move_ahead_limit = max_move_ahead_limit;
     subgame_factory->max_particles = max_particles;
-    // TODO: requires refactor with random num generator
-//    if (game->GetType().short_name == "goofspiel") {
-//      auto goof_game =
-//          std::dynamic_pointer_cast<const goofspiel::GoofspielGame>(game);
-//      subgame_factory->particle_generator =
-//          std::make_shared<ParticleGenerator>(goof_game, seed);
-//    }
+    if (game->GetType().short_name == "goofspiel") {
+      auto goof_game =
+          std::dynamic_pointer_cast<const goofspiel::GoofspielGame>(game);
+      subgame_factory->particle_generator =
+          std::make_shared<ParticleGenerator>(goof_game, rnd_gen);
+    }
     //
     auto solver_factory = std::make_shared<SolverFactory>();
+    solver_factory->rnd_gen = rnd_gen;
     if (non_terminal_evaluator == "net") {
       torch::Device device(device_spec);
 
@@ -232,11 +233,7 @@ class SherlockBotFactory : public BotFactory {
       //
       solver_factory->leaf_evaluator = MakeNetEvaluator(
           dims, model, eval_batch, device,
-          // TODO(sustr): pass rnd number generator when it will be needed.
-          //              This may need some refactoring of code to do it
-          //              properly.
-          nullptr,
-          nullptr, subgame_factory->hand_observer);
+          rnd_gen, nullptr, subgame_factory->hand_observer);
     } else {
       std::shared_ptr<const PublicStateEvaluator> terminal_evaluator =
           MakeTerminalEvaluator();
@@ -256,23 +253,7 @@ class SherlockBotFactory : public BotFactory {
     solver_factory->terminal_evaluator = std::make_shared<TerminalEvaluator>();
     solver_factory->safe_resolving = true;
 
-    return std::tuple<std::shared_ptr<SubgameFactory>,
-                      std::shared_ptr<SolverFactory>,
-                      int>
-                      {std::move(subgame_factory),
-                       std::move(solver_factory),
-                       seed};
-  }
-
-  std::unique_ptr<Bot> Create(std::shared_ptr<const Game> game,
-                              Player player_id,
-                              const GameParameters& bot_params) const override {
-    std::tuple<std::shared_ptr<SubgameFactory>,
-               std::shared_ptr<SolverFactory>,
-               int> params = ParseParams(game, player_id, bot_params);
-    return MakeSherlockBot(std::move(std::get<0>(params)),
-                           std::move(std::get<1>(params)),
-                           player_id, std::get<2>(params));
+    return MakeSherlockBot(subgame_factory, solver_factory, player_id);
   }
 };
 REGISTER_SPIEL_BOT("sherlock", SherlockBotFactory);

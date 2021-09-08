@@ -69,7 +69,7 @@ void ExperienceReplay::AdvanceHead() {
   }
 }
 
-void ExperienceReplay::SampleBatch(BatchData* batch, std::mt19937& rnd_gen) {
+void ExperienceReplay::SampleBatch(BatchData* batch, std::mt19937* rnd_gen) {
   // Do not sample non-filled experiences.
   const int n = overflow_cnt_ == 0 ? head_ : size();
   const int k = batch->size();
@@ -84,7 +84,7 @@ void ExperienceReplay::SampleBatch(BatchData* batch, std::mt19937& rnd_gen) {
 
   std::vector<int> perm(n);
   std::iota(perm.begin(), perm.end(), 0);
-  std::shuffle(perm.begin(), perm.end(), rnd_gen);
+  std::shuffle(perm.begin(), perm.end(), *rnd_gen);
 
   for (int i = 0; i < k; ++i) {
     ++visit_cnt_[perm[i]];
@@ -276,7 +276,7 @@ void ReplayFiller::AddIigsKnRandomPbsSolution() {
   }
 
   // 2. Generate particle set.
-  ParticleGenerator generator(goof_game, *randomizer->rnd_gen);
+  ParticleGenerator generator(goof_game, randomizer->rnd_gen);
   generator.SetPublicOutcomes(outcomes);
   std::unique_ptr<ParticleSet> set = generator.GenerateParticles(
       subgame_factory->max_particles, max_rejection_cnt);
@@ -412,12 +412,12 @@ std::unique_ptr<ParticleSet> ReplayFiller::PickIsmctsParticleSet(int at_depth) {
   // 1. Pick a random infostate.
   SPIEL_CHECK_TRUE(randomizer->rnd_gen);
   InfostateStats::iterator it =
-      playthroughs->SampleInfostate(at_depth, *randomizer->rnd_gen);
+      playthroughs->SampleInfostate(at_depth, randomizer->rnd_gen.get());
 
   // 2. Generate particles compatible with the public state and infostate.
   ParticleGenerator generator(
       std::dynamic_pointer_cast<const goofspiel::GoofspielGame>(subgame_factory->game),
-      *randomizer->rnd_gen);
+      randomizer->rnd_gen);
   //
   generator.SetPublicState(it->first);
   std::unique_ptr<ParticleSet> set = generator.GenerateParticles(

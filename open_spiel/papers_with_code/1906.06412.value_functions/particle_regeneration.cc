@@ -86,15 +86,15 @@ std::unique_ptr<ParticleSet> ParticleGenerator::GenerateParticles(
     for (int i = 0; i < num_bets_; ++i) {
       int diverse_player;
       if (current_player_ == kInvalidPlayer) {
-        diverse_player = player_dist(rnd_gen_);
+        diverse_player = player_dist(*rnd_gen_);
       } else {
         diverse_player = 1 - current_player_;
       }
 
       // Add random constraints to generate diverse solutions.
       // Without this we would get exactly the same solution each call.
-      int card = card_dist(rnd_gen_);
-      int dir = dir_dist(rnd_gen_);
+      int card = card_dist(*rnd_gen_);
+      int dir = dir_dist(*rnd_gen_);
       opr::sat::IntVar& a = played_[diverse_player][i];
       // TODO: make more tuning of the constraints so that we have
       //       better diversity. Now from 1000 particles ~500 begin with

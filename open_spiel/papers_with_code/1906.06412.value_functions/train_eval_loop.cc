@@ -246,11 +246,11 @@ void TrainEvalLoop() {
   const int seed = absl::GetFlag(FLAGS_seed);
   torch::manual_seed(seed);
   // All source of randomness need to plumb this through.
-  std::mt19937 rnd_gen(seed);
+  std::shared_ptr<std::mt19937> rnd_gen = std::make_shared<std::mt19937>(seed);
   //
   std::cout << "# Making strategy randomizer ..." << std::endl;
   StrategyRandomizer randomizer;
-  randomizer.rnd_gen = &rnd_gen;
+  randomizer.rnd_gen = rnd_gen;
   randomizer.prob_pure_strat = absl::GetFlag(FLAGS_prob_pure_strat);
   randomizer.prob_fully_mixed = absl::GetFlag(FLAGS_prob_fully_mixed);
   randomizer.prob_benford_dist = absl::GetFlag(FLAGS_prob_benford_dist);
@@ -440,9 +440,10 @@ void TrainEvalLoop() {
   solver_factory->save_values_policy   = save_values_policy;
   solver_factory->terminal_evaluator   = terminal_evaluator;
   solver_factory->leaf_evaluator = MakeNetEvaluator(
-      dims, model, eval_batch, device, &rnd_gen,
+      dims, model, eval_batch, device, rnd_gen,
       hand_info,  // May be nullptr for particle VF.
       subgame_factory->hand_observer);
+  solver_factory->rnd_gen = rnd_gen;
   reuse.solver_factory = solver_factory.get();
   //
   std::cout << "# Making replay filler ..." << std::endl;
@@ -474,7 +475,7 @@ void TrainEvalLoop() {
   }
   std::unique_ptr<Bot> bot = MakeSherlockBot(bot_subgame_factory,
                                              bot_solver_factory,
-                                             Player{0}, seed);
+                                             Player{0});
   //
   std::cout << "# Making evaluation metrics ..." << std::endl;
   std::vector<std::unique_ptr<Metric>> metrics;
@@ -557,12 +558,12 @@ void TrainEvalLoop() {
   //
   if (exp_loop == kIsmctsBootstrap) {
     SPIEL_CHECK_TRUE(exp_init == kIsmctsBootstrap);
-    reuse.playthroughs->MakeBot(rnd_gen);
+    reuse.playthroughs->MakeBot((*rnd_gen)());
     std::shared_ptr<const Game> turn_based = game;
     if (game->GetType().dynamics == GameType::Dynamics::kSimultaneous) {
       turn_based = ConvertToTurnBased(*game);
     }
-    reuse.playthroughs->GenerateNodes(*turn_based, rnd_gen);
+    reuse.playthroughs->GenerateNodes(*turn_based, rnd_gen.get());
   }
   //
   const int snapshot_loop = absl::GetFlag(FLAGS_snapshot_loop);
@@ -607,7 +608,7 @@ void TrainEvalLoop() {
     model->train();  // Train mode.
     double cumul_loss = 0.;
     for (int i = 0; i < train_batches; ++i) {
-      experience_replay.SampleBatch(&train_batch, rnd_gen);
+      experience_replay.SampleBatch(&train_batch, rnd_gen.get());
       cumul_loss += TrainNetwork(model.get(), &device,
                                  optimizer.get(), &train_batch);
       std::cout << '.' << std::flush;
@@ -655,7 +656,7 @@ void TrainEvalLoop() {
       model->train();  // Train mode.
       double cumul_loss = 0.;
       for (int i = 0; i < train_batches; ++i) {
-        filler.bootstrap->SampleBatch(&train_batch, rnd_gen);
+        filler.bootstrap->SampleBatch(&train_batch, rnd_gen.get());
         cumul_loss += TrainNetwork(model.get(), &device,
                                    optimizer.get(), &train_batch);
         std::cout << '.' << std::flush;

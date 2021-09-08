@@ -22,7 +22,7 @@ namespace papers_with_code {
 namespace {
 
 void TestSamplingPlaythroughs() {
-  std::mt19937 rnd_gen(0);
+  auto rnd_gen = std::make_shared<std::mt19937>(0);
   auto game =  LoadGame("goofspiel("
                           "players=2,"
                           "num_cards=13,"
@@ -33,8 +33,8 @@ void TestSamplingPlaythroughs() {
   playthroughs.num_matches = 2;
   playthroughs.max_simulations = 10;
   auto turn_based = ConvertToTurnBased(*game);
-  playthroughs.MakeBot(rnd_gen);
-  playthroughs.GenerateNodes(*turn_based, rnd_gen);
+  playthroughs.MakeBot(0);
+  playthroughs.GenerateNodes(*turn_based, rnd_gen.get());
 
   for (int i = 0; i < playthroughs.cdfs.size(); ++i) {
     auto& cdf = playthroughs.cdfs[i];
