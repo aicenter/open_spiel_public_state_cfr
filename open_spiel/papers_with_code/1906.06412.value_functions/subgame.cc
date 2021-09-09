@@ -424,15 +424,19 @@ SubgameSolver::SubgameSolver(
     std::shared_ptr<Subgame> subgame,
     const std::shared_ptr<const PublicStateEvaluator> nonterminal_evaluator,
     const std::shared_ptr<const PublicStateEvaluator> terminal_evaluator,
+    const std::shared_ptr<std::mt19937> rnd_gen,
     const std::string& bandit_name,
     PolicySelection save_values_policy,
     bool safe_resolving,
-    bool beliefs_for_average
+    bool beliefs_for_average,
+    double noisy_values
 ) : subgame_(subgame),
     nonterminal_evaluator_(nonterminal_evaluator),
     terminal_evaluator_(terminal_evaluator),
+    rnd_gen_(rnd_gen),
     safe_resolving_(safe_resolving),
     beliefs_for_average_(beliefs_for_average),
+    noisy_values_(noisy_values),
     bandits_(algorithms::MakeBanditVectors(subgame_->trees, bandit_name)),
     reach_probs_({std::vector<double>(subgame_->trees[0]->num_leaves()),
                   std::vector<double>(subgame_->trees[1]->num_leaves())}),
@@ -558,7 +562,13 @@ void SubgameSolver::EvaluateLeaf(PublicState* state,
       SPIEL_DCHECK_GE(trunk_position, 0);
       SPIEL_DCHECK_LT(trunk_position, subgame()->trees[pl]->num_leaves());
       // Copy value from the leaf public state to the trunk.
-      cf_values_[pl][trunk_position] = state->values[pl][j];
+      double noise = 0.;
+      if (noisy_values_ > 0) {
+        SPIEL_CHECK_TRUE(rnd_gen_);
+        std::normal_distribution<double> dist(0, noisy_values_);
+        noise = dist(*rnd_gen_);
+      }
+      cf_values_[pl][trunk_position] = state->values[pl][j] + noise;
     }
   }
 
@@ -658,7 +668,7 @@ std::unique_ptr<PublicStateContext> CFREvaluator::CreateContext(
   auto subgame = std::make_shared<Subgame>(
       game, public_observer, subgame_trees);
   auto solver = std::make_unique<SubgameSolver>(
-      subgame, nonterminal_evaluator, terminal_evaluator,
+      subgame, nonterminal_evaluator, terminal_evaluator, /*rnd_gen=*/nullptr,
       bandit_name, save_values_policy);
   auto cfr_public_state = std::make_unique<CFRContext>(std::move(solver));
   SPIEL_DCHECK(CheckChildPublicStateConsistency(*cfr_public_state, state));

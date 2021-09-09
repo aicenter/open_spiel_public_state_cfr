@@ -35,6 +35,9 @@ ABSL_FLAG(int, cfr_iterations, 100,
 ABSL_FLAG(int, max_move_ahead_limit, 1, "Size of the lookahead tree.");
 ABSL_FLAG(bool, beliefs_for_average, false,
           "Use average beliefs for leaf evaluation instead of current beliefs.");
+ABSL_FLAG(double, noisy_values, 0.,
+          "Additive noise for the value function, sigma of the normal "
+          "distribution centered at zero");
 
 // -- Data generation --
 ABSL_FLAG(int, depth, 3, "Depth of the trunk.");
@@ -469,7 +472,12 @@ void TrainEvalLoop() {
     bot_subgame_factory->max_particles = bot_particles;
   }
   auto bot_solver_factory = std::make_shared<SolverFactory>(*solver_factory);
+  // Make sure that bot has a different rnd_gen, but seeded in the same way.
+  // This makes sure that different bot settings will have no effect on the
+  // stochasticity of the training procedure.
+  bot_solver_factory->rnd_gen = std::make_shared<std::mt19937>(seed);
   bot_solver_factory->safe_resolving = absl::GetFlag(FLAGS_safe_resolving);
+  bot_solver_factory->noisy_values   = absl::GetFlag(FLAGS_noisy_values);
   if (absl::GetFlag(FLAGS_bot_use_oracle)) {
     bot_solver_factory->leaf_evaluator = oracle;
   }

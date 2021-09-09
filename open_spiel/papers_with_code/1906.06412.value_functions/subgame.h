@@ -268,10 +268,12 @@ class SubgameSolver {
       std::shared_ptr<Subgame> subgame,
       const std::shared_ptr<const PublicStateEvaluator> nonterminal_evaluator,
       const std::shared_ptr<const PublicStateEvaluator> terminal_evaluator,
+      const std::shared_ptr<std::mt19937> rnd_gen,
       const std::string& bandit_name,
       PolicySelection save_values_policy = kDefaultPolicySelection,
       bool safe_resolving = false,
-      bool beliefs_for_average = false);
+      bool beliefs_for_average = false,
+      double noisy_values = 0.);
 
   void RunSimultaneousIterations(int iterations);
   void Reset();
@@ -288,8 +290,10 @@ class SubgameSolver {
   const std::shared_ptr<Subgame> subgame_;
   const std::shared_ptr<const PublicStateEvaluator> nonterminal_evaluator_;
   const std::shared_ptr<const PublicStateEvaluator> terminal_evaluator_;
+  const std::shared_ptr<std::mt19937> rnd_gen_;
   const bool safe_resolving_;
   const bool beliefs_for_average_;
+  const double noisy_values_;
 
   // -- Mutable values to keep track of. --
   // These have the size at largest depth of the tree, i.e. the size of the

@@ -65,7 +65,7 @@ void TestTerminalEvaluatorHasSameIterations(const std::string& game_name) {
       MakeDummyEvaluator();
   auto subgame = std::make_shared<Subgame>(game, algorithms::kNoMoveAheadLimit);
   SubgameSolver dl_solver(subgame, nonterminal_evaluator, terminal_evaluator,
-                          "RegretMatching");
+                          /*rnd_gen=*/nullptr, "RegretMatching");
 
   std::shared_ptr<Policy> vec_avg = vec_solver.AveragePolicy();
   std::shared_ptr<Policy> dl_avg = dl_solver.AveragePolicy();
@@ -109,7 +109,9 @@ std::unique_ptr<SubgameSolver> MakeRecursiveDepthLimitedCFR(
   // evaluator.
   auto subgame = std::make_shared<Subgame>(game, trunk_depth_limit);
   return std::make_unique<SubgameSolver>(subgame, leaf_evaluator,
-                                         terminal_evaluator, "RegretMatching",
+                                         terminal_evaluator,
+                                         /*rnd_gen=*/nullptr,
+                                         "RegretMatching",
                                          PolicySelection::kCurrentPolicy);
 }
 
@@ -216,6 +218,7 @@ void TestValuesInLimitedGoofspiel() {
   auto solver = std::make_unique<SubgameSolver>(subgame,
                                                 /*nonterminal_evaluator=*/nullptr,
                                                 MakeTerminalEvaluator(),
+                                                /*rnd_gen=*/nullptr,
                                                 "PredictiveRegretMatchingPlus");
   subgame->initial_state().beliefs[0] = {0., 0., 0.};  // PL0 doesn't want to play here.
   subgame->initial_state().beliefs[1] = {0., 0., 1.};  // PL1 plays here with the highest card (4).

@@ -105,7 +105,8 @@ void TestBasicCFVs() {
 
   auto subgame = std::make_shared<Subgame>(game, /*max_moves=*/1);
   auto subgame_solver = std::make_unique<SubgameSolver>(
-      subgame, leaf_evaluator, terminal_evaluator, "RegretMatching",
+      subgame, leaf_evaluator, terminal_evaluator,
+      /*rnd_gen=*/nullptr, "RegretMatching",
       PolicySelection::kCurrentPolicy, /*safe_resolving=*/true);
 
   // We do 5 iterations and check the CFVs after each iteration.
@@ -142,7 +143,7 @@ void TestKuhnGadget() {
   auto subgame = subgame_factory->MakeTrunk(3);
   auto solver = std::make_unique<SubgameSolver>(
       subgame, MakeApproxOracleEvaluator(game), MakeTerminalEvaluator(),
-      "FixableStrategy", PolicySelection::kAveragePolicy, true);
+      /*rnd_gen=*/nullptr, "FixableStrategy", PolicySelection::kAveragePolicy, true);
 
   TabularPolicy optimal_policy = kuhn_poker::GetOptimalPolicy(/*alpha=*/0);
 
