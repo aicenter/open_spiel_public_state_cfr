@@ -13,10 +13,13 @@
 // limitations under the License.
 
 #include "open_spiel/algorithms/bandits_policy.h"
+#include "open_spiel/algorithms/best_response.h"
+#include "open_spiel/game_transforms/turn_based_simultaneous_game.h"
 #include "open_spiel/games/goofspiel.h"
+
 #include "open_spiel/papers_with_code/1906.06412.value_functions/experience_replay.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/particle_regeneration.h"
-
+#include "open_spiel/papers_with_code/1906.06412.value_functions/tabularize_bot.h"
 
 namespace open_spiel {
 namespace papers_with_code {
@@ -102,6 +105,7 @@ ReplayFillerPolicy GetReplayFillerPolicy(const std::string& s) {
   if (s == "iigskn_pbs_random") return kIigsKnPbsRandom;
   if (s == "bootstrap")         return kBootstrap;
   if (s == "ismcts_bootstrap")  return kIsmctsBootstrap;
+  if (s == "bot_queries")       return kBotQueries;
   SpielFatalError("Exhausted pattern match: ReplayFillerPolicy.");
 }
 
@@ -212,6 +216,73 @@ void ReplayFiller::FillReplayWithTrunkDlCfrPbsSolutions() {
 
   std::cout << "# </ref_expl>\n";
   SPIEL_CHECK_TRUE(replay->IsFilled() && replay->IsAtBeginning());
+}
+
+struct TrackingEvaluator : public PublicStateEvaluator {
+  std::shared_ptr<const PublicStateEvaluator> leaf_evaluator;
+  ExperienceReplay* tracking_replay;
+  ParticleDims* dims;
+  std::shared_ptr<Observer> hand_observer;
+
+  std::unique_ptr<PublicStateContext> CreateContext(
+      const PublicState& state) const override {
+    return leaf_evaluator->CreateContext(state);
+  }
+  void ResetContext(PublicStateContext* context) const override {
+    leaf_evaluator->ResetContext(context);
+  }
+  void EvaluatePublicState(PublicState* state,
+                           PublicStateContext* context) const override {
+    leaf_evaluator->EvaluatePublicState(state, context);
+
+    // Select all particles (this just follows the Write interface)
+    std::array<std::vector<int>, 2> perms;
+    for (int pl = 0; pl < 2; ++pl) {
+      // Make sure all particles can be selected.
+      SPIEL_CHECK_LE(state->nodes[0].size(), dims->max_parviews / 2);
+      perms[pl] = std::vector<int>(state->nodes[pl].size());
+      std::iota(perms[pl].begin(), perms[pl].end(), 0);
+    }
+    SPIEL_CHECK_FALSE(tracking_replay->IsFilled());
+    ParticleDataPoint point = tracking_replay->AddExperience(*dims);
+    WriteParticleDataPoint(*state, perms, *dims, &point, hand_observer);
+  }
+};
+
+void ReplayFiller::FillReplayWithBotQueriesSolutions() {
+  // Make local copies of factories.
+  auto bot_subgame_factory =
+      std::make_shared<SubgameFactory>(*reuse->bot_subgame_factory);
+  auto bot_solver_factory =
+      std::make_shared<SolverFactory>(*reuse->bot_solver_factory);
+
+  // Update the solver to use oracle.
+  auto tracking_evaluator = std::make_shared<TrackingEvaluator>();
+  tracking_evaluator->leaf_evaluator = reuse->pbs_oracle;
+  tracking_evaluator->tracking_replay = replay;
+  tracking_evaluator->dims = down_cast<ParticleDims*>(dims);
+  tracking_evaluator->hand_observer = subgame_factory->hand_observer;
+  //
+  bot_solver_factory->leaf_evaluator = tracking_evaluator;
+
+  // Create the bot that is in all ways same as the online bot,
+  // except it uses the oracle and allows tracking of the queried values.
+  auto bot = MakeSherlockBot(bot_subgame_factory, bot_solver_factory);
+  auto br_game = subgame_factory->game;
+  auto player_tree = algorithms::MakeInfostateTree(
+      *br_game, Player{0},
+      algorithms::kNoMoveAheadLimit,
+      algorithms::kStoreAllStatesPolicy);
+  // TODO: public-state tabularization for faster performance.
+  std::shared_ptr<TabularPolicy> policy =
+      TabularizeOnlinePolicy(bot.get(), player_tree, {});
+  SPIEL_CHECK_FALSE(replay->IsFilled());
+  std::cout << "# Filled with " << replay->head() << " experiences." << "\n";
+
+  auto turn_br_game = ConvertToTurnBased(*br_game);
+  algorithms::TabularBestResponse br(*turn_br_game, Player{1}, policy.get());
+  std::cout << "# BR value against oracle: " << br.Value("") << "\n";
+  // GS(3,4) cfr_iterations 10, 10 --> 0.314136
 }
 
 void ReplayFiller::AddRandomPbsSolution() {
@@ -343,6 +414,9 @@ void ReplayFiller::CreateExperiences(ReplayFillerPolicy fill_policy,
   if (fill_policy == kTrunkDlcfr) {
     SPIEL_CHECK_EQ(num_experiences, replay->size());
     return FillReplayWithTrunkDlCfrPbsSolutions();
+  }
+  if (fill_policy == kBotQueries) {
+    return FillReplayWithBotQueriesSolutions();
   }
   // Every time we create new batch of bootstrapped experiences,
   // we move up in the game.

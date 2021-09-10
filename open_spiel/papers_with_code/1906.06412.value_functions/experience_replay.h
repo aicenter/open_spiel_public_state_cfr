@@ -60,7 +60,8 @@ enum ReplayFillerPolicy {
   kSparsePbsRandom,
   kIigsKnPbsRandom,
   kBootstrap,
-  kIsmctsBootstrap
+  kIsmctsBootstrap,
+  kBotQueries
 };
 ReplayFillerPolicy GetReplayFillerPolicy(const std::string& s);  // From string.
 
@@ -115,6 +116,7 @@ struct ReplayFiller {
   void AddBootstrappedSolution();
   void AddIsmctsBootstrapedSolution();
   void FillReplayWithTrunkDlCfrPbsSolutions();
+  void FillReplayWithBotQueriesSolutions();
 
   std::unique_ptr<ParticleSet> PickParticleSet(int at_depth = -1);
   std::unique_ptr<ParticleSet> PickIsmctsParticleSet(int at_depth = -1);

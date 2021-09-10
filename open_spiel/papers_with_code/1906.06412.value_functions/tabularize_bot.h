@@ -16,8 +16,8 @@
 #ifndef OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_TABULARIZE_BOT_
 #define OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_TABULARIZE_BOT_
 
-#include "policy.h"
-#include "bot.h"
+#include "open_spiel/policy.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/bot.h"
 
 namespace open_spiel {
 namespace papers_with_code {

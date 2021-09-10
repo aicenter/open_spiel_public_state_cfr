@@ -84,7 +84,7 @@ class SherlockBot : public Bot {
 std::unique_ptr<Bot> MakeSherlockBot(
     std::shared_ptr<SubgameFactory> subgame_factory,
     std::shared_ptr<SolverFactory> solver_factory,
-    Player player_id);
+    Player player_id = kDefaultPlayerId);
 
 namespace {
 

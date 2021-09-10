@@ -481,9 +481,9 @@ void TrainEvalLoop() {
   if (absl::GetFlag(FLAGS_bot_use_oracle)) {
     bot_solver_factory->leaf_evaluator = oracle;
   }
-  std::unique_ptr<Bot> bot = MakeSherlockBot(bot_subgame_factory,
-                                             bot_solver_factory,
-                                             Player{0});
+  // Make the factories accessible for reuse.
+  reuse.bot_subgame_factory = bot_subgame_factory;
+  reuse.bot_solver_factory = bot_solver_factory;
   //
   std::cout << "# Making evaluation metrics ..." << std::endl;
   std::vector<std::unique_ptr<Metric>> metrics;
@@ -517,11 +517,14 @@ void TrainEvalLoop() {
     auto goof_game =
         std::dynamic_pointer_cast<const goofspiel::GoofspielGame>(game);
     bool approx_response = absl::GetFlag(FLAGS_iigs_approx_response);
-    metrics.push_back(MakeIigsBrMetric(bot->Clone(), goof_game, approx_response));
+    metrics.push_back(MakeIigsBrMetric(
+        MakeSherlockBot(bot_subgame_factory, bot_solver_factory),
+        goof_game, approx_response));
   }
   if (absl::GetFlag(FLAGS_br_metric)) {
     std::cout << "# Making BR metric ..." << std::endl;
-    metrics.push_back(MakeBrMetric(bot->Clone(), game));
+    metrics.push_back(MakeBrMetric(
+        MakeSherlockBot(bot_subgame_factory, bot_solver_factory), game));
   }
   //
   ReplayFillerPolicy exp_init =

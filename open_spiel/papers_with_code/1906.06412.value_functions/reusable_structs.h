@@ -32,6 +32,8 @@ struct ReusableStructures {
   SubgameFactory* subgame_factory;
   SolverFactory* solver_factory;
   const std::shared_ptr<const PublicStateEvaluator> pbs_oracle;
+  std::shared_ptr<SubgameFactory> bot_subgame_factory;
+  std::shared_ptr<SolverFactory> bot_solver_factory;
 
   explicit ReusableStructures(
       SubgameFactory* subgame_factory,
