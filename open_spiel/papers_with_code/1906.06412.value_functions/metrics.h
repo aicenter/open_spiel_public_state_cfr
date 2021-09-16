@@ -58,6 +58,11 @@ std::unique_ptr<Metric> MakeReplayVisitsMetric(
 
 std::unique_ptr<Metric> MakeTrackTimeMetric();
 std::unique_ptr<Metric> MakeTrackLearningRate(torch::optim::Optimizer* optimizer);
+std::unique_ptr<Metric> MakeValidationLossMetric(const ReplayFiller& filler,
+                                                 std::shared_ptr<ValueNet> model,
+                                                 torch::Device* device,
+                                                 ReplayFillerPolicy fill_policy,
+                                                 int num_experiences);
 
 void ComputeMetrics(std::vector<std::unique_ptr<Metric>>& metrics);
 void PrintHeaders(const std::vector<std::unique_ptr<Metric>>& metrics);

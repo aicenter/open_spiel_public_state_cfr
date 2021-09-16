@@ -124,6 +124,13 @@ ABSL_FLAG(bool, bot_use_oracle, false,
           "Use oracle instead of net as leaf evaluator.");
 
 // -- Metrics --
+// Validation loss
+ABSL_FLAG(int, val_experiences, 0,
+          "Number of separate experiences that should be used for computation "
+          "of validation loss.");
+ABSL_FLAG(std::string, val_init, "nothing",
+          "How the data for validation loss computation should be generated.");
+
 // FullTrunkExplMetric
 ABSL_FLAG(std::string, trunk_expl_iterations, "",
           "Evaluate trunk exploitability for each trunk iteration.");
@@ -508,10 +515,6 @@ void TrainEvalLoop() {
     std::cout << "# Making tracking learning rate ..." << std::endl;
     metrics.push_back(MakeTrackLearningRate(optimizer.get()));
   }
-  if (absl::GetFlag(FLAGS_track_time)) {
-    std::cout << "# Making tracking time metric ..." << std::endl;
-    metrics.push_back(MakeTrackTimeMetric());
-  }
   if (absl::GetFlag(FLAGS_iigs_br_metric)) {
     std::cout << "# Making IIGS BR metric ..." << std::endl;
     auto goof_game =
@@ -525,6 +528,17 @@ void TrainEvalLoop() {
     std::cout << "# Making BR metric ..." << std::endl;
     metrics.push_back(MakeBrMetric(
         MakeSherlockBot(bot_subgame_factory, bot_solver_factory), game));
+  }
+  if (absl::GetFlag(FLAGS_val_experiences) > 0) {
+    std::cout << "# Making validation loss metric ..." << std::endl;
+    metrics.push_back(MakeValidationLossMetric(
+        filler, model, &device,
+        GetReplayFillerPolicy(absl::GetFlag(FLAGS_val_init)),
+        absl::GetFlag(FLAGS_val_experiences)));
+  }
+  if (absl::GetFlag(FLAGS_track_time)) {
+    std::cout << "# Making tracking time metric ..." << std::endl;
+    metrics.push_back(MakeTrackTimeMetric());
   }
   //
   ReplayFillerPolicy exp_init =

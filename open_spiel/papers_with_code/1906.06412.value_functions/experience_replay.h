@@ -106,6 +106,22 @@ struct ReplayFiller {
   int infostate_particles = 1;
   bool normalize_beliefs = false;
 
+  ReplayFiller() = default;
+  ReplayFiller(const ReplayFiller& o)
+    : replay(o.replay),
+      subgame_factory(o.subgame_factory),
+      solver_factory(o.solver_factory),
+      dims(o.dims),
+      randomizer(o.randomizer),
+      reuse(o.reuse),
+      bootstrap(nullptr),
+      bootstrap_move_number(o.bootstrap_move_number),
+      arch(o.arch),
+      sparse_epsilon(o.sparse_epsilon),
+      eval_iters(o.eval_iters),
+      max_rejection_cnt(o.max_rejection_cnt),
+      infostate_particles(o.infostate_particles),
+      normalize_beliefs(o.normalize_beliefs) {}
   void CreateExperiences(ReplayFillerPolicy fill_policy, int num_experiences);
 
  protected:

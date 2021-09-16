@@ -254,6 +254,46 @@ class TrackLearningRate : public Metric {
   void Reset() override {}
 };
 
+
+class ValidationLossMetric : public Metric {
+  ExperienceReplay validation_data_;
+  std::shared_ptr<ValueNet> model_;
+  torch::Device* device_;
+  float loss_;
+ public:
+  ValidationLossMetric(ReplayFiller filler,
+                       std::shared_ptr<ValueNet> model,
+                       torch::Device* device,
+                       ReplayFillerPolicy fill_policy,
+                       int num_experiences)
+    : validation_data_(num_experiences,
+                       filler.dims->point_input_size(),
+                       filler.dims->point_output_size()),
+      model_(model),
+      device_(device) {
+    // Modify local filler copy.
+    filler.replay = &validation_data_;
+    filler.CreateExperiences(fill_policy, num_experiences);
+  }
+  std::string name() const override { return "val_loss"; }
+  void Evaluate(std::ostream& progress) override {
+    SPIEL_DCHECK_FALSE(model_->is_training());
+    torch::NoGradGuard no_grad_guard;  // We run only inference.
+
+    torch::Tensor data = validation_data_.data.to(*device_);
+    torch::Tensor target = model_->PrepareTarget(&validation_data_).to(*device_);
+    SPIEL_DCHECK_TRUE(torch::isfinite(data).all().item<bool>());
+    SPIEL_DCHECK_TRUE(torch::isfinite(target).all().item<bool>());
+    torch::Tensor output = model_->forward(data);
+    SPIEL_DCHECK_TRUE(torch::isfinite(output).all().item<bool>());
+    loss_ = torch::mse_loss(output, target).item<float>();
+  }
+
+  void PrintHeader(std::ostream& os) const override { os << name(); }
+  void PrintMetric(std::ostream& os) const override { os << loss_; }
+  void Reset() override {}
+};
+
 std::unique_ptr<Metric> MakeFullTrunkExplMetric(
     std::vector<int> evaluate_iters, SubgameSolver* trunk_with_net,
     or_algs::SequenceFormLpSpecification* whole_game) {
@@ -285,6 +325,15 @@ std::unique_ptr<Metric> MakeTrackTimeMetric() {
 
 std::unique_ptr<Metric> MakeTrackLearningRate(torch::optim::Optimizer* optimizer) {
   return std::make_unique<TrackLearningRate>(optimizer);
+}
+
+std::unique_ptr<Metric> MakeValidationLossMetric(const ReplayFiller& filler,
+                                                 std::shared_ptr<ValueNet> model,
+                                                 torch::Device* device,
+                                                 ReplayFillerPolicy fill_policy,
+                                                 int num_experiences) {
+  return std::make_unique<ValidationLossMetric>(
+      filler, model, device, fill_policy, num_experiences);
 }
 
 
