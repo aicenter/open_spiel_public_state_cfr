@@ -31,7 +31,7 @@ std::unique_ptr<State> Particle::MakeState(const Game& game) const {
 }
 
 
-void ParticleSet::AssignBeliefs(PublicState* state) const {
+void ParticleSet::AssignBeliefsTo(PublicState* state) const {
   for (int pl = 0; pl < 2; ++pl) {
     SPIEL_CHECK_EQ(state->beliefs[pl].size(), state->nodes[pl].size());
     for (int i = 0; i < state->nodes[pl].size(); ++i) {
@@ -50,6 +50,51 @@ void ParticleSet::AssignBeliefs(PublicState* state) const {
            SPIEL_CHECK_EQ(state->beliefs[pl][i], particle.player_reach[pl]);
          }
        });
+    }
+  }
+}
+
+void ParticleSet::ComputeBeliefs(const Game& game, const TabularPolicy& policy,
+                                 const Observer& infostate_observer) {
+  for (Particle& p: particles) {
+    p.chance_reach = 1.;
+    p.player_reach[0] = 1.;
+    p.player_reach[1] = 1.;
+
+    std::unique_ptr<State> s = game.NewInitialState();
+    for (int i = 0; i < p.history.size(); ++i) {
+      if (s->IsChanceNode()) {
+        ActionsAndProbs infostate_policy = s->ChanceOutcomes();
+        Action a = p.history[i];
+        double prob = GetProb(infostate_policy, a);
+        p.chance_reach *= prob;
+        s->ApplyAction(a);
+      } else if (s->IsSimultaneousNode()) {
+        for (int pl = 0; pl < 2; ++pl) {
+          ActionsAndProbs infostate_policy =
+              policy.GetStatePolicy(infostate_observer.StringFrom(*s, pl));
+          if (infostate_policy.empty()) {  // Such infostate was not visited in the past.
+            infostate_policy = UniformStatePolicy(*s, pl);
+          }
+          Action a = p.history[i + pl];
+          double prob = GetProb(infostate_policy, a);
+          p.player_reach[pl] *= prob;
+        }
+
+        s->ApplyActions({p.history[i], p.history.at(++i)});
+      } else {
+        SPIEL_CHECK_FALSE(s->IsTerminal());
+        Player pl = s->CurrentPlayer();
+        ActionsAndProbs infostate_policy =
+            policy.GetStatePolicy(infostate_observer.StringFrom(*s, pl));
+        if (infostate_policy.empty()) {  // Such infostate was not visited in the past.
+          infostate_policy = UniformStatePolicy(*s, pl);
+        }
+        Action a = p.history[i];
+        double prob = GetProb(infostate_policy, a);
+        p.player_reach[pl] *= prob;
+        s->ApplyAction(a);
+      }
     }
   }
 }
@@ -176,14 +221,13 @@ void CheckParticleSetConsistency(const Game& game,
 //  }
 
 }
-std::unique_ptr<ParticleSetPartition> MakeParticleSetPartition(
-    const PublicState& state,
-    int primary_max_particles, double epsilon,
-    bool save_secondary, std::mt19937& rnd_gen) {
-  // TODO: make work well for case "primary_max_particles == 0"
-  auto all = std::make_unique<ParticleSet>();
-  all->particles.reserve(primary_max_particles);
 
+std::unique_ptr<ParticleSet> PickParticlesBasedOnReach(const PublicState& state,
+                                                       int max_particles) {
+  auto set = std::make_unique<ParticleSet>();
+  set->particles.reserve(max_particles);
+
+  // 1. Add all particles from the public state.
   for (int pl = 0; pl < 2; ++pl) {
     for (int i = 0; i < state.nodes[pl].size(); ++i) {
       for (int k = 0; k < state.nodes[pl][i]->corresponding_states_size(); ++k) {
@@ -192,97 +236,111 @@ std::unique_ptr<ParticleSetPartition> MakeParticleSetPartition(
         // While technically possible, no game makes zero chance transitions.
         SPIEL_CHECK_GT(chn, 0.);
 
-        Particle& particle = pl == 0 ? all->add(s->History())
-                                     : all->at(s->History());
+        Particle& particle = pl == 0 ? set->add(s->History())
+                                     : set->at(s->History());
         particle.player_reach[pl] = state.beliefs[pl][i];
         particle.chance_reach = chn;
       }
     }
   }
 
-  auto partition = std::make_unique<ParticleSetPartition>();
-  if (all->particles.size() <= primary_max_particles) {  // Fast track return.
-    partition->primary = std::move(all);
-    return partition;  // Secondary is empty.
+  if (set->particles.size() <= max_particles) {
+    return set;
   }
 
-  // We have more particles (N) than needed (K):
-  // N choose (at most) K without repetition, using a discrete probability
-  // distribution D(U,R).
-  // The distribution D is epsilon-convex combination of a) uniform U and
-  // b) the normalized reach probs distribution R.
+  // 2. Sort the particles based on reach.
+  std::sort(set->particles.begin(), set->particles.end(),
+            [](const Particle& a, const Particle& b) {
+              return a.reach() > b.reach();
+            });
 
-  // Compute normalization factor of reach probs distribution R.
-  double norm_r = 0.;
-  for (const Particle& p : all->particles) norm_r += p.reach();
-  SPIEL_CHECK_GT(norm_r, 0.);
+  // 3. Erase the particles that go over the limit.
+  set->particles.erase(set->particles.begin() + max_particles,
+                       set->particles.end());
+  SPIEL_CHECK_EQ(set->size(), max_particles);
+  return set;
+}
 
-  // Prepare CDF of distribution D.
-  std::map</*cumul=*/double, /*particle_index=*/int> cdf;
-  double cumul = 0.;
-  int n = all->particles.size();
-  int zero_entries = 0;
-  for (int i = 0; i < n; ++i) {
-    // D = U + R
-    double p = epsilon / n
-             + (1-epsilon) * all->particles[i].reach() / norm_r;
-    if (cumul + p == cumul) {
-      // Do not add this to the cdf, as it cannot be sampled.
-      ++zero_entries;
-    } else {
-      cumul += p;
-      cdf[cumul] = i;
+void AddParticlesBelow(
+    const algorithms::InfostateNode* node,
+    const std::vector<const algorithms::InfostateNode*>& target_leaf_nodes,
+    ParticleSet* set,
+    int max_particles) {
+
+  if (node->is_leaf_node()) {
+    // Check if we arrived to the public state.
+    if (std::find(target_leaf_nodes.begin(), target_leaf_nodes.end(), node)
+        == target_leaf_nodes.end()) {
+      return;
+    }
+
+    for (int i = 0; i < node->corresponding_states_size()
+        && set->particles.size() < max_particles; i++) {
+      auto h = node->corresponding_states()[i]->History();
+      if (!set->has(h)) {
+        set->add(h);
+      }
+    }
+    return;
+  }
+
+  for (const algorithms::InfostateNode* child : node->child_iterator()) {
+    if (set->particles.size() >= max_particles) return;
+    AddParticlesBelow(child, target_leaf_nodes, set, max_particles);
+  }
+}
+
+std::unique_ptr<ParticleSet> PickParticlesBasedOnQvalues(const PublicState& state,
+                                                         int max_particles) {
+  auto set = std::make_unique<ParticleSet>();
+
+  // 1. Implementation for other games
+  //    (mainly to make tests on games like Kuhn work).
+  GameType g =
+      state.nodes[0][0]->corresponding_states()[0]->GetGame()->GetType();
+  if (g.short_name != "goofspiel") {
+    // TODO: proper last Q-nodes tree slice implementation.
+    std::cerr << "Particle selection is implemented only for goofspiel due "
+                 "to game structure. Selecting all particles instead! \n";
+    for (int j = 0; j < state.nodes[0].size(); j++) {
+      for (const std::unique_ptr<State>& s
+          : state.nodes[0][j]->corresponding_states()) {
+        set->add(s->History());
+      }
+    }
+    return set;
+  }
+
+  // 2. Actual particle selection on Goofspiel:
+  //    Select particles as nodes with the highest Q-values within resolving.
+  using Record = std::pair<double, const algorithms::InfostateNode*>;
+  std::vector<Record> node_q_values;
+  for (int pl = 0; pl < 2; ++pl) {
+    for (algorithms::InfostateNode* dec_node
+        : state.trees[pl]->AllDecisionInfostates()) {
+      // Skip resolving nodes.
+      if (absl::StartsWith(dec_node->infostate_string(),
+                           algorithms::kFtInfostatePrefix))
+        continue;
+
+      for (algorithms::InfostateNode* q_node: dec_node->children()) {
+        SPIEL_CHECK_EQ(q_node->type(), algorithms::kObservationInfostateNode);
+        node_q_values.push_back({q_node->cumul_value, q_node});
+      }
     }
   }
-  SPIEL_CHECK_FLOAT_NEAR(cumul, 1., 1e-6);
 
-  // Pick K particles.
-  int k = primary_max_particles;
+  std::sort(node_q_values.begin(), node_q_values.end(),
+            [](const Record& a, const Record& b) { return a.first > b.first; });
 
-  // However, some particles could have had (near) zero probability:
-  // we omit those choices.
-  if (k >= n - zero_entries) {  // Fast track return.
-    SPIEL_CHECK_GT(n, zero_entries);
-    // Keep only the non-zero reach entries.
-    for(auto& [cumul, particle_index] : cdf) {
-      partition->primary->particles.push_back(all->particles[particle_index]);
-    }
-    return partition;  // Secondary is empty.
-  }
-
-  // Finally, pick the indices iteratively based on the CDF.
-  // We remove the selected choices from the CDF (otherwise it may take a long
-  // time for the while loop to terminate).
-  std::set<int> pick;
-  std::uniform_real_distribution<double> unif(0., 1.);  // Interval [0,1)
-  while (pick.size() != k) {
-    double p = unif(rnd_gen);
-    auto it = cdf.upper_bound(p);
-    if (it == cdf.end()) {
-      // This can happen due to iterative removal from cdf.
-      SPIEL_CHECK_FALSE(cdf.empty());
-      --it;
-    }
-    int particle_index = it->second;
-    pick.insert(particle_index);
-    cdf.erase(it);  // TODO: think about more if this is indeed correct.
-  }
-
-  // Construct primary set based on the pick.
-  partition->primary->particles.reserve(primary_max_particles);
-  for(int particle_index : pick) {
-    partition->primary->particles.push_back(all->particles[particle_index]);
-  }
-  // Construct secondary set as all the other particles.
-  if (save_secondary) {
-    partition->secondary = std::make_unique<ParticleSet>();
-    for (int i = 0; i < n; ++i) {
-      if (pick.count(i) != 0) continue;
-      partition->secondary->particles.push_back(all->particles[i]);
+  // 3. Keep adding particles until the limit is reached.
+  for (const auto&[q_value, node]: node_q_values) {
+    if (set->particles.size() < max_particles) {
+      AddParticlesBelow(node, state.nodes[node->tree().acting_player()],
+                        set.get(), max_particles);
     }
   }
-
-  return partition;
+  return set;
 }
 
 void GetStatesInSupport(const State* s, const Policy& policy,

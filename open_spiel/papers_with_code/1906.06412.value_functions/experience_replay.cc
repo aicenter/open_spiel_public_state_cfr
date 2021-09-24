@@ -472,12 +472,7 @@ std::unique_ptr<ParticleSet> ReplayFiller::PickParticleSet(int at_depth) {
   }
 
   // 4. Pick the most probable particles.
-  std::unique_ptr<ParticleSetPartition> particle_partition =
-      MakeParticleSetPartition(*state, subgame_factory->max_particles,
-                               sparse_epsilon, /*save_secondary=*/false,
-                               *randomizer->rnd_gen);
-
-  return std::move(particle_partition->primary);
+  return PickParticlesBasedOnReach(*state, subgame_factory->max_particles);
 }
 
 std::unique_ptr<ParticleSet> ReplayFiller::PickIsmctsParticleSet(int at_depth) {

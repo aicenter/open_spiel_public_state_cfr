@@ -90,13 +90,14 @@ std::pair<ActionsAndProbs, Action> SherlockBot::StepWithPolicy(const State& stat
   // Select particles to keep from the previous step along with their beliefs.
   // Currently, this works only for one-step lookahead trees.
   std::unique_ptr<ParticleSet> set =
-      GetParticles(*public_state, infostate_observation, public_observation);
+      PickParticles(*public_state, infostate_observation, public_observation);
 
   // Assign beliefs for each particle based on past policy.
   // The opponent's beliefs are not strictly necessary: they are used
   // to initialize resolving game.
   // (See Opponent Ranges in Re-Solving: DeepStack paper).
-  AssignBeliefs(set.get(), past_policy_);
+  set->ComputeBeliefs(*subgame_factory_->game, past_policy_,
+                      *subgame_factory_->infostate_observer);
 
   // Make opponent's beliefs mix with vector of 1-beliefs
   // (that would be a uniform belief, after belief normalization).
@@ -152,16 +153,24 @@ void SherlockBot::StorePastPolicy(
   }
 }
 
-std::unique_ptr<ParticleSet> SherlockBot::GetParticles(
+std::unique_ptr<ParticleSet> SherlockBot::PickParticles(
     const PublicState& for_state,
     const Observation& infostate_observation,
-    const Observation& public_observation) {
+    const Observation& public_observation) const {
 
-  // 1. Pick particles that from the previous lookahead tree that lead
-  //    to the current public state.
-  std::unique_ptr<ParticleSet> set = PickParticlesInPublicState(for_state);
+  // 1. If no lookahead tree was done yet, return an empty history.
+  auto all = std::make_unique<ParticleSet>();
+  if (first_step_) {
+    all->add({});
+    return all;
+  }
 
-  // 2. Augment the particle set using the particle generator,
+  // 2. Pick particles that from the previous lookahead tree
+  //    that lead to the current public state.
+  std::unique_ptr<ParticleSet> set = PickParticlesBasedOnQvalues(
+      for_state, subgame_factory_->max_particles);
+
+  // 3. Augment the particle set using the particle generator,
   //    if we are below limit.
   ParticleGenerator* particle_generator = subgame_factory_->particle_generator.get();
   if (particle_generator) {  // Implemented currently only for goofspiel.
@@ -187,140 +196,6 @@ std::unique_ptr<ParticleSet> SherlockBot::GetParticles(
   return set;
 }
 
-void AddParticlesBelow(
-    const algorithms::InfostateNode* node,
-    const std::vector<const algorithms::InfostateNode*>& target_leaf_nodes,
-    ParticleSet* set,
-    int max_particles) {
-
-  if (node->is_leaf_node()) {
-    // Check if we arrived to the public state.
-    if (std::find(target_leaf_nodes.begin(), target_leaf_nodes.end(), node)
-        == target_leaf_nodes.end()) {
-      return;
-    }
-
-    for (int i = 0; i < node->corresponding_states_size()
-        && set->particles.size() < max_particles; i++) {
-      auto h = node->corresponding_states()[i]->History();
-      if (!set->has(h)) {
-        set->add(h);
-      }
-    }
-    return;
-  }
-
-  for (const algorithms::InfostateNode* child : node->child_iterator()) {
-    if (set->particles.size() >= max_particles) return;
-    AddParticlesBelow(child, target_leaf_nodes, set, max_particles);
-  }
-}
-
-std::unique_ptr<ParticleSet> SherlockBot::PickParticlesInPublicState(
-    const PublicState& state) {
-
-  // 1. If no lookahead tree was done yet, return an empty history.
-  auto all = std::make_unique<ParticleSet>();
-  if (first_step_) {
-    all->add({});
-    return all;
-  }
-
-  // 2. Implementation for other games
-  //    (mainly to make tests on games like Kuhn work).
-  GameType g = state.nodes[0][0]->corresponding_states()[0]->GetGame()->GetType();
-  if (g.short_name != "goofspiel") {
-    // TODO: proper last Q-nodes tree slice implementation.
-    std::cerr << "Particle selection is implemented only for goofspiel due "
-                 "to game structure. Selecting all particles instead! \n";
-    for (int j = 0; j < state.nodes[0].size(); j++) {
-      for (const std::unique_ptr<State>& s
-           : state.nodes[0][j]->corresponding_states()) {
-        all->add(s->History());
-      }
-    }
-    return all;
-  }
-
-  // 3. Actual particle selection on Goofspiel:
-  //    Select particles as nodes with the highest Q-values within resolving.
-  using Record = std::pair<double, const algorithms::InfostateNode*>;
-  std::vector<Record> node_q_values;
-  for (int pl = 0; pl < 2; ++pl) {
-    for (algorithms::InfostateNode* dec_node : state.trees[pl]->AllDecisionInfostates()) {
-      // Skip resolving nodes.
-      if (absl::StartsWith(dec_node->infostate_string(),
-                           algorithms::kFtInfostatePrefix)) continue;
-
-      for (algorithms::InfostateNode* q_node : dec_node->children()) {
-        SPIEL_CHECK_EQ(q_node->type(), algorithms::kObservationInfostateNode);
-        node_q_values.push_back({q_node->cumul_value, q_node});
-      }
-    }
-  }
-
-  std::sort(node_q_values.begin(), node_q_values.end(),
-            [](const Record& a, const Record& b) { return a.first > b.first; });
-
-  // Make sure to keep space for one extra particle: in the current infostate.
-  // This is added by the particle generator.
-  const int max_particles = subgame_factory_->max_particles - 1;
-
-  for(const auto&[q_value, node] : node_q_values) {
-    if (all->particles.size() < max_particles) {
-      AddParticlesBelow(node, state.nodes[node->tree().acting_player()],
-                        all.get(), max_particles);
-    }
-  }
-
-  return all;
-}
-
-
-void SherlockBot::AssignBeliefs(
-    ParticleSet* set, const TabularPolicy& policy) const {
-  Observer* obs = subgame_factory_->infostate_observer.get();
-
-  for (Particle& p : set->particles) {
-    p.chance_reach = 1.;
-    p.player_reach[0] = 1.;
-    p.player_reach[1] = 1.;
-
-    std::unique_ptr<State> s = subgame_factory_->game->NewInitialState();
-    for (int i = 0; i < p.history.size(); ++i) {
-      if (s->IsChanceNode()) {
-        ActionsAndProbs infostate_policy = s->ChanceOutcomes();
-        Action a = p.history[i];
-        double prob = GetProb(infostate_policy, a);
-        p.chance_reach *= prob;
-        s->ApplyAction(a);
-      } else if (s->IsSimultaneousNode()) {
-        for (int pl = 0; pl < 2; ++pl) {
-          ActionsAndProbs infostate_policy = policy.GetStatePolicy(obs->StringFrom(*s, pl));
-          if (infostate_policy.empty()) {  // Such infostate was not visited in the past.
-            infostate_policy = UniformStatePolicy(*s, pl);
-          }
-          Action a = p.history[i+pl];
-          double prob = GetProb(infostate_policy, a);
-          p.player_reach[pl] *= prob;
-        }
-
-        s->ApplyActions({p.history[i], p.history.at(++i)});
-      } else {
-        SPIEL_CHECK_FALSE(s->IsTerminal());
-        Player pl = s->CurrentPlayer();
-        ActionsAndProbs infostate_policy = policy.GetStatePolicy(obs->StringFrom(*s, pl));
-        if (infostate_policy.empty()) {  // Such infostate was not visited in the past.
-          infostate_policy = UniformStatePolicy(*s, pl);
-        }
-        Action a = p.history[i];
-        double prob = GetProb(infostate_policy, a);
-        p.player_reach[pl] *= prob;
-        s->ApplyAction(a);
-      }
-    }
-  }
-}
 
 std::unique_ptr<Bot> MakeSherlockBot(
     std::shared_ptr<SubgameFactory> subgame_factory,

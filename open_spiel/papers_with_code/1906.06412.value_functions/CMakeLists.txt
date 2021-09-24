@@ -34,7 +34,7 @@ add_library(paper_value_functions OBJECT
         subgame_factory.cc
         subgame_factory.h
         tabularize_bot.h
-        tabularize_bot.cpp
+        tabularize_bot.cc
         torch_utils.h
         )
 
@@ -71,9 +71,9 @@ add_paper_executable(pareto_frontier_test pareto_frontier_test.cc)
 add_test(pareto_frontier_test pareto_frontier_test)
 add_paper_executable(subgame_test subgame_test.cc)
 add_test(subgame_test subgame_test)
-add_paper_executable(continual_resolving_test continual_resolving_test.cpp)
+add_paper_executable(continual_resolving_test continual_resolving_test.cc)
 add_test(continual_resolving_test continual_resolving_test)
-add_paper_executable(tabularize_bot_test tabularize_bot_test.cpp)
+add_paper_executable(tabularize_bot_test tabularize_bot_test.cc)
 add_test(tabularize_bot_test tabularize_bot_test)
 add_paper_executable(snapshot_test snapshot_test.cc)
 add_test(snapshot_test snapshot_test)

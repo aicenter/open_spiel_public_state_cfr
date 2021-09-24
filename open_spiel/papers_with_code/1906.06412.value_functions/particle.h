@@ -34,7 +34,7 @@ struct Particle {
 
   // Full reach prob.
   float reach() const {
-    return chance_reach * player_reach[0]; //* player_reach[1];
+    return chance_reach * player_reach[0] * player_reach[1];
   }
   // Rollout a state based on particle history.
   std::unique_ptr<State> MakeState(const Game& game) const;
@@ -52,38 +52,21 @@ struct ParticleSet {
   bool has(const std::vector<Action>& history) const;
   int size() const { return particles.size(); }
 
-  void AssignBeliefs(PublicState* state) const;
   void ImportSet(const ParticleSet& other) {
     for (const Particle& candidate : other.particles) {
       if (!has(candidate.history)) particles.push_back(candidate);
     }
   }
+  void AssignBeliefsTo(PublicState* state) const;
+  void ComputeBeliefs(const Game& game, const TabularPolicy& policy,
+                      const Observer& infostate_observer);
 };
 
-// See explanation below.
-struct ParticleSetPartition {
-  std::unique_ptr<ParticleSet> primary;
-  std::unique_ptr<ParticleSet> secondary;
-  ParticleSetPartition()
-      : primary(std::make_unique<ParticleSet>()),
-        secondary(std::make_unique<ParticleSet>()) {}
-};
 
-// `PublicState` maintains all of its corresponding `State`s. For a given
-// number, primary_max_particles, partition these states into two particle sets:
-// `primary`, of size `primary_max_particles`, and the complement in the
-// `secondary` particle set.
-//
-// The split is done according to the reach probability distribution induced by
-// the player beliefs and chance. It is possible to specify whether the
-// particles are taken uniformly (epsilon=1) or according to this reach prob
-// distribution only (epsilon=0).
-std::unique_ptr<ParticleSetPartition> MakeParticleSetPartition(
-    const PublicState& state,
-    int primary_max_particles,
-    double epsilon,
-    bool save_secondary,
-    std::mt19937& rng_gen);
+std::unique_ptr<ParticleSet> PickParticlesBasedOnReach(const PublicState& state,
+                                                       int max_particles);
+std::unique_ptr<ParticleSet> PickParticlesBasedOnQvalues(const PublicState& state,
+                                                         int max_particles);
 
 // Check internal observation consistency of the particle set.
 void CheckParticleSetConsistency(const Game& game,
