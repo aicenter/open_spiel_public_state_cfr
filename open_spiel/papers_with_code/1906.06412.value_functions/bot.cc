@@ -176,7 +176,9 @@ std::unordered_map<std::string, double> SherlockBot::GetOpponentCfvs(
           state.nodes[opp][j]->infostate_string();
       const algorithms::InfostateNode* node =
           spec.trees()[opp]->DecisionNodeFromInfostateString(infostate_string);
-      double cfv = spec.node_spec()[node].var_cf_value->solution_value();
+      // The node may not exist in sequential games like Kuhn.
+      SPIEL_CHECK_TRUE(node);
+      double cfv = spec.node_spec().at(node).var_cf_value->solution_value();
       CFVs.emplace(infostate_string, cfv);
 //      double cfv2 = state.average_values[opp][j];
 //      std::cout << cfv << " " << cfv2 << "\n";
