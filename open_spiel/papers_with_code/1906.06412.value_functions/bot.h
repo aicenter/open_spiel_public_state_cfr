@@ -75,6 +75,9 @@ class SherlockBot : public Bot {
       const PublicState& for_state,
       const Observation& infostate_observation,
       const Observation& public_observation) const;
+
+  std::unordered_map<std::string, double> GetOpponentCfvs(
+      const PublicState& state, const TabularPolicy& past_policy) const;
 };
 
 std::unique_ptr<Bot> MakeSherlockBot(

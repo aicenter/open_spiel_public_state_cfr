@@ -125,6 +125,8 @@ ABSL_FLAG(int, bot_particles, -1,
           "public state. -1 to set the limit same as max_particles.");
 ABSL_FLAG(bool, bot_use_oracle, false,
           "Use oracle instead of net as leaf evaluator.");
+ABSL_FLAG(std::string, opponent_cfvs_selection, "average",
+          "How the cf values should be computed.");
 
 // -- Metrics --
 // Validation loss
@@ -489,6 +491,8 @@ void TrainEvalLoop() {
   bot_solver_factory->rnd_gen = std::make_shared<std::mt19937>(seed);
   bot_solver_factory->safe_resolving = absl::GetFlag(FLAGS_safe_resolving);
   bot_solver_factory->noisy_values   = absl::GetFlag(FLAGS_noisy_values);
+  bot_solver_factory->opponent_cfvs_selection =
+      GetSafeResolvingOpponentCfValues(absl::GetFlag(FLAGS_opponent_cfvs_selection));
   if (absl::GetFlag(FLAGS_bot_use_oracle)) {
     bot_solver_factory->leaf_evaluator = oracle;
   }

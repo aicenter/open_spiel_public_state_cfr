@@ -28,6 +28,12 @@ namespace papers_with_code {
 constexpr const char* kDefaultDlCfrBandit = "RegretMatchingPlus";
 constexpr int kDefaultCfrIterations = 100;
 
+enum SafeResolvingOpponentCfValues {
+  kAverageOfCurrentValues,
+  kOracleValueForAverageBeliefs
+};
+SafeResolvingOpponentCfValues GetSafeResolvingOpponentCfValues(const std::string& cf);
+
 // Produce a solver given a subgame.
 struct SolverFactory {
   std::shared_ptr<const TerminalEvaluator> terminal_evaluator;
@@ -40,6 +46,7 @@ struct SolverFactory {
   bool beliefs_for_average = false;
   double opponent_beliefs_eps = 0.;
   double noisy_values = 0.;
+  SafeResolvingOpponentCfValues opponent_cfvs_selection = kAverageOfCurrentValues;
 
   std::unique_ptr<SubgameSolver> MakeSolver(
       std::shared_ptr<Subgame> subgame,
