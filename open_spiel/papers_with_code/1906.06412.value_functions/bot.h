@@ -75,10 +75,9 @@ class SherlockBot : public Bot {
       const PublicState& for_state,
       const Observation& infostate_observation,
       const Observation& public_observation);
-  std::unique_ptr<ParticleSet> PickParticlesFromPublicState(
+  std::unique_ptr<ParticleSet> PickParticlesInPublicState(
       const PublicState& for_state);
-  void AssignBeliefs(ParticleSet* set) const;
-  double ComputeReach(const std::vector<Action>& history);
+  void AssignBeliefs(ParticleSet* set, const TabularPolicy& policy) const;
 };
 
 std::unique_ptr<Bot> MakeSherlockBot(

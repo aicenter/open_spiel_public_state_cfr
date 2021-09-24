@@ -38,6 +38,9 @@ ABSL_FLAG(bool, beliefs_for_average, false,
 ABSL_FLAG(double, noisy_values, 0.,
           "Additive noise for the value function, sigma of the normal "
           "distribution centered at zero");
+ABSL_FLAG(double, opponent_beliefs_eps, 0.,
+          "How much the opponent's beliefs should be mixed with 1. beliefs per "
+          "infostate when constructing gadget game for safe resolving.");
 
 // -- Data generation --
 ABSL_FLAG(int, depth, 3, "Depth of the trunk.");
@@ -447,6 +450,7 @@ void TrainEvalLoop() {
   solver_factory->use_bandits_for_cfr  = absl::GetFlag(FLAGS_use_bandits_for_cfr);
   solver_factory->safe_resolving       = false;  // No resolving for training.
   solver_factory->beliefs_for_average  = absl::GetFlag(FLAGS_beliefs_for_average);
+  solver_factory->opponent_beliefs_eps = absl::GetFlag(FLAGS_opponent_beliefs_eps);
   solver_factory->save_values_policy   = save_values_policy;
   solver_factory->terminal_evaluator   = terminal_evaluator;
   solver_factory->leaf_evaluator = MakeNetEvaluator(

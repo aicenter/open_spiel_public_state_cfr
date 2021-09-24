@@ -38,7 +38,7 @@ std::shared_ptr<Subgame> SubgameFactory::MakeSubgame(
                                           : max_move_ahead_limit;
   auto trees = MakeSubgameInfostateTrees(set, depth);
   auto out = std::make_unique<Subgame>(game, public_observer, trees);
-  set.AssignBeliefs(out->initial_state());  // Compute initial beliefs..
+  set.AssignBeliefs(&out->initial_state());  // Compute initial beliefs..
   return out;
 }
 
@@ -53,7 +53,7 @@ std::shared_ptr<Subgame> SubgameFactory::MakeSubgameSafeResolving(
       set, depth, player, std::move(opponent_CFVs),
       use_max_cfv_in_missing_infostates);
   auto out = std::make_unique<Subgame>(game, public_observer, trees);
-  set.AssignBeliefs(out->initial_state());  // Compute initial beliefs.
+  set.AssignBeliefs(&out->initial_state());  // Compute initial beliefs.
   return out;
 }
 

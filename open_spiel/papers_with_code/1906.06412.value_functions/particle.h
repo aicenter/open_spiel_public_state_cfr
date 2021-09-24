@@ -52,7 +52,7 @@ struct ParticleSet {
   bool has(const std::vector<Action>& history) const;
   int size() const { return particles.size(); }
 
-  void AssignBeliefs(PublicState& state) const;
+  void AssignBeliefs(PublicState* state) const;
   void ImportSet(const ParticleSet& other) {
     for (const Particle& candidate : other.particles) {
       if (!has(candidate.history)) particles.push_back(candidate);

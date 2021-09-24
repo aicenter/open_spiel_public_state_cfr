@@ -38,6 +38,7 @@ struct SolverFactory {
   PolicySelection save_values_policy = kDefaultPolicySelection;
   bool safe_resolving = false;
   bool beliefs_for_average = false;
+  double opponent_beliefs_eps = 0.;
   double noisy_values = 0.;
 
   std::unique_ptr<SubgameSolver> MakeSolver(

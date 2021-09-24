@@ -89,15 +89,29 @@ std::pair<ActionsAndProbs, Action> SherlockBot::StepWithPolicy(const State& stat
 
   // Select particles to keep from the previous step along with their beliefs.
   // Currently, this works only for one-step lookahead trees.
-  std::unordered_map<std::string, double> opponent_CFVs =
-      public_state->InfostateAvgValues(1 - player_id_);
   std::unique_ptr<ParticleSet> set =
       GetParticles(*public_state, infostate_observation, public_observation);
+
+  // Assign beliefs for each particle based on past policy.
+  // The opponent's beliefs are not strictly necessary: they are used
+  // to initialize resolving game.
+  // (See Opponent Ranges in Re-Solving: DeepStack paper).
+  AssignBeliefs(set.get(), past_policy_);
+
+  // Make opponent's beliefs mix with vector of 1-beliefs
+  // (that would be a uniform belief, after belief normalization).
+  for (int i = 0; i < set->particles.size(); ++i) {
+    float& opp_belief = set->particles[i].player_reach[1 - player_id_];  // Ref!
+    opp_belief = 1 * solver_factory_->opponent_beliefs_eps
+               + (1 - solver_factory_->opponent_beliefs_eps) * opp_belief;
+  }
+
+  std::unordered_map<std::string, double> opponent_CFVs =
+      public_state->InfostateAvgValues(1 - player_id_);
   SPIEL_CHECK_FALSE(set->particles.empty());
 
-  // We will do the gadget if we are resolving
+  // We will make the gadget game if we are resolving.
   if (!first_step_ && solver_factory_->safe_resolving) {
-    // The particle set includes reach probs.
     subgame_ = subgame_factory_->MakeSubgameSafeResolving(*set, player_id_,
                                                           opponent_CFVs);
   } else {
@@ -143,10 +157,12 @@ std::unique_ptr<ParticleSet> SherlockBot::GetParticles(
     const Observation& infostate_observation,
     const Observation& public_observation) {
 
-  std::unique_ptr<ParticleSet> set =
-      PickParticlesFromPublicState(for_state);
+  // 1. Pick particles that from the previous lookahead tree that lead
+  //    to the current public state.
+  std::unique_ptr<ParticleSet> set = PickParticlesInPublicState(for_state);
 
-  // We will augment the current particle set using the particle generator.
+  // 2. Augment the particle set using the particle generator,
+  //    if we are below limit.
   ParticleGenerator* particle_generator = subgame_factory_->particle_generator.get();
   if (particle_generator) {  // Implemented currently only for goofspiel.
     // Make sure we always have 1 particle in the current infostate.
@@ -167,7 +183,7 @@ std::unique_ptr<ParticleSet> SherlockBot::GetParticles(
       set->ImportSet(*infostate_targeted_set);
     }
   }
-  AssignBeliefs(set.get());
+
   return set;
 }
 
@@ -200,16 +216,18 @@ void AddParticlesBelow(
   }
 }
 
-std::unique_ptr<ParticleSet> SherlockBot::PickParticlesFromPublicState(
+std::unique_ptr<ParticleSet> SherlockBot::PickParticlesInPublicState(
     const PublicState& state) {
 
-  // Empty history.
+  // 1. If no lookahead tree was done yet, return an empty history.
   auto all = std::make_unique<ParticleSet>();
   if (first_step_) {
     all->add({});
     return all;
   }
 
+  // 2. Implementation for other games
+  //    (mainly to make tests on games like Kuhn work).
   GameType g = state.nodes[0][0]->corresponding_states()[0]->GetGame()->GetType();
   if (g.short_name != "goofspiel") {
     // TODO: proper last Q-nodes tree slice implementation.
@@ -224,6 +242,8 @@ std::unique_ptr<ParticleSet> SherlockBot::PickParticlesFromPublicState(
     return all;
   }
 
+  // 3. Actual particle selection on Goofspiel:
+  //    Select particles as nodes with the highest Q-values within resolving.
   using Record = std::pair<double, const algorithms::InfostateNode*>;
   std::vector<Record> node_q_values;
   for (int pl = 0; pl < 2; ++pl) {
@@ -242,7 +262,10 @@ std::unique_ptr<ParticleSet> SherlockBot::PickParticlesFromPublicState(
   std::sort(node_q_values.begin(), node_q_values.end(),
             [](const Record& a, const Record& b) { return a.first > b.first; });
 
-  int max_particles = subgame_factory_->max_particles - 1;
+  // Make sure to keep space for one extra particle: in the current infostate.
+  // This is added by the particle generator.
+  const int max_particles = subgame_factory_->max_particles - 1;
+
   for(const auto&[q_value, node] : node_q_values) {
     if (all->particles.size() < max_particles) {
       AddParticlesBelow(node, state.nodes[node->tree().acting_player()],
@@ -250,75 +273,35 @@ std::unique_ptr<ParticleSet> SherlockBot::PickParticlesFromPublicState(
     }
   }
 
-  AssignBeliefs(all.get());
   return all;
 }
 
-double SherlockBot::ComputeReach(const std::vector<Action>& history) {
-  Observer* obs = subgame_factory_->infostate_observer.get();
-  std::unique_ptr<State> s = subgame_factory_->game->NewInitialState();
-  double reach = 1.0;
 
-  for (int i = 0; i < history.size(); ++i) {
-    if (s->IsChanceNode()) {
-      ActionsAndProbs policy = s->ChanceOutcomes();
-      Action a = history[i];
-      double prob = GetProb(policy, a);
-      reach *= prob;
-      s->ApplyAction(a);
-    } else if (s->IsSimultaneousNode()) {
-      int pl = player_id_;
-      ActionsAndProbs policy =
-          past_policy_.GetStatePolicy(obs->StringFrom(*s, pl));
-      if (policy.empty()) {  // Such infostate was not visited in the past.
-        policy = UniformStatePolicy(*s, pl);
-      }
-      Action a = history[i+pl];
-      double prob = GetProb(policy, a);
-      reach *= prob;
-      s->ApplyActions({history[i], history.at(++i)});
-    } else {
-      SPIEL_CHECK_FALSE(s->IsTerminal());
-      Player pl = s->CurrentPlayer();
-      Action a = history[i];
-      if (pl == player_id_) {
-        ActionsAndProbs policy = past_policy_.GetStatePolicy(obs->StringFrom(*s, pl));
-        if (policy.empty()) {  // Such infostate was not visited in the past.
-          policy = UniformStatePolicy(*s, pl);
-        }
-        double prob = GetProb(policy, a);
-        reach *= prob;
-      }
-      s->ApplyAction(a);
-    }
-  }
-  return reach;
-}
-
-void SherlockBot::AssignBeliefs(ParticleSet* set) const {
+void SherlockBot::AssignBeliefs(
+    ParticleSet* set, const TabularPolicy& policy) const {
   Observer* obs = subgame_factory_->infostate_observer.get();
 
   for (Particle& p : set->particles) {
-    p.chance_reach = 1.;  // TODO: chance reach for other games (GS has no chance).
+    p.chance_reach = 1.;
     p.player_reach[0] = 1.;
     p.player_reach[1] = 1.;
 
     std::unique_ptr<State> s = subgame_factory_->game->NewInitialState();
     for (int i = 0; i < p.history.size(); ++i) {
       if (s->IsChanceNode()) {
-        ActionsAndProbs policy = s->ChanceOutcomes();
+        ActionsAndProbs infostate_policy = s->ChanceOutcomes();
         Action a = p.history[i];
-        double prob = GetProb(policy, a);
+        double prob = GetProb(infostate_policy, a);
         p.chance_reach *= prob;
         s->ApplyAction(a);
       } else if (s->IsSimultaneousNode()) {
         for (int pl = 0; pl < 2; ++pl) {
-          ActionsAndProbs policy = past_policy_.GetStatePolicy(obs->StringFrom(*s, pl));
-          if (policy.empty()) {  // Such infostate was not visited in the past.
-            policy = UniformStatePolicy(*s, pl);
+          ActionsAndProbs infostate_policy = policy.GetStatePolicy(obs->StringFrom(*s, pl));
+          if (infostate_policy.empty()) {  // Such infostate was not visited in the past.
+            infostate_policy = UniformStatePolicy(*s, pl);
           }
           Action a = p.history[i+pl];
-          double prob = GetProb(policy, a);
+          double prob = GetProb(infostate_policy, a);
           p.player_reach[pl] *= prob;
         }
 
@@ -326,12 +309,12 @@ void SherlockBot::AssignBeliefs(ParticleSet* set) const {
       } else {
         SPIEL_CHECK_FALSE(s->IsTerminal());
         Player pl = s->CurrentPlayer();
-        ActionsAndProbs policy = past_policy_.GetStatePolicy(obs->StringFrom(*s, pl));
-        if (policy.empty()) {  // Such infostate was not visited in the past.
-          policy = UniformStatePolicy(*s, pl);
+        ActionsAndProbs infostate_policy = policy.GetStatePolicy(obs->StringFrom(*s, pl));
+        if (infostate_policy.empty()) {  // Such infostate was not visited in the past.
+          infostate_policy = UniformStatePolicy(*s, pl);
         }
         Action a = p.history[i];
-        double prob = GetProb(policy, a);
+        double prob = GetProb(infostate_policy, a);
         p.player_reach[pl] *= prob;
         s->ApplyAction(a);
       }
