@@ -71,12 +71,7 @@ std::unique_ptr<ParticleSet> PickParticlesBasedOnQvalues(const PublicState& stat
 // Check internal observation consistency of the particle set.
 void CheckParticleSetConsistency(const Game& game,
                                  std::shared_ptr<Observer> public_observer,
-                                 std::shared_ptr<Observer> hand_observer,
-                                 const ParticleSet& set);
-// Check consistency with infostate nodes -- the roots of the infostate tree.
-void CheckParticleSetConsistency(const Game& game,
                                  std::shared_ptr<Observer> infostate_observer,
-                                 std::vector<std::vector<algorithms::InfostateNode*>> infostate_nodes,
                                  const ParticleSet& set);
 
 std::vector<std::unique_ptr<State>> GetStatesInSupport(const Game& game,

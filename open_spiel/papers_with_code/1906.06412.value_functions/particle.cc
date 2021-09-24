@@ -191,37 +191,6 @@ void CheckParticleSetConsistency(const Game& game,
   }
 }
 
-void CheckParticleSetConsistency(const Game& game,
-                                 std::shared_ptr<Observer> infostate_observer,
-                                 std::vector<std::vector<algorithms::InfostateNode*>> infostate_nodes,
-                                 const ParticleSet& set) {
-  SPIEL_CHECK_FALSE(set.particles.empty());
-//  SPIEL_CHECK_FALSE(set.partition.empty());
-
-  std::vector<std::unique_ptr<State>> histories;
-  for (const Particle& particle : set.particles) {
-    histories.push_back(particle.MakeState(game));
-  }
-
-//  for (int pl = 0; pl < 2; ++pl) {
-//    SPIEL_CHECK_FALSE(set.partition[pl].empty());
-//    SPIEL_CHECK_FALSE(infostate_nodes[pl].empty());
-//    SPIEL_CHECK_EQ(set.partition[pl].size(), infostate_nodes[pl].size());
-//
-//    for (int i = 0; i < set.partition[pl].size(); ++i) {
-//      SPIEL_CHECK_FALSE(set.partition[pl][i].empty());
-//      for (int particle_idx : set.partition[pl][i]) {
-//        const algorithms::InfostateNode* node = infostate_nodes[pl][i];
-//        const State& h = *histories[particle_idx];
-//        SPIEL_CHECK_TRUE(node);
-//        SPIEL_CHECK_EQ(infostate_observer->StringFrom(h, pl),
-//                       node->infostate_string());
-//      }
-//    }
-//  }
-
-}
-
 std::unique_ptr<ParticleSet> PickParticlesBasedOnReach(const PublicState& state,
                                                        int max_particles) {
   auto set = std::make_unique<ParticleSet>();

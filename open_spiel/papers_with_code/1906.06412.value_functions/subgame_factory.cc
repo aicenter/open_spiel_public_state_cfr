@@ -88,9 +88,6 @@ SubgameFactory::MakeSubgameInfostateTrees(const ParticleSet& set,
         kDlCfrInfostateTreeStorage
     ));
   }
-  SPIEL_DCHECK(CheckParticleSetConsistency(*game, infostate_observer,
-                                           {trees[0]->root().children(),
-                                            trees[1]->root().children()}, set));
   return trees;
 }
 
@@ -101,7 +98,7 @@ SubgameFactory::MakeSubgameResolvingInfostateTrees(
     bool use_max_cfv_in_missing_infostates) const {
   SPIEL_CHECK_LE(set.particles.size(), max_particles);
   SPIEL_DCHECK(CheckParticleSetConsistency(*game, public_observer,
-                                           hand_observer, set));
+                                           infostate_observer, set));
   SPIEL_CHECK_FALSE(opponent_CFVs.empty());
 
   int opponent = 1 - player;
@@ -155,9 +152,6 @@ SubgameFactory::MakeSubgameResolvingInfostateTrees(
       algorithms::MakeResolvingInfostateTrees(
           root_histories, chance_reach_probs, infostate_observer,
           1 - player, opponent_CFVs, depth, kDlCfrInfostateTreeStorage);
-  SPIEL_DCHECK(CheckParticleSetConsistency(*game, infostate_observer,
-                                           {trees[0]->root().children(),
-                                            trees[1]->root().children()}, set));
   return trees;
 }
 

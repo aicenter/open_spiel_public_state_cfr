@@ -167,7 +167,6 @@ void TestKuhnGadget() {
 
   // Compare resulting policies and game values.
   // FIXME(David): why only pass?
-  std::mt19937 rnd(0);
   for (const PublicState& public_state : subgame->public_states) {
     if (public_state.IsLeaf()
         && public_state.nodes[0][0]->infostate_string().substr(1) == "p") {
