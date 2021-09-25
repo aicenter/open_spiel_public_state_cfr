@@ -21,6 +21,7 @@
 
 #include "open_spiel/spiel.h"
 #include "open_spiel/utils/tree_map.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/include_libs_ordered.h"
 
 // This file contains data structures used in imperfect information games.
 // Specifically, we implement an infostate tree, a representation of a game
