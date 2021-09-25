@@ -13,14 +13,11 @@
 // limitations under the License.
 
 #include "open_spiel/games/universal_poker.h"
-#include <iostream>
+
 #include <memory>
-#include <string>
 
 #include "open_spiel/abseil-cpp/absl/algorithm/container.h"
 #include "open_spiel/abseil-cpp/absl/container/flat_hash_map.h"
-#include "open_spiel/abseil-cpp/absl/flags/flag.h"
-#include "open_spiel/abseil-cpp/absl/flags/parse.h"
 #include "open_spiel/abseil-cpp/absl/strings/str_join.h"
 #include "open_spiel/games/universal_poker/acpc/project_acpc_server/game.h"
 #include "open_spiel/algorithms/evaluate_bots.h"
@@ -29,11 +26,6 @@
 #include "open_spiel/spiel.h"
 #include "open_spiel/spiel_utils.h"
 #include "open_spiel/tests/basic_tests.h"
-#include "open_spiel/utils/init.h"
-#include "open_spiel/utils/file.h"
-
-ABSL_FLAG(std::string, subgames_data_dir, "universal_poker/endgames",
-          "Directory containing the subgames data.");
 
 namespace open_spiel {
 namespace universal_poker {
@@ -104,7 +96,7 @@ void LoadKuhnLimitWithAndWithoutGameDef() {
   SPIEL_CHECK_EQ(kuhn_limit_3p_gamedef.GetACPCGame()->ToString(),
                  kuhn_limit_3p.GetACPCGame()->ToString());
   SPIEL_CHECK_TRUE((*(kuhn_limit_3p_gamedef.GetACPCGame())) ==
-                   (*(kuhn_limit_3p.GetACPCGame())));
+      (*(kuhn_limit_3p.GetACPCGame())));
 }
 
 void LoadHoldemNoLimit6PWithAndWithoutGameDef() {
@@ -115,7 +107,7 @@ void LoadHoldemNoLimit6PWithAndWithoutGameDef() {
   SPIEL_CHECK_EQ(holdem_no_limit_6p_gamedef.GetACPCGame()->ToString(),
                  holdem_no_limit_6p.GetACPCGame()->ToString());
   SPIEL_CHECK_TRUE((*(holdem_no_limit_6p_gamedef.GetACPCGame())) ==
-                   (*(holdem_no_limit_6p.GetACPCGame())));
+      (*(holdem_no_limit_6p.GetACPCGame())));
 }
 void LoadGameFromDefaultConfig() { LoadGame("universal_poker"); }
 
@@ -248,16 +240,16 @@ void ChumpPolicyTests() {
 void FullNLBettingTest1() {
   std::shared_ptr<const Game> game = LoadGame(
       "universal_poker(betting=nolimit,"
-                      "numPlayers=2,"
-                      "numRounds=4,"
-                      "blind=2 1,"
-                      "firstPlayer=2 1 1 1,"
-                      "numSuits=4,"
-                      "numRanks=13,"
-                      "numHoleCards=2,"
-                      "numBoardCards=0 3 1 1,"
-                      "stack=20 20,"
-                      "bettingAbstraction=fullgame)");
+      "numPlayers=2,"
+      "numRounds=4,"
+      "blind=2 1,"
+      "firstPlayer=2 1 1 1,"
+      "numSuits=4,"
+      "numRanks=13,"
+      "numHoleCards=2,"
+      "numBoardCards=0 3 1 1,"
+      "stack=20 20,"
+      "bettingAbstraction=fullgame)");
   std::unique_ptr<State> state = game->NewInitialState();
   SPIEL_CHECK_EQ(game->NumDistinctActions(), 21);
   while (state->IsChanceNode())
@@ -293,16 +285,16 @@ void FullNLBettingTest1() {
 void FullNLBettingTest2() {
   std::shared_ptr<const Game> game = LoadGame(
       "universal_poker(betting=nolimit,"
-                      "numPlayers=2,"
-                      "numRounds=4,"
-                      "blind=100 50,"
-                      "firstPlayer=2 1 1 1,"
-                      "numSuits=4,"
-                      "numRanks=13,"
-                      "numHoleCards=2,"
-                      "numBoardCards=0 3 1 1,"
-                      "stack=10000 10000,"
-                      "bettingAbstraction=fullgame)");
+      "numPlayers=2,"
+      "numRounds=4,"
+      "blind=100 50,"
+      "firstPlayer=2 1 1 1,"
+      "numSuits=4,"
+      "numRanks=13,"
+      "numHoleCards=2,"
+      "numBoardCards=0 3 1 1,"
+      "stack=10000 10000,"
+      "bettingAbstraction=fullgame)");
   std::unique_ptr<State> state = game->NewInitialState();
   SPIEL_CHECK_EQ(game->NumDistinctActions(), 10001);
   while (state->IsChanceNode())
@@ -353,8 +345,8 @@ void FullNLBettingTest2() {
   SPIEL_CHECK_EQ(state->Returns()[0], 5900);
   SPIEL_CHECK_EQ(state->Returns()[1], -5900);
   SPIEL_CHECK_TRUE(absl::StrContains(state->ToString(),
-      "ACPC State: STATE:0:r5100c/r5200c/r5400r5600r5900c/r10000f"
-      ":2c2d|2h2s/3c3d3h/3s/4c"));
+                                     "ACPC State: STATE:0:r5100c/r5200c/r5400r5600r5900c/r10000f"
+                                     ":2c2d|2h2s/3c3d3h/3s/4c"));
 }
 
 // Checks bet sizing is correct when there are more than two players
@@ -362,16 +354,16 @@ void FullNLBettingTest2() {
 void FullNLBettingTest3() {
   std::shared_ptr<const Game> game = LoadGame(
       "universal_poker(betting=nolimit,"
-                      "numPlayers=3,"
-                      "numRounds=4,"
-                      "blind=100 50 0,"
-                      "firstPlayer=2 1 1 1,"
-                      "numSuits=4,"
-                      "numRanks=13,"
-                      "numHoleCards=2,"
-                      "numBoardCards=0 3 1 1,"
-                      "stack=500 1000 2000,"
-                      "bettingAbstraction=fullgame)");
+      "numPlayers=3,"
+      "numRounds=4,"
+      "blind=100 50 0,"
+      "firstPlayer=2 1 1 1,"
+      "numSuits=4,"
+      "numRanks=13,"
+      "numHoleCards=2,"
+      "numBoardCards=0 3 1 1,"
+      "stack=500 1000 2000,"
+      "bettingAbstraction=fullgame)");
   std::unique_ptr<State> state = game->NewInitialState();
   SPIEL_CHECK_EQ(game->NumDistinctActions(), 2001);
   while (state->IsChanceNode()) state->ApplyAction(state->LegalActions()[0]);
@@ -424,8 +416,8 @@ void FullNLBettingTest3() {
   SPIEL_CHECK_EQ(state->Returns()[1], -1000);
   SPIEL_CHECK_EQ(state->Returns()[2], 1500);
   SPIEL_CHECK_TRUE(absl::StrContains(state->ToString(),
-      "ACPC State: STATE:0:ccc/ccr200r500r800r2000c//"
-      ":2c2d|2h2s|3c3d/3h3s4c/4d/4h"));
+                                     "ACPC State: STATE:0:ccc/ccr200r500r800r2000c//"
+                                     ":2c2d|2h2s|3c3d/3h3s4c/4d/4h"));
 }
 
 void ChanceDealRegressionTest() {
@@ -558,107 +550,11 @@ void TestFCHPA() {
   }
 }
 
-void TestHoleIndexCalculation() {
-  auto check_index = [](std::string card_a, std::string card_b,
-                        int expected_index) {
-    int a = logic::CardSet(card_a).ToCardArray()[0];
-    int b = logic::CardSet(card_b).ToCardArray()[0];
-    int actual_index = GetHoleCardsReachIndex(a, b,
-        /*num_suits=*/4, /*num_ranks=*/13);
-    SPIEL_CHECK_EQ(actual_index, expected_index);
-  };
-
-  // Suit order is "shdc"
-  check_index("2s", "2h", 0);
-  check_index("2s", "2d", 1);
-  check_index("2s", "2c", 2);
-  check_index("2s", "3s", 3);
-  check_index("2s", "3h", 4);
-  // ...
-  check_index("2s", "Ac", 50);
-  check_index("2h", "2d", 51);
-  check_index("2h", "2c", 52);
-  // ...
-  check_index("Ad", "Ac", 1325);
-}
-
-std::string ReadSubgameReachProbs(const std::string& file_name) {
-  std::string dir = absl::GetFlag(FLAGS_subgames_data_dir);
-  if (dir.back() == '/') {
-    dir.pop_back();
-  }
-  return file::ReadContentsFromFile(absl::StrCat(dir, "/", file_name, ".txt"),
-                                    "r");
-}
-
-void TestSubgameCreation() {
-  auto test_game = [](
-      int pot_size,
-      const std::string& board_cards,
-      const std::string& hand_reach){
-    constexpr const char* base_game =
-      "universal_poker("
-        "betting=nolimit,"
-        "numPlayers=2,"
-        "numRounds=4,"
-        "blind=100 50,"
-        "firstPlayer=2 1 1 1,"
-        "numSuits=4,"
-        "numRanks=13,"
-        "numHoleCards=2,"
-        "numBoardCards=0 3 1 1,"
-        "stack=20000 20000,"
-        "bettingAbstraction=fcpa,"
-        "potSize=%d,"
-        "boardCards=%s,"
-        "handReaches=%s"
-      ")";
-
-    std::string game_str =
-        absl::StrFormat(base_game, pot_size, board_cards, hand_reach);
-    printf("game_str %s", game_str.c_str());
-    std::shared_ptr<const Game> with_reach = LoadGame(game_str);
-    testing::RandomSimTest(*with_reach,
-                           /*num_sims=*/5,
-                           /*serialize=*/true,
-                           /*verbose=*/true,
-                           /*mask_test=*/false);
-  };
-
-  // Build uniform reaches as a string.
-  std::stringstream ss;
-  for (int i = 0; i < 2 * kSubgameUniqueHands; ++i)
-    ss << 1. / (2 * kSubgameUniqueHands) << ' ';
-  std::string uniform_reaches = ss.str();
-  test_game(500,  "7s9h9cTc",   uniform_reaches);
-  test_game(500,  "7s9h9cTc",   ReadSubgameReachProbs("subgame1"));
-  test_game(4780, "Ts6hAh7c",   uniform_reaches);
-  test_game(4780, "Ts6hAh7c",   ReadSubgameReachProbs("subgame2"));
-  test_game(500,  "4s8hTc9h2s", uniform_reaches);
-  test_game(500,  "4s8hTc9h2s", ReadSubgameReachProbs("subgame3"));
-  test_game(3750, "JsKs5cQs7d", uniform_reaches);
-  test_game(3750, "JsKs5cQs7d", ReadSubgameReachProbs("subgame4"));
-}
-void TestRandomSubgameCreation() {
-  std::mt19937 rng;
-  MakeRandomSubgame(rng);
-  MakeRandomSubgame(rng, 100);
-  MakeRandomSubgame(rng, 100, "7s9h9cTc");
-
-  std::vector<double> uniform_reaches;
-  for (int i = 0; i < 2 * kSubgameUniqueHands; ++i) {
-    uniform_reaches.push_back(1. / (2 * kSubgameUniqueHands));
-  }
-  MakeRandomSubgame(rng, 100, "7s9h9cTc", uniform_reaches);
-}
-
 }  // namespace
 }  // namespace universal_poker
 }  // namespace open_spiel
 
 int main(int argc, char **argv) {
-  open_spiel::Init("", &argc, &argv, true);
-  absl::ParseCommandLine(argc, argv);
   open_spiel::universal_poker::ChanceDealRegressionTest();
   open_spiel::universal_poker::LoadKuhnLimitWithAndWithoutGameDef();
   open_spiel::universal_poker::LoadHoldemNoLimit6PWithAndWithoutGameDef();
@@ -675,7 +571,4 @@ int main(int argc, char **argv) {
   open_spiel::universal_poker::HulhMaxUtilityIsCorrect();
   open_spiel::universal_poker::CanConvertActionsCorrectly();
   open_spiel::universal_poker::TestFCHPA();
-  open_spiel::universal_poker::TestHoleIndexCalculation();
-  open_spiel::universal_poker::TestSubgameCreation();
-  open_spiel::universal_poker::TestRandomSubgameCreation();
 }

@@ -39,6 +39,7 @@
 namespace open_spiel {
 namespace universal_poker {
 
+class UniversalPokerObserver;
 class UniversalPokerGame;
 
 constexpr uint8_t kMaxUniversalPokerPlayers = 10;
@@ -111,6 +112,8 @@ class UniversalPokerState : public State {
   void DoApplyAction(Action action_id) override;
 
  private:
+  friend class UniversalPokerObserver;
+
   void _CalculateActionsAndNodeType();
 
   double GetTotalReward(Player player) const;
@@ -181,18 +184,12 @@ class UniversalPokerState : public State {
   std::string actionSequence_;
 
   BettingAbstraction betting_abstraction_;
-
-  // Used for custom implementation of subgames.
-  std::vector<double> handReaches_;
-  std::vector <std::pair <Action, double>> DistributeHandCardsInSubgame() const;
-  bool IsDistributingSingleCard() const;
-  const std::vector <int> GetEncodingBase() const;
 };
 
 class UniversalPokerGame : public Game {
  public:
   explicit UniversalPokerGame(const GameParameters &params);
-
+  int MaxMoveNumber() const override {return MaxGameLength();};
   int NumDistinctActions() const override;
   std::unique_ptr<State> NewInitialState() const override;
   int NumPlayers() const override;
@@ -212,12 +209,17 @@ class UniversalPokerGame : public Game {
   int big_blind() const { return big_blind_; }
   double MaxCommitment() const;
 
+  // Used to implement the old observation API.
+  std::shared_ptr<UniversalPokerObserver> default_observer_;
+  std::shared_ptr<UniversalPokerObserver> info_state_observer_;
+
+  std::shared_ptr<Observer> MakeObserver(
+      absl::optional<IIGObservationType> iig_obs_type,
+      const GameParameters& params) const override;
+
  private:
   std::string gameDesc_;
   const acpc_cpp::ACPCGame acpc_game_;
-  const int potSize_;
-  const std::string boardCards_;
-  const std::string handReaches_;
   absl::optional<int> max_game_length_;
   BettingAbstraction betting_abstraction_ = BettingAbstraction::kFULLGAME;
   int big_blind_;
@@ -252,7 +254,7 @@ class UniformRestrictedActions : public Policy {
     // It is always legal to check/call.
     if (policy.empty()) {
       SPIEL_DCHECK_TRUE(absl::c_find(legal_actions, ActionType::kCall) !=
-                        legal_actions.end());
+          legal_actions.end());
       policy.push_back({static_cast<Action>(ActionType::kCall), 1.});
     }
 
@@ -271,32 +273,7 @@ open_spiel::Action ACPCActionToOpenSpielAction(
     const project_acpc_server::Action &action,
     const UniversalPokerState &state);
 
-// Get hole card index within the array of reach probabilities, as specified
-// in https://github.com/Sandholm-Lab/LibratusEndgames :
-//
-// The probability, according to the Libratus blueprint strategy, of each player
-// reaching this endgame with each hand. There are a total of 2,652
-// probabilities in this list. The first 1,326 are for the "out of position"
-// player (the first player to act on the round), while the remaining 1,326 are
-// for the "button" player. Each of the 1,326 probabilities corresponds to a
-// poker hand, ordered as follows:
-//
-// 2s2h, 2s2d, 2s2c, 2s3s, 2s3h, ..., 2sAc, 2h2d, 2h2c, ..., AdAc.
-int GetHoleCardsReachIndex(int card_a, int card_b,
-                           int num_suits, int num_ranks);
-
-// Make random subgame, with optionally specified round, pot size, board
-// cards and hand reach probs. If all of these variables are specified,
-// it is actually a non-randomized subgame: by omiting any parameter,
-// a random value will be supplied automatically.
-std::shared_ptr<const Game> MakeRandomSubgame(
-    std::mt19937 &rng, int pot_size = -1, std::string board_cards = "",
-    std::vector<double> hand_reach = {});
-// Number of unique hands in no-limit poker.
-constexpr int kSubgameUniqueHands = 1326;  // = (52*51) / 2
-
 std::ostream &operator<<(std::ostream &os, const BettingAbstraction &betting);
-
 }  // namespace universal_poker
 }  // namespace open_spiel
 
