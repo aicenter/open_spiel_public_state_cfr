@@ -22,33 +22,18 @@
 namespace open_spiel {
 namespace papers_with_code {
 
+// -- Dummy evaluator ----------------------------------------------------------
 
-std::shared_ptr<PublicStateEvaluator> MakeTerminalEvaluator() {
-  return std::make_shared<TerminalEvaluator>();
-}
+// Evaluator that does nothing.
+struct DummyEvaluator : public PublicStateEvaluator {
+  std::unique_ptr<PublicStateContext> CreateContext(
+      const PublicState& state) const override { return nullptr; };
+  void ResetContext(PublicStateContext* context) const override {};
+  void EvaluatePublicState(PublicState* public_state,
+                           PublicStateContext* context) const override {};
+};
 
-std::shared_ptr<PublicStateEvaluator> MakeDummyEvaluator() {
-  return std::make_shared<DummyEvaluator>();
-}
-
-std::shared_ptr<PublicStateEvaluator> MakeApproxOracleEvaluator(
-    std::shared_ptr<const Game> game, int cfr_iterations) {
-
-  std::shared_ptr<const PublicStateEvaluator> dummy_evaluator =
-      MakeDummyEvaluator();
-  std::shared_ptr<Observer> public_observer =
-      game->MakeObserver(kPublicStateObsType, {});
-  std::shared_ptr<Observer> infostate_observer =
-      game->MakeObserver(kInfoStateObsType, {});
-
-  std::shared_ptr<const PublicStateEvaluator> terminal_evaluator =
-      MakeTerminalEvaluator();
-
-  return std::make_shared<CFREvaluator>(game, algorithms::kNoMoveAheadLimit,
-                                        dummy_evaluator, terminal_evaluator,
-                                        public_observer, infostate_observer,
-                                        cfr_iterations);
-}
+// -- Terminal evaluator -------------------------------------------------------
 
 TerminalPublicStateContext::TerminalPublicStateContext(
     const PublicState& state) {
@@ -101,8 +86,6 @@ void TerminalEvaluator::EvaluatePublicState(
     state->values[1][j] = - terminal->utilities[i] * state->beliefs[0][i];
   }
 }
-
-
 
 // -- CFR evaluator ------------------------------------------------------------
 
@@ -194,107 +177,34 @@ void CFREvaluator::EvaluatePublicState(PublicState* state,
 //            << " " << " values: " << state->values[0]  << "\n";
 }
 
-void PrintPublicStatesStats(const std::vector<PublicState>& public_leaves) {
-  for (const PublicState& state : public_leaves) {
-    std::array<int, 2>
-        num_nodes = {(int) state.nodes[0].size(),
-                     (int) state.nodes[1].size()},
-        largest_infostates = {-1, -1},
-        smallest_infostates = {1000000, 1000000};
-    int num_states = 0;
-    for (int pl = 0; pl < 2; ++pl) {
-      for (const algorithms::InfostateNode* node : state.nodes[pl]) {
-        int size = node->corresponding_states_size();
-        if (pl == 0) num_states += size;
-        largest_infostates[pl] = std::max(largest_infostates[pl], size);
-        smallest_infostates[pl] = std::min(smallest_infostates[pl], size);
-      }
-    }
-    std::cout << "# Public state #" << state.public_id
-              << (state.IsTerminal() ? " (terminal)" : "")
-              << "  states: " << num_states
-              << "  infostates: " << num_nodes
-              << "  largest infostate: " << largest_infostates
-              << "  smallest infostate: " << smallest_infostates << '\n';
-  }
+// -- Shorthand factories ------------------------------------------------------
+
+std::shared_ptr<PublicStateEvaluator> MakeTerminalEvaluator() {
+  return std::make_shared<TerminalEvaluator>();
 }
 
-bool contains(std::vector<const algorithms::InfostateNode*>& xs,
-              const algorithms::InfostateNode* x) {
-  return std::find(xs.begin(), xs.end(), x) != xs.end();
+std::shared_ptr<PublicStateEvaluator> MakeDummyEvaluator() {
+  return std::make_shared<DummyEvaluator>();
 }
 
-void MakeReachesAndValuesForPublicStates(std::vector<PublicState>& states) {
-  for (PublicState& state : states) {
-    for (int pl = 0; pl < 2; ++pl) {
-      const int num_nodes = state.nodes[pl].size();
-      state.beliefs[pl] = std::vector<double>(num_nodes, 1.);
-      state.values[pl] = std::vector<double>(num_nodes, 0.);
-      state.average_values[pl] = std::vector<double>(num_nodes, 0.);
-    }
-  }
-}
+std::shared_ptr<PublicStateEvaluator> MakeApproxOracleEvaluator(
+    std::shared_ptr<const Game> game, int cfr_iterations) {
 
-// TODO: optional plumbing of observers
-std::unique_ptr<PublicStatesInGame> MakeAllPublicStates(const Game& game) {
-  auto all = std::make_unique<PublicStatesInGame>();
-  constexpr int store_all_states = algorithms::kStoreStatesInLeaves
-      | algorithms::kStoreStatesInRoots
-      | algorithms::kStoreStatesInBody;
-  for (int pl = 0; pl < 2; ++pl) {
-    all->infostate_trees.push_back(algorithms::MakeInfostateTree(
-        game, pl, algorithms::kNoMoveAheadLimit, store_all_states));
-  }
+  std::shared_ptr<const PublicStateEvaluator> dummy_evaluator =
+      MakeDummyEvaluator();
   std::shared_ptr<Observer> public_observer =
-      game.MakeObserver(kPublicStateObsType, {});
-  Observation public_observation(game, public_observer);
-  for (int pl = 0; pl < 2; ++pl) {
-    const std::vector<std::vector<algorithms::InfostateNode*>>& nodes_at_depths =
-        all->infostate_trees[pl]->nodes_at_depths();
-    for (int depth = 0; depth < nodes_at_depths.size(); ++depth) {
-      for (algorithms::InfostateNode* node : nodes_at_depths[depth]) {
-        // Some nodes may not have corresponding states, even though we
-        // requested to save states at all the nodes (like root, or nodes added
-        // due to  rebalancing)
-        if (node->corresponding_states().empty()) continue;
+      game->MakeObserver(kPublicStateObsType, {});
+  std::shared_ptr<Observer> infostate_observer =
+      game->MakeObserver(kInfoStateObsType, {});
 
-        const std::unique_ptr<State>& some_state =
-            node->corresponding_states()[0];
-        public_observation.SetFrom(*some_state, kDefaultPlayerId);
-        SPIEL_DCHECK_TRUE(DoStatesProduceEqualPublicObservations(
-            game, public_observer, *node, public_observation.Tensor()));
-        PublicState* state = all->GetPublicState(public_observation);
-        if (state->move_number == -1) {
-          state->move_number = some_state->MoveNumber();
-        } else {
-          SPIEL_CHECK_EQ(state->move_number, some_state->MoveNumber());
-        }
-        SPIEL_DCHECK_FALSE(contains(state->nodes[pl], node->parent()));
-        state->nodes[pl].push_back(node);
-      }
-    }
-  }
-  // Init.
-  MakeReachesAndValuesForPublicStates(all->public_states);
+  std::shared_ptr<const PublicStateEvaluator> terminal_evaluator =
+      MakeTerminalEvaluator();
 
-  return all;
+  return std::make_shared<CFREvaluator>(game, algorithms::kNoMoveAheadLimit,
+                                        dummy_evaluator, terminal_evaluator,
+                                        public_observer, infostate_observer,
+                                        cfr_iterations);
 }
-
-PublicState* PublicStatesInGame::GetPublicState(
-    const Observation& public_observation) {
-  for (PublicState& state : public_states) {
-    if (state.public_tensor == public_observation
-        && state.state_type == kInitialPublicState) {
-      return &state;
-    }
-  }
-  // None found: create and return the pointer.
-  public_states.emplace_back(public_observation,
-                             kInitialPublicState,
-                             public_states.size());
-  return &public_states.back();
-}
-
 
 }  // namespace papers_with_code
 }  // namespace open_spiel

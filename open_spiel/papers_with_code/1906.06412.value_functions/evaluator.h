@@ -68,19 +68,6 @@ class TerminalEvaluator final : public PublicStateEvaluator {
       PublicState* state, PublicStateContext* context) const override;
 };
 
-
-// -- Dummy evaluator ----------------------------------------------------------
-
-// Evaluator that does nothing.
-struct DummyEvaluator : public PublicStateEvaluator {
-  std::unique_ptr<PublicStateContext> CreateContext(
-      const PublicState& state) const override { return nullptr; };
-  void ResetContext(PublicStateContext* context) const override {};
-  void EvaluatePublicState(PublicState* public_state,
-                           PublicStateContext* context) const override {};
-};
-
-
 // -- CFR evaluator ------------------------------------------------------------
 
 
@@ -111,8 +98,11 @@ struct CFREvaluator : public PublicStateEvaluator {
 };
 
 
-std::shared_ptr<PublicStateEvaluator> MakeTerminalEvaluator();
+// -- Shorthand factories ------------------------------------------------------
+
+// Evaluator that does nothing.
 std::shared_ptr<PublicStateEvaluator> MakeDummyEvaluator();
+std::shared_ptr<PublicStateEvaluator> MakeTerminalEvaluator();
 // CFR evaluator that makes a large number of iterations.
 std::shared_ptr<PublicStateEvaluator> MakeApproxOracleEvaluator(
     std::shared_ptr<const Game> game, int cfr_iterations = 100000);

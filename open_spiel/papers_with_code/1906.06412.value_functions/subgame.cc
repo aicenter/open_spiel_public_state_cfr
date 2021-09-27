@@ -305,5 +305,91 @@ std::unique_ptr<Subgame> MakeSubgame(const PublicState& state,
   return out;
 }
 
+void PrintPublicStatesStats(const std::vector<PublicState>& public_leaves) {
+  for (const PublicState& state : public_leaves) {
+    std::array<int, 2>
+        num_nodes = {(int) state.nodes[0].size(),
+                     (int) state.nodes[1].size()},
+        largest_infostates = {-1, -1},
+        smallest_infostates = {1000000, 1000000};
+    int num_states = 0;
+    for (int pl = 0; pl < 2; ++pl) {
+      for (const algorithms::InfostateNode* node : state.nodes[pl]) {
+        int size = node->corresponding_states_size();
+        if (pl == 0) num_states += size;
+        largest_infostates[pl] = std::max(largest_infostates[pl], size);
+        smallest_infostates[pl] = std::min(smallest_infostates[pl], size);
+      }
+    }
+    std::cout << "# Public state #" << state.public_id
+              << (state.IsTerminal() ? " (terminal)" : "")
+              << "  states: " << num_states
+              << "  infostates: " << num_nodes
+              << "  largest infostate: " << largest_infostates
+              << "  smallest infostate: " << smallest_infostates << '\n';
+  }
+}
+
+
+// TODO: optional plumbing of observers
+std::unique_ptr<PublicStatesInGame> MakeAllPublicStates(const Game& game) {
+  auto all = std::make_unique<PublicStatesInGame>();
+  constexpr int store_all_states = algorithms::kStoreStatesInLeaves
+      | algorithms::kStoreStatesInRoots
+      | algorithms::kStoreStatesInBody;
+  for (int pl = 0; pl < 2; ++pl) {
+    all->infostate_trees.push_back(algorithms::MakeInfostateTree(
+        game, pl, algorithms::kNoMoveAheadLimit, store_all_states));
+  }
+  std::shared_ptr<Observer> public_observer =
+      game.MakeObserver(kPublicStateObsType, {});
+  Observation public_observation(game, public_observer);
+  for (int pl = 0; pl < 2; ++pl) {
+    const std::vector<std::vector<algorithms::InfostateNode*>>& nodes_at_depths =
+        all->infostate_trees[pl]->nodes_at_depths();
+    for (int depth = 0; depth < nodes_at_depths.size(); ++depth) {
+      for (algorithms::InfostateNode* node : nodes_at_depths[depth]) {
+        // Some nodes may not have corresponding states, even though we
+        // requested to save states at all the nodes (like root, or nodes added
+        // due to  rebalancing)
+        if (node->corresponding_states().empty()) continue;
+
+        const std::unique_ptr<State>& some_state =
+            node->corresponding_states()[0];
+        public_observation.SetFrom(*some_state, kDefaultPlayerId);
+        SPIEL_DCHECK_TRUE(DoStatesProduceEqualPublicObservations(
+            game, public_observer, *node, public_observation.Tensor()));
+        PublicState* state = all->GetPublicState(public_observation);
+        if (state->move_number == -1) {
+          state->move_number = some_state->MoveNumber();
+        } else {
+          SPIEL_CHECK_EQ(state->move_number, some_state->MoveNumber());
+        }
+        SPIEL_DCHECK_FALSE(contains(state->nodes[pl], node->parent()));
+        state->nodes[pl].push_back(node);
+      }
+    }
+  }
+  // Init.
+  MakeReachesAndValuesForPublicStates(all->public_states);
+
+  return all;
+}
+
+PublicState* PublicStatesInGame::GetPublicState(
+    const Observation& public_observation) {
+  for (PublicState& state : public_states) {
+    if (state.public_tensor == public_observation
+        && state.state_type == kInitialPublicState) {
+      return &state;
+    }
+  }
+  // None found: create and return the pointer.
+  public_states.emplace_back(public_observation,
+                             kInitialPublicState,
+                             public_states.size());
+  return &public_states.back();
+}
+
 }  // namespace papers_with_code
 }  // namespace open_spiel
