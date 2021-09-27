@@ -86,6 +86,15 @@ enum InfostateNodeType {
   kTerminalInfostateNode
 };
 
+struct PokerData {
+  PokerData(int num_cards, int num_hands, std::vector<std::string> card_mask) :
+  num_cards_(num_cards), num_hands_(num_hands), card_mask_(std::move(card_mask)) {}
+
+  int num_cards_;
+  int num_hands_;
+  std::vector<std::string> card_mask_;
+};
+
 // Representing the game via infostates leads actually to a graph structure
 // of a forest (a collection of trees), as the player may be acting for the
 // first time in distinct situations. We trivially make it into a proper tree
@@ -384,7 +393,7 @@ std::vector<std::shared_ptr<InfostateTree>> MakeResolvingInfostateTrees(
 std::vector<std::shared_ptr<InfostateTree>> MakePokerInfostateTrees(
     const std::unique_ptr<State> &start_state,
     const std::vector<double> &chance_reach_probs,
-    const std::shared_ptr<Observer>& infostate_observer,
+    const std::shared_ptr<Observer> &infostate_observer,
     int max_move_ahead_limit,
     int storage_policy);
 
@@ -582,7 +591,27 @@ class InfostateTree final {
 
     move_limit_ = start_state->MoveNumber() + max_move_ahead_limit;
 
-    RecursivelyBuildPokerTree(root_.get(), /*depth=*/1, *start_state, chance_reach_probs);
+    auto poker_game = down_cast<const universal_poker::UniversalPokerGame &>(*start_state->GetGame()).GetACPCGame();
+    int cards_in_deck = poker_game->NumRanksDeck() * poker_game->NumSuitsDeck();
+    int cards_in_hand = poker_game->GetNbHoleCardsRequired();
+    int num_hands = 1;
+    for (int i = 0; i < cards_in_hand; i++) {
+      num_hands = num_hands * (cards_in_deck - i) / (i + 1);
+    }
+
+    std::vector<std::string> card_mask;
+    auto initial_state = start_state->GetGame()->NewInitialState();
+    for (Action action : initial_state->LegalActions()) {
+      card_mask.push_back(initial_state->Child(action)->InformationStateString(0).substr(23, 2));
+    }
+
+    SPIEL_CHECK_EQ(chance_reach_probs.size(), num_hands);
+
+    PokerData poker_data(cards_in_deck, num_hands, card_mask);
+
+    RecursivelyBuildPokerTree(
+        std::vector<InfostateNode *>(num_hands, root_.get()), /*depth=*/1,
+        *start_state, chance_reach_probs, poker_data);
 
     // Operations to make after building the tree.
     RebalanceTree();
@@ -645,6 +674,11 @@ class InfostateTree final {
                                           bool terminate = false);
   std::unique_ptr<InfostateNode> MakeRootNode() const;
 
+  static std::pair<std::string, std::string> ExtractInfostateString(const std::string &infostate_string);
+
+  static std::string ConstructInfostateString(
+      const std::pair<std::string, std::string> &parts, int card_one,
+      int card_two, const std::vector<std::string> &card_mask);
   // Makes sure that all tree leaves are at the same height.
   // It inserts a linked list of dummy observation nodes with appropriate length
   // to balance all the leaves.
@@ -669,7 +703,20 @@ class InfostateTree final {
 
   // Build tree specifically for poker
   void RecursivelyBuildPokerTree(
-      InfostateNode *parent, size_t depth, const State &state, const std::vector<double> &chance_reach_prob);
+      const std::vector<InfostateNode *> &parents, size_t depth, const State &state,
+      const std::vector<double> &chance_reach_probs, const PokerData& poker_data);
+
+  void BuildTerminalPokerNodes(
+      const std::vector<InfostateNode *> &parents, size_t depth, const State &state,
+      const std::vector<double> &chance_reach_probs, const PokerData &poker_data);
+
+  void BuildDecisionPokerNodes(
+      const std::vector<InfostateNode *> &parents, size_t depth, const State &state,
+      const std::vector<double> &chance_reach_probs, const PokerData &poker_data);
+
+  void BuildObservationPokerNode(
+      const std::vector<InfostateNode *> &parents, size_t depth, const State &state,
+      const std::vector<double> &chance_reach_probs, const PokerData &poker_data);
 
   void CollectNodesAtDepth(InfostateNode *node, size_t depth);
   void LabelNodesWithIds();

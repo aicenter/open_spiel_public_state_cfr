@@ -286,14 +286,137 @@ void InfostateTree::AddCorrespondingState(InfostateNode *node,
   }
 }
 
+std::pair<std::string, std::string> InfostateTree::ExtractInfostateString(const std::string &infostate_string) {
+  return {infostate_string.substr(0, 13), infostate_string.substr(28)};
+}
+
+std::string InfostateTree::ConstructInfostateString(
+    const std::pair<std::string, std::string> &parts, int card_one,
+    int card_two, const std::vector<std::string> &card_mask) {
+  return parts.first + "[Private: " + card_mask[card_one] + card_mask[card_two] + "]" + parts.second;
+}
+
 void InfostateTree::RecursivelyBuildPokerTree(
-    InfostateNode *parent, size_t depth, const State &state, const std::vector<double> &chance_reach_prob) {
+    const std::vector<InfostateNode *> &parents, size_t depth, const State &state,
+    const std::vector<double> &chance_reach_probs, const PokerData &poker_data) {
   // If we are building safe resolving trees, we have to add additional
   // nodes before going into the actual nodes.
   if (is_resolving_tree_ and depth == 1) {
     SpielFatalError("Not implemented.");
   }
-  std::cout << "Without error reached the recusive building Which is not implemented yet.\n";
+
+  if (state.IsTerminal()) {
+    BuildTerminalPokerNodes(parents, depth, state, chance_reach_probs, poker_data);
+  } else if (state.IsPlayerActing(acting_player_)) {
+    BuildDecisionPokerNodes(parents, depth, state, chance_reach_probs, poker_data);
+  } else {
+    BuildObservationPokerNode(parents, depth, state, chance_reach_probs, poker_data);
+  }
+}
+
+void InfostateTree::BuildTerminalPokerNodes(
+    const std::vector<InfostateNode *> &parents, size_t depth, const State &state,
+    const std::vector<double> &chance_reach_probs, const PokerData &poker_data) {
+  // Get poker state
+  auto poker_state = down_cast<const open_spiel::universal_poker::UniversalPokerState&>(state);
+
+  // Set terminal utility based on call or
+  int acting_player_ante = poker_state.acpc_state().Ante(acting_player_);
+  int opponent_ante = poker_state.acpc_state().Ante(1 - acting_player_);
+  int terminal_utility = acting_player_ante;
+  if (acting_player_ante > opponent_ante) {
+    terminal_utility = opponent_ante;
+  } else if (acting_player_ante < opponent_ante) {
+    terminal_utility = -acting_player_ante;
+  }
+
+  std::pair<std::string, std::string>
+      parts = ExtractInfostateString(infostate_observer_->StringFrom(state, acting_player_));
+
+  int hand_index = 0;
+  for (int card_one = 0; card_one < poker_data.num_cards_ - 1; card_one++) {
+    for (int card_two = card_one + 1; card_two < poker_data.num_cards_; card_two++) {
+      parents[hand_index]->AddChild(
+          MakeNode(parents[hand_index], kTerminalInfostateNode,
+                   ConstructInfostateString(parts, card_one, card_two, poker_data.card_mask_),
+                   terminal_utility, chance_reach_probs[hand_index], depth, &state));
+
+      hand_index++;
+    }
+  }
+
+  UpdateLeafNode(depth);
+}
+
+void InfostateTree::BuildDecisionPokerNodes(
+    const std::vector<InfostateNode *> &parents, size_t depth, const State &state,
+    const std::vector<double> &chance_reach_probs, const PokerData &poker_data) {
+  const bool is_leaf_node = state.MoveNumber() >= move_limit_;
+  std::pair<std::string, std::string>
+      parts = ExtractInfostateString(infostate_observer_->StringFrom(state, acting_player_));
+
+  std::vector<InfostateNode *> new_parents;
+  new_parents.reserve(poker_data.num_hands_);
+
+  int hand_index = 0;
+  for (int card_one = 0; card_one < poker_data.num_cards_ - 1; card_one++) {
+    for (int card_two = card_one + 1; card_two < poker_data.num_cards_; card_two++) {
+      new_parents.push_back(parents[hand_index]->AddChild(
+          MakeNode(parents[hand_index], kDecisionInfostateNode,
+                   ConstructInfostateString(parts, card_one, card_two, poker_data.card_mask_),
+              /*terminal_utility=*/NAN, /*chance_reach_prob=*/NAN, depth, &state)));
+      hand_index++;
+    }
+  }
+  if (is_leaf_node) {
+    UpdateLeafNode(depth);
+    return;
+  }
+  for (Action action : state.LegalActions()) {
+    RecursivelyBuildPokerTree(new_parents, depth + 1, *state.Child(action), chance_reach_probs, poker_data);
+  }
+}
+
+void InfostateTree::BuildObservationPokerNode(
+    const std::vector<InfostateNode *> &parents, size_t depth, const State &state,
+    const std::vector<double> &chance_reach_probs, const PokerData &poker_data) {
+  SPIEL_DCHECK_TRUE(state.IsChanceNode() ||
+      !state.IsPlayerActing(acting_player_));
+  const bool is_leaf_node = state.MoveNumber() >= move_limit_;
+
+  std::pair<std::string, std::string>
+      parts = ExtractInfostateString(infostate_observer_->StringFrom(state, acting_player_));
+
+  std::vector<InfostateNode *> new_parents;
+  new_parents.reserve(poker_data.num_hands_);
+
+  int hand_index = 0;
+  for (int card_one = 0; card_one < poker_data.num_cards_ - 1; card_one++) {
+    for (int card_two = card_one + 1; card_two < poker_data.num_cards_; card_two++) {
+      new_parents.push_back(parents[hand_index]->AddChild(
+          MakeNode(parents[hand_index], kObservationInfostateNode,
+                   ConstructInfostateString(parts, card_one, card_two, poker_data.card_mask_),
+              /*terminal_utility=*/NAN, /*chance_reach_prob=*/NAN, depth, &state)));
+      hand_index++;
+    }
+  }
+  if (is_leaf_node) {
+    UpdateLeafNode(depth);
+    return;   // Do not build deeper.
+  }
+
+  // TODO: Change ranges correctly
+  if (state.IsChanceNode()) {
+    for (std::pair<Action, double> action_prob : state.ChanceOutcomes()) {
+      std::unique_ptr<State> child = state.Child(action_prob.first);
+      RecursivelyBuildPokerTree(new_parents, depth + 1, *child, chance_reach_probs, poker_data);
+    }
+  } else {
+    for (Action a : state.LegalActions()) {
+      std::unique_ptr<State> child = state.Child(a);
+      RecursivelyBuildPokerTree(new_parents, depth + 1, *child, chance_reach_probs, poker_data);
+    }
+  }
 }
 
 void InfostateTree::RecursivelyBuildTree(InfostateNode *parent, size_t depth,
@@ -528,6 +651,7 @@ void InfostateTree::BuildObservationNode(InfostateNode *parent, size_t depth,
     }
   }
 }
+
 int InfostateTree::root_branching_factor() const {
   return root_->num_children();
 }
@@ -599,7 +723,7 @@ std::shared_ptr<InfostateTree> MakeInfostateTree(
 std::shared_ptr<InfostateTree> MakePokerInfostateTree(
     const std::unique_ptr<State> &start_state,
     const std::vector<double> &chance_reach_probs,
-    const std::shared_ptr<Observer>& infostate_observer,
+    const std::shared_ptr<Observer> &infostate_observer,
     Player acting_player,
     int max_move_ahead_limit,
     int storage_policy) {
@@ -713,7 +837,7 @@ std::vector<std::shared_ptr<InfostateTree>> MakeInfostateTrees(
 std::vector<std::shared_ptr<InfostateTree>> MakePokerInfostateTrees(
     const std::unique_ptr<State> &start_state,
     const std::vector<double> &chance_reach_probs,
-    const std::shared_ptr<Observer>& infostate_observer,
+    const std::shared_ptr<Observer> &infostate_observer,
     int max_move_ahead_limit,
     int storage_policy) {
   std::vector<std::shared_ptr<InfostateTree>> trees;
