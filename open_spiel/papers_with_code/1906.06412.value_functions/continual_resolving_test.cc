@@ -101,13 +101,13 @@ void TestBasicCFVs() {
   leaf_evaluator->bandit_name = "RegretMatching";
   leaf_evaluator->nonterminal_evaluator = leaf_evaluator;
   leaf_evaluator->num_cfr_iterations = 1;
-  leaf_evaluator->save_values_policy = PolicySelection::kCurrentPolicy;
+  leaf_evaluator->save_values_policy = algorithms::PolicySelection::kCurrentPolicy;
 
   auto subgame = std::make_shared<Subgame>(game, /*max_moves=*/1);
   auto subgame_solver = std::make_unique<SubgameSolver>(
       subgame, leaf_evaluator, terminal_evaluator,
       /*rnd_gen=*/nullptr, "RegretMatching",
-      PolicySelection::kCurrentPolicy, /*safe_resolving=*/true);
+      algorithms::PolicySelection::kCurrentPolicy, /*safe_resolving=*/true);
 
   // We do 5 iterations and check the CFVs after each iteration.
   for (int i = 0; i < trunk_iterations; i++) {
@@ -143,7 +143,7 @@ void TestKuhnGadget() {
   auto subgame = subgame_factory->MakeTrunk(3);
   auto solver = std::make_unique<SubgameSolver>(
       subgame, MakeApproxOracleEvaluator(game), MakeTerminalEvaluator(),
-      /*rnd_gen=*/nullptr, "FixableStrategy", PolicySelection::kAveragePolicy, true);
+      /*rnd_gen=*/nullptr, "FixableStrategy", algorithms::PolicySelection::kAveragePolicy, true);
 
   TabularPolicy optimal_policy = kuhn_poker::GetOptimalPolicy(/*alpha=*/0);
 

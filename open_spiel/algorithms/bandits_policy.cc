@@ -205,6 +205,11 @@ void RandomizeDecisionPoint(ActionsAndProbs& policy,
   }
 }
 
+algorithms::PolicySelection GetSaveValuesPolicy(const std::string& s) {
+  if (s == "current") return algorithms::PolicySelection::kCurrentPolicy;
+  if (s == "average") return algorithms::PolicySelection::kAveragePolicy;
+  SpielFatalError("Exhausted pattern match for PolicySelection");
+}
 
 }  // namespace algorithms
 }  // namespace open_spiel

@@ -157,7 +157,7 @@ std::unordered_map<std::string, double> SherlockBot::GetOpponentCfvs(
 
   if (solver_factory_->opponent_cfvs_selection == kAverageOfCurrentValues) {
     SPIEL_CHECK_TRUE(solver_factory_->save_values_policy ==
-                     PolicySelection::kAveragePolicy);
+                     algorithms::PolicySelection::kAveragePolicy);
     return state.InfostateAvgValues(1 - player_id_);
 
   } else if(solver_factory_->opponent_cfvs_selection == kOracleValueForAverageBeliefs) {

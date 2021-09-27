@@ -287,8 +287,8 @@ void TrainEvalLoop() {
   }
   //
   std::cout << "# Making oracle evaluator ..." << std::endl;
-  const PolicySelection save_values_policy =
-      GetSaveValuesPolicy(absl::GetFlag(FLAGS_save_values_policy));
+  const algorithms::PolicySelection save_values_policy =
+      algorithms::GetSaveValuesPolicy(absl::GetFlag(FLAGS_save_values_policy));
   auto terminal_evaluator = std::make_shared<TerminalEvaluator>();
   auto oracle = std::make_shared<CFREvaluator>(
       subgame_factory->game, algorithms::kNoMoveAheadLimit,
