@@ -229,6 +229,28 @@ class PublicStateEvaluator {
       PublicState* public_state, PublicStateContext* context) const = 0;
 };
 
+// Terminal evaluator for poker
+
+struct PokerTerminalPublicStateContext final : public PublicStateContext {
+  bool fold_state_;
+  std::vector<double> utilities_;
+  explicit PokerTerminalPublicStateContext(const PublicState& state);
+};
+
+class PokerTerminalEvaluator final : public PublicStateEvaluator {
+ public:
+  PokerTerminalEvaluator(algorithms::PokerData poker_data, std::vector<int> board_cards);
+
+  std::unique_ptr<PublicStateContext> CreateContext(
+      const PublicState& state) const override;
+  void EvaluatePublicState(
+      PublicState* state, PublicStateContext* context) const override;
+  static int ConvertToFullPokerCard(int card, const algorithms::PokerData &poker_data);
+ private:
+  algorithms::PokerData poker_data_;
+  std::vector<std::vector<int>> ordered_hands_;
+};
+
 // -- Terminal evaluator -------------------------------------------------------
 
 struct TerminalPublicStateContext final : public PublicStateContext {
@@ -247,6 +269,7 @@ class TerminalEvaluator final : public PublicStateEvaluator {
       PublicState* state, PublicStateContext* context) const override;
 };
 
+std::shared_ptr<PublicStateEvaluator> MakePokerTerminalEvaluator(algorithms::PokerData poker_data, std::vector<int> cards);
 std::shared_ptr<PublicStateEvaluator> MakeTerminalEvaluator();
 std::shared_ptr<PublicStateEvaluator> MakeDummyEvaluator();
 // CFR evaluator that makes a large number of iterations.

@@ -24,7 +24,7 @@ namespace papers_with_code {
 
 namespace {
 
-void CheckConsistency(const PublicState& s) {
+void CheckConsistency(const PublicState &s) {
   // All leaf nodes must be indeed leaf nodes and belong to correct players.
   // They should all be terminal or non-terminal.
   // The set of corresponding states must be the same across players.
@@ -33,29 +33,29 @@ void CheckConsistency(const PublicState& s) {
   using History = std::vector<Action>;
   std::unordered_set<History, absl::Hash<History>> state_histories;
   for (int pl = 0; pl < 2; ++pl) {
-    for (const algorithms::InfostateNode* node : s.nodes[pl]) {
+    for (const algorithms::InfostateNode *node : s.nodes[pl]) {
       SPIEL_CHECK_TRUE(!s.IsLeaf() || node->is_leaf_node());
       SPIEL_CHECK_EQ(node->tree().acting_player(), pl);
       if (node->type() == algorithms::kTerminalInfostateNode) num_terminals++;
       else num_nonterminals++;
 
-      for (const std::unique_ptr<State>& state : node->corresponding_states()) {
-        std::unique_ptr<std::vector<Action>> h;
-        if (node->type() == algorithms::kTerminalInfostateNode) {
-          h = std::make_unique<std::vector<Action>>(node->TerminalHistory());
-        } else {
-          h = std::make_unique<std::vector<Action>>(state->History());
-        }
-        if (pl == 0) {
-          SPIEL_CHECK_TRUE(state_histories.find(*h) == state_histories.end());
-          state_histories.insert(*h);
-        } else {
-          SPIEL_CHECK_TRUE(state_histories.find(*h) != state_histories.end());
-        }
-
-//        if (state->IsTerminal()) num_terminals++;
-//        else num_nonterminals++;
-      }
+//      for (const std::unique_ptr<State> &state : node->corresponding_states()) {
+//        std::unique_ptr<std::vector<Action>> h;
+//        if (node->type() == algorithms::kTerminalInfostateNode) {
+//          h = std::make_unique<std::vector<Action>>(node->TerminalHistory());
+//        } else {
+//          h = std::make_unique<std::vector<Action>>(state->History());
+//        }
+//        if (pl == 0) {
+//          SPIEL_CHECK_TRUE(state_histories.find(*h) == state_histories.end());
+//          state_histories.insert(*h);
+//        } else {
+//          SPIEL_CHECK_TRUE(state_histories.find(*h) != state_histories.end());
+//        }
+//
+////        if (state->IsTerminal()) num_terminals++;
+////        else num_nonterminals++;
+//      }
     }
   }
   SPIEL_CHECK_FALSE(num_terminals > 0 && num_nonterminals > 0);
@@ -65,12 +65,12 @@ void CheckConsistency(const PublicState& s) {
 }
 
 bool DoStatesProduceEqualPublicObservations(
-    const Game& game, std::shared_ptr<Observer> public_observer,
-    const algorithms::InfostateNode& node, absl::Span<float> expected_observation) {
+    const Game &game, std::shared_ptr<Observer> public_observer,
+    const algorithms::InfostateNode &node, absl::Span<float> expected_observation) {
   Observation public_observation(game, public_observer);
 
   // Check that indeed all states produce the same public observations.
-  for (const std::unique_ptr<State>& state : node.corresponding_states()) {
+  for (const std::unique_ptr<State> &state : node.corresponding_states()) {
     public_observation.SetFrom(*state, kDefaultPlayerId);
     if (public_observation.Tensor() != expected_observation) return false;
   }
@@ -78,23 +78,23 @@ bool DoStatesProduceEqualPublicObservations(
 }
 
 void CheckChildPublicStateConsistency(
-    const CFRContext& cfr_public_state, const PublicState& leaf_state) {
+    const CFRContext &cfr_public_state, const PublicState &leaf_state) {
   SPIEL_CHECK_TRUE(leaf_state.IsLeaf());
   auto trees = cfr_public_state.dlcfr->subgame()->trees;
   for (int pl = 0; pl < 2; ++pl) {
-    const algorithms::InfostateNode& root = trees[pl]->root();
+    const algorithms::InfostateNode &root = trees[pl]->root();
     SPIEL_CHECK_EQ(leaf_state.nodes[pl].size(), root.num_children());
     for (int i = 0; i < root.num_children(); ++i) {
-      const algorithms::InfostateNode& actual = *root.child_at(i);
-      const algorithms::InfostateNode& expected = *leaf_state.nodes[pl][i];
+      const algorithms::InfostateNode &actual = *root.child_at(i);
+      const algorithms::InfostateNode &expected = *leaf_state.nodes[pl][i];
       SPIEL_CHECK_EQ(actual.infostate_string(), expected.infostate_string());
     }
   }
   // All OK.
 }
 
-void MakeReachesAndValuesForPublicStates(std::vector<PublicState>& states) {
-  for (PublicState& state : states) {
+void MakeReachesAndValuesForPublicStates(std::vector<PublicState> &states) {
+  for (PublicState &state : states) {
     for (int pl = 0; pl < 2; ++pl) {
       const int num_nodes = state.nodes[pl].size();
       state.beliefs[pl] = std::vector<double>(num_nodes, 1.);
@@ -110,7 +110,7 @@ std::vector<std::unique_ptr<PublicStateContext>> MakeContexts(
     const std::shared_ptr<const PublicStateEvaluator> terminal_evaluator) {
   std::vector<std::unique_ptr<PublicStateContext>> contexts;
   contexts.reserve(subgame->public_states.size());
-  for (const PublicState& state : subgame->public_states) {
+  for (const PublicState &state : subgame->public_states) {
     SPIEL_DCHECK(CheckConsistency(state));
     if (state.IsTerminal()) {
       contexts.push_back(terminal_evaluator->CreateContext(state));
@@ -128,7 +128,7 @@ std::vector<std::unique_ptr<PublicStateContext>> MakeContexts(
 
 // -- Public state -------------------------------------------------------------
 
-PublicState::PublicState(const Observation& public_observation,
+PublicState::PublicState(const Observation &public_observation,
                          const PublicStateType state_type,
                          const size_t public_id)
     : public_tensor(public_observation), state_type(state_type),
@@ -149,8 +149,8 @@ double PublicState::ReachProbability() const {
   for (int pl = 0; pl < 2; ++pl) {
     for (int i = 0; i < nodes[pl].size(); ++i) {
       for (int k = 0; k < nodes[pl][i]->corresponding_states_size(); ++k) {
-        State* s = nodes[pl][i]->corresponding_states()[k].get();
-        const std::vector<State::PlayerAction>& h = s->FullHistory();
+        State *s = nodes[pl][i]->corresponding_states()[k].get();
+        const std::vector<State::PlayerAction> &h = s->FullHistory();
         if (pl == 0) {
           const double chn = nodes[pl][i]->corresponding_chance_reach_probs()[k];
           reach_map[h] = chn * beliefs[pl][i];
@@ -165,7 +165,7 @@ double PublicState::ReachProbability() const {
 }
 
 bool PublicState::IsReachableByPlayer(int player) const {
-  for (const double& belief : beliefs[player]) {
+  for (const double &belief : beliefs[player]) {
     if (belief > 0) return true;
   }
   return false;
@@ -190,7 +190,7 @@ double PublicState::AverageValue(int player) const {
 }
 
 void PublicState::SetBeliefs(
-    const std::array<std::vector<double>, 2>& new_beliefs) {
+    const std::array<std::vector<double>, 2> &new_beliefs) {
   SPIEL_CHECK_EQ(new_beliefs[0].size(), nodes[0].size());
   SPIEL_CHECK_EQ(new_beliefs[1].size(), nodes[1].size());
   beliefs = new_beliefs;
@@ -235,9 +235,9 @@ void Subgame::MakePublicStates() {
   // Save nodes for initial (root) public state.
   for (int pl = 0; pl < 2; ++pl) {
     for (int i = 0; i < trees[pl]->root_branching_factor(); ++i) {
-      algorithms::InfostateNode* root_node = trees[pl]->root().child_at(i);
+      algorithms::InfostateNode *root_node = trees[pl]->root().child_at(i);
       SPIEL_CHECK_TRUE(root_node->is_root_child());
-      PublicState* init_state = GetPublicState(
+      PublicState *init_state = GetPublicState(
           public_observation, kInitialPublicState, root_node);
       init_state->nodes[pl].push_back(root_node);
       init_state->nodes_positions[root_node] = i;
@@ -254,9 +254,9 @@ void Subgame::MakePublicStates() {
   // Save node positions for leaf public states.
   for (int pl = 0; pl < 2; ++pl) {
     for (int i = 0; i < trees[pl]->num_leaves(); ++i) {
-      algorithms::InfostateNode* leaf_node = trees[pl]->leaf_nodes()[i];
+      algorithms::InfostateNode *leaf_node = trees[pl]->leaf_nodes()[i];
       SPIEL_CHECK_TRUE(leaf_node->is_leaf_node());
-      PublicState* leaf_state = GetPublicState(public_observation,
+      PublicState *leaf_state = GetPublicState(public_observation,
                                                kLeafPublicState, leaf_node);
       leaf_state->nodes[pl].push_back(leaf_node);
       leaf_state->nodes_positions[leaf_node] = i;
@@ -264,28 +264,29 @@ void Subgame::MakePublicStates() {
   }
 }
 
-PublicState* Subgame::GetPublicState(Observation& public_observation,
+PublicState *Subgame::GetPublicState(Observation &public_observation,
                                      PublicStateType state_type,
-                                     algorithms::InfostateNode* node) {
+                                     algorithms::InfostateNode *node) {
   SPIEL_CHECK_FALSE(node->corresponding_states().empty());
-  const std::unique_ptr<State>& some_state = node->corresponding_states()[0];
+  const std::unique_ptr<State> &some_state = node->corresponding_states()[0];
   public_observation.SetFrom(*some_state, kDefaultPlayerId);
   SPIEL_DCHECK_TRUE(DoStatesProduceEqualPublicObservations(
       *game, public_observer, *node, public_observation.Tensor()));
-  PublicState* state = GetPublicState(public_observation, state_type);
+  PublicState *state = GetPublicState(public_observation, state_type);
   if (state->move_number == -1) {
     state->move_number = some_state->MoveNumber();
   } else {
-    SPIEL_CHECK_EQ(state->move_number, some_state->MoveNumber());
+//    SPIEL_CHECK_EQ(state->move_number, some_state->MoveNumber());
   }
   return state;
 }
 
-PublicState* Subgame::GetPublicState(const Observation& public_observation,
+PublicState *Subgame::GetPublicState(const Observation &public_observation,
                                      PublicStateType state_type) {
-  for (PublicState& state : public_states) {
+  for (PublicState &state : public_states) {
     if (state.public_tensor == public_observation
-        && state.state_type == state_type) return &state;
+        && state.state_type == state_type)
+      return &state;
   }
   // None found: create and return the pointer.
   public_states.emplace_back(public_observation,
@@ -298,14 +299,14 @@ void Subgame::MakeBeliefsAndValues() {
   MakeReachesAndValuesForPublicStates(public_states);
 }
 
-PublicState* Subgame::PickRandomLeaf(std::mt19937& rnd_gen) {
+PublicState *Subgame::PickRandomLeaf(std::mt19937 &rnd_gen) {
   // Pick some valid public state.
   // Loop until we find one. There should be always one -- or perhaps
   // the subgame is too deep, getting into terminal states only.
   int num_states = public_states.size();
   auto public_state_dist = std::uniform_int_distribution<>(0, num_states - 1);
   int pick_public_state;
-  PublicState* state = nullptr;
+  PublicState *state = nullptr;
   while (!state || state->IsTerminal() || state->IsInitial()) {
     pick_public_state = public_state_dist(rnd_gen);
     state = &public_states[pick_public_state];
@@ -313,16 +314,16 @@ PublicState* Subgame::PickRandomLeaf(std::mt19937& rnd_gen) {
   return state;
 }
 
-std::unique_ptr<Subgame> MakeSubgame(const PublicState& state,
+std::unique_ptr<Subgame> MakeSubgame(const PublicState &state,
                                      std::shared_ptr<const Game> game,
                                      std::shared_ptr<Observer> public_observer,
                                      int custom_move_ahead_limit) {
   if (!game) {
     SPIEL_CHECK_FALSE(state.nodes[0].empty());
-    const algorithms::InfostateNode* node = state.nodes[0][0];
+    const algorithms::InfostateNode *node = state.nodes[0][0];
     SPIEL_CHECK_TRUE(node);
     SPIEL_CHECK_FALSE(node->corresponding_states().empty());
-    const State* a_state = node->corresponding_states()[0].get();
+    const State *a_state = node->corresponding_states()[0].get();
     SPIEL_CHECK_TRUE(a_state);
     game = a_state->GetGame();
   }
@@ -339,6 +340,10 @@ std::unique_ptr<Subgame> MakeSubgame(const PublicState& state,
   auto out = std::make_unique<Subgame>(game, public_observer, trees);
   out->initial_state().SetBeliefs(state.beliefs);
   return out;
+}
+
+std::shared_ptr<PublicStateEvaluator> MakeTerminalEvaluator(algorithms::PokerData poker_data, std::vector<int> cards) {
+  return std::make_shared<PokerTerminalEvaluator>(std::move(poker_data), std::move(cards));
 }
 
 std::shared_ptr<PublicStateEvaluator> MakeTerminalEvaluator() {
@@ -368,10 +373,112 @@ std::shared_ptr<PublicStateEvaluator> MakeApproxOracleEvaluator(
                                         cfr_iterations);
 }
 
-TerminalPublicStateContext::TerminalPublicStateContext(
-    const PublicState& state) {
+PokerTerminalPublicStateContext::PokerTerminalPublicStateContext(
+    const PublicState &state) {
   SPIEL_CHECK_TRUE(state.IsTerminal());
-  auto& leaf_nodes = state.nodes;
+  auto &leaf_nodes = state.nodes;
+  SPIEL_CHECK_EQ(leaf_nodes[0].size(), leaf_nodes[1].size());
+
+  fold_state_ = (state.nodes[0][0]->corresponding_states()[0]->History().back() == universal_poker::kFold);
+
+  const int num_terminals = leaf_nodes[0].size();
+  utilities_.reserve(num_terminals);
+
+  for (int i = 0; i < num_terminals; ++i) {
+    const algorithms::InfostateNode *leaf = leaf_nodes[0][i];
+    const double v = leaf->terminal_utility();
+    const double chn = leaf->terminal_chance_reach_prob();
+    utilities_.push_back(v * chn);
+  }
+}
+
+int PokerTerminalEvaluator::ConvertToFullPokerCard(int card, const algorithms::PokerData &poker_data) {
+  int rank = (int) (card / poker_data.num_suits_);
+  int suit = card % poker_data.num_suits_;
+  return rank * 4 + suit;
+}
+
+PokerTerminalEvaluator::PokerTerminalEvaluator(
+    algorithms::PokerData poker_data, std::vector<int> board_cards) : poker_data_(std::move(poker_data)) {
+  board_cards.insert(board_cards.begin(), 1);
+  board_cards.insert(board_cards.begin(), 0);
+  std::vector<int> hand_strength;
+  hand_strength.reserve(poker_data_.num_hands_);
+  for(int i = 0; i < board_cards.size();i++) {
+    board_cards[i] = ConvertToFullPokerCard(board_cards[i], poker_data_);
+  }
+  for (int card_one = 0; card_one < poker_data_.num_cards_ - 1; card_one++) {
+    board_cards[0] = ConvertToFullPokerCard(card_one, poker_data_);;
+    for (int card_two = card_one + 1; card_two < poker_data_.num_cards_; card_two++) {
+      board_cards[1] = ConvertToFullPokerCard(card_two, poker_data_);;
+      universal_poker::logic::CardSet cards = universal_poker::logic::CardSet(board_cards);
+      hand_strength.push_back(cards.RankCards());
+    }
+  }
+  std::vector<size_t> idx(hand_strength.size());
+  iota(idx.begin(), idx.end(), 0);
+  std::stable_sort(idx.begin(), idx.end(),
+                   [&hand_strength](size_t i1, size_t i2) { return hand_strength[i1] < hand_strength[i2]; });
+  std::vector<std::vector<int>> sorted_with_ties;
+  int current_hand_strength = -1;
+  for (int hand_index : idx) {
+    if (hand_strength[hand_index] > current_hand_strength) {
+      sorted_with_ties.push_back({hand_index});
+      current_hand_strength = hand_strength[hand_index];
+    } else {
+      sorted_with_ties.back().push_back(hand_index);
+    }
+  }
+  ordered_hands_ = sorted_with_ties;
+}
+
+std::unique_ptr<PublicStateContext> PokerTerminalEvaluator::CreateContext(
+    const PublicState &state) const {
+  return std::make_unique<PokerTerminalPublicStateContext>(state);
+}
+
+void PokerTerminalEvaluator::EvaluatePublicState(
+    PublicState *state, PublicStateContext *context) const {
+  auto *terminal_context = open_spiel::down_cast<PokerTerminalPublicStateContext *>(context);
+  if (terminal_context->fold_state_) {
+    // Fold state
+    std::vector<double> beliefs(2, 0);
+    for (int hand_index = 0; hand_index < state->beliefs[0].size(); hand_index++) {
+      beliefs[0] += state->beliefs[0][hand_index];
+      beliefs[1] += state->beliefs[1][hand_index];
+    }
+    for (int hand_index = 0; hand_index < state->beliefs[0].size(); hand_index++) {
+      state->values[0][hand_index] = terminal_context->utilities_[hand_index] * beliefs[1];
+      state->values[1][hand_index] = -terminal_context->utilities_[hand_index] * beliefs[0];
+    }
+  } else {
+    // Showdown state
+    std::vector<double> beliefs(2, 0);
+    std::vector<double> current_beliefs(2, 0);
+    for (const std::vector<int> &hand_indexes : ordered_hands_) {
+      // collect beliefs
+      current_beliefs[0] = current_beliefs[1] = 0;
+      for (int hand_index : hand_indexes) {
+        current_beliefs[0] += state->beliefs[0][hand_index];
+        current_beliefs[1] += state->beliefs[1][hand_index];
+      }
+      // compute value
+      for (int hand_index : hand_indexes) {
+        state->values[0][hand_index] =
+            terminal_context->utilities_[hand_index] * (2 * beliefs[1] + current_beliefs[1] - 1);
+        state->values[1][hand_index] =
+            terminal_context->utilities_[hand_index] * (2 * beliefs[0] + current_beliefs[0] - 1);
+      }
+      beliefs[0] += current_beliefs[0];
+      beliefs[1] += current_beliefs[1];
+    }
+  }
+}
+
+TerminalPublicStateContext::TerminalPublicStateContext(
+    const PublicState &state) {
+  SPIEL_CHECK_TRUE(state.IsTerminal());
+  auto &leaf_nodes = state.nodes;
   SPIEL_CHECK_EQ(leaf_nodes[0].size(), leaf_nodes[1].size());
   const int num_terminals = leaf_nodes[0].size();
   utilities.reserve(num_terminals);
@@ -385,12 +492,12 @@ TerminalPublicStateContext::TerminalPublicStateContext(
   SPIEL_CHECK_EQ(player1_map.size(), leaf_nodes[1].size());
 
   for (int i = 0; i < num_terminals; ++i) {
-    const algorithms::InfostateNode* a = leaf_nodes[0][i];
+    const algorithms::InfostateNode *a = leaf_nodes[0][i];
     const int permutation_index = player1_map.at(a->TerminalHistory());
-    const algorithms::InfostateNode* b = leaf_nodes[1][permutation_index];
+    const algorithms::InfostateNode *b = leaf_nodes[1][permutation_index];
     SPIEL_DCHECK_EQ(a->TerminalHistory(), b->TerminalHistory());
 
-    const algorithms::InfostateNode* leaf = leaf_nodes[0][i];
+    const algorithms::InfostateNode *leaf = leaf_nodes[0][i];
     const double v = leaf->terminal_utility();
     const double chn = leaf->terminal_chance_reach_prob();
     utilities.push_back(v * chn);
@@ -406,17 +513,17 @@ TerminalPublicStateContext::TerminalPublicStateContext(
 }
 
 std::unique_ptr<PublicStateContext> TerminalEvaluator::CreateContext(
-    const PublicState& state) const {
+    const PublicState &state) const {
   return std::make_unique<TerminalPublicStateContext>(state);
 }
 
 void TerminalEvaluator::EvaluatePublicState(
-    PublicState* state, PublicStateContext* context) const {
-  auto* terminal = open_spiel::down_cast<TerminalPublicStateContext*>(context);
+    PublicState *state, PublicStateContext *context) const {
+  auto *terminal = open_spiel::down_cast<TerminalPublicStateContext *>(context);
   for (int i = 0; i < terminal->utilities.size(); ++i) {
     const int j = terminal->permutation[i];
     state->values[0][i] = terminal->utilities[i] * state->beliefs[1][j];
-    state->values[1][j] = - terminal->utilities[i] * state->beliefs[0][i];
+    state->values[1][j] = -terminal->utilities[i] * state->beliefs[0][i];
   }
 }
 
@@ -425,7 +532,7 @@ SubgameSolver::SubgameSolver(
     const std::shared_ptr<const PublicStateEvaluator> nonterminal_evaluator,
     const std::shared_ptr<const PublicStateEvaluator> terminal_evaluator,
     const std::shared_ptr<std::mt19937> rnd_gen,
-    const std::string& bandit_name,
+    const std::string &bandit_name,
     PolicySelection save_values_policy,
     bool safe_resolving,
     bool beliefs_for_average,
@@ -461,7 +568,7 @@ void SubgameSolver::RunSimultaneousIterations(int iterations) {
     ++num_iterations_;
 
     // 1. Prepare initial reach probs, based on beliefs in initial state.
-    std::array<std::vector<double>, 2>& beliefs = initial_state().beliefs;
+    std::array<std::vector<double>, 2> &beliefs = initial_state().beliefs;
 //    SPIEL_DCHECK_TRUE(initial_state().IsReachableBySomePlayer());
     for (int pl = 0; pl < 2; ++pl) {
       std::copy(beliefs[pl].begin(), beliefs[pl].end(),
@@ -518,15 +625,15 @@ void SubgameSolver::RunSimultaneousIterations(int iterations) {
 void SubgameSolver::EvaluateLeaves() {
   SPIEL_CHECK_EQ(subgame()->public_states.size(), contexts_.size());
   for (int i = 0; i < subgame()->public_states.size(); ++i) {
-    PublicState* state = &subgame()->public_states[i];
+    PublicState *state = &subgame()->public_states[i];
     if (!state->IsLeaf()) continue;
-    PublicStateContext* context = contexts_[i].get();
+    PublicStateContext *context = contexts_[i].get();
     EvaluateLeaf(state, context);
   }
 }
 
-void SubgameSolver::EvaluateLeaf(PublicState* state,
-                                 PublicStateContext* context) {
+void SubgameSolver::EvaluateLeaf(PublicState *state,
+                                 PublicStateContext *context) {
   SPIEL_CHECK_TRUE(state);
   SPIEL_CHECK_TRUE(state->IsLeaf());
 
@@ -534,7 +641,7 @@ void SubgameSolver::EvaluateLeaf(PublicState* state,
   for (int pl = 0; pl < 2; pl++) {
     const int num_leaves = state->nodes[pl].size();
     for (int j = 0; j < num_leaves; ++j) {
-      const algorithms::InfostateNode* leaf_node = state->nodes[pl][j];
+      const algorithms::InfostateNode *leaf_node = state->nodes[pl][j];
       const int trunk_position = state->nodes_positions.at(leaf_node);
       SPIEL_DCHECK_GE(trunk_position, 0);
       SPIEL_DCHECK_LT(trunk_position, subgame()->trees[pl]->num_leaves());
@@ -557,7 +664,7 @@ void SubgameSolver::EvaluateLeaf(PublicState* state,
   for (int pl = 0; pl < 2; pl++) {
     const int num_leaves = state->nodes[pl].size();
     for (int j = 0; j < num_leaves; ++j) {
-      const algorithms::InfostateNode* leaf_node = state->nodes[pl][j];
+      const algorithms::InfostateNode *leaf_node = state->nodes[pl][j];
       const int trunk_position = state->nodes_positions.at(leaf_node);
       SPIEL_DCHECK_GE(trunk_position, 0);
       SPIEL_DCHECK_LT(trunk_position, subgame()->trees[pl]->num_leaves());
@@ -592,14 +699,14 @@ void SubgameSolver::Reset() {
     std::fill(cf_values_[pl].begin(), cf_values_[pl].end(), 0.);
     std::fill(reach_probs_[pl].begin(), reach_probs_[pl].end(), 0.);
   }
-  for (algorithms::BanditVector& bandits : bandits_) {
+  for (algorithms::BanditVector &bandits : bandits_) {
     for (algorithms::DecisionId id : bandits.range()) {
       bandits[id]->Reset();
     }
   }
   // Reset subgames
   for (int i = 0; i < subgame_->public_states.size(); ++i) {
-    PublicState& state = subgame_->public_states[i];
+    PublicState &state = subgame_->public_states[i];
     for (int pl = 0; pl < 2; ++pl) {
       // Conserve beliefs for initial state.
       if (!state.IsInitial()) {
@@ -610,7 +717,7 @@ void SubgameSolver::Reset() {
                 state.average_values[pl].end(), 0.);
     }
     if (nonterminal_evaluator_.get()) {
-      std::unique_ptr<PublicStateContext>& context = contexts_[i];
+      std::unique_ptr<PublicStateContext> &context = contexts_[i];
       if (!state.IsTerminal() && context.get()) {
         nonterminal_evaluator_->ResetContext(context.get());
       }
@@ -627,7 +734,7 @@ void SubgameSolver::CopyCurrentValuesToInitialState() {
   }
 }
 
-void SubgameSolver::IncrementallyAverageValuesInState(PublicState* state) {
+void SubgameSolver::IncrementallyAverageValuesInState(PublicState *state) {
   for (int pl = 0; pl < 2; ++pl) {
     for (int i = 0; i < state->values[pl].size(); ++i) {
       state->values[pl][i] +=
@@ -655,7 +762,7 @@ CFREvaluator::CFREvaluator(std::shared_ptr<const Game> game, int depth_limit,
 }
 
 std::unique_ptr<PublicStateContext> CFREvaluator::CreateContext(
-    const PublicState& state) const {
+    const PublicState &state) const {
   if (!state.IsLeaf()) return nullptr;
   SPIEL_CHECK_TRUE(state.IsLeaf());
 
@@ -675,23 +782,23 @@ std::unique_ptr<PublicStateContext> CFREvaluator::CreateContext(
   return cfr_public_state;
 }
 
-void CFREvaluator::ResetContext(PublicStateContext* context) const {
-  auto* cfr_state = open_spiel::down_cast<CFRContext*>(context);
+void CFREvaluator::ResetContext(PublicStateContext *context) const {
+  auto *cfr_state = open_spiel::down_cast<CFRContext *>(context);
   cfr_state->dlcfr->Reset();
 }
 
-void CFREvaluator::EvaluatePublicState(PublicState* state,
-                                       PublicStateContext* context) const {
+void CFREvaluator::EvaluatePublicState(PublicState *state,
+                                       PublicStateContext *context) const {
   SPIEL_CHECK_TRUE(state->IsLeaf());
-  auto* cfr_context = open_spiel::down_cast<CFRContext*>(context);
-  SubgameSolver* solver = cfr_context->dlcfr.get();
+  auto *cfr_context = open_spiel::down_cast<CFRContext *>(context);
+  SubgameSolver *solver = cfr_context->dlcfr.get();
   // We pretty much always should. This only to support special test cases.
   if (reset_subgames_on_evaluation) {
     solver->Reset();
   }
   solver->initial_state().SetBeliefs(state->beliefs);
   solver->RunSimultaneousIterations(num_cfr_iterations);
-  auto& resulting_values = solver->initial_state().values;
+  auto &resulting_values = solver->initial_state().values;
   // Copy the results.
   for (int pl = 0; pl < 2; ++pl) {
     std::copy(resulting_values[pl].begin(), resulting_values[pl].end(),
@@ -705,8 +812,8 @@ void CFREvaluator::EvaluatePublicState(PublicState* state,
 //            << " " << " values: " << state->values[0]  << "\n";
 }
 
-void PrintPublicStatesStats(const std::vector<PublicState>& public_leaves) {
-  for (const PublicState& state : public_leaves) {
+void PrintPublicStatesStats(const std::vector<PublicState> &public_leaves) {
+  for (const PublicState &state : public_leaves) {
     std::array<int, 2>
         num_nodes = {(int) state.nodes[0].size(),
                      (int) state.nodes[1].size()},
@@ -714,7 +821,7 @@ void PrintPublicStatesStats(const std::vector<PublicState>& public_leaves) {
         smallest_infostates = {1000000, 1000000};
     int num_states = 0;
     for (int pl = 0; pl < 2; ++pl) {
-      for (const algorithms::InfostateNode* node : state.nodes[pl]) {
+      for (const algorithms::InfostateNode *node : state.nodes[pl]) {
         int size = node->corresponding_states_size();
         if (pl == 0) num_states += size;
         largest_infostates[pl] = std::max(largest_infostates[pl], size);
@@ -730,17 +837,17 @@ void PrintPublicStatesStats(const std::vector<PublicState>& public_leaves) {
   }
 }
 
-bool contains(std::vector<const algorithms::InfostateNode*>& xs,
-              const algorithms::InfostateNode* x) {
+bool contains(std::vector<const algorithms::InfostateNode *> &xs,
+              const algorithms::InfostateNode *x) {
   return std::find(xs.begin(), xs.end(), x) != xs.end();
 }
 
 // TODO: optional plumbing of observers
-std::unique_ptr<PublicStatesInGame> MakeAllPublicStates(const Game& game) {
+std::unique_ptr<PublicStatesInGame> MakeAllPublicStates(const Game &game) {
   auto all = std::make_unique<PublicStatesInGame>();
   constexpr int store_all_states = algorithms::kStoreStatesInLeaves
-                                 | algorithms::kStoreStatesInRoots
-                                 | algorithms::kStoreStatesInBody;
+      | algorithms::kStoreStatesInRoots
+      | algorithms::kStoreStatesInBody;
   for (int pl = 0; pl < 2; ++pl) {
     all->infostate_trees.push_back(algorithms::MakeInfostateTree(
         game, pl, algorithms::kNoMoveAheadLimit, store_all_states));
@@ -749,21 +856,21 @@ std::unique_ptr<PublicStatesInGame> MakeAllPublicStates(const Game& game) {
       game.MakeObserver(kPublicStateObsType, {});
   Observation public_observation(game, public_observer);
   for (int pl = 0; pl < 2; ++pl) {
-    const std::vector<std::vector<algorithms::InfostateNode*>>& nodes_at_depths =
+    const std::vector<std::vector<algorithms::InfostateNode *>> &nodes_at_depths =
         all->infostate_trees[pl]->nodes_at_depths();
     for (int depth = 0; depth < nodes_at_depths.size(); ++depth) {
-      for (algorithms::InfostateNode* node : nodes_at_depths[depth]) {
+      for (algorithms::InfostateNode *node : nodes_at_depths[depth]) {
         // Some nodes may not have corresponding states, even though we
         // requested to save states at all the nodes (like root, or nodes added
         // due to  rebalancing)
         if (node->corresponding_states().empty()) continue;
 
-        const std::unique_ptr<State>& some_state =
+        const std::unique_ptr<State> &some_state =
             node->corresponding_states()[0];
         public_observation.SetFrom(*some_state, kDefaultPlayerId);
         SPIEL_DCHECK_TRUE(DoStatesProduceEqualPublicObservations(
             game, public_observer, *node, public_observation.Tensor()));
-        PublicState* state = all->GetPublicState(public_observation);
+        PublicState *state = all->GetPublicState(public_observation);
         if (state->move_number == -1) {
           state->move_number = some_state->MoveNumber();
         } else {
@@ -780,9 +887,9 @@ std::unique_ptr<PublicStatesInGame> MakeAllPublicStates(const Game& game) {
   return all;
 }
 
-PublicState* PublicStatesInGame::GetPublicState(
-    const Observation& public_observation) {
-  for (PublicState& state : public_states) {
+PublicState *PublicStatesInGame::GetPublicState(
+    const Observation &public_observation) {
+  for (PublicState &state : public_states) {
     if (state.public_tensor == public_observation
         && state.state_type == kInitialPublicState) {
       return &state;
@@ -795,7 +902,7 @@ PublicState* PublicStatesInGame::GetPublicState(
   return &public_states.back();
 }
 
-PolicySelection GetSaveValuesPolicy(const std::string& s) {
+PolicySelection GetSaveValuesPolicy(const std::string &s) {
   if (s == "current") return PolicySelection::kCurrentPolicy;
   if (s == "average") return PolicySelection::kAveragePolicy;
   SpielFatalError("Exhausted pattern match for PolicySelection");
