@@ -226,9 +226,12 @@ class UniversalPokerObserver : public Observer {
                                   Allocator *allocator) {
     const logic::CardSet full_deck(state.acpc_game_->NumSuitsDeck(),
                                    state.acpc_game_->NumRanksDeck());
+    const std::vector<uint8_t> deckCards = full_deck.ToCardArray();
     auto out = allocator->Get("community_card", {full_deck.NumCards()});
-    for (int card : state.BoardCards().ToCardArray()) {
-      out.at(card) = 1;
+    for (uint32_t i = 0; i < full_deck.NumCards(); i++) {
+      if(state.BoardCards().ContainsCards(deckCards[i])) {
+        out.at(i) = 1;
+      }
     }
   }
 
