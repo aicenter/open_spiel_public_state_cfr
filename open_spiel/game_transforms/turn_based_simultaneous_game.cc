@@ -90,7 +90,7 @@ void TurnBasedSimultaneousState::RolloutModeIncrementCurrentPlayer() {
   while (current_player_ < num_players_ &&
          state_->LegalActions(current_player_).empty()) {
     // Unnecessary to set an action here, but leads to a nicer ToString.
-    action_vector_[current_player_] = 0;
+    action_vector_[current_player_] = kInvalidAction;
     current_player_++;
   }
 }
@@ -266,15 +266,40 @@ TurnBasedSimultaneousGame::TurnBasedSimultaneousGame(
 
 class TurnBasedSimultaneousObserver : public Observer {
   std::shared_ptr<Observer> observer_;
+  IIGObservationType iig_obs_type_;
  public:
-  TurnBasedSimultaneousObserver(const std::shared_ptr<Observer>& observer)
+  TurnBasedSimultaneousObserver(const std::shared_ptr<Observer>& observer,
+                                IIGObservationType iig_obs_type)
       : Observer(observer->HasString(), observer->HasTensor()),
-        observer_(observer) {}
+        observer_(observer), iig_obs_type_(iig_obs_type) {}
   void WriteTensor(const State& state,
                    Player player,
                    Allocator* allocator) const override {
     const TurnBasedSimultaneousState& turn_state =
         open_spiel::down_cast<const TurnBasedSimultaneousState&>(state);
+
+    if (iig_obs_type_.private_info == PrivateInfoType::kSinglePlayer) {
+      // Tell the players what actions they have already picked
+      // in the transformation.
+      int num_actions = state.GetGame()->NumDistinctActions();
+      auto out = allocator->Get("turn_based_sim_played_action",
+                                {num_actions + 1});
+      if (turn_state.action_vector_[player] != kInvalidAction) {
+        const int played_action = turn_state.action_vector_[player];
+        out.at(played_action) = 1;
+      }
+    }
+
+    if (iig_obs_type_.public_info) {
+      // Tell the players publicly which player already acted
+      // in the transformation.
+      auto out = allocator->Get("turn_based_sim_progress",
+                                {turn_state.NumPlayers() + 1});
+      if (turn_state.rollout_mode_) {
+        out.at(turn_state.CurrentPlayer()) = 1;
+      }
+    }
+
     return observer_->WriteTensor(*turn_state.state_, player, allocator);
   }
   std::string StringFrom(const State& state, Player player) const override {
@@ -292,7 +317,8 @@ std::shared_ptr<Observer> TurnBasedSimultaneousGame::MakeObserver(
     absl::optional<IIGObservationType> iig_obs_type,
     const GameParameters& params) const {
   return std::make_shared<TurnBasedSimultaneousObserver>(
-      game_->MakeObserver(iig_obs_type, params));
+      game_->MakeObserver(iig_obs_type, params),
+      iig_obs_type.value_or(kDefaultObsType));
 }
 
 
