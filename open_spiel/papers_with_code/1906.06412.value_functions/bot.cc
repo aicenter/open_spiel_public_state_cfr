@@ -162,7 +162,7 @@ std::unordered_map<std::string, double> SherlockBot::GetOpponentCfvs(
 
   } else if(solver_factory_->opponent_cfvs_selection == kOracleValueForAverageBeliefs) {
 
-    SequenceFormLpSpecification spec(*subgame_factory_->game);
+    algorithms::ortools::SequenceFormLpSpecification spec(*subgame_factory_->game);
     spec.SpecifyLinearProgram(player_id_);
     algorithms::ortools::RecursivelyRefineSpecFixStrategyWithPolicy(
         spec.trees()[player_id_]->mutable_root(), past_policy, &spec);

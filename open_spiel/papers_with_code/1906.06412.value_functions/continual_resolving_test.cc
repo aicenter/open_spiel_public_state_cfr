@@ -178,15 +178,15 @@ void TestKuhnGadget() {
             *set, player, public_state.InfostateAvgValues(1 - player),
             algorithms::kNoMoveAheadLimit);
 
-        SequenceFormLpSpecification specification(local_subgame->trees);
-        specification.SpecifyLinearProgram(player);
+        algorithms::ortools::SequenceFormLpSpecification spec(local_subgame->trees);
+        spec.SpecifyLinearProgram(player);
 
-        double game_value = specification.Solve();
+        double game_value = spec.Solve();
         SPIEL_CHECK_FLOAT_NEAR(game_value,
                                player == 0 ? -1. / 18 : 1. / 18,
                                0.001);
 
-        TabularPolicy policy = specification.OptimalPolicy(player);
+        TabularPolicy policy = spec.OptimalPolicy(player);
         SPIEL_CHECK_EQ(policy.PolicyTable().size(), 3);
 
         for (const auto&[infostate, actions_and_probs] : policy.PolicyTable()) {
@@ -275,7 +275,7 @@ void CheckNfgGame(const std::string& nfg_string,
   SPIEL_CHECK_EQ(tree_safe_opponent->root().MakeCertificate(2),
                  expected_opponent_certificate);
 
-  SequenceFormLpSpecification lp_spec(trees);
+  algorithms::ortools::SequenceFormLpSpecification lp_spec(trees);
   lp_spec.SpecifyLinearProgram(Player{1});
   SPIEL_CHECK_FLOAT_EQ(expected_game_value, lp_spec.Solve());
 
@@ -392,7 +392,7 @@ void CheckKuhnGame(std::vector<std::vector<Action>> start_histories,
   SPIEL_CHECK_EQ(tree_safe_opponent->root().MakeCertificate(2),
                  expected_opponent_certificate);
 
-  SequenceFormLpSpecification specification(trees);
+  algorithms::ortools::SequenceFormLpSpecification specification(trees);
   TabularPolicy solved_slp_policy;
   for (int pl = 0; pl < 2; ++pl) {
     specification.SpecifyLinearProgram(pl);
