@@ -300,7 +300,7 @@ foreach(py_test_file IN LISTS PYTHON_TESTS)
     set_property(TEST python/${py_test_file}
         PROPERTY ENVIRONMENT
         CMAKE_BINARY_DIR=${CMAKE_BINARY_DIR};
-      PYTHONPATH=${OPEN_SPIEL_PYTHONPATH}
+        PYTHONPATH=${OPEN_SPIEL_PYTHONPATH}
         TEST_SRCDIR=${CMAKE_CURRENT_SOURCE_DIR}/../..)
   endif()
 endforeach(py_test_file)

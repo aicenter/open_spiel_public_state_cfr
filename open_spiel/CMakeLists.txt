@@ -67,7 +67,7 @@ if(APPLE)
   # has a virtual environment active
   set (CMAKE_FIND_FRAMEWORK LAST)
 else()
-  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pedantic -Wall -Wno-sign-compare -Wno-macro-redefined -Wno-tautological-type-limit-compare -Wno-unused-template -Wno-unused-value -Wno-potentially-evaluated-expression -Wno-gnu-zero-variadic-macro-arguments -Wno-c99-extensions -Wno-gcc-compat -Wno-gnu-case-range -Wno-extra-semi -Wno-unused-const-variable -Wno-unused-variable -Wno-unused-private-field -Wno-sizeof-array-div -Wno-unused-function -Wno-zero-length-array"
+  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pedantic -Wall -Wno-sign-compare -Wno-macro-redefined -Wno-tautological-type-limit-compare -Wno-unused-template -Wno-unused-value -Wno-potentially-evaluated-expression -Wno-gnu-zero-variadic-macro-arguments -Wno-c99-extensions -Wno-gcc-compat -Wno-gnu-case-range -Wno-extra-semi -Wno-unused-const-variable -Wno-unused-variable -Wno-unused-private-field -Wno-unused-function -Wno-zero-length-array"
     )
   # -Wno-unused-function : open_spiel/games/universal_poker/acpc/project_acpc_server/evalHandTables:4257:16: warning: unused function 'emptyCardset'
   # -Wno-sizeof-array-div : libtorch/libtorch/include/torch/csrc/jit/ir/attributes.h:37:42: warning: expression does not compute the number of elements in this array; element type is 'const char *', not 'torch::jit::AttributeKind' [-Wsizeof-array-div]

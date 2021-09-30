@@ -164,6 +164,7 @@ class SpanTensor {
   absl::Span<float> data_;
 };
 
+
 struct ConstDimensionedSpan {
   absl::InlinedVector<int, 4> shape;
   absl::Span<const float> data;
@@ -195,6 +196,7 @@ struct ConstDimensionedSpan {
     return data[((idx1 * shape[1] + idx2) * shape[2] + idx3) * shape[3] + idx4];
   }
 };
+
 
 // An Allocator is responsible for returning memory for an Observer.
 class Allocator {
@@ -396,7 +398,7 @@ class Observer {
   virtual ~Observer() = default;
 
  protected:
-  // TODO(author11) Remove when all games support both types of observations
+  // TODO(author11) Remove when all games support both types of observations.
   bool has_string_;
   bool has_tensor_;
 };
@@ -471,9 +473,17 @@ class Observation {
   void Decompress(absl::string_view compressed);
 
   // What observations do we support?
-  // TODO(author11) Remove when all games support both types of observations
+  // TODO(author11) Remove when all games support both types of observations.
   bool HasString() const { return observer_->HasString(); }
   bool HasTensor() const { return observer_->HasTensor(); }
+
+  bool operator==(const Observation& other) const {
+    return buffer_ == other.buffer_
+        && tensors_info_ == other.tensors_info_;
+  }
+  bool operator!=(const Observation& other) const { return !(*this == other); }
+
+  size_t size() const { return buffer_.size(); }
 
  public:
   // Deprecated methods.
@@ -484,14 +494,6 @@ class Observation {
 
   ABSL_DEPRECATED("Use `tensors()`. This method is unsafe.")
   absl::Span<const float> Tensor() const { return absl::MakeSpan(buffer_); }
-
-  bool operator==(const Observation& other) const {
-    return buffer_ == other.buffer_
-        && tensors_info_ == other.tensors_info_;
-  }
-  bool operator!=(const Observation& other) const { return !(*this == other); }
-
-  size_t size() const { return buffer_.size(); }
 
  private:
   std::shared_ptr<Observer> observer_;
