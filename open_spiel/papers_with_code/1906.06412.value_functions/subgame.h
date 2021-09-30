@@ -143,9 +143,10 @@ struct PublicState {
 
 void DebugPrintPublicFeatures(const std::vector<PublicState>& states);
 void PrintPublicStatesStats(const std::vector<PublicState>& public_leaves);
-bool DoStatesProduceEqualPublicObservations(
-    const Game& game, std::shared_ptr<Observer> public_observer,
-    const algorithms::InfostateNode& node, absl::Span<float> expected_observation);
+bool DoStatesProduceEqualPublicObservations(const Game& game,
+                                            std::shared_ptr<Observer> public_observer,
+                                            const algorithms::InfostateNode& node,
+                                            const Observation& expected_observation);
 
 // -- Many public states -------------------------------------------------------
 

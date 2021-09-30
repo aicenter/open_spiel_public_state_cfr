@@ -40,6 +40,7 @@
 #include "open_spiel/python/pybind11/policy.h"
 #include "open_spiel/python/pybind11/pybind11.h"
 #include "open_spiel/python/pybind11/python_games.h"
+#include "open_spiel/python/pybind11/referee.h"
 #include "open_spiel/spiel.h"
 #include "open_spiel/spiel_globals.h"
 #include "open_spiel/spiel_utils.h"
@@ -265,6 +266,9 @@ PYBIND11_MODULE(pyspiel, m) {
   state.def(py::init<std::shared_ptr<const Game>>())
       .def("current_player", &State::CurrentPlayer)
       .def("apply_action", &State::ApplyAction)
+      .def("apply_action_with_legality_check",
+           py::overload_cast<Action>(
+               &State::ApplyActionWithLegalityCheck))
       .def("legal_actions",
            (std::vector<open_spiel::Action>(State::*)(int) const) &
                State::LegalActions)
@@ -321,6 +325,8 @@ PYBIND11_MODULE(pyspiel, m) {
       .def("child", &State::Child)
       .def("undo_action", &State::UndoAction)
       .def("apply_actions", &State::ApplyActions)
+      .def("apply_actions_with_legality_checks",
+           &State::ApplyActionsWithLegalityChecks)
       .def("num_distinct_actions", &State::NumDistinctActions)
       .def("num_players", &State::NumPlayers)
       .def("chance_outcomes", &State::ChanceOutcomes)
@@ -623,6 +629,7 @@ PYBIND11_MODULE(pyspiel, m) {
   init_pyspiel_policy(m);           // Policies and policy-related algorithms.
   init_pyspiel_algorithms_corr_dist(m);     // Correlated eq. distance funcs
   init_pyspiel_algorithms_trajectories(m);  // Trajectories.
+  init_pyspiel_referee(m);                  // Referee.
   init_pyspiel_game_transforms(m);          // Game transformations.
   init_pyspiel_games_backgammon(m);         // Backgammon game.
   init_pyspiel_games_bridge(m);  // Game-specific functions for bridge.

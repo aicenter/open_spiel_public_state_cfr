@@ -77,15 +77,16 @@ void MakeReachesAndValuesForPublicStates(std::vector<PublicState>& states) {
 
 }  // namespace
 
-bool DoStatesProduceEqualPublicObservations(
-    const Game& game, std::shared_ptr<Observer> public_observer,
-    const algorithms::InfostateNode& node, absl::Span<float> expected_observation) {
+bool DoStatesProduceEqualPublicObservations(const Game& game,
+                                            std::shared_ptr<Observer> public_observer,
+                                            const algorithms::InfostateNode& node,
+                                            const Observation& expected_observation) {
   Observation public_observation(game, public_observer);
 
   // Check that indeed all states produce the same public observations.
   for (const std::unique_ptr<State>& state : node.corresponding_states()) {
     public_observation.SetFrom(*state, kDefaultPlayerId);
-    if (public_observation.Tensor() != expected_observation) return false;
+    if (public_observation != expected_observation) return false;
   }
   return true;
 }
@@ -235,7 +236,7 @@ PublicState* Subgame::GetPublicState(Observation& public_observation,
   const std::unique_ptr<State>& some_state = node->corresponding_states()[0];
   public_observation.SetFrom(*some_state, kDefaultPlayerId);
   SPIEL_DCHECK_TRUE(DoStatesProduceEqualPublicObservations(
-      *game, public_observer, *node, public_observation.Tensor()));
+      *game, public_observer, *node, public_observation));
   PublicState* state = GetPublicState(public_observation, state_type);
   if (state->move_number == -1) {
     state->move_number = some_state->MoveNumber();
@@ -358,14 +359,14 @@ std::unique_ptr<PublicStatesInGame> MakeAllPublicStates(const Game& game) {
             node->corresponding_states()[0];
         public_observation.SetFrom(*some_state, kDefaultPlayerId);
         SPIEL_DCHECK_TRUE(DoStatesProduceEqualPublicObservations(
-            game, public_observer, *node, public_observation.Tensor()));
+            game, public_observer, *node, public_observation));
         PublicState* state = all->GetPublicState(public_observation);
         if (state->move_number == -1) {
           state->move_number = some_state->MoveNumber();
         } else {
           SPIEL_CHECK_EQ(state->move_number, some_state->MoveNumber());
         }
-        SPIEL_DCHECK_FALSE(contains(state->nodes[pl], node->parent()));
+//        SPIEL_DCHECK_FALSE(contains(state->nodes[pl], node->parent()));
         state->nodes[pl].push_back(node);
       }
     }

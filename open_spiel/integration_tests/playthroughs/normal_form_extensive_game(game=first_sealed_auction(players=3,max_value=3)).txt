@@ -50,10 +50,6 @@ InformationStateTensor(2).is_terminal: ◯
 ObservationString(0) = "Observing player: 0. Non-terminal"
 ObservationString(1) = "Observing player: 1. Non-terminal"
 ObservationString(2) = "Observing player: 2. Non-terminal"
-PublicObservationString() = "Observing player: 0. Non-terminal"
-PrivateObservationString(0) = "Observing player: 0. Non-terminal"
-PrivateObservationString(1) = "Observing player: 1. Non-terminal"
-PrivateObservationString(2) = "Observing player: 2. Non-terminal"
 ObservationTensor(0).is_terminal: ◯
 ObservationTensor(1).is_terminal: ◯
 ObservationTensor(2).is_terminal: ◯
@@ -151,10 +147,6 @@ InformationStateTensor(2).is_terminal: ◉
 ObservationString(0) = "Observing player: 0. Terminal. History string: 0, 0, 2"
 ObservationString(1) = "Observing player: 1. Terminal. History string: 0, 0, 2"
 ObservationString(2) = "Observing player: 2. Terminal. History string: 0, 0, 2"
-PublicObservationString() = "Observing player: 0. Terminal. History string: 0, 0, 2"
-PrivateObservationString(0) = "Observing player: 0. Terminal. History string: 0, 0, 2"
-PrivateObservationString(1) = "Observing player: 1. Terminal. History string: 0, 0, 2"
-PrivateObservationString(2) = "Observing player: 2. Terminal. History string: 0, 0, 2"
 ObservationTensor(0).is_terminal: ◉
 ObservationTensor(1).is_terminal: ◉
 ObservationTensor(2).is_terminal: ◉

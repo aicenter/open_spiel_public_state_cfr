@@ -121,12 +121,12 @@ inline std::ostream& operator<<(
     std::ostream& os, const Observation& observation) {
   SPIEL_CHECK_TRUE(observation.HasTensor());
   bool first = true;
-  for (const TensorInfo& tensor : observation.tensor_info()) {
-    if (!first) os << "\n";
-    else first = false;
-    absl::Span<const float> tensor_span = observation.Tensor(tensor.name);
-    _format_tensor(os, tensor.name, tensor_span, tensor.shape);
-  }
+//  for (const TensorInfo& tensor : observation.tensor_info()) {
+//    if (!first) os << "\n";
+//    else first = false;
+//    absl::Span<const float> tensor_span = observation.Tensor(tensor.name);
+//    _format_tensor(os, tensor.name, tensor_span, tensor.shape);
+//  }
   return os;
 }
 
@@ -145,11 +145,13 @@ inline std::string ObservationToString(const Observation& observation, std::stri
   SPIEL_CHECK_TRUE(observation.HasTensor());
   std::stringstream ss;
   bool first = true;
-  for (const TensorInfo& tensor : observation.tensor_info()) {
+  for (const SpanTensorInfo& tensor : observation.tensors_info()) {
     if (!first) ss << "\n";
     else first = false;
-    absl::Span<const float> tensor_span = observation.Tensor(tensor.name);
-    _format_tensor(ss, tensor.name, tensor_span, tensor.shape);
+// TODO: fix
+//    absl::Span<const float> tensor_span =
+//    SpanTensor span_tensor = observation.GetTensor(tensor.name);
+//    _format_tensor(ss, tensor.name, tensor_span, tensor.shape);
   }
   std::string out = ss.str();
   return ReplaceString(out, "\n", sep);
