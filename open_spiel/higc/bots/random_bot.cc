@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <charconv>
-
 #include "absl/strings/escaping.h"
+#include "absl/strings/numbers.h"
 #include "open_spiel/spiel.h"
 
 // Example implementation of the random bot for HIG competition.
@@ -104,8 +103,7 @@ void RandomBotMainLoop() {
             private_observation.Decompress(decoded);
         } else {  // Legal actions.
           Action a;
-          auto [p, ec] = std::from_chars(x.begin(), x.end(), a);
-          SPIEL_CHECK_TRUE(p == x.end());
+          absl::SimpleAtoi(x, &a);
           legal_actions.push_back(a);
         }
       }
@@ -123,9 +121,10 @@ void RandomBotMainLoop() {
     }
 
     SPIEL_CHECK_EQ(message.rfind("match over", 0), 0);
+    constexpr size_t offset = 11;  // = "match over "
     int score = 0;
-    std::from_chars(message.data() + 11, message.data() + message.size(),
-                    score);
+    absl::SimpleAtoi(absl::string_view(message.data() + offset,
+                                       message.size() - offset), &score);
     std::cerr << "score: " << score << std::endl;
   }
 }
