@@ -142,6 +142,11 @@ struct PublicState {
 };
 
 void DebugPrintPublicFeatures(const std::vector<PublicState>& states);
+void PrintPublicStatesStats(const std::vector<PublicState>& public_leaves);
+bool DoStatesProduceEqualPublicObservations(const Game& game,
+                                            std::shared_ptr<Observer> public_observer,
+                                            const algorithms::InfostateNode& node,
+                                            const Observation& expected_observation);
 
 // -- Many public states -------------------------------------------------------
 
@@ -201,166 +206,6 @@ std::unique_ptr<Subgame> MakeSubgame(
     std::shared_ptr<Observer> public_observer = nullptr,
     int custom_move_ahead_limit = algorithms::kNoMoveAheadLimit);
 
-// Derived classes specify members as they need for their specific
-// public state evaluators.
-//
-// It is **strongly advised** to make the contexts immutable, or if the state
-// evaluator mutates the context for the purposes of its computation, it should
-// restore it back to the original. This is because it is beneficial to share
-// the same context between multiple evaluator implementations (for example
-// the sequence-form oracle evaluators). If mutation were to happen, each
-// evaluator then must take this into account, making implementation more
-// difficult.
-struct PublicStateContext {
-  // Make sure PublicStateContext is polymorphic.
-  virtual ~PublicStateContext() = default;
-};
-
-// Public state evaluator can create appropriate contexts for later evaluation
-// of public states. The derived classes should down_cast the context as needed.
-// Beliefs and values are saved within the public state.
-class PublicStateEvaluator {
- public:
-  virtual ~PublicStateEvaluator() = default;
-  virtual std::unique_ptr<PublicStateContext> CreateContext(
-      const PublicState& state) const { return nullptr; };
-  virtual void ResetContext(PublicStateContext* context) const {}
-  virtual void EvaluatePublicState(
-      PublicState* public_state, PublicStateContext* context) const = 0;
-};
-
-// -- Terminal evaluator -------------------------------------------------------
-
-struct TerminalPublicStateContext final : public PublicStateContext {
-  // Map from player 0 index (key) to player 1 (value).
-  std::vector<int> permutation;
-  // For the player 0 and already multiplied by chance reach probs.
-  std::vector<double> utilities;
-  explicit TerminalPublicStateContext(const PublicState& state);
-};
-
-class TerminalEvaluator final : public PublicStateEvaluator {
- public:
-  std::unique_ptr<PublicStateContext> CreateContext(
-      const PublicState& state) const override;
-  void EvaluatePublicState(
-      PublicState* state, PublicStateContext* context) const override;
-};
-
-std::shared_ptr<PublicStateEvaluator> MakeTerminalEvaluator();
-std::shared_ptr<PublicStateEvaluator> MakeDummyEvaluator();
-// CFR evaluator that makes a large number of iterations.
-std::shared_ptr<PublicStateEvaluator> MakeApproxOracleEvaluator(
-    std::shared_ptr<const Game> game, int cfr_iterations = 100000);
-
-// -- Subgame solver -----------------------------------------------------------
-
-using PolicySelection = algorithms::PolicySelection;
-PolicySelection GetSaveValuesPolicy(const std::string& s);
-constexpr PolicySelection kDefaultPolicySelection =
-    PolicySelection::kAveragePolicy;
-
-// CFR-based subgame solver that evaluates public leaves using terminal
-// or non-terminal evaluator.
-class SubgameSolver {
- public:
-  SubgameSolver(
-      std::shared_ptr<Subgame> subgame,
-      const std::shared_ptr<const PublicStateEvaluator> nonterminal_evaluator,
-      const std::shared_ptr<const PublicStateEvaluator> terminal_evaluator,
-      const std::shared_ptr<std::mt19937> rnd_gen,
-      const std::string& bandit_name,
-      PolicySelection save_values_policy = kDefaultPolicySelection,
-      bool safe_resolving = false,
-      bool beliefs_for_average = false,
-      double noisy_values = 0.);
-
-  void RunSimultaneousIterations(int iterations);
-  void Reset();
-
-  // Accessors.
-  PublicState& initial_state() { return subgame_->initial_state(); }
-  std::vector<algorithms::BanditVector>& bandits() { return bandits_; }
-  Subgame* subgame() { return subgame_.get(); }
-
-  // Policy available only for the infostates of the subgame!
-  std::shared_ptr<Policy> AveragePolicy();
-  std::shared_ptr<Policy> CurrentPolicy();
- private:
-  const std::shared_ptr<Subgame> subgame_;
-  const std::shared_ptr<const PublicStateEvaluator> nonterminal_evaluator_;
-  const std::shared_ptr<const PublicStateEvaluator> terminal_evaluator_;
-  const std::shared_ptr<std::mt19937> rnd_gen_;
-  const bool safe_resolving_;
-  const bool beliefs_for_average_;
-  const double noisy_values_;
-
-  // -- Mutable values to keep track of. --
-  // These have the size at largest depth of the tree, i.e. the size of the
-  // leaf infostate nodes.
-  std::vector<algorithms::BanditVector> bandits_;
-  std::vector<std::vector<double>> reach_probs_;
-  std::vector<std::vector<double>> cf_values_;
-  // Save evaluator-specific information for any public state.
-  // If no information should be saved, a nullptr is used.
-  std::vector<std::unique_ptr<PublicStateContext>> contexts_;
-
-  size_t num_iterations_ = 0;
-  PolicySelection init_save_values_;
-
-  void EvaluateLeaves();
-  void EvaluateLeaf(PublicState* state, PublicStateContext* context);
-  void CopyCurrentValuesToInitialState();
-  void IncrementallyAverageValuesInState(PublicState* state);
-};
-
-// -- Dummy evaluator ----------------------------------------------------------
-
-// Evaluator that does nothing.
-struct DummyEvaluator : public PublicStateEvaluator {
-  std::unique_ptr<PublicStateContext> CreateContext(
-      const PublicState& state) const override { return nullptr; };
-  void ResetContext(PublicStateContext* context) const override {};
-  void EvaluatePublicState(PublicState* public_state,
-                           PublicStateContext* context) const override {};
-};
-
-
-// -- CFR evaluator ------------------------------------------------------------
-
-struct CFRContext : public PublicStateContext {
-  std::unique_ptr<SubgameSolver> dlcfr;
-  explicit CFRContext(std::unique_ptr<SubgameSolver> d)
-      : dlcfr(std::move(d)) {}
-};
-
-struct CFREvaluator : public PublicStateEvaluator {
-  std::shared_ptr<const Game> game;
-  int depth_limit;
-  std::shared_ptr<const PublicStateEvaluator> nonterminal_evaluator;
-  std::shared_ptr<const PublicStateEvaluator> terminal_evaluator;
-  std::shared_ptr<Observer> public_observer;
-  std::shared_ptr<Observer> infostate_observer;
-  bool reset_subgames_on_evaluation = true;
-  int num_cfr_iterations;
-  std::string bandit_name = "RegretMatchingPlus";
-  PolicySelection save_values_policy = kDefaultPolicySelection;
-
-  CFREvaluator(std::shared_ptr<const Game> game, int depth_limit,
-               std::shared_ptr<const PublicStateEvaluator> leaf_evaluator,
-               std::shared_ptr<const PublicStateEvaluator> terminal_evaluator,
-               std::shared_ptr<Observer> public_observer,
-               std::shared_ptr<Observer> infostate_observer,
-               int cfr_iterations = 100);
-
-  std::unique_ptr<PublicStateContext> CreateContext(
-      const PublicState& state) const override;
-  void ResetContext(PublicStateContext* context) const override;
-  void EvaluatePublicState(PublicState* state,
-                           PublicStateContext* context) const override;
-};
-
-void PrintPublicStatesStats(const std::vector<PublicState>& public_leaves);
 
 }  // namespace papers_with_code
 }  // namespace open_spiel

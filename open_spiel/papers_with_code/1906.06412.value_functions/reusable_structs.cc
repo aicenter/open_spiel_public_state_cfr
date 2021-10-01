@@ -49,9 +49,9 @@ SubgameSolver* ReusableStructures::GetTrunkWithNet() {
   return trunk_with_net.get();
 }
 
-SequenceFormLpSpecification* ReusableStructures::GetSfLp() {
+algorithms::ortools::SequenceFormLpSpecification* ReusableStructures::GetSfLp() {
   if (!sf_lp) {
-    sf_lp = std::make_unique<SequenceFormLpSpecification>(
+    sf_lp = std::make_unique<algorithms::ortools::SequenceFormLpSpecification>(
         *subgame_factory->game, "CLP", /*return_nan_if_non_optimal=*/true);
   }
   return sf_lp.get();

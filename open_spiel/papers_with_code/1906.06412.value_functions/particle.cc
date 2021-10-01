@@ -149,8 +149,7 @@ bool ParticleSet::has(const std::vector<Action>& history) const {
 }
 
 void CheckObservation(const Observation& actual, const Observation& expected) {
-  SPIEL_CHECK_EQ(actual.tensor_info(), expected.tensor_info());
-  SPIEL_CHECK_EQ(actual.Tensor(), expected.Tensor());
+  SPIEL_CHECK_TRUE(actual == expected);
 }
 
 void CheckParticleSetConsistency(const Game& game,

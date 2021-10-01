@@ -34,6 +34,7 @@
 #include "open_spiel/abseil-cpp/absl/types/span.h"
 #include "open_spiel/game_parameters.h"
 #include "open_spiel/spiel_utils.h"
+#include "open_spiel/utils/usage_logging.h"
 
 namespace open_spiel {
 namespace {
@@ -234,6 +235,7 @@ std::shared_ptr<const Game> LoadGame(GameParameters params) {
   if (result == nullptr) {
     SpielFatalError(absl::StrCat("Unable to create game: ", name));
   }
+  LogUsage();
   return result;
 }
 
@@ -329,6 +331,18 @@ void State::ApplyAction(Action action_id) {
   ++move_number_;
 }
 
+void State::ApplyActionWithLegalityCheck(Action action_id) {
+  std::vector<Action> legal_actions = LegalActions();
+  if (absl::c_find(legal_actions, action_id) == legal_actions.end()) {
+    Player cur_player = CurrentPlayer();
+    SpielFatalError(
+        absl::StrCat("Current player ", cur_player, " calling ApplyAction ",
+                     "with illegal action (", action_id, "): ",
+                     ActionToString(cur_player, action_id)));
+  }
+  ApplyAction(action_id);
+}
+
 void State::ApplyActions(const std::vector<Action>& actions) {
   // history_ needs to be modified *after* DoApplyActions which could
   // be using it.
@@ -338,6 +352,20 @@ void State::ApplyActions(const std::vector<Action>& actions) {
     history_.push_back({player, actions[player]});
   }
   ++move_number_;
+}
+
+void State::ApplyActionsWithLegalityChecks(const std::vector<Action>& actions) {
+  for (Player player = 0; player < actions.size(); ++player) {
+    std::vector<Action> legal_actions = LegalActions(player);
+    if (!legal_actions.empty() &&
+        absl::c_find(legal_actions, actions[player]) == legal_actions.end()) {
+      SpielFatalError(
+          absl::StrCat("Player ", player, " calling ApplyAction ",
+                       "with illegal action (", actions[player], "): ",
+                       ActionToString(player, actions[player])));
+    }
+  }
+  ApplyActions(actions);
 }
 
 std::vector<int> State::LegalActionsMask(Player player) const {

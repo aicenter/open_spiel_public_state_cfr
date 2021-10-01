@@ -157,12 +157,12 @@ std::unordered_map<std::string, double> SherlockBot::GetOpponentCfvs(
 
   if (solver_factory_->opponent_cfvs_selection == kAverageOfCurrentValues) {
     SPIEL_CHECK_TRUE(solver_factory_->save_values_policy ==
-                     PolicySelection::kAveragePolicy);
+                     algorithms::PolicySelection::kAveragePolicy);
     return state.InfostateAvgValues(1 - player_id_);
 
   } else if(solver_factory_->opponent_cfvs_selection == kOracleValueForAverageBeliefs) {
 
-    SequenceFormLpSpecification spec(*subgame_factory_->game);
+    algorithms::ortools::SequenceFormLpSpecification spec(*subgame_factory_->game);
     spec.SpecifyLinearProgram(player_id_);
     algorithms::ortools::RecursivelyRefineSpecFixStrategyWithPolicy(
         spec.trees()[player_id_]->mutable_root(), past_policy, &spec);

@@ -47,9 +47,6 @@ InformationStateTensor(0).is_terminal: ◯
 InformationStateTensor(1).is_terminal: ◯
 ObservationString(0) = "Observing player: 0. Non-terminal"
 ObservationString(1) = "Observing player: 1. Non-terminal"
-PublicObservationString() = "Observing player: 0. Non-terminal"
-PrivateObservationString(0) = "Observing player: 0. Non-terminal"
-PrivateObservationString(1) = "Observing player: 1. Non-terminal"
 ObservationTensor(0).is_terminal: ◯
 ObservationTensor(1).is_terminal: ◯
 Rewards() = [0.0, 0.0]
@@ -78,9 +75,6 @@ InformationStateTensor(0).is_terminal: ◉
 InformationStateTensor(1).is_terminal: ◉
 ObservationString(0) = "Observing player: 0. Terminal. History string: 54, 58"
 ObservationString(1) = "Observing player: 1. Terminal. History string: 54, 58"
-PublicObservationString() = "Observing player: 0. Terminal. History string: 54, 58"
-PrivateObservationString(0) = "Observing player: 0. Terminal. History string: 54, 58"
-PrivateObservationString(1) = "Observing player: 1. Terminal. History string: 54, 58"
 ObservationTensor(0).is_terminal: ◉
 ObservationTensor(1).is_terminal: ◉
 Rewards() = [0.0, 0.0]

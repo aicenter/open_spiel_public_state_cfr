@@ -87,7 +87,7 @@ void ShowParticleDiversity() {
     std::cout << particle << "\n";
     auto particle_state = particle.MakeState(*game);
     particle_observation.SetFrom(*particle_state, 0);
-    SPIEL_CHECK_EQ(particle_observation.Tensor(), public_observation.Tensor());
+    SPIEL_CHECK_TRUE(particle_observation == public_observation);
   }
   std::cout << "Generated " << particle_set->particles.size()
             << " particles in " << milis << "ms";

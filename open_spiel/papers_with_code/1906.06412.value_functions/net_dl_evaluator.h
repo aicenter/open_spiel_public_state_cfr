@@ -19,6 +19,7 @@
 
 #include "open_spiel/papers_with_code/1906.06412.value_functions/hand_table.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_architectures.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/solver.h"
 #include "open_spiel/spiel.h"
 
 namespace open_spiel {
