@@ -103,6 +103,12 @@ class TurnBasedSimultaneousObserver : public Observer {
 
     std::string extra_info = "";
 
+    if (iig_obs_type_.public_info) {
+      absl::StrAppend(&extra_info, "Current player: ");
+      absl::StrAppend(&extra_info, turn_state.current_player_);
+      extra_info.push_back('\n');
+    }
+
     if (iig_obs_type_.private_info == PrivateInfoType::kSinglePlayer) {
       // Include the player's action if they have take one already.
       if (turn_state.action_vector_[player] != kInvalidAction) {
@@ -110,12 +116,6 @@ class TurnBasedSimultaneousObserver : public Observer {
         absl::StrAppend(&extra_info, turn_state.action_vector_[player]);
         extra_info.push_back('\n');
       }
-    }
-
-    if (iig_obs_type_.public_info) {
-      extra_info = "Current player: ";
-      absl::StrAppend(&extra_info, turn_state.current_player_);
-      extra_info.push_back('\n');
     }
 
     // Append the additional strings.
@@ -133,7 +133,8 @@ std::shared_ptr<Observer> TurnBasedSimultaneousGame::MakeObserver(
 
 TurnBasedSimultaneousState::TurnBasedSimultaneousState(
     std::shared_ptr<const Game> game, std::unique_ptr<State> state)
-    : State(game), state_(std::move(state)), action_vector_(game->NumPlayers()),
+    : State(game), state_(std::move(state)),
+      action_vector_(game->NumPlayers(), kInvalidAction),
       rollout_mode_(false) {
   DetermineWhoseTurn();
 }
@@ -166,7 +167,8 @@ void TurnBasedSimultaneousState::RolloutModeIncrementCurrentPlayer() {
   while (current_player_ < num_players_ &&
          state_->LegalActions(current_player_).empty()) {
     // Unnecessary to set an action here, but leads to a nicer ToString.
-    action_vector_[current_player_] = kInvalidAction;
+    // FIXME(sustr): use something like kNonActingAction = -2
+    action_vector_[current_player_] = 0;
     current_player_++;
   }
 }
