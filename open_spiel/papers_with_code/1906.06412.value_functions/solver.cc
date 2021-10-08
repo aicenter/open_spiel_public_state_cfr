@@ -51,9 +51,6 @@ void CheckConsistency(const PublicState& s) {
         } else {
           SPIEL_CHECK_TRUE(state_histories.find(*h) != state_histories.end());
         }
-
-//        if (state->IsTerminal()) num_terminals++;
-//        else num_nonterminals++;
       }
     }
   }
@@ -70,13 +67,17 @@ std::vector<std::unique_ptr<PublicStateContext>> MakeContexts(
   std::vector<std::unique_ptr<PublicStateContext>> contexts;
   contexts.reserve(subgame->public_states.size());
   for (const PublicState& state : subgame->public_states) {
-    SPIEL_DCHECK(CheckConsistency(state));
-    if (state.IsTerminal()) {
-      contexts.push_back(terminal_evaluator->CreateContext(state));
+    if (!state.IsLeaf()) {
+      contexts.push_back(nullptr);
     } else {
-      contexts.push_back(nonterminal_evaluator
-                         ? nonterminal_evaluator->CreateContext(state)
-                         : nullptr);
+      SPIEL_DCHECK(CheckConsistency(state));
+      if (state.IsTerminal()) {
+        contexts.push_back(terminal_evaluator->CreateContext(state));
+      } else {
+        contexts.push_back(nonterminal_evaluator
+                           ? nonterminal_evaluator->CreateContext(state)
+                           : nullptr);
+      }
     }
   }
   return contexts;
@@ -110,6 +111,25 @@ SubgameSolver::SubgameSolver(
     num_iterations_(0),
     init_save_values_(save_values_policy) {}
 
+SubgameSolver::SubgameSolver(
+    std::shared_ptr<Subgame> subgame,
+    std::vector<algorithms::BanditVector> bandits
+) : subgame_(subgame),
+    nonterminal_evaluator_(nullptr),
+    terminal_evaluator_(MakeTerminalEvaluator()),
+    rnd_gen_(nullptr),
+    safe_resolving_(false),
+    beliefs_for_average_(false),
+    noisy_values_(0.),
+    bandits_(std::move(bandits)),
+    reach_probs_({std::vector<double>(subgame_->trees[0]->num_leaves()),
+                  std::vector<double>(subgame_->trees[1]->num_leaves())}),
+    cf_values_({std::vector<double>(subgame_->trees[0]->num_leaves()),
+                std::vector<double>(subgame_->trees[1]->num_leaves())}),
+    contexts_(MakeContexts(subgame, nullptr, terminal_evaluator_)),
+    num_iterations_(0),
+    init_save_values_(algorithms::kDefaultPolicySelection) {}
+
 std::shared_ptr<Policy> SubgameSolver::AveragePolicy() {
   return std::make_shared<algorithms::BanditsAveragePolicy>(subgame()->trees,
                                                             bandits_);
@@ -126,7 +146,6 @@ void SubgameSolver::RunSimultaneousIterations(int iterations) {
 
     // 1. Prepare initial reach probs, based on beliefs in initial state.
     std::array<std::vector<double>, 2>& beliefs = initial_state().beliefs;
-//    SPIEL_DCHECK_TRUE(initial_state().IsReachableBySomePlayer());
     for (int pl = 0; pl < 2; ++pl) {
       std::copy(beliefs[pl].begin(), beliefs[pl].end(),
                 reach_probs_[pl].begin());
@@ -281,6 +300,15 @@ void SubgameSolver::Reset() {
     }
   }
 }
+
+void SubgameSolver::ResetCumulValues() {
+  for (int pl = 0; pl < 2; ++pl) {
+    for (auto& nodes : subgame_->trees[pl]->nodes_at_depths()) {
+      for (auto& node: nodes) node->cumul_value = 0;
+    }
+  }
+}
+
 
 void SubgameSolver::CopyCurrentValuesToInitialState() {
   for (int pl = 0; pl < 2; ++pl) {

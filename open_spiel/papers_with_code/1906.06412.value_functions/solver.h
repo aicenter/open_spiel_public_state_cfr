@@ -37,13 +37,18 @@ class SubgameSolver {
       bool beliefs_for_average = false,
       double noisy_values = 0.);
 
+  SubgameSolver(std::shared_ptr<Subgame> subgame,
+                std::vector<algorithms::BanditVector> bandits);
+
   void RunSimultaneousIterations(int iterations);
   void Reset();
+  void ResetCumulValues();
 
   // Accessors.
   PublicState& initial_state() { return subgame_->initial_state(); }
   std::vector<algorithms::BanditVector>& bandits() { return bandits_; }
   Subgame* subgame() { return subgame_.get(); }
+  int num_iterations() const { return num_iterations_; }
 
   // Policy available only for the infostates of the subgame!
   std::shared_ptr<Policy> AveragePolicy();

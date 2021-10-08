@@ -172,6 +172,13 @@ std::unordered_map<std::string, double> PublicState::InfostateAvgValues(
   return CFVs;
 }
 
+std::shared_ptr<const Game> PublicState::game() const {
+  // Fetch some node and some corresponding state
+  SPIEL_CHECK_FALSE(nodes.empty());
+  SPIEL_CHECK_FALSE(nodes[0].empty());
+  return nodes[0][0]->tree().game();
+}
+
 // -- Subgame ------------------------------------------------------------------
 
 Subgame::Subgame(

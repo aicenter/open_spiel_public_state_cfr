@@ -79,7 +79,8 @@ struct PublicState {
   const PublicStateType state_type;
   // Position in the vector of Subgame::public_states()
   const size_t public_id;
-  // TODO
+  // TODO: careful about using this! maybe should be removed or properly handled
+  //       this is just temporary field
   /*const*/ std::vector<std::shared_ptr<algorithms::InfostateTree>> trees;
   // For each player, store a pointer to the infostate nodes for this public
   // state, within the depth-limited infostate tree. If needed, you can get
@@ -139,6 +140,8 @@ struct PublicState {
   // Return a map of infostate string: average cf. values.
   std::unordered_map<std::string, double> InfostateAvgValues(
       Player player) const;
+  // Return the underlying game for this public state;
+  std::shared_ptr<const Game> game() const;
 };
 
 void DebugPrintPublicFeatures(const std::vector<PublicState>& states);
