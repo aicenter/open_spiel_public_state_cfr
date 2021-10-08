@@ -289,8 +289,6 @@ void InfostateTree::AddCorrespondingState(InfostateNode* node,
 void InfostateTree::RecursivelyBuildTree(InfostateNode* parent, size_t depth,
                                          const State& state,
                                          double chance_reach_prob) {
-  SPIEL_CHECK_GT(chance_reach_prob, 0);
-
   // If we are building safe resolving trees, we have to add additional
   // nodes before going into the actual nodes.
   if(is_resolving_tree_ and depth == 1) {

@@ -78,6 +78,12 @@ void BottomUp(
       tree.nodes_at_depths();
   SPIEL_CHECK_EQ(cf_values.size(), nodes_at_depths.back().size());
   const int tree_depth = nodes_at_depths.size();
+
+  // Update leaf cumul values.
+  for (int i = 0; i < nodes_at_depths.back().size(); i++) {
+    InfostateNode* node = nodes_at_depths.back()[i];
+    node->cumul_value += cf_values[i];
+  }
   // Loop over all depths, except for the last one, as it is already set
   // by calling the leaf evaluation.
   for (int d = tree_depth - 2; d >= 1; d--) {
