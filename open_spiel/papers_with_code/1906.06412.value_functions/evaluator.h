@@ -106,6 +106,9 @@ std::shared_ptr<PublicStateEvaluator> MakeTerminalEvaluator();
 // CFR evaluator that makes a large number of iterations.
 std::shared_ptr<PublicStateEvaluator> MakeApproxOracleEvaluator(
     std::shared_ptr<const Game> game, int cfr_iterations = 100000);
+// Evaluator that uses sequence-form LP to compute exact values.
+std::shared_ptr<PublicStateEvaluator> MakeOracleEvaluator(
+    std::shared_ptr<const Game> game);
 
 
 

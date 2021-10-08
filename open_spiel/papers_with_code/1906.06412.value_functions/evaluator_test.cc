@@ -12,10 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "open_spiel/papers_with_code/1906.06412.value_functions/evaluator.h"
+
 #include "open_spiel/algorithms/infostate_cfr.h"
+#include "open_spiel/game_transforms/turn_based_simultaneous_game.h"
 
 #include "open_spiel/papers_with_code/1906.06412.value_functions/solver.h"
-#include "open_spiel/papers_with_code/1906.06412.value_functions/evaluator.h"
+
 
 namespace open_spiel {
 namespace papers_with_code {
@@ -69,20 +72,122 @@ void TestTerminalEvaluatorHasSameIterations(const std::string& game_name) {
   }
 }
 
+void TestOracleEvaluatorMP() {
+  auto game = LoadGameAsTurnBased("matrix_mp");
+  auto evaluator = MakeOracleEvaluator(game);
+  std::unique_ptr<PublicStatesInGame> all = MakeAllPublicStates(*game);
+  SPIEL_CHECK_EQ(all->public_states.size(), 3);
+  SPIEL_CHECK_TRUE(all->public_states[0].IsInitial());
+  SPIEL_CHECK_TRUE(all->public_states[2].IsTerminal());
+
+  PublicState* s = &all->public_states[1];
+  SPIEL_CHECK_EQ(s->beliefs[0].size(), 2);  // Player 0 played.
+  SPIEL_CHECK_EQ(s->beliefs[1].size(), 1);  // But not player 1.
+  std::unique_ptr<PublicStateContext> context = evaluator->CreateContext(*s);
+  PublicStateContext* c = context.get();
+
+  constexpr double eps = 1. / 1024;
+  {
+    s->beliefs[0] = {0., 1.};
+    evaluator->EvaluatePublicState(s, c);
+    SPIEL_CHECK_FLOAT_EQ(s->values[0][0], 1.);
+    SPIEL_CHECK_FLOAT_EQ(s->values[0][1], -1.);
+    SPIEL_CHECK_FLOAT_EQ(s->values[1][0], 1.);
+  }
+  {
+    s->beliefs[0] = {0.5 - eps, 0.5 + eps};
+    evaluator->EvaluatePublicState(s, c);
+    SPIEL_CHECK_FLOAT_EQ(s->values[0][0],  1);
+    SPIEL_CHECK_FLOAT_EQ(s->values[0][1], -1);
+    SPIEL_CHECK_FLOAT_EQ(s->values[1][0], 2 * eps);
+  }
+  {
+    s->beliefs[0] = {0.5 + eps, 0.5 - eps};
+    evaluator->EvaluatePublicState(s, c);
+    SPIEL_CHECK_FLOAT_EQ(s->values[0][0], -1);
+    SPIEL_CHECK_FLOAT_EQ(s->values[0][1], 1);
+    SPIEL_CHECK_FLOAT_EQ(s->values[1][0], 2 * eps);
+  }
+  {
+    s->beliefs[0] = {1., 0.};
+    evaluator->EvaluatePublicState(s, c);
+    SPIEL_CHECK_FLOAT_EQ(s->values[0][0], -1.);
+    SPIEL_CHECK_FLOAT_EQ(s->values[0][1], 1.);
+    SPIEL_CHECK_FLOAT_EQ(s->values[1][0], 1.);
+  }
+  {
+    s->beliefs[0] = {0.5, 0.5};
+    evaluator->EvaluatePublicState(s, c);
+    // The LP prefers to pick one action (Heads) rather than uniform.
+    SPIEL_CHECK_FLOAT_EQ(s->values[0][0], 1);
+    SPIEL_CHECK_FLOAT_EQ(s->values[0][1], -1);
+    SPIEL_CHECK_FLOAT_EQ(s->values[1][0], 0.);
+  }
+}
+
+void TestOracleEvaluator(const std::string& game_name) {
+  std::cout << "\nEvaluating " << game_name << " with (approx) oracle\n";
+  auto game = LoadGameAsTurnBased(game_name);
+  auto oracle_evaluator = MakeOracleEvaluator(game);
+  auto approx_evaluator = MakeApproxOracleEvaluator(game, 1000);
+  std::unique_ptr<PublicStatesInGame> all = MakeAllPublicStates(*game);
+  constexpr double kTol = 5e-3;
+
+  for (PublicState& public_state : all->public_states) {
+    std::cout << "Public state: " << public_state.public_tensor.Tensor() << "\n";
+    auto oracle_context = oracle_evaluator->CreateContext(public_state);
+    auto approx_context = approx_evaluator->CreateContext(public_state);
+
+    int num_combinations = public_state.nodes[0].size() + public_state.nodes[1].size();
+    if (num_combinations > 6) {
+      std::cout << "Limiting test, too many nodes...\n";
+      num_combinations = 6;
+    }
+
+    for (int i = 0; i < (1 << num_combinations); ++i) {
+      int shift = 0;
+      for (int j = 0; j < public_state.beliefs[0].size(); ++j) {
+        public_state.beliefs[0][j] = (i & (1 << shift)) > 0 ? 1. : 0.;
+        shift++;
+      }
+      for (int j = 0; j < public_state.beliefs[1].size(); ++j) {
+        public_state.beliefs[1][j] = (i & (1 << shift)) > 0 ? 1. : 0.;
+        shift++;
+      }
+
+      oracle_evaluator->EvaluatePublicState(&public_state, oracle_context.get());
+      std::array<std::vector<double>, 2> oracle_values = public_state.values;
+
+      approx_evaluator->EvaluatePublicState(&public_state, approx_context.get());
+      std::array<std::vector<double>, 2> approx_values = public_state.values;
+
+      for (int pl = 0; pl < 2; ++pl) {
+        double oracle = 0;
+        double approx = 0;
+        for (int j = 0; j < public_state.nodes[pl].size(); ++j) {
+          oracle += public_state.beliefs[pl][j] * oracle_values[pl][j];
+          approx += public_state.beliefs[pl][j] * approx_values[pl][j];
+        }
+        SPIEL_CHECK_FLOAT_NEAR(oracle, approx, kTol);
+      }
+    }
+  }
+}
 
 }  // namespace
 }  // namespace papers_with_code
 }  // namespace open_spiel
 
 int main(int argc, char** argv) {
-  std::vector<std::string> test_games = {
-      "kuhn_poker",
-      "leduc_poker",
-      "goofspiel(players=2,num_cards=4,imp_info=True,points_order=descending)",
-  };
+  using namespace open_spiel::papers_with_code;
+  TestTerminalEvaluatorHasSameIterations("kuhn_poker");
+  TestTerminalEvaluatorHasSameIterations("leduc_poker");
+  TestTerminalEvaluatorHasSameIterations(
+      "goofspiel(players=2,num_cards=4,imp_info=True,points_order=descending)");
 
-  for (const std::string& game_name : test_games) {
-    open_spiel::papers_with_code::TestTerminalEvaluatorHasSameIterations(
-        game_name);
-  }
+  TestOracleEvaluatorMP();
+  TestOracleEvaluator("matrix_mp");
+  TestOracleEvaluator("kuhn_poker");
+  TestOracleEvaluator(
+      "goofspiel(players=2,num_cards=3,imp_info=True,points_order=descending)");
 }

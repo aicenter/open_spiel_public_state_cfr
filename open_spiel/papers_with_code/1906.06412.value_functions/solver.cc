@@ -185,8 +185,11 @@ void SubgameSolver::RunSimultaneousIterations(int iterations) {
                absl::MakeSpan(cf_values_[pl]));
     }
     // Holds for oracle values, but not for the ones coming from NN (not yet).
-//    SPIEL_DCHECK_FLOAT_NEAR(initial_state().Value(0),
-//                            -initial_state().Value(1), 1e-6);
+//    std::cout << initial_state().CurrentValue(0) << " "
+//              << initial_state().CurrentValue(1) << "\n";
+
+//    SPIEL_DCHECK_FLOAT_NEAR(initial_state().CurrentValue(0),
+//                            -initial_state().CurrentValue(1), 1e-6);
 
     if (init_save_values_ == algorithms::PolicySelection::kAveragePolicy) {
       IncrementallyAverageValuesInState(&initial_state());

@@ -14,21 +14,9 @@
 
 #include "open_spiel/papers_with_code/1906.06412.value_functions/solver.h"
 
-#include <cmath>
-#include <iostream>
-#include <absl/strings/str_replace.h>
-
-#include "open_spiel/abseil-cpp/absl/hash/hash.h"
-#include "open_spiel/algorithms/expected_returns.h"
-#include "open_spiel/algorithms/tabular_exploitability.h"
+#include "open_spiel/algorithms/ortools/trunk_exploitability.h"
 #include "open_spiel/game_transforms/turn_based_simultaneous_game.h"
-#include "open_spiel/games/goofspiel.h"
-#include "open_spiel/games/kuhn_poker.h"
-#include "open_spiel/games/leduc_poker.h"
-#include "open_spiel/spiel.h"
-#include "open_spiel/spiel_utils.h"
 #include "open_spiel/algorithms/infostate_cfr.h"
-#include "open_spiel/algorithms/cfr.h"
 
 namespace open_spiel {
 namespace papers_with_code {
@@ -154,6 +142,43 @@ void TestValuesInLimitedGoofspiel() {
   std::cout << subgame->initial_state().values[1] << "\n";
 }
 
+void TestConvergenceInSubgameWithOracle(const PublicState& state) {
+  std::shared_ptr<Subgame> subgame = MakeSubgame(
+      state, state.game(), state.game()->MakeObserver(kPublicStateObsType, {}),
+      /*custom_move_ahead_limit=*/1);
+  auto solver = std::make_unique<SubgameSolver>(subgame,
+                                                MakeOracleEvaluator(subgame->game),
+                                                MakeTerminalEvaluator(),
+                                                /*rnd_gen=*/nullptr,
+                                                "PredictiveRegretMatchingPlus");
+  algorithms::ortools::SequenceFormLpSpecification lp(*subgame->game);
+
+  solver->RunSimultaneousIterations(5000);
+  double expl = algorithms::ortools::TrunkExploitability(&lp, *solver->AveragePolicy());
+  SPIEL_CHECK_LT(expl, 1e-3);
+}
+
+void TestConvergenceInKuhnWithOracle() {
+  auto game = LoadGame("kuhn_poker");
+  std::unique_ptr<PublicStatesInGame> all = MakeAllPublicStates(*game);
+  const PublicState& s_dealt = all->public_states[2];
+  SPIEL_CHECK_EQ(s_dealt.public_tensor.Tensor(),
+                 (std::vector<float>{1, 1, 0, 0, 0, 0, 0, 0}));
+  TestConvergenceInSubgameWithOracle(s_dealt);
+}
+
+void TestConvergenceInGoofWithOracle() {
+  auto game = LoadGame("goofspiel(players=2,num_turns=2,num_cards=3,imp_info=True,points_order=descending)");
+  std::unique_ptr<PublicStatesInGame> all = MakeAllPublicStates(*game);
+  TestConvergenceInSubgameWithOracle(all->public_states[0]);
+}
+
+void TestConvergenceInMP() {
+  auto game = LoadGameAsTurnBased("matrix_mp");
+  std::unique_ptr<PublicStatesInGame> all = MakeAllPublicStates(*game);
+  TestConvergenceInSubgameWithOracle(all->public_states[0]);
+}
+
 }  // namespace
 }  // namespace papers_with_code
 }  // namespace open_spiel
@@ -168,5 +193,10 @@ int main(int argc, char** argv) {
   for (const std::string& game_name : test_games) {
     open_spiel::papers_with_code::TestRecursiveDepthLimitedSolving(game_name);
   }
+
   open_spiel::papers_with_code::TestValuesInLimitedGoofspiel();
+
+  open_spiel::papers_with_code::TestConvergenceInMP();
+  open_spiel::papers_with_code::TestConvergenceInKuhnWithOracle();
+  open_spiel::papers_with_code::TestConvergenceInGoofWithOracle();
 }

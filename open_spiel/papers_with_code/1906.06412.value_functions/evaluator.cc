@@ -15,6 +15,7 @@
 
 #include "open_spiel/papers_with_code/1906.06412.value_functions/evaluator.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/solver.h"
+#include "open_spiel/algorithms/ortools/sequence_form_lp.h"
 #include "open_spiel/algorithms/bandits.h"
 #include "open_spiel/algorithms/bandits_policy.h"
 
@@ -97,7 +98,6 @@ struct CFRContext : public PublicStateContext {
 
 void CheckChildPublicStateConsistency(
     const CFRContext& cfr_public_state, const PublicState& leaf_state) {
-  SPIEL_CHECK_TRUE(leaf_state.IsLeaf());
   auto trees = cfr_public_state.dlcfr->subgame()->trees;
   for (int pl = 0; pl < 2; ++pl) {
     const algorithms::InfostateNode& root = trees[pl]->root();
@@ -128,8 +128,8 @@ CFREvaluator::CFREvaluator(std::shared_ptr<const Game> game, int depth_limit,
 
 std::unique_ptr<PublicStateContext> CFREvaluator::CreateContext(
     const PublicState& state) const {
-  if (!state.IsLeaf()) return nullptr;
-  SPIEL_CHECK_TRUE(state.IsLeaf());
+//  if (!state.IsLeaf()) return nullptr;
+//  SPIEL_CHECK_TRUE(state.IsLeaf());
 
   auto subgame_trees = std::vector{
       MakeInfostateTree(state.nodes[0],
@@ -154,7 +154,9 @@ void CFREvaluator::ResetContext(PublicStateContext* context) const {
 
 void CFREvaluator::EvaluatePublicState(PublicState* state,
                                        PublicStateContext* context) const {
-  SPIEL_CHECK_TRUE(state->IsLeaf());
+  SPIEL_CHECK_TRUE(state);
+  SPIEL_CHECK_TRUE(context);
+
   auto* cfr_context = open_spiel::down_cast<CFRContext*>(context);
   SubgameSolver* solver = cfr_context->dlcfr.get();
   // We pretty much always should. This only to support special test cases.
@@ -175,6 +177,225 @@ void CFREvaluator::EvaluatePublicState(PublicState* state,
 //  std::cout << state->public_id << " "
 //            << " " << " beliefs: " << state->beliefs[0]
 //            << " " << " values: " << state->values[0]  << "\n";
+}
+
+
+// -- Oracle evaluator ---------------------------------------------------------
+
+
+// Following is an implementation of a counterfactually optimal value function
+// (that computes values for counterfactually optimal extensions of trunk
+// strategies). See [1] for details.
+//
+// It uses sequence-form linear program to find the Nash equilibrium strategy
+// for each player, one at a time, by reformulating it to be a value-solving
+// subgame, with specified beliefs of both players. The resulting strategies
+// correspond to mutual best responses.
+//
+// However, counterfactually optimal extensions must be mutual *counterfactual*
+// best responses. This is a subtle, but important distinction. This refinement
+// is required because we'd like to use these values for CFR iterations in the
+// trunk, and that requires the counterfactually optimal value functions. Thus
+// we make post-processing of the SF-LP strategies, as briefly outlined in [1].
+//
+// Here are the more specific steps for the post-processing procedure:
+//
+// 1. Compute the mutual best-responding strategies by using the value-solving
+//    subgames.
+//
+// 2. Make a refinement step, where the strategies in unreachable infostates
+//    change from fully-uniform to uniform over actions that have the max value.
+//
+// 3. Compute the counterfactual values using these mutual CBR strategies.
+//
+// [1] Value Functions for Depth-Limited Solving in Imperfect-Information Games
+// Vojtěch Kovařík, Dominik Seitz, Viliam Lisý, Jan Rudolf, Shuo Sun, Karel Ha
+
+
+struct OracleEvaluator : public PublicStateEvaluator {
+  std::shared_ptr<const Game> game;
+  std::shared_ptr<Observer> infostate_observer;
+  OracleEvaluator(std::shared_ptr<const Game> game,
+                  std::shared_ptr<Observer> infostate_observer)
+    : game(game), infostate_observer(infostate_observer) {};
+  std::unique_ptr<PublicStateContext> CreateContext(
+      const PublicState& state) const override;
+  void EvaluatePublicState(PublicState* s,
+                           PublicStateContext* context) const override;
+};
+
+struct OraclePublicStateContext : public PublicStateContext {
+  std::shared_ptr<Observer> infostate_observer;
+  std::vector<const State*> histories;
+  std::vector<double> chances;
+  std::array<std::vector<int>, 2> belief_indices;  // History -> belief idx
+  std::shared_ptr<Subgame> subgame;
+
+ public:
+  OraclePublicStateContext(const PublicState& state);
+
+  std::vector<std::shared_ptr<algorithms::InfostateTree>>
+    MakeTrees(const std::array<std::vector<double>, 2>& beliefs);
+};
+
+OraclePublicStateContext::OraclePublicStateContext(const PublicState& state) {
+  subgame = MakeSubgame(state);
+  infostate_observer = state.game()->MakeObserver(kInfoStateObsType, {});
+  for (int i = 0; i < state.nodes[0].size(); ++i) {
+    const auto* node = state.nodes[0][i];
+    for (int k = 0; k < node->corresponding_states_size(); ++k) {
+      const auto& state = node->corresponding_states()[k];
+      const auto& chn = node->corresponding_chance_reach_probs()[k];
+      histories.push_back(state.get());
+      chances.push_back(chn);
+      belief_indices[0].push_back(i);
+    }
+  }
+  belief_indices[1] = std::vector<int>(histories.size(), -1);
+  for (int j = 0; j < state.nodes[1].size(); ++j) {
+    const auto* node = state.nodes[1][j];
+    for (int k = 0; k < node->corresponding_states_size(); ++k) {
+      const auto& state = node->corresponding_states()[k];
+      const auto& chn = node->corresponding_chance_reach_probs()[k];
+      for (int l = 0; l < histories.size(); ++l) {
+        if (histories[l]->History() == state->History()) {
+          belief_indices[1][l] = j;
+          break;
+        }
+      }
+    }
+  }
+  for (int k = 0; k < histories.size(); ++k) {
+    SPIEL_CHECK_NE(belief_indices[1][k], -1);
+  }
+}
+
+std::vector<std::shared_ptr<algorithms::InfostateTree>>
+OraclePublicStateContext::MakeTrees(
+    const std::array<std::vector<double>, 2>& beliefs) {
+  std::vector<double> subgame_chances = chances;
+  double chn_sum = 0.;
+  for (int k = 0; k < histories.size(); ++k) {
+    for (int pl = 0; pl < 2; ++pl) {
+      subgame_chances[k] *= beliefs[pl].at(belief_indices[pl][k]);
+    }
+    SPIEL_DCHECK_PROB(subgame_chances[k]);
+    chn_sum += subgame_chances[k];
+  }
+  // Normalize chance probs.
+  if (chn_sum == 0.) {
+    for (int k = 0; k < histories.size(); ++k) {
+      subgame_chances[k] = 1. / histories.size();
+    }
+  } else {
+    for (int k = 0; k < histories.size(); ++k) {
+      subgame_chances[k] /= chn_sum;
+    }
+  }
+  return algorithms::MakeInfostateTrees(histories, subgame_chances,
+                                        infostate_observer);
+}
+
+class ResponseBandit : public algorithms::bandits::Bandit {
+  double reach_prob_;
+  int time_;
+  bool unreachable_;
+ public:
+  ResponseBandit(std::vector<double> init_strategy, bool unreachable)
+    : Bandit(std::move(init_strategy)) {
+    unreachable_ = unreachable;
+    SPIEL_DCHECK_TRUE(IsValidProbDistribution(current_strategy_));
+  }
+  void ComputeStrategy(size_t current_time, double reach_prob = 1.) override {
+    time_ = current_time;
+    reach_prob_ = reach_prob;
+  }
+  void ObserveRewards(absl::Span<const double> rewards) override {
+    SPIEL_DCHECK_EQ(rewards.size(), current_strategy_.size());
+    if (!unreachable_) return;  // Do not modify strategy in reachable parts.
+    if (time_ > 1) return;  // Do not modify on second pass when computing value.
+
+    double max_reward = -std::numeric_limits<double>::infinity();
+    int num_max = 0;
+    for (const double& reward : rewards) {
+      if (reward > max_reward) {
+        max_reward = reward;
+        num_max = 1;
+      } else if (reward == max_reward) {
+        ++num_max;
+      }
+    }
+    SPIEL_CHECK_GE(num_max, 1);
+
+    for (int i = 0; i < num_actions(); ++i) {
+      if (rewards[i] == max_reward) {
+        current_strategy_[i] = 1. / num_max;
+      } else {
+        current_strategy_[i] = 0.;
+      }
+    }
+    SPIEL_DCHECK_TRUE(IsValidProbDistribution(current_strategy_));
+  };
+};
+
+std::vector<algorithms::BanditVector> MakeResponseBandits(
+    const std::vector<std::shared_ptr<algorithms::InfostateTree>>& trees,
+    const TabularPolicy& optimal_brs) {
+  std::vector<algorithms::BanditVector> out;
+  out.reserve(2);
+  for (const std::shared_ptr<algorithms::InfostateTree>& tree : trees) {
+    algorithms::BanditVector bandits(tree.get());
+    for (auto* node: tree->AllDecisionInfostates()) {
+      auto optimal_local_policy = optimal_brs.GetStatePolicy(node->infostate_string());
+      if (optimal_local_policy.empty()) {
+        int num_actions = node->num_children();
+        bandits[node->decision_id()] = std::make_unique<ResponseBandit>(
+            std::vector<double>(num_actions, 1. / num_actions),
+            /*unreachable=*/true);
+      } else {
+        bandits[node->decision_id()] = std::make_unique<ResponseBandit>(
+            GetProbs(optimal_local_policy), /*unreachable=*/false);
+      }
+    }
+    out.push_back(std::move(bandits));
+  }
+  return out;
+}
+
+void OracleEvaluator::EvaluatePublicState(
+    PublicState* state, PublicStateContext* context) const {
+  SPIEL_CHECK_TRUE(context);
+  auto* oracle_context = down_cast<OraclePublicStateContext*>(context);
+  auto trees = oracle_context->MakeTrees(state->beliefs);
+  SPIEL_CHECK_EQ(trees[0]->root().num_children(), state->nodes[0].size());
+  SPIEL_CHECK_EQ(trees[1]->root().num_children(), state->nodes[1].size());
+
+  algorithms::ortools::SequenceFormLpSpecification sf_lp(trees);
+  const auto& [optimal_brs, game_value] =
+      MakeEquilibriumPolicy(&sf_lp, /*uniform_imputation=*/false);
+
+  SubgameSolver solver(
+      oracle_context->subgame,
+      MakeResponseBandits(oracle_context->subgame->trees, optimal_brs));
+  SPIEL_CHECK_TRUE(state->public_tensor == solver.initial_state().public_tensor);
+  solver.initial_state().beliefs = state->beliefs;
+
+  solver.RunSimultaneousIterations(1);
+  solver.ResetCumulValues();
+  solver.RunSimultaneousIterations(1);
+
+  for (int pl = 0; pl < 2; ++pl) {
+    SPIEL_CHECK_EQ(state->nodes[pl].size(), state->values[pl].size());
+    for (int i = 0; i < state->values[pl].size(); ++i) {
+      auto* node = oracle_context->subgame->trees[pl]->root().child_at(i);
+      state->values[pl][i] = node->cumul_value;
+    }
+  }
+}
+
+std::unique_ptr<PublicStateContext> OracleEvaluator::CreateContext(
+    const PublicState& state) const {
+  return std::make_unique<OraclePublicStateContext>(state);
 }
 
 // -- Shorthand factories ------------------------------------------------------
@@ -200,10 +421,19 @@ std::shared_ptr<PublicStateEvaluator> MakeApproxOracleEvaluator(
   std::shared_ptr<const PublicStateEvaluator> terminal_evaluator =
       MakeTerminalEvaluator();
 
-  return std::make_shared<CFREvaluator>(game, algorithms::kNoMoveAheadLimit,
+  auto evaluator = std::make_shared<CFREvaluator>(game, algorithms::kNoMoveAheadLimit,
                                         dummy_evaluator, terminal_evaluator,
                                         public_observer, infostate_observer,
                                         cfr_iterations);
+  // Use PRM+ since it is typically faster.
+  evaluator->bandit_name = "PredictiveRegretMatchingPlus";
+  return evaluator;
+}
+
+std::shared_ptr<PublicStateEvaluator> MakeOracleEvaluator(
+    std::shared_ptr<const Game> game) {
+  return std::make_shared<OracleEvaluator>(
+      game, game->MakeObserver(kInfoStateObsType, {}));
 }
 
 }  // namespace papers_with_code
