@@ -489,10 +489,10 @@ class Observation {
   // Deprecated methods.
 
   // Returns the internal buffer into which observations are written.
-  ABSL_DEPRECATED("Use `tensors()`. This method is unsafe.")
+  // ABSL_DEPRECATED("Use `tensors()`. This method is unsafe.")
   absl::Span<float> Tensor() { return absl::MakeSpan(buffer_); }
 
-  ABSL_DEPRECATED("Use `tensors()`. This method is unsafe.")
+  // ABSL_DEPRECATED("Use `tensors()`. This method is unsafe.")
   absl::Span<const float> Tensor() const { return absl::MakeSpan(buffer_); }
 
  private:
@@ -542,13 +542,13 @@ class ObserverRegisterer {
 // Pure function that creates a tensor from an observer. Slower than using an
 // Observation, but threadsafe. This is useful when you cannot keep an
 // Observation around to use multiple times.
-ABSL_DEPRECATED("Use 'Observation::tensors()`.")
+// ABSL_DEPRECATED("Use 'Observation::tensors()`.")
 std::vector<float> TensorFromObserver(const State& state,
                                       const Observer& observer);
 
 // Pure function that gets the tensor shape from an observer.
 // Any valid state may be supplied.
-ABSL_DEPRECATED("Use 'Observation::tensors_info()`.")
+// ABSL_DEPRECATED("Use 'Observation::tensors_info()`.")
 std::vector<int> ObserverTensorShape(const State& state,
                                      const Observer& observer);
 
