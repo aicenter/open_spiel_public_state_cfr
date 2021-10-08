@@ -193,7 +193,8 @@ double SequenceFormLpSpecification::Solve() {
   return -solver_->Objective().Value();
 }
 
-TabularPolicy SequenceFormLpSpecification::OptimalPolicy(Player for_player) {
+TabularPolicy SequenceFormLpSpecification::OptimalPolicy(
+    Player for_player, bool uniform_imputation) {
   SPIEL_CHECK_TRUE(for_player == 0 || for_player == 1);
   const InfostateTree* tree = trees_[for_player].get();
   TabularPolicy policy;
@@ -203,10 +204,17 @@ TabularPolicy SequenceFormLpSpecification::OptimalPolicy(Player for_player) {
     SPIEL_CHECK_EQ(actions.size(), node->num_children());
     ActionsAndProbs state_policy;
     state_policy.reserve(node->num_children());
+
     double rp_sum = 0.;
     for (int i = 0; i < actions.size(); ++i) {
       rp_sum += node_spec_[node->child_at(i)].var_reach_prob->solution_value();
     }
+
+    // Do not insert strategy in unreachable parts of the tree (if requested).
+    if (rp_sum == 0 && !uniform_imputation) {
+      continue;
+    }
+
     for (int i = 0; i < actions.size(); ++i) {
       double prob;
       if (rp_sum) {
@@ -301,13 +309,13 @@ void SequenceFormLpSpecification::PrintProblemSpecification() {
 }
 
 std::pair<TabularPolicy, double> MakeEquilibriumPolicy(
-    const Game& game) {
+    const Game& game, bool uniform_imputation) {
   SequenceFormLpSpecification whole_game_spec(game);
   return MakeEquilibriumPolicy(&whole_game_spec);
 }
 
 std::pair<TabularPolicy, double> MakeEquilibriumPolicy(
-    SequenceFormLpSpecification* lp) {
+    SequenceFormLpSpecification* lp, bool uniform_imputation) {
   TabularPolicy joint_policy;
   double game_value;
   for (int pl = 0; pl < 2; ++pl) {
@@ -317,7 +325,7 @@ std::pair<TabularPolicy, double> MakeEquilibriumPolicy(
     } else {
       lp->Solve();
     }
-    TabularPolicy player_policy = lp->OptimalPolicy(pl);
+    TabularPolicy player_policy = lp->OptimalPolicy(pl, uniform_imputation);
     joint_policy.PolicyTable().insert(
         player_policy.PolicyTable().begin(),
         player_policy.PolicyTable().end()

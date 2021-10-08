@@ -107,7 +107,8 @@ class SequenceFormLpSpecification {
 
   // Transform the computed sequence form policy into a behavioral policy.
   // This function can be called only after call for Solve().
-  TabularPolicy OptimalPolicy(Player for_player);
+  TabularPolicy OptimalPolicy(Player for_player,
+                              bool uniform_imputation = true);
 
   // Transform the computed realization plan into a behavioral policy.
   // This function can be called only after call for Solve().
@@ -146,9 +147,10 @@ class SequenceFormLpSpecification {
 
 // Return equilibrium policy and game value.
 std::pair<TabularPolicy, double> MakeEquilibriumPolicy(
-    const Game& game);
+    const Game& game, bool uniform_imputation = true);
 std::pair<TabularPolicy, double> MakeEquilibriumPolicy(
-    SequenceFormLpSpecification* specification);
+    SequenceFormLpSpecification* specification,
+    bool uniform_imputation = true);
 
 }  // namespace ortools
 }  // namespace algorithms
