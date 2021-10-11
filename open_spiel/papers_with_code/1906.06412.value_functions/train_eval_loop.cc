@@ -123,8 +123,8 @@ ABSL_FLAG(std::string, load_snapshot, "",
 ABSL_FLAG(int, bot_particles, -1,
           "Number of particles the bot should use when stepping to the next "
           "public state. -1 to set the limit same as max_particles.");
-ABSL_FLAG(bool, bot_use_oracle, false,
-          "Use oracle instead of net as leaf evaluator.");
+ABSL_FLAG(std::string, bot_vf, "net",
+          "Value function to use in the bot, one of {net,approx,oracle}");
 ABSL_FLAG(std::string, opponent_cfvs_selection, "average",
           "How the cf values should be computed.");
 
@@ -290,18 +290,19 @@ void TrainEvalLoop() {
   const algorithms::PolicySelection save_values_policy =
       algorithms::GetSaveValuesPolicy(absl::GetFlag(FLAGS_save_values_policy));
   auto terminal_evaluator = std::make_shared<TerminalEvaluator>();
-  auto oracle = std::make_shared<CFREvaluator>(
+  auto app_oracle = std::make_shared<CFREvaluator>(
       subgame_factory->game, algorithms::kNoMoveAheadLimit,
       /*no_leaf_evaluator=*/nullptr, terminal_evaluator,
       subgame_factory->public_observer, subgame_factory->infostate_observer);
-  oracle->bandit_name = absl::GetFlag(FLAGS_use_bandits_for_cfr);
-  oracle->num_cfr_iterations = absl::GetFlag(FLAGS_cfr_oracle_iterations);
-  oracle->save_values_policy = save_values_policy;
+  app_oracle->bandit_name = absl::GetFlag(FLAGS_use_bandits_for_cfr);
+  app_oracle->num_cfr_iterations = absl::GetFlag(FLAGS_cfr_oracle_iterations);
+  app_oracle->save_values_policy = save_values_policy;
+  auto oracle = MakeOracleEvaluator(game);
   //
   std::cout << "# Init empty reusable structures ..." << std::endl;
   ReusableStructures reuse(subgame_factory.get(),
                            /*solver_factory=*/nullptr, // Supplied later.
-                           oracle);
+                           app_oracle);
   //
   std::cout << "# Setting IS-MCTS config ..." << std::endl;
   reuse.playthroughs = std::make_unique<IsmctsPlaythroughs>();
@@ -493,8 +494,14 @@ void TrainEvalLoop() {
   bot_solver_factory->noisy_values   = absl::GetFlag(FLAGS_noisy_values);
   bot_solver_factory->opponent_cfvs_selection =
       GetSafeResolvingOpponentCfValues(absl::GetFlag(FLAGS_opponent_cfvs_selection));
-  if (absl::GetFlag(FLAGS_bot_use_oracle)) {
+  std::string bot_vf = absl::GetFlag(FLAGS_bot_vf);
+  if (bot_vf == "net") {  // Nothing, already set by copy of subgame factory.
+  } else if (bot_vf == "approx") {
+    bot_solver_factory->leaf_evaluator = app_oracle;
+  } else if (bot_vf == "oracle") {
     bot_solver_factory->leaf_evaluator = oracle;
+  } else {
+    SpielFatalError("Unknown bot VF.");
   }
   // Make the factories accessible for reuse.
   reuse.bot_subgame_factory = bot_subgame_factory;

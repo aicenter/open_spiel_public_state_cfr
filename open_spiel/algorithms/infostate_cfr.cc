@@ -185,9 +185,9 @@ void InfostateCFR::RunSimultaneousIterations(int iterations) {
     for (int pl = 0; pl < 2; ++pl) {
       BottomUp(*trees_[pl], bandits_[pl], absl::MakeSpan(cf_values_[pl]));
     }
-    SPIEL_CHECK_FLOAT_NEAR(
-        RootCfValue(trees_[0]->root_branching_factor(), cf_values_[0]),
-        -RootCfValue(trees_[1]->root_branching_factor(), cf_values_[1]), 1e-6);
+//    SPIEL_CHECK_FLOAT_NEAR(
+//        RootCfValue(trees_[0]->root_branching_factor(), cf_values_[0]),
+//        -RootCfValue(trees_[1]->root_branching_factor(), cf_values_[1]), 1e-6);
   }
 }
 void InfostateCFR::RunAlternatingIterations(int iterations) {
@@ -288,6 +288,14 @@ double InfostateCFR::TerminalReachProbSum() {
   return reach_sum;
 }
 
+void InfostateCFR::ResetCumulValues() {
+  for (int pl = 0; pl < 2; ++pl) {
+    for (auto& nodes : trees_[pl]->nodes_at_depths()) {
+      for (auto& node: nodes) node->cumul_value = 0;
+    }
+  }
+}
+
 std::shared_ptr<Policy> InfostateCFR::AveragePolicy() {
   return std::make_shared<BanditsAveragePolicy>(trees_, bandits_);
 }
@@ -296,6 +304,13 @@ std::shared_ptr<Policy> InfostateCFR::CurrentPolicy() {
 }
 double InfostateCFR::RootValue() const {
   return RootCfValue(trees_[0]->root_branching_factor(), cf_values_[0]);
+}
+
+std::vector<double> InfostateCFR::RootValues() const {
+  return {
+    RootCfValue(trees_[0]->root_branching_factor(), cf_values_[0]),
+    RootCfValue(trees_[1]->root_branching_factor(), cf_values_[1])
+  };
 }
 
 }  // namespace algorithms

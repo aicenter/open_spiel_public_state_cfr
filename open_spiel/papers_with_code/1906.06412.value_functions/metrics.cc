@@ -20,6 +20,7 @@
 #include "open_spiel/algorithms/expected_returns.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/subgame_factory.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/tabularize_bot.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/infostate_tree_br.h"
 #include <open_spiel/algorithms/infostate_tree.h>
 #include <algorithms/best_response.h>
 #include <game_transforms/turn_based_simultaneous_game.h>
@@ -96,7 +97,7 @@ class IigsBrMetric : public Metric {
   std::shared_ptr<const Game> br_game_;
   std::shared_ptr<const Game> turn_br_game_;
   absl::optional<int> max_actions_ = {};
-  std::shared_ptr<algorithms::InfostateTree> player_tree_;
+  std::vector<std::shared_ptr<algorithms::InfostateTree>> player_trees_;
   double br_;
   double returns_;
  public:
@@ -119,24 +120,23 @@ class IigsBrMetric : public Metric {
         max_actions_(approx_response
           ? absl::optional<int>{game->NumTurns() + 1}
           : absl::optional<int>{}),
-        player_tree_(algorithms::MakeInfostateTree(
-            *br_game_, Player{0},
+        player_trees_(algorithms::MakeInfostateTrees(
+            *br_game_,
             algorithms::kNoMoveAheadLimit,
             algorithms::kStoreAllStatesPolicy)) {}
   std::string name() const override { return "br"; }
   void Reset() override {}
   void Evaluate(std::ostream& progress) override {
     std::shared_ptr<TabularPolicy> policy =
-        TabularizeOnlinePolicy(bot_.get(), player_tree_, max_actions_);
+        TabularizeOnlinePolicy(bot_.get(), player_trees_[0], max_actions_);
     progress << '.';
 
-    algorithms::TabularBestResponse br(*turn_br_game_, Player{1}, policy.get());
-    br_ = br.Value("");
+    br_ = BestResponse(player_trees_, *policy)[1];
     progress << '.';
 
-    auto uniform = GetUniformPolicy(*turn_br_game_);
+    auto uniform = GetUniformPolicy(*br_game_);
     std::vector<double> returns =
-        algorithms::ExpectedReturns(*turn_br_game_->NewInitialState(),
+        algorithms::ExpectedReturns(*br_game_->NewInitialState(),
                                     {policy.get(), &uniform}, 1000);
     returns_ = returns[0];
     progress << '.';

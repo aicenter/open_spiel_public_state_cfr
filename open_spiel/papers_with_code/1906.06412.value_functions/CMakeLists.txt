@@ -8,6 +8,8 @@ add_library(paper_value_functions OBJECT
         hand_table.cc
         hand_table.h
         include_libs_ordered.h
+        infostate_tree_br.cc
+        infostate_tree_br.h
         ismcts_playthroughs.cc
         ismcts_playthroughs.h
         metrics.cc

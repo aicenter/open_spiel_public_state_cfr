@@ -13,6 +13,7 @@
 // limitations under the License.
 
 
+#include "open_spiel/papers_with_code/1906.06412.value_functions/infostate_tree_br.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/evaluator.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/solver.h"
 #include "open_spiel/algorithms/ortools/sequence_form_lp.h"
@@ -296,71 +297,6 @@ OraclePublicStateContext::MakeTrees(
                                         infostate_observer);
 }
 
-class ResponseBandit : public algorithms::bandits::Bandit {
-  double reach_prob_;
-  int time_;
-  bool unreachable_;
- public:
-  ResponseBandit(std::vector<double> init_strategy, bool unreachable)
-    : Bandit(std::move(init_strategy)) {
-    unreachable_ = unreachable;
-    SPIEL_DCHECK_TRUE(IsValidProbDistribution(current_strategy_));
-  }
-  void ComputeStrategy(size_t current_time, double reach_prob = 1.) override {
-    time_ = current_time;
-    reach_prob_ = reach_prob;
-  }
-  void ObserveRewards(absl::Span<const double> rewards) override {
-    SPIEL_DCHECK_EQ(rewards.size(), current_strategy_.size());
-    if (!unreachable_) return;  // Do not modify strategy in reachable parts.
-    if (time_ > 1) return;  // Do not modify on second pass when computing value.
-
-    double max_reward = -std::numeric_limits<double>::infinity();
-    int num_max = 0;
-    for (const double& reward : rewards) {
-      if (reward > max_reward) {
-        max_reward = reward;
-        num_max = 1;
-      } else if (reward == max_reward) {
-        ++num_max;
-      }
-    }
-    SPIEL_CHECK_GE(num_max, 1);
-
-    for (int i = 0; i < num_actions(); ++i) {
-      if (rewards[i] == max_reward) {
-        current_strategy_[i] = 1. / num_max;
-      } else {
-        current_strategy_[i] = 0.;
-      }
-    }
-    SPIEL_DCHECK_TRUE(IsValidProbDistribution(current_strategy_));
-  };
-};
-
-std::vector<algorithms::BanditVector> MakeResponseBandits(
-    const std::vector<std::shared_ptr<algorithms::InfostateTree>>& trees,
-    const TabularPolicy& optimal_brs) {
-  std::vector<algorithms::BanditVector> out;
-  out.reserve(2);
-  for (const std::shared_ptr<algorithms::InfostateTree>& tree : trees) {
-    algorithms::BanditVector bandits(tree.get());
-    for (auto* node: tree->AllDecisionInfostates()) {
-      auto optimal_local_policy = optimal_brs.GetStatePolicy(node->infostate_string());
-      if (optimal_local_policy.empty()) {
-        int num_actions = node->num_children();
-        bandits[node->decision_id()] = std::make_unique<ResponseBandit>(
-            std::vector<double>(num_actions, 1. / num_actions),
-            /*unreachable=*/true);
-      } else {
-        bandits[node->decision_id()] = std::make_unique<ResponseBandit>(
-            GetProbs(optimal_local_policy), /*unreachable=*/false);
-      }
-    }
-    out.push_back(std::move(bandits));
-  }
-  return out;
-}
 
 void OracleEvaluator::EvaluatePublicState(
     PublicState* state, PublicStateContext* context) const {
