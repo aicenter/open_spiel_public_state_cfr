@@ -119,6 +119,7 @@ void TestOracleEvaluatorMP() {
     s->beliefs[0] = {0.5, 0.5};
     evaluator->EvaluatePublicState(s, c);
     // The LP prefers to pick one action (Heads) rather than uniform.
+    // The outcome of this test can depend on the choice of the LP solver.
     SPIEL_CHECK_FLOAT_EQ(s->values[0][0], 1);
     SPIEL_CHECK_FLOAT_EQ(s->values[0][1], -1);
     SPIEL_CHECK_FLOAT_EQ(s->values[1][0], 0.);
@@ -129,47 +130,81 @@ void TestOracleEvaluator(const std::string& game_name) {
   std::cout << "\nEvaluating " << game_name << " with (approx) oracle\n";
   auto game = LoadGameAsTurnBased(game_name);
   auto oracle_evaluator = MakeOracleEvaluator(game);
-  auto approx_evaluator = MakeApproxOracleEvaluator(game, 1000);
+  auto approx_evaluator = MakeApproxOracleEvaluator(game, 5000);
   std::unique_ptr<PublicStatesInGame> all = MakeAllPublicStates(*game);
   constexpr double kTol = 5e-3;
+
+  // Compare the public state values between oracle
+  // and approximative oracle value functions.
+  auto TestCase = [&](PublicState* public_state,
+                      PublicStateContext* oracle_context,
+                      PublicStateContext* approx_context) {
+    oracle_evaluator->EvaluatePublicState(public_state, oracle_context);
+    std::array<std::vector<double>, 2> oracle_values = public_state->values;
+
+    approx_evaluator->EvaluatePublicState(public_state, approx_context);
+    std::array<std::vector<double>, 2> approx_values = public_state->values;
+
+    for (int pl = 0; pl < 2; ++pl) {
+      double oracle = 0;
+      double approx = 0;
+      for (int j = 0; j < public_state->nodes[pl].size(); ++j) {
+        oracle += public_state->beliefs[pl][j] * oracle_values[pl][j];
+        approx += public_state->beliefs[pl][j] * approx_values[pl][j];
+      }
+      SPIEL_CHECK_FLOAT_NEAR(oracle, approx, kTol);
+    }
+  };
 
   for (PublicState& public_state : all->public_states) {
     std::cout << "Public state: " << public_state.public_tensor.Tensor() << "\n";
     auto oracle_context = oracle_evaluator->CreateContext(public_state);
     auto approx_context = approx_evaluator->CreateContext(public_state);
 
-    int num_combinations = public_state.nodes[0].size() + public_state.nodes[1].size();
-    if (num_combinations > 6) {
-      std::cout << "Limiting test, too many nodes...\n";
-      num_combinations = 6;
+    int num_nodes = public_state.nodes[0].size()
+                  + public_state.nodes[1].size();
+    bool random_combinations = num_nodes > 6;
+
+    int num_combinations;
+    if (random_combinations) {
+      // Limiting test, too many nodes...
+      num_combinations = 100;
+    } else {
+      num_combinations = 1 << num_nodes;
     }
 
-    for (int i = 0; i < (1 << num_combinations); ++i) {
+    std::mt19937 rnd(0);
+    for (int i = 0; i < num_combinations; ++i) {
+      int mask;
+      if (random_combinations) {
+        mask = std::uniform_int_distribution<int>(0, 1 << num_nodes)(rnd);
+      } else {
+        mask = i;
+      }
+
+      // One-hot beliefs.
       int shift = 0;
       for (int j = 0; j < public_state.beliefs[0].size(); ++j) {
-        public_state.beliefs[0][j] = (i & (1 << shift)) > 0 ? 1. : 0.;
+        public_state.beliefs[0][j] = (mask & (1 << shift)) > 0 ? 1. : 0.;
         shift++;
       }
       for (int j = 0; j < public_state.beliefs[1].size(); ++j) {
-        public_state.beliefs[1][j] = (i & (1 << shift)) > 0 ? 1. : 0.;
+        public_state.beliefs[1][j] = (mask & (1 << shift)) > 0 ? 1. : 0.;
         shift++;
       }
 
-      oracle_evaluator->EvaluatePublicState(&public_state, oracle_context.get());
-      std::array<std::vector<double>, 2> oracle_values = public_state.values;
+      TestCase(&public_state, oracle_context.get(), approx_context.get());
+    }
 
-      approx_evaluator->EvaluatePublicState(&public_state, approx_context.get());
-      std::array<std::vector<double>, 2> approx_values = public_state.values;
-
+    // Random beliefs.
+    for (int i = 0; i < 10; ++i) {
+      std::uniform_real_distribution<double> d(0, 1);
       for (int pl = 0; pl < 2; ++pl) {
-        double oracle = 0;
-        double approx = 0;
-        for (int j = 0; j < public_state.nodes[pl].size(); ++j) {
-          oracle += public_state.beliefs[pl][j] * oracle_values[pl][j];
-          approx += public_state.beliefs[pl][j] * approx_values[pl][j];
-        }
-        SPIEL_CHECK_FLOAT_NEAR(oracle, approx, kTol);
+        for (int j = 0; j < public_state.beliefs[pl].size(); ++j) {
+          public_state.beliefs[pl][j] = d(rnd);
+       }
       }
+      TestCase(&public_state, oracle_context.get(), approx_context.get());
     }
   }
 }

@@ -55,6 +55,14 @@ class ResponseBandit : public algorithms::bandits::Bandit {
   };
 };
 
+// Fix sometimes problematic LP results.
+void NumericalNormalization(std::vector<double>& ps) {
+  for(double&p : ps) {
+    if (p < 1e-10) p = 0;
+    if (p > 1. && p < 1.+1e-8) p = 1;
+  }
+  SPIEL_CHECK_TRUE(IsValidProbDistribution(ps));
+}
 
 std::vector<algorithms::BanditVector> MakeResponseBandits(
     const std::vector<std::shared_ptr<algorithms::InfostateTree>>& trees,
@@ -70,9 +78,10 @@ std::vector<algorithms::BanditVector> MakeResponseBandits(
         bandits[node->decision_id()] = std::make_unique<ResponseBandit>(
             std::vector<double>(num_actions, 1. / num_actions));
       } else {
+        std::vector<double> ps = GetProbs(optimal_local_policy);
+        NumericalNormalization(ps);
         bandits[node->decision_id()] =
-            std::make_unique<algorithms::bandits::FixedStrategy>(
-                GetProbs(optimal_local_policy));
+            std::make_unique<algorithms::bandits::FixedStrategy>(ps);
       }
     }
     out.push_back(std::move(bandits));
