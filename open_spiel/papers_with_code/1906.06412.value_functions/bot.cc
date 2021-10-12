@@ -111,6 +111,11 @@ std::pair<ActionsAndProbs, Action> SherlockBot::StepWithPolicy(const State& stat
 
   auto opponent_CFVs = GetOpponentCfvs(*public_state, past_policy_);
 
+  std::cout << "Current: " << infostate <<"\n";
+  for (auto&[is,v]:opponent_CFVs) {
+    std::cout << is << " " << v <<"\n";
+  }
+
   // We will make the gadget game if we are resolving.
   if (!first_step_ && solver_factory_->safe_resolving) {
     subgame_ = subgame_factory_->MakeSubgameSafeResolving(*set, player_id_,
@@ -175,7 +180,7 @@ std::unordered_map<std::string, double> SherlockBot::GetOpponentCfvs(
       std::string infostate_string =
           state.nodes[opp][j]->infostate_string();
       const algorithms::InfostateNode* node =
-          spec.trees()[opp]->DecisionNodeFromInfostateString(infostate_string);
+          spec.trees()[opp]->NodeFromInfostateString(infostate_string);
       // The node may not exist in sequential games like Kuhn.
       SPIEL_CHECK_TRUE(node);
       double cfv = spec.node_spec().at(node).var_cf_value->solution_value();

@@ -916,6 +916,18 @@ const InfostateNode* InfostateTree::DecisionNodeFromInfostateString(
   return nullptr;
 }
 
+const InfostateNode* InfostateTree::NodeFromInfostateString(
+    const std::string& infostate_string) const {
+  for (int d = 0; d < depth(); ++d) {
+    for (InfostateNode* node: nodes_at_depth(d)) {
+      if (node->has_infostate_string() &&
+          node->infostate_string() == infostate_string)
+        return node;
+    }
+  }
+  return nullptr;
+}
+
 bool CheckSum(const SfStrategy& strategy, SequenceId id, double expected_sum) {
   if (fabs(strategy[id] - expected_sum) > 1e-13) {
     return false;

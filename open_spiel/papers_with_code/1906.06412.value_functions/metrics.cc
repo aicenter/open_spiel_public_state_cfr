@@ -150,7 +150,7 @@ class BrMetric : public Metric {
   std::unique_ptr<Bot> bot_;
   std::shared_ptr<const Game> br_game_;
   std::shared_ptr<const Game> turn_br_game_;
-  std::shared_ptr<algorithms::InfostateTree> player_tree_;
+  std::vector<std::shared_ptr<algorithms::InfostateTree>> player_trees_;
   double br_;
   double returns_;
  public:
@@ -160,20 +160,18 @@ class BrMetric : public Metric {
         turn_br_game_(game->GetType().dynamics == GameType::Dynamics::kSimultaneous
                       ? ConvertToTurnBased(*br_game_)
                       : br_game_),
-        player_tree_(algorithms::MakeInfostateTree(
-            *br_game_, Player{0},
+        player_trees_(algorithms::MakeInfostateTrees(
+            *br_game_,
             algorithms::kNoMoveAheadLimit,
             algorithms::kStoreAllStatesPolicy)) {}
   std::string name() const override { return "br"; }
   void Reset() override {}
   void Evaluate(std::ostream& progress) override {
     std::shared_ptr<TabularPolicy> policy =
-        TabularizeOnlinePolicy(bot_.get(), player_tree_, absl::nullopt);
+        TabularizeOnlinePolicy(bot_.get(), player_trees_[0], absl::nullopt);
     progress << '.';
 
-    algorithms::TabularBestResponse br(*turn_br_game_, Player{1},
-                                       policy->PolicyTable());
-    br_ = br.Value("");
+    br_ = BestResponse(player_trees_, *policy)[1];
     progress << '.';
 
     auto uniform = GetUniformPolicy(*turn_br_game_);

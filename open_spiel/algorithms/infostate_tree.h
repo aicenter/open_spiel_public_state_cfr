@@ -402,6 +402,10 @@ class InfostateTree final {
   size_t num_ids(SequenceId) const { return num_sequences(); }
   size_t num_ids(LeafId) const { return num_leaves(); }
 
+  // -- General operations -----------------------------------------------------
+  const InfostateNode* NodeFromInfostateString(
+      const std::string& infostate) const;
+
   // -- Sequence operations ----------------------------------------------------
   SequenceId empty_sequence() const;
   InfostateNode* observation_infostate(const SequenceId& sequence_id) {
