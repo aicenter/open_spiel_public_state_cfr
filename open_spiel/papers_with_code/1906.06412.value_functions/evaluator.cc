@@ -306,7 +306,7 @@ void OracleEvaluator::EvaluatePublicState(
   SPIEL_CHECK_EQ(trees[0]->root().num_children(), state->nodes[0].size());
   SPIEL_CHECK_EQ(trees[1]->root().num_children(), state->nodes[1].size());
 
-  algorithms::ortools::SequenceFormLpSpecification sf_lp(trees);
+  algorithms::ortools::SequenceFormLpSpecification sf_lp(trees, "CLP");
   const auto& [optimal_brs, game_value] =
       MakeEquilibriumPolicy(&sf_lp, /*uniform_imputation=*/false);
 
