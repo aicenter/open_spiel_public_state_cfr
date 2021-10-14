@@ -111,10 +111,7 @@ std::pair<ActionsAndProbs, Action> SherlockBot::StepWithPolicy(const State& stat
 
   auto opponent_CFVs = GetOpponentCfvs(*public_state, past_policy_);
 
-  std::cout << "Current: " << infostate <<"\n";
-  for (auto&[is,v]:opponent_CFVs) {
-    std::cout << is << " " << v <<"\n";
-  }
+
 
   // We will make the gadget game if we are resolving.
   if (!first_step_ && solver_factory_->safe_resolving) {
@@ -166,31 +163,7 @@ std::unordered_map<std::string, double> SherlockBot::GetOpponentCfvs(
     return state.InfostateAvgValues(1 - player_id_);
 
   } else if(solver_factory_->opponent_cfvs_selection == kOracleValueForAverageBeliefs) {
-
-    algorithms::ortools::SequenceFormLpSpecification spec(*subgame_factory_->game);
-    spec.SpecifyLinearProgram(player_id_);
-    algorithms::ortools::RecursivelyRefineSpecFixStrategyWithPolicy(
-        spec.trees()[player_id_]->mutable_root(), past_policy, &spec);
-    spec.Solve();
-
-    Player opp = 1 - player_id_;
-    std::unordered_map<std::string, double> CFVs;
-    for (int j = 0; j < state.nodes[opp].size(); j++) {
-      // Can't use the node directly: they belong to distinct trees!
-      std::string infostate_string =
-          state.nodes[opp][j]->infostate_string();
-      const algorithms::InfostateNode* node =
-          spec.trees()[opp]->NodeFromInfostateString(infostate_string);
-      // The node may not exist in sequential games like Kuhn.
-      SPIEL_CHECK_TRUE(node);
-      double cfv = spec.node_spec().at(node).var_cf_value->solution_value();
-      CFVs.emplace(infostate_string, cfv);
-//      double cfv2 = state.average_values[opp][j];
-//      std::cout << cfv << " " << cfv2 << "\n";
-    }
-//    std::cout << "---\n";
-    return CFVs;
-
+    return ComputeOracleConstraints(state, 1 - player_id_, past_policy);
   } else {
     SpielFatalError("Unrecognized option");
   }

@@ -31,11 +31,7 @@ std::unique_ptr<SubgameSolver> SolverFactory::MakeSolver(
                                          beliefs_for_average, noisy_values);
 }
 
-SafeResolvingOpponentCfValues GetSafeResolvingOpponentCfValues(const std::string& cf) {
-  if (cf == "average")     return SafeResolvingOpponentCfValues::kAverageOfCurrentValues;
-  else if (cf == "oracle") return SafeResolvingOpponentCfValues::kOracleValueForAverageBeliefs;
-  else SpielFatalError("Exhausted pattern match! SafeResolvingOpponentCfValues not recognized.");
-}
+
 }  // papers_with_code
 }  // open_spiel
 

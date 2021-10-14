@@ -3,6 +3,8 @@ add_library(paper_value_functions OBJECT
         bot.h
         experience_replay.cc
         experience_replay.h
+        constraints.cc
+        constraints.h
         evaluator.cc
         evaluator.h
         hand_table.cc
