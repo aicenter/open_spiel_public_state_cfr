@@ -18,6 +18,7 @@
 #include "open_spiel/algorithms/bandits_policy.h"
 
 #include "open_spiel/papers_with_code/1906.06412.value_functions/subgame.h"
+#include "open_spiel/algorithms/ortools/sequence_form_lp.h"
 
 namespace open_spiel {
 namespace papers_with_code {
@@ -108,7 +109,8 @@ std::shared_ptr<PublicStateEvaluator> MakeApproxOracleEvaluator(
     std::shared_ptr<const Game> game, int cfr_iterations = 100000);
 // Evaluator that uses sequence-form LP to compute exact values.
 std::shared_ptr<PublicStateEvaluator> MakeOracleEvaluator(
-    std::shared_ptr<const Game> game);
+    std::shared_ptr<const Game> game,
+    std::string solver_id = algorithms::ortools::kDefaultLinProgSolver);
 
 
 

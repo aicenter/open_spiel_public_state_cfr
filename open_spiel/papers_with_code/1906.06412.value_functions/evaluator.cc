@@ -216,9 +216,13 @@ void CFREvaluator::EvaluatePublicState(PublicState* state,
 struct OracleEvaluator : public PublicStateEvaluator {
   std::shared_ptr<const Game> game;
   std::shared_ptr<Observer> infostate_observer;
+  std::string solver_id_;
   OracleEvaluator(std::shared_ptr<const Game> game,
-                  std::shared_ptr<Observer> infostate_observer)
-    : game(game), infostate_observer(infostate_observer) {};
+                  std::shared_ptr<Observer> infostate_observer,
+                  std::string solver_id)
+    : game(game),
+      infostate_observer(infostate_observer),
+      solver_id_(solver_id) {};
   std::unique_ptr<PublicStateContext> CreateContext(
       const PublicState& state) const override;
   void EvaluatePublicState(PublicState* s,
@@ -306,7 +310,7 @@ void OracleEvaluator::EvaluatePublicState(
   SPIEL_CHECK_EQ(trees[0]->root().num_children(), state->nodes[0].size());
   SPIEL_CHECK_EQ(trees[1]->root().num_children(), state->nodes[1].size());
 
-  algorithms::ortools::SequenceFormLpSpecification sf_lp(trees, "CLP");
+  algorithms::ortools::SequenceFormLpSpecification sf_lp(trees, solver_id_);
   const auto& [optimal_brs, game_value] =
       MakeEquilibriumPolicy(&sf_lp, /*uniform_imputation=*/false);
 
@@ -367,9 +371,9 @@ std::shared_ptr<PublicStateEvaluator> MakeApproxOracleEvaluator(
 }
 
 std::shared_ptr<PublicStateEvaluator> MakeOracleEvaluator(
-    std::shared_ptr<const Game> game) {
+    std::shared_ptr<const Game> game, std::string solver_id) {
   return std::make_shared<OracleEvaluator>(
-      game, game->MakeObserver(kInfoStateObsType, {}));
+      game, game->MakeObserver(kInfoStateObsType, {}), solver_id);
 }
 
 }  // namespace papers_with_code

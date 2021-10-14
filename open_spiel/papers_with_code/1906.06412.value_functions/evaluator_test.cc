@@ -18,6 +18,7 @@
 #include "open_spiel/game_transforms/turn_based_simultaneous_game.h"
 
 #include "open_spiel/papers_with_code/1906.06412.value_functions/solver.h"
+#include "open_spiel/algorithms/ortools/sequence_form_lp.h"
 
 
 namespace open_spiel {
@@ -131,84 +132,111 @@ void TestOracleEvaluatorMP() {
 void TestOracleEvaluator(const std::string& game_name) {
   std::cout << "\nEvaluating " << game_name << " with (approx) oracle\n";
   auto game = LoadGameAsTurnBased(game_name);
-  auto oracle_evaluator = MakeOracleEvaluator(game);
-  auto approx_evaluator = MakeApproxOracleEvaluator(game, 5000);
-  std::unique_ptr<PublicStatesInGame> all = MakeAllPublicStates(*game);
-  constexpr double kTol = 5e-3;
 
-  // Compare the public state values between oracle
-  // and approximative oracle value functions.
-  auto TestCase = [&](PublicState* public_state,
-                      PublicStateContext* oracle_context,
-                      PublicStateContext* approx_context) {
-    oracle_evaluator->EvaluatePublicState(public_state, oracle_context);
-    std::array<std::vector<double>, 2> oracle_values = public_state->values;
+  for (auto lp_solver : std::vector<std::string>{"GLOP", "SCIP", "CLP", "CBC"}) {
+    std::cout << "\nTesting solver: " << lp_solver << "\n";
+    auto oracle_evaluator = MakeOracleEvaluator(game, lp_solver);
+    auto approx_evaluator = MakeApproxOracleEvaluator(game, 5000);
+    std::unique_ptr<PublicStatesInGame> all = MakeAllPublicStates(*game);
+    constexpr double kTol = 5e-3;
 
-    approx_evaluator->EvaluatePublicState(public_state, approx_context);
-    std::array<std::vector<double>, 2> approx_values = public_state->values;
+    // Compare the public state values between oracle
+    // and approximative oracle value functions.
+    auto TestCase = [&](PublicState* public_state,
+                        PublicStateContext* oracle_context,
+                        PublicStateContext* approx_context) {
+      oracle_evaluator->EvaluatePublicState(public_state, oracle_context);
+      std::array<std::vector<double>, 2> oracle_values = public_state->values;
 
-    for (int pl = 0; pl < 2; ++pl) {
-      double oracle = 0;
-      double approx = 0;
-      for (int j = 0; j < public_state->nodes[pl].size(); ++j) {
-        oracle += public_state->beliefs[pl][j] * oracle_values[pl][j];
-        approx += public_state->beliefs[pl][j] * approx_values[pl][j];
-      }
-      SPIEL_CHECK_FLOAT_NEAR(oracle, approx, kTol);
-    }
-  };
+      approx_evaluator->EvaluatePublicState(public_state, approx_context);
+      std::array<std::vector<double>, 2> approx_values = public_state->values;
 
-  for (PublicState& public_state : all->public_states) {
-    std::cout << "Public state: " << public_state.public_tensor.Tensor() << "\n";
-    auto oracle_context = oracle_evaluator->CreateContext(public_state);
-    auto approx_context = approx_evaluator->CreateContext(public_state);
-
-    int num_nodes = public_state.nodes[0].size()
-                  + public_state.nodes[1].size();
-    bool random_combinations = num_nodes > 6;
-
-    int num_combinations;
-    if (random_combinations) {
-      // Limiting test, too many nodes...
-      num_combinations = 100;
-    } else {
-      num_combinations = 1 << num_nodes;
-    }
-
-    std::mt19937 rnd(0);
-    for (int i = 0; i < num_combinations; ++i) {
-      int mask;
-      if (random_combinations) {
-        mask = std::uniform_int_distribution<int>(0, 1 << num_nodes)(rnd);
-      } else {
-        mask = i;
-      }
-
-      // One-hot beliefs.
-      int shift = 0;
-      for (int j = 0; j < public_state.beliefs[0].size(); ++j) {
-        public_state.beliefs[0][j] = (mask & (1 << shift)) > 0 ? 1. : 0.;
-        shift++;
-      }
-      for (int j = 0; j < public_state.beliefs[1].size(); ++j) {
-        public_state.beliefs[1][j] = (mask & (1 << shift)) > 0 ? 1. : 0.;
-        shift++;
-      }
-
-      TestCase(&public_state, oracle_context.get(), approx_context.get());
-    }
-
-    // Random beliefs.
-    for (int i = 0; i < 10; ++i) {
-      std::uniform_real_distribution<double> d(0, 1);
       for (int pl = 0; pl < 2; ++pl) {
-        for (int j = 0; j < public_state.beliefs[pl].size(); ++j) {
-          public_state.beliefs[pl][j] = d(rnd);
-       }
+        double oracle = 0;
+        double approx = 0;
+        for (int j = 0; j < public_state->nodes[pl].size(); ++j) {
+          oracle += public_state->beliefs[pl][j] * oracle_values[pl][j];
+          approx += public_state->beliefs[pl][j] * approx_values[pl][j];
+        }
+        SPIEL_CHECK_FLOAT_NEAR(oracle, approx, kTol);
       }
-      TestCase(&public_state, oracle_context.get(), approx_context.get());
+    };
+
+    for (PublicState& public_state: all->public_states) {
+      std::cout << "Public state: " << public_state.public_tensor.Tensor()
+                << "\n";
+      auto oracle_context = oracle_evaluator->CreateContext(public_state);
+      auto approx_context = approx_evaluator->CreateContext(public_state);
+
+      int num_nodes = public_state.nodes[0].size()
+          + public_state.nodes[1].size();
+      bool random_combinations = num_nodes > 6;
+
+      int num_combinations;
+      if (random_combinations) {
+        // Limiting test, too many nodes...
+        num_combinations = 100;
+      } else {
+        num_combinations = 1 << num_nodes;
+      }
+
+      std::mt19937 rnd(0);
+      for (int i = 0; i < num_combinations; ++i) {
+        int mask;
+        if (random_combinations) {
+          mask = std::uniform_int_distribution<int>(0, 1 << num_nodes)(rnd);
+        } else {
+          mask = i;
+        }
+
+        // One-hot beliefs.
+        int shift = 0;
+        for (int j = 0; j < public_state.beliefs[0].size(); ++j) {
+          public_state.beliefs[0][j] = (mask & (1 << shift)) > 0 ? 1. : 0.;
+          shift++;
+        }
+        for (int j = 0; j < public_state.beliefs[1].size(); ++j) {
+          public_state.beliefs[1][j] = (mask & (1 << shift)) > 0 ? 1. : 0.;
+          shift++;
+        }
+
+        TestCase(&public_state, oracle_context.get(), approx_context.get());
+      }
+
+      // Random beliefs.
+      for (int i = 0; i < 10; ++i) {
+        std::uniform_real_distribution<double> d(0, 1);
+        for (int pl = 0; pl < 2; ++pl) {
+          for (int j = 0; j < public_state.beliefs[pl].size(); ++j) {
+            public_state.beliefs[pl][j] = d(rnd);
+          }
+        }
+        TestCase(&public_state, oracle_context.get(), approx_context.get());
+      }
     }
   }
+}
+
+void TestRestrictedStrategyInGoofSpiel() {
+  auto game = LoadGame("goofspiel(players=2,num_cards=4,num_turns=3,imp_info=True,points_order=descending)");
+  algorithms::ortools::SequenceFormLpSpecification sf_lp(*game, "CLP");
+  sf_lp.SpecifyLinearProgram(0);
+  auto node = sf_lp.trees()[0]->root().child_at(0)->child_at(3);
+
+  namespace opres = operations_research;
+  double p = 0.950485;
+  opres::MPConstraint* ct
+      = sf_lp.solver()->MakeRowConstraint(/*lb=*/p, /*ub=*/p, "");
+  ct->SetCoefficient(sf_lp.node_spec()[node].var_reach_prob, 1);
+
+  std::cout << sf_lp.Solve() << "\n";
+
+//  std::cout << sf_lp.OptimalPolicy(0).PolicyTable() << "\n";
+  auto table = sf_lp.OptimalPolicy(0, false).PolicyTable();
+  for (const auto&[is,ps] : table) {
+    std::cout << is << " " << GetProbs(ps) << "\n";
+  };
+
 }
 
 }  // namespace
@@ -217,14 +245,16 @@ void TestOracleEvaluator(const std::string& game_name) {
 
 int main(int argc, char** argv) {
   using namespace open_spiel::papers_with_code;
-  TestTerminalEvaluatorHasSameIterations("kuhn_poker");
-  TestTerminalEvaluatorHasSameIterations("leduc_poker");
-  TestTerminalEvaluatorHasSameIterations(
-      "goofspiel(players=2,num_cards=4,imp_info=True,points_order=descending)");
-
+//  TestTerminalEvaluatorHasSameIterations("kuhn_poker");
+//  TestTerminalEvaluatorHasSameIterations("leduc_poker");
+//  TestTerminalEvaluatorHasSameIterations(
+//      "goofspiel(players=2,num_cards=4,imp_info=True,points_order=descending)");
+//
   TestOracleEvaluatorMP();
   TestOracleEvaluator("matrix_mp");
   TestOracleEvaluator("kuhn_poker");
   TestOracleEvaluator(
       "goofspiel(players=2,num_cards=3,imp_info=True,points_order=descending)");
+
+//  TestRestrictedStrategyInGoofSpiel();
 }
