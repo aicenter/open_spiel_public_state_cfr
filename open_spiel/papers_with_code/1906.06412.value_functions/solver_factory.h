@@ -41,7 +41,7 @@ struct SolverFactory {
   bool beliefs_for_average = false;
   double opponent_beliefs_eps = 0.;
   double noisy_values = 0.;
-  SafeResolvingOpponentCfValues opponent_cfvs_selection = kAverageOfCurrentValues;
+  SafeResolvingConstraints resolving_constraints = kAverageOfCurrentValues;
 
   std::unique_ptr<SubgameSolver> MakeSolver(
       std::shared_ptr<Subgame> subgame,

@@ -125,8 +125,8 @@ ABSL_FLAG(int, bot_particles, -1,
           "public state. -1 to set the limit same as max_particles.");
 ABSL_FLAG(std::string, bot_vf, "net",
           "Value function to use in the bot, one of {net,approx,oracle}");
-ABSL_FLAG(std::string, opponent_cfvs_selection, "average",
-          "How the cf values should be computed.");
+ABSL_FLAG(std::string, resolving_constraints, "average",
+          "How the cf values for safe resolving should be computed.");
 
 // -- Metrics --
 // Validation loss
@@ -492,8 +492,8 @@ void TrainEvalLoop() {
   bot_solver_factory->rnd_gen = std::make_shared<std::mt19937>(seed);
   bot_solver_factory->safe_resolving = absl::GetFlag(FLAGS_safe_resolving);
   bot_solver_factory->noisy_values   = absl::GetFlag(FLAGS_noisy_values);
-  bot_solver_factory->opponent_cfvs_selection =
-      GetSafeResolvingOpponentCfValues(absl::GetFlag(FLAGS_opponent_cfvs_selection));
+  bot_solver_factory->resolving_constraints =
+      GetSafeResolvingConstraints(absl::GetFlag(FLAGS_resolving_constraints));
   std::string bot_vf = absl::GetFlag(FLAGS_bot_vf);
   if (bot_vf == "net") {  // Nothing, already set by copy of subgame factory.
   } else if (bot_vf == "approx") {

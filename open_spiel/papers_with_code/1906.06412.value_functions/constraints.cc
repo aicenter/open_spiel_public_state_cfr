@@ -18,14 +18,18 @@
 namespace open_spiel {
 namespace papers_with_code {
 
-SafeResolvingOpponentCfValues GetSafeResolvingOpponentCfValues(const std::string& cf) {
-  if (cf == "average")     return SafeResolvingOpponentCfValues::kAverageOfCurrentValues;
-  else if (cf == "oracle") return SafeResolvingOpponentCfValues::kOracleValueForAverageBeliefs;
-  else SpielFatalError("Exhausted pattern match! SafeResolvingOpponentCfValues not recognized.");
+SafeResolvingConstraints GetSafeResolvingConstraints(const std::string& cf) {
+  if (cf == "average") return SafeResolvingConstraints::kAverageOfCurrentValues;
+  else if (cf == "oracle") return SafeResolvingConstraints::kOracleConstraints;
+  else
+    SpielFatalError("Exhausted pattern match! "
+                    "SafeResolvingConstraints not recognized.");
 }
 
 std::unordered_map<std::string, double> ComputeOracleConstraints(
-    const PublicState& state, Player opponent, const Policy& player_past_policy) {
+    const PublicState& state,
+    Player opponent,
+    const Policy& player_past_policy) {
   Player player = 1 - opponent;
 
   algorithms::ortools::SequenceFormLpSpecification spec(*state.game());

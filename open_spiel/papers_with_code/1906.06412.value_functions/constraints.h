@@ -22,11 +22,11 @@ namespace open_spiel {
 namespace papers_with_code {
 
 
-enum SafeResolvingOpponentCfValues {
+enum SafeResolvingConstraints {
   kAverageOfCurrentValues,
-  kOracleValueForAverageBeliefs
+  kOracleConstraints
 };
-SafeResolvingOpponentCfValues GetSafeResolvingOpponentCfValues(const std::string& cf);
+SafeResolvingConstraints GetSafeResolvingConstraints(const std::string& cf);
 
 std::unordered_map<std::string, double> ComputeOracleConstraints(
     const PublicState& state, Player opponent, const Policy& player_past_policy);
