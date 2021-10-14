@@ -217,44 +217,20 @@ void TestOracleEvaluator(const std::string& game_name) {
   }
 }
 
-void TestRestrictedStrategyInGoofSpiel() {
-  auto game = LoadGame("goofspiel(players=2,num_cards=4,num_turns=3,imp_info=True,points_order=descending)");
-  algorithms::ortools::SequenceFormLpSpecification sf_lp(*game, "CLP");
-  sf_lp.SpecifyLinearProgram(0);
-  auto node = sf_lp.trees()[0]->root().child_at(0)->child_at(3);
-
-  namespace opres = operations_research;
-  double p = 0.950485;
-  opres::MPConstraint* ct
-      = sf_lp.solver()->MakeRowConstraint(/*lb=*/p, /*ub=*/p, "");
-  ct->SetCoefficient(sf_lp.node_spec()[node].var_reach_prob, 1);
-
-  std::cout << sf_lp.Solve() << "\n";
-
-//  std::cout << sf_lp.OptimalPolicy(0).PolicyTable() << "\n";
-  auto table = sf_lp.OptimalPolicy(0, false).PolicyTable();
-  for (const auto&[is,ps] : table) {
-    std::cout << is << " " << GetProbs(ps) << "\n";
-  };
-
-}
-
 }  // namespace
 }  // namespace papers_with_code
 }  // namespace open_spiel
 
 int main(int argc, char** argv) {
   using namespace open_spiel::papers_with_code;
-//  TestTerminalEvaluatorHasSameIterations("kuhn_poker");
-//  TestTerminalEvaluatorHasSameIterations("leduc_poker");
-//  TestTerminalEvaluatorHasSameIterations(
-//      "goofspiel(players=2,num_cards=4,imp_info=True,points_order=descending)");
-//
+  TestTerminalEvaluatorHasSameIterations("kuhn_poker");
+  TestTerminalEvaluatorHasSameIterations("leduc_poker");
+  TestTerminalEvaluatorHasSameIterations(
+      "goofspiel(players=2,num_cards=4,imp_info=True,points_order=descending)");
+
   TestOracleEvaluatorMP();
   TestOracleEvaluator("matrix_mp");
   TestOracleEvaluator("kuhn_poker");
   TestOracleEvaluator(
       "goofspiel(players=2,num_cards=3,imp_info=True,points_order=descending)");
-
-//  TestRestrictedStrategyInGoofSpiel();
 }

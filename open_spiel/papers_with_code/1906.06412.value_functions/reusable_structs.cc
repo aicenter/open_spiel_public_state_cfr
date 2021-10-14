@@ -40,13 +40,13 @@ SubgameSolver* ReusableStructures::GetIterableTrunkWithOracle() {
   return iterable_trunk_with_oracle.get();
 }
 
-SubgameSolver* ReusableStructures::GetTrunkWithNet() {
-  if (!trunk_with_net) {
-    trunk_with_net = solver_factory->MakeSolver(
-        GetTrunk(), solver_factory->leaf_evaluator,
-        solver_factory->use_bandits_for_cfr);
+SubgameSolver* ReusableStructures::GetTrunkWithVf() {
+  if (!trunk_with_vf) {
+    trunk_with_vf = bot_solver_factory->MakeSolver(
+        GetTrunk(), bot_solver_factory->leaf_evaluator,
+        bot_solver_factory->use_bandits_for_cfr);
   }
-  return trunk_with_net.get();
+  return trunk_with_vf.get();
 }
 
 algorithms::ortools::SequenceFormLpSpecification* ReusableStructures::GetSfLp() {

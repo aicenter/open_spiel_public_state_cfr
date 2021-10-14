@@ -29,6 +29,7 @@ std::vector<double> BestResponse(
 
 std::vector<algorithms::BanditVector> MakeResponseBandits(
     const std::vector<std::shared_ptr<algorithms::InfostateTree>>& trees,
+    const std::array<std::vector<double>, 2>& beliefs,
     const Policy& optimal_brs);
 
 }  // namespace papers_with_code

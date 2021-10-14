@@ -22,7 +22,6 @@
 #include "open_spiel/papers_with_code/1906.06412.value_functions/tabularize_bot.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/infostate_tree_br.h"
 #include <open_spiel/algorithms/infostate_tree.h>
-#include <algorithms/best_response.h>
 #include <game_transforms/turn_based_simultaneous_game.h>
 
 namespace open_spiel {
@@ -34,16 +33,16 @@ namespace or_algs = algorithms::ortools;
 class FullTrunkExplMetric : public Metric {
   std::vector<int> evaluate_iters_;
   std::vector<double> expls_;
-  SubgameSolver* trunk_with_net_;
+  SubgameSolver* trunk_with_vf_;
   or_algs::SequenceFormLpSpecification* whole_game_;
 
  public:
   FullTrunkExplMetric(std::vector<int> evaluate_iters,
-                      SubgameSolver* trunk_with_net,
+                      SubgameSolver* trunk_with_vf,
                       or_algs::SequenceFormLpSpecification* whole_game)
      : evaluate_iters_(std::move(evaluate_iters)),
        expls_(evaluate_iters_.size()),
-       trunk_with_net_(trunk_with_net),
+       trunk_with_vf_(trunk_with_vf),
        whole_game_(whole_game) {}
 
   std::string name() const override { return "full_trunk_expl"; }
@@ -51,13 +50,13 @@ class FullTrunkExplMetric : public Metric {
   void Reset() override { std::fill(expls_.begin(), expls_.end(), 0.); }
 
   void Evaluate(std::ostream& progress) override {
-    std::shared_ptr<Policy> eval_policy = trunk_with_net_->AveragePolicy();
+    std::shared_ptr<Policy> eval_policy = trunk_with_vf_->AveragePolicy();
     int j = 0;
 
     // Important!! We must reset all the bandits & other memory for proper eval.
-    trunk_with_net_->Reset();
+    trunk_with_vf_->Reset();
     for (int i = 1; i <= evaluate_iters_.back(); ++i) {
-      trunk_with_net_->RunSimultaneousIterations(1);
+      trunk_with_vf_->RunSimultaneousIterations(1);
       if (should_evaluate_at_iter(i)) {
         expls_[j++] = or_algs::TrunkExploitability(whole_game_, *eval_policy,
                                                    /*strategy_epsilon=*/0.);
@@ -293,10 +292,10 @@ class ValidationLossMetric : public Metric {
 };
 
 std::unique_ptr<Metric> MakeFullTrunkExplMetric(
-    std::vector<int> evaluate_iters, SubgameSolver* trunk_with_net,
+    std::vector<int> evaluate_iters, SubgameSolver* trunk_with_vf,
     or_algs::SequenceFormLpSpecification* whole_game) {
   return std::make_unique<FullTrunkExplMetric>(std::move(evaluate_iters),
-                                               trunk_with_net, whole_game);
+                                               trunk_with_vf, whole_game);
 }
 
 std::unique_ptr<Metric> MakeIigsBrMetric(

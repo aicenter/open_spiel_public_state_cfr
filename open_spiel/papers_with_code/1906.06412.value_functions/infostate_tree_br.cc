@@ -64,25 +64,49 @@ void NumericalNormalization(std::vector<double>& ps) {
   SPIEL_CHECK_TRUE(IsValidProbDistribution(ps));
 }
 
+void RecursiveMakeResponseBandits(algorithms::InfostateNode* node,
+                                  double reach,
+                                  const Policy& optimal_brs,
+                                  algorithms::BanditVector& bandits) {
+
+  if (node->type() == algorithms::kDecisionInfostateNode) {
+    auto policy = optimal_brs.GetStatePolicy(node->infostate_string());
+    std::vector<double> ps;
+    if (policy.empty() || reach == 0.) {
+      int num_actions = node->num_children();
+      ps = std::vector<double>(num_actions, 1. / num_actions);
+      bandits[node->decision_id()] = std::make_unique<ResponseBandit>(ps);
+    } else {
+      ps = GetProbs(policy);
+      NumericalNormalization(ps);
+      bandits[node->decision_id()] =
+          std::make_unique<algorithms::bandits::FixedStrategy>(ps);
+    }
+
+    for (int i = 0; i < node->num_children(); ++i) {
+      RecursiveMakeResponseBandits(node->child_at(i), reach * ps[i],
+                                   optimal_brs, bandits);
+    }
+  } else {
+    for (int i = 0; i < node->num_children(); ++i) {
+      RecursiveMakeResponseBandits(node->child_at(i), reach,
+                                   optimal_brs, bandits);
+    }
+  }
+}
+
 std::vector<algorithms::BanditVector> MakeResponseBandits(
     const std::vector<std::shared_ptr<algorithms::InfostateTree>>& trees,
+    const std::array<std::vector<double>, 2>& beliefs,
     const Policy& optimal_brs) {
   std::vector<algorithms::BanditVector> out;
   out.reserve(2);
   for (const std::shared_ptr<algorithms::InfostateTree>& tree : trees) {
     algorithms::BanditVector bandits(tree.get());
-    for (auto* node: tree->AllDecisionInfostates()) {
-      auto optimal_local_policy = optimal_brs.GetStatePolicy(node->infostate_string());
-      if (optimal_local_policy.empty()) {
-        int num_actions = node->num_children();
-        bandits[node->decision_id()] = std::make_unique<ResponseBandit>(
-            std::vector<double>(num_actions, 1. / num_actions));
-      } else {
-        std::vector<double> ps = GetProbs(optimal_local_policy);
-        NumericalNormalization(ps);
-        bandits[node->decision_id()] =
-            std::make_unique<algorithms::bandits::FixedStrategy>(ps);
-      }
+    for (int i = 0; i < tree->root().num_children(); ++i) {
+      auto* node = tree->root().child_at(i);
+      RecursiveMakeResponseBandits(node, beliefs[tree->acting_player()][i],
+                                   optimal_brs, bandits);
     }
     out.push_back(std::move(bandits));
   }
@@ -94,7 +118,13 @@ std::vector<double> BestResponse(
     std::vector<std::shared_ptr<algorithms::InfostateTree>> trees,
     const Policy& fixed_policy) {
 
-  algorithms::InfostateCFR cfr(trees, MakeResponseBandits(trees, fixed_policy));
+  std::array<std::vector<double>, 2> beliefs;
+  for (int pl = 0; pl < 2; ++pl) {
+    beliefs[pl] = std::vector<double>(trees[pl]->root().num_children(), 1.);
+  }
+
+  algorithms::InfostateCFR cfr(
+      trees, MakeResponseBandits(trees, beliefs, fixed_policy));
 
   cfr.RunSimultaneousIterations(1);
   cfr.ResetCumulValues();

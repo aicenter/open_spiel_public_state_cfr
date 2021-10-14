@@ -43,7 +43,6 @@ ABSL_FLAG(double, opponent_beliefs_eps, 0.,
           "infostate when constructing gadget game for safe resolving.");
 
 // -- Data generation --
-ABSL_FLAG(int, depth, 3, "Depth of the trunk.");
 ABSL_FLAG(double, prob_pure_strat, 0.1, "Params for random generation.");
 ABSL_FLAG(double, prob_fully_mixed, 0.05, "Params for random generation.");
 ABSL_FLAG(double, prob_benford_dist, 0.0, "Params for random generation.");
@@ -127,6 +126,8 @@ ABSL_FLAG(std::string, bot_vf, "net",
           "Value function to use in the bot, one of {net,approx,oracle}");
 ABSL_FLAG(std::string, resolving_constraints, "average",
           "How the cf values for safe resolving should be computed.");
+ABSL_FLAG(std::string, lp_solver, "CLP",
+          "Which solver should be used for the oracle VF.");
 
 // -- Metrics --
 // Validation loss
@@ -139,17 +140,21 @@ ABSL_FLAG(std::string, val_init, "nothing",
 // FullTrunkExplMetric
 ABSL_FLAG(std::string, trunk_expl_iterations, "",
           "Evaluate trunk exploitability for each trunk iteration.");
+ABSL_FLAG(int, depth, 3, "Depth of the trunk.");
+
 // ReplayVisitsMetric
 ABSL_FLAG(int, replay_visits_window, -1,
           "Track the average visit count over a past window "
           "behind the head in experience replay");
 ABSL_FLAG(bool, track_time, false, "Track time between loops");
 ABSL_FLAG(bool, track_lr, false, "Track time between loops");
+
 // IigsBrMetric
 ABSL_FLAG(bool, iigs_br_metric, false,
           "Compute domain-specific BR for IIGS(N,K)");
 ABSL_FLAG(bool, iigs_approx_response, true,
           "Make an approximate version of the response, faster to compute.");
+
 // BrMetric
 ABSL_FLAG(bool, br_metric, false,
           "Compute domain-agnostic BR (can be very slow)");
@@ -297,7 +302,7 @@ void TrainEvalLoop() {
   app_oracle->bandit_name = absl::GetFlag(FLAGS_use_bandits_for_cfr);
   app_oracle->num_cfr_iterations = absl::GetFlag(FLAGS_cfr_oracle_iterations);
   app_oracle->save_values_policy = save_values_policy;
-  auto oracle = MakeOracleEvaluator(game);
+  auto oracle = MakeOracleEvaluator(game, absl::GetFlag(FLAGS_lp_solver));
   //
   std::cout << "# Init empty reusable structures ..." << std::endl;
   ReusableStructures reuse(subgame_factory.get(),
@@ -515,7 +520,7 @@ void TrainEvalLoop() {
     if (!trunk_expl_iterations.empty()) {
       std::cout << "# Making full trunk exploitability metric ..." << std::endl;
       metrics.push_back(MakeFullTrunkExplMetric(
-          trunk_expl_iterations, reuse.GetTrunkWithNet(), reuse.GetSfLp()));
+          trunk_expl_iterations, reuse.GetTrunkWithVf(), reuse.GetSfLp()));
     }
   }
   {
@@ -722,6 +727,6 @@ void TrainEvalLoop() {
 int main(int argc, char** argv) {
   INIT_EXPERIMENT();
   // Enable float error signals.
-  feenableexcept(FE_INVALID);
+//  feenableexcept(FE_INVALID);
   open_spiel::papers_with_code::TrainEvalLoop();
 }

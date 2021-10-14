@@ -42,7 +42,7 @@ struct Metric {
 
 std::unique_ptr<Metric> MakeFullTrunkExplMetric(
     std::vector<int> evaluate_iters,
-    SubgameSolver* trunk_with_net,
+    SubgameSolver* trunk_with_vf,
     algorithms::ortools::SequenceFormLpSpecification* whole_game);
 
 std::unique_ptr<Metric> MakeIigsBrMetric(

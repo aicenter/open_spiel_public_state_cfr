@@ -314,9 +314,10 @@ void OracleEvaluator::EvaluatePublicState(
   const auto& [optimal_brs, game_value] =
       MakeEquilibriumPolicy(&sf_lp, /*uniform_imputation=*/false);
 
-  SubgameSolver solver(
-      oracle_context->subgame,
-      MakeResponseBandits(oracle_context->subgame->trees, optimal_brs));
+  SubgameSolver solver(oracle_context->subgame,
+                       MakeResponseBandits(oracle_context->subgame->trees,
+                                           state->beliefs,
+                                           optimal_brs));
   SPIEL_CHECK_TRUE(state->public_tensor == solver.initial_state().public_tensor);
   solver.initial_state().beliefs = state->beliefs;
 
