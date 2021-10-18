@@ -58,11 +58,16 @@ class ResponseBandit : public algorithms::bandits::Bandit {
 // Fix sometimes problematic LP results. These results are typically pure
 // strategies.
 void NumericalNormalization(std::vector<double>& ps) {
+  double sum = 0.;
   for(double&p : ps) {
     if (p < 1e-4) p = 0;
     if (p > 1. && p < 1.+1e-4) p = 1;
+    sum += p;
   }
-  SPIEL_CHECK_TRUE(IsValidProbDistribution(ps));
+  for(double&p : ps) {
+    p /= sum;
+  }
+//  SPIEL_CHECK_TRUE(IsValidProbDistribution(ps));
 }
 
 void RecursiveMakeResponseBandits(algorithms::InfostateNode* node,
