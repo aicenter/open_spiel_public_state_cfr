@@ -196,6 +196,11 @@ std::unique_ptr<ParticleSet> SherlockBot::PickParticles(
     std::unique_ptr<ParticleSet> infostate_targeted_set =
         particle_generator->GenerateParticles(1, /*max_rejection_cnt=*/100);
     SPIEL_CHECK_FALSE(infostate_targeted_set->particles.empty());
+    // Remove one particle from the generated set to make space for the
+    // one targeted particle.
+    if (set->size() == subgame_factory_->max_particles) {
+      set->particles.pop_back();
+    }
     set->ImportSet(*infostate_targeted_set);
 
     // Generate even more particles if we starved too many of them between steps.

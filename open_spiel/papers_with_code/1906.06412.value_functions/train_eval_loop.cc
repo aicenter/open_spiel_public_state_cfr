@@ -87,8 +87,11 @@ ABSL_FLAG(int, num_loops, 5000, "Number of train-eval loops.");
 ABSL_FLAG(std::string, optimizer, "adam", "Optimizer. One of adam/sgd");
 ABSL_FLAG(double, learning_rate, 1e-3, "Optimizer learning rate.");
 ABSL_FLAG(double, lr_decay, 1., "Learning rate decay after each loop.");
-ABSL_FLAG(int, max_particles, -1,
-          "Max particles to use. Set -1 to find an upper bound automatically.");
+ABSL_FLAG(double, max_particles, -1,
+          "Max particles to use. Use positive integer value for a specific "
+          "number. Use -1 to find an upper bound automatically. Use a fraction "
+          "0.X to select a fraction of UB number of particles automatically. "
+          "Note that 1.0 evaluates to 1 particle -- use -1 for all particles.");
 
 // -- Network --
 ABSL_FLAG(std::string, arch, "particle_vf",
@@ -283,7 +286,6 @@ void TrainEvalLoop() {
   subgame_factory->hand_observer        = game->MakeObserver(kHandHistoryObsType, {});
   subgame_factory->max_move_ahead_limit = absl::GetFlag(FLAGS_max_move_ahead_limit);
   subgame_factory->max_trunk_depth      = absl::GetFlag(FLAGS_depth);
-  subgame_factory->max_particles        = absl::GetFlag(FLAGS_max_particles);
   if (game->GetType().short_name == "goofspiel") {
     auto goof_game =
         std::dynamic_pointer_cast<const goofspiel::GoofspielGame>(game);
@@ -322,15 +324,18 @@ void TrainEvalLoop() {
   std::cout << "# Hand features: " << dims->hand_features_size << std::endl;
   //
   std::cout << "# Deducing dimensions for specific VFs ..." << std::endl;
-  if (subgame_factory->max_particles >= 1) {  // Static setting.
+  double max_particles = absl::GetFlag(FLAGS_max_particles);
+  if (max_particles >= 1) {  // Static setting.
     auto particle_dims = open_spiel::down_cast<ParticleDims*>(dims.get());
-    particle_dims->max_parviews = subgame_factory->max_particles * 2;
+    subgame_factory->max_particles = max_particles;
+    particle_dims->max_parviews = max_particles * 2;
     std::cout << "# Particle VF (set statically): "
-                 "max_particles = " << subgame_factory->max_particles << ' ' <<
-              "max_parviews = " << particle_dims->max_parviews << std::endl;
+                 "max_particles = " << subgame_factory->max_particles << ' '
+              << "max_parviews = " << particle_dims->max_parviews << std::endl;
   }
+  // Dynamic setting: find out number of particles that should be used.
   std::shared_ptr<HandInfo> hand_info;
-  if (arch == NetArchitecture::kPositional || subgame_factory->max_particles == -1) {
+  if (arch == NetArchitecture::kPositional || max_particles < 1) {
     std::cout << "# Finding all hands in the game (may take a while) ..."
               << std::endl;
     PublicStatesInGame* all_states = reuse.GetAllPublicStates();
@@ -360,10 +365,15 @@ void TrainEvalLoop() {
     if (arch == NetArchitecture::kParticle) {
       auto particle_dims = open_spiel::down_cast<ParticleDims*>(dims.get());
       subgame_factory->max_particles = LargestPublicState(public_states);
-      particle_dims->max_parviews = hand_info->num_hands();
+      if (max_particles > 0. && max_particles < 1.) { // Use a fraction.
+        subgame_factory->max_particles =
+            ceil(subgame_factory->max_particles * max_particles);
+      }
+      particle_dims->max_parviews = std::min((int) hand_info->num_hands(),
+                                             subgame_factory->max_particles * 2);
       std::cout << "# Particle VF (derived automatically): "
-                   "max_particles = " << subgame_factory->max_particles << ' ' <<
-                "max_parviews = " << particle_dims->max_parviews << "\n";
+                   "max_particles = " << subgame_factory->max_particles << ' '
+                << "max_parviews = " << particle_dims->max_parviews << "\n";
       std::cout << "# Full features for a particle: "
                 << particle_dims->full_features_size() << "\n";
     }
@@ -727,6 +737,6 @@ void TrainEvalLoop() {
 int main(int argc, char** argv) {
   INIT_EXPERIMENT();
   // Enable float error signals.
-//  feenableexcept(FE_INVALID);
+  feenableexcept(FE_INVALID);
   open_spiel::papers_with_code::TrainEvalLoop();
 }
