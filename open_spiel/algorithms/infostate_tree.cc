@@ -290,10 +290,17 @@ std::pair<std::string, std::string> InfostateTree::ExtractInfostateString(const 
   return {infostate_string.substr(0, 13), infostate_string.substr(28)};
 }
 
+int ConvertToFullPokerCard(int card, const algorithms::PokerData &poker_data) {
+  int rank = (int) (card / poker_data.num_suits_);
+  int suit = card % poker_data.num_suits_;
+  return rank * 4 + suit;
+}
+
 std::string InfostateTree::ConstructInfostateString(
     const std::pair<std::string, std::string> &parts, int card_one,
-    int card_two, const std::vector<std::string> &card_mask) {
-  std::vector<int> card_vector = {card_one, card_two};
+    int card_two, const algorithms::PokerData &poker_data) {
+  std::vector<int> card_vector =
+      {ConvertToFullPokerCard(card_one, poker_data), ConvertToFullPokerCard(card_two, poker_data)};
   universal_poker::logic::CardSet cards(card_vector);
   return parts.first + "[Private: " + cards.ToString() + "]" + parts.second;
 }
@@ -340,7 +347,7 @@ void InfostateTree::BuildTerminalPokerNodes(
     for (int card_two = card_one + 1; card_two < poker_data.num_cards_; card_two++) {
       InfostateNode *node = parents[hand_index]->AddChild(
           MakeNode(parents[hand_index], kTerminalInfostateNode,
-                   ConstructInfostateString(parts, card_one, card_two, poker_data.card_mask_),
+                   ConstructInfostateString(parts, card_one, card_two, poker_data),
                    terminal_utility, chance_reach_probs[hand_index], depth, &state));
       AddCorrespondingState(node, state, chance_reach_probs[hand_index]);
 
@@ -366,7 +373,7 @@ void InfostateTree::BuildDecisionPokerNodes(
     for (int card_two = card_one + 1; card_two < poker_data.num_cards_; card_two++) {
       new_parents.push_back(parents[hand_index]->AddChild(
           MakeNode(parents[hand_index], kDecisionInfostateNode,
-                   ConstructInfostateString(parts, card_one, card_two, poker_data.card_mask_),
+                   ConstructInfostateString(parts, card_one, card_two, poker_data),
               /*terminal_utility=*/NAN, /*chance_reach_prob=*/NAN, depth, &state)));
       AddCorrespondingState(new_parents.back(), state, chance_reach_probs[hand_index]);
       hand_index++;
@@ -416,7 +423,7 @@ void InfostateTree::BuildObservationPokerNode(
     for (int card_two = card_one + 1; card_two < poker_data.num_cards_; card_two++) {
       new_parents.push_back(parents[hand_index]->AddChild(
           MakeNode(parents[hand_index], kObservationInfostateNode,
-                   ConstructInfostateString(parts, card_one, card_two, poker_data.card_mask_),
+                   ConstructInfostateString(parts, card_one, card_two, poker_data),
               /*terminal_utility=*/NAN, /*chance_reach_prob=*/NAN, depth, &state)));
       AddCorrespondingState(new_parents.back(), state, chance_reach_probs[hand_index]);
       hand_index++;

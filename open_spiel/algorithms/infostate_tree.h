@@ -704,7 +704,7 @@ class InfostateTree final {
 
   static std::string ConstructInfostateString(
       const std::pair<std::string, std::string> &parts, int card_one,
-      int card_two, const std::vector<std::string> &card_mask);
+      int card_two, const algorithms::PokerData &poker_data);
   // Makes sure that all tree leaves are at the same height.
   // It inserts a linked list of dummy observation nodes with appropriate length
   // to balance all the leaves.
