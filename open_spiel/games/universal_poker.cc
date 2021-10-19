@@ -257,11 +257,11 @@ class UniversalPokerObserver : public Observer {
         out.at(i, 0) = 1;
         out.at(i, 1) = 0;
       } else if (actionSeq[i] == 'p') {
-        // Encode raise as 01.
+        // Encode pot as 01.
         out.at(i, 0) = 0;
         out.at(i, 1) = 1;
       } else if (actionSeq[i] == 'a') {
-        // Encode raise as 11.
+        // Encode all in as 11.
         out.at(i, 0) = 1;
         out.at(i, 1) = 1;
       } else if (actionSeq[i] == 'f') {
