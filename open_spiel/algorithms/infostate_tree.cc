@@ -293,7 +293,9 @@ std::pair<std::string, std::string> InfostateTree::ExtractInfostateString(const 
 std::string InfostateTree::ConstructInfostateString(
     const std::pair<std::string, std::string> &parts, int card_one,
     int card_two, const std::vector<std::string> &card_mask) {
-  return parts.first + "[Private: " + card_mask[card_one] + card_mask[card_two] + "]" + parts.second;
+  std::vector<int> card_vector = {card_one, card_two};
+  universal_poker::logic::CardSet cards(card_vector);
+  return parts.first + "[Private: " + cards.ToString() + "]" + parts.second;
 }
 
 void InfostateTree::RecursivelyBuildPokerTree(
