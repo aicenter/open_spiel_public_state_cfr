@@ -219,6 +219,9 @@ struct PublicStateContext {
 // Public state evaluator can create appropriate contexts for later evaluation
 // of public states. The derived classes should down_cast the context as needed.
 // Beliefs and values are saved within the public state.
+int ConvertToFullPokerCard(int card, const algorithms::PokerData &poker_data);
+bool CompatibleHands(const std::vector<int> &hand_one, const std::vector<int> &hand_two);
+
 class PublicStateEvaluator {
  public:
   virtual ~PublicStateEvaluator() = default;
@@ -237,18 +240,34 @@ struct PokerTerminalPublicStateContext final : public PublicStateContext {
   explicit PokerTerminalPublicStateContext(const PublicState& state);
 };
 
-class PokerTerminalEvaluator final : public PublicStateEvaluator {
+class PokerTerminalEvaluatorQuadratic final : public PublicStateEvaluator {
  public:
-  PokerTerminalEvaluator(algorithms::PokerData poker_data, std::vector<int> board_cards);
+  PokerTerminalEvaluatorQuadratic(algorithms::PokerData poker_data, std::vector<int> board_cards);
 
   std::unique_ptr<PublicStateContext> CreateContext(
       const PublicState& state) const override;
   void EvaluatePublicState(
       PublicState* state, PublicStateContext* context) const override;
-  static int ConvertToFullPokerCard(int card, const algorithms::PokerData &poker_data);
  private:
   algorithms::PokerData poker_data_;
+  std::unordered_map<int, std::vector<std::vector<int>>> lost_won_mapping_;
+  std::unordered_map<int, int> belief_sizes_;
+};
+
+class PokerTerminalEvaluatorLinear final : public PublicStateEvaluator {
+ public:
+  PokerTerminalEvaluatorLinear(algorithms::PokerData poker_data, std::vector<int> board_cards);
+
+  std::unique_ptr<PublicStateContext> CreateContext(
+      const PublicState& state) const override;
+  void EvaluatePublicState(
+      PublicState* state, PublicStateContext* context) const override;
+ private:
+  algorithms::PokerData poker_data_;
+  int belief_size_;
   std::vector<std::vector<int>> ordered_hands_;
+  std::unordered_map<int, std::vector<int>> card_to_possible_hands_;
+  std::vector<int> hand_strengths_;
 };
 
 // -- Terminal evaluator -------------------------------------------------------
