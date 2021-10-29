@@ -9,7 +9,6 @@ wget --show-progress -O "libtorch.zip" "https://download.pytorch.org/libtorch/cp
 unzip "libtorch.zip" -d "open_spiel/libtorch/"
 
 wget --show-progress -O "ortools.tar.gz" "https://github.com/google/or-tools/releases/download/v8.0/or-tools_ubuntu-18.04_v8.0.8283.tar.gz"
-tar -xzf "${DOWNLOAD_FILE}" --strip 1 -C "open_spiel/ortools"  
 
 mkdir open_spiel/build
 cd open_spiel/build
