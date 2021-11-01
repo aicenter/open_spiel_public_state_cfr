@@ -30,7 +30,6 @@
 //
 // TODO:
 //   - implement UndoAction for these games.
-//   - generalize to use Observation as well as Information state
 
 namespace open_spiel {
 
@@ -48,9 +47,9 @@ class TurnBasedSimultaneousState : public State {
   bool IsTerminal() const override;
   std::vector<double> Returns() const override;
   std::string InformationStateString(Player player) const override;
+  std::string ObservationString(Player player) const override;
   void InformationStateTensor(Player player,
                               absl::Span<float> values) const override;
-  std::string ObservationString(Player player) const override;
   void ObservationTensor(Player player,
                          absl::Span<float> values) const override;
   std::unique_ptr<State> Clone() const override;
@@ -98,27 +97,30 @@ class TurnBasedSimultaneousGame : public Game {
   double MinUtility() const override { return game_->MinUtility(); }
   double MaxUtility() const override { return game_->MaxUtility(); }
   double UtilitySum() const override { return game_->UtilitySum(); }
-  std::vector<int> InformationStateTensorShape() const override {
-    // We flatten the representation of the underlying game and add one-hot
-    // indications of the to-play player and the observing player.
-    return {2 * NumPlayers() + game_->InformationStateTensorSize()};
-  }
-  std::vector<int> ObservationTensorShape() const override {
-    // We flatten the representation of the underlying game and add one-hot
-    // indications of the to-play player and the observing player.
-    return {2 * NumPlayers() + game_->ObservationTensorSize()};
-  }
   int MaxGameLength() const override {
     return game_->MaxGameLength() * NumPlayers();
   }
   int MaxChanceNodesInHistory() const override {
     return game_->MaxChanceNodesInHistory();
   }
-  std::shared_ptr<Observer> MakeObserver(absl::optional<IIGObservationType> iig_obs_type,
-                                         const GameParameters& params) const override;
+  std::vector<int> InformationStateTensorShape() const override {
+    return {NumDistinctActions() + NumPlayers()
+            + game_->InformationStateTensorSize()};
+  }
+  std::vector<int> ObservationTensorShape() const override {
+    return {NumDistinctActions() + NumPlayers()
+            + game_->ObservationTensorSize()};
+  }
+  std::shared_ptr<Observer> MakeObserver(
+      absl::optional<IIGObservationType> iig_obs_type,
+      const GameParameters& params) const override;
   std::shared_ptr<const Game> wrapped_game() const { return game_; }
  private:
+  friend TurnBasedSimultaneousState;
   std::shared_ptr<const Game> game_;
+  // Used to implement the old observation API.
+  std::shared_ptr<TurnBasedSimultaneousObserver> default_observer_;
+  std::shared_ptr<TurnBasedSimultaneousObserver> info_state_observer_;
 };
 
 // Return back a transformed clone of the game.

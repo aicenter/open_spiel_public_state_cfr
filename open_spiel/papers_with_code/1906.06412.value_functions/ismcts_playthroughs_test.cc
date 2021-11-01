@@ -42,9 +42,9 @@ void TestSamplingPlaythroughs() {
       SPIEL_CHECK_FLOAT_NEAR((--cdf.end())->first, 1., 1e-8);
       // Check each collected infostate for move number it claims to be.
       for(auto& [cumul, it] : cdf) {
-        const auto point_cards = it->first.Tensor("point_card_sequence");
-        int bet_rounds = std::accumulate(point_cards.begin(),
-                                         point_cards.end(), -1);
+        const auto point_cards = it->first.GetConstSpan("point_card_sequence");
+        int bet_rounds = std::accumulate(point_cards.data.begin(),
+                                         point_cards.data.end(), -1);
         SPIEL_CHECK_EQ(it->second.move_number, i);
         SPIEL_CHECK_EQ(bet_rounds, i);
       }

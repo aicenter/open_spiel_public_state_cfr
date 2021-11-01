@@ -55,11 +55,11 @@ struct ReusableStructures {
   std::unique_ptr<SubgameSolver> iterable_trunk_with_oracle;
   SubgameSolver* GetIterableTrunkWithOracle();
 
-  std::unique_ptr<SubgameSolver> trunk_with_net;
-  SubgameSolver* GetTrunkWithNet();
+  std::unique_ptr<SubgameSolver> trunk_with_vf;
+  SubgameSolver* GetTrunkWithVf();
 
-  std::unique_ptr<SequenceFormLpSpecification> sf_lp;
-  SequenceFormLpSpecification* GetSfLp();
+  std::unique_ptr<algorithms::ortools::SequenceFormLpSpecification> sf_lp;
+  algorithms::ortools::SequenceFormLpSpecification* GetSfLp();
 
   std::unique_ptr<PublicStatesInGame> all_states;
   PublicStatesInGame* GetAllPublicStates();

@@ -67,7 +67,7 @@ if(APPLE)
   # has a virtual environment active
   set (CMAKE_FIND_FRAMEWORK LAST)
 else()
-  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pedantic -Wall -Wno-sign-compare -Wno-macro-redefined -Wno-tautological-type-limit-compare -Wno-unused-template -Wno-unused-value -Wno-potentially-evaluated-expression -Wno-gnu-zero-variadic-macro-arguments -Wno-c99-extensions -Wno-gcc-compat -Wno-gnu-case-range -Wno-extra-semi -Wno-unused-const-variable -Wno-unused-variable -Wno-unused-private-field -Wno-sizeof-array-div -Wno-unused-function -Wno-zero-length-array"
+  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pedantic -Wall -Wno-sign-compare -Wno-macro-redefined -Wno-tautological-type-limit-compare -Wno-unused-template -Wno-unused-value -Wno-potentially-evaluated-expression -Wno-gnu-zero-variadic-macro-arguments -Wno-c99-extensions -Wno-gcc-compat -Wno-gnu-case-range -Wno-extra-semi -Wno-unused-const-variable -Wno-unused-variable -Wno-unused-private-field -Wno-unused-function -Wno-zero-length-array"
     )
   # -Wno-unused-function : open_spiel/games/universal_poker/acpc/project_acpc_server/evalHandTables:4257:16: warning: unused function 'emptyCardset'
   # -Wno-sizeof-array-div : libtorch/libtorch/include/torch/csrc/jit/ir/attributes.h:37:42: warning: expression does not compute the number of elements in this array; element type is 'const char *', not 'torch::jit::AttributeKind' [-Wsizeof-array-div]
@@ -155,6 +155,9 @@ openspiel_optional_dependency(OPEN_SPIEL_ENABLE_TENSORFLOW        AUTO
 openspiel_optional_dependency(OPEN_SPIEL_ENABLE_PYTHON_MISC       OFF
   "Enable miscellaneous Python dependencies.")
 
+openspiel_optional_dependency(OPEN_SPIEL_BUILDING_WHEEL           OFF
+  "Building a Python wheel?")
+
 
 # Needed to disable Abseil tests.
 set (BUILD_TESTING OFF)
@@ -218,6 +221,7 @@ set (OPEN_SPIEL_OBJECTS
   $<TARGET_OBJECTS:bots>
   $<TARGET_OBJECTS:games>
   $<TARGET_OBJECTS:game_transforms>
+  $<TARGET_OBJECTS:higc>
   $<TARGET_OBJECTS:bridge_double_dummy_solver>
   $<TARGET_OBJECTS:algorithms>
   $<TARGET_OBJECTS:utils>
@@ -304,6 +308,9 @@ endif()
 
 if (OPEN_SPIEL_BUILD_WITH_PYTHON)
   add_subdirectory (python)
+  # HIGC needs pyspiel.so and corresponding PYTHONPATH to be set
+  # in order to run its tests.
+  add_subdirectory (higc)
 endif()
 
 add_subdirectory (utils)

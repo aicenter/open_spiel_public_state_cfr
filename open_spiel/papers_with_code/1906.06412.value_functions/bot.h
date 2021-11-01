@@ -248,7 +248,7 @@ class SherlockBotFactory : public BotFactory {
     }
     solver_factory->cfr_iterations = cfr_iterations;
     solver_factory->use_bandits_for_cfr = use_bandits_for_cfr;
-    solver_factory->save_values_policy = GetSaveValuesPolicy(save_values_policy);
+    solver_factory->save_values_policy = algorithms::GetSaveValuesPolicy(save_values_policy);
     solver_factory->terminal_evaluator = std::make_shared<TerminalEvaluator>();
     solver_factory->safe_resolving = true;
 

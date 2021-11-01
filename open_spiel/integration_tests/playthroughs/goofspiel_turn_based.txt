@@ -9,8 +9,8 @@ GameType.min_num_players = 2
 GameType.parameter_specification = ["game"]
 GameType.provides_information_state_string = True
 GameType.provides_information_state_tensor = True
-GameType.provides_observation_string = False
-GameType.provides_observation_tensor = False
+GameType.provides_observation_string = True
+GameType.provides_observation_tensor = True
 GameType.provides_factored_observation_string = True
 GameType.reward_model = RewardModel.TERMINAL
 GameType.short_name = "turn_based_simultaneous_game"
@@ -24,31 +24,28 @@ NumPlayers() = 2
 MinUtility() = -1.0
 MaxUtility() = 1.0
 UtilitySum() = 0.0
-InformationStateTensorShape() = point_totals: [2, 11], player_hand: [4], win_sequence: [4, 2], tie_sequence: [4], point_card_sequence: [4, 4], player_action_sequence: [4, 4]
+InformationStateTensorShape() = turn_based_sim_played_action: [4], turn_based_sim_progress: [2], point_totals: [2, 11], player_hand: [4], win_sequence: [4, 2], tie_sequence: [4], point_card_sequence: [4, 4], player_action_sequence: [4, 4]
 InformationStateTensorLayout() = TensorLayout.CHW
-InformationStateTensorSize() = 70
-ObservationTensorShape() = current_point_card: [4], remaining_point_cards: [4], point_totals: [2, 11], player_hand: [4], win_sequence: [4, 2], tie_sequence: [4]
+InformationStateTensorSize() = 76
+ObservationTensorShape() = turn_based_sim_played_action: [4], turn_based_sim_progress: [2], current_point_card: [4], remaining_point_cards: [4], point_totals: [2, 11], player_hand: [4], win_sequence: [4, 2], tie_sequence: [4]
 ObservationTensorLayout() = TensorLayout.CHW
-ObservationTensorSize() = 46
+ObservationTensorSize() = 52
 MaxGameLength() = 8
 ToString() = "turn_based_simultaneous_game(game=goofspiel(imp_info=True,num_cards=4,num_turns=-1,opponent_br_deck=False,players=2,points_order=descending,returns_type=win_loss))"
 
 # State 0
 # Partial joint action:
-# P0 hand: 1 2 3 4
-# P1 hand: 1 2 3 4
-# P0 actions:
-# P1 actions:
-# Point card sequence: 4
-# Points: 0 0
+# P0 hand: 1 2 3 4  P1 hand: 1 2 3 4  P0 actions:  P1 actions:  Point card sequence: 4  Points: 0 0
 IsTerminal() = False
 History() = []
 HistoryString() = ""
 IsChanceNode() = False
 IsSimultaneousNode() = False
 CurrentPlayer() = 0
-InformationStateString(0) = "P0 hand: 1 2 3 4 \nP0 action sequence: \nPoint card sequence: 4 \nWin sequence: \nPoints: 0 0 \nTerminal?: 0\n"
-InformationStateString(1) = "P1 hand: 1 2 3 4 \nP1 action sequence: \nPoint card sequence: 4 \nWin sequence: \nPoints: 0 0 \nTerminal?: 0\n"
+InformationStateString(0) = "Current player: 0\nP0 hand: 1 2 3 4  P0 action sequence:  Point card sequence: 4  Win sequence:  Points: 0 0  Terminal?: 0 "
+InformationStateString(1) = "Current player: 0\nP1 hand: 1 2 3 4  P1 action sequence:  Point card sequence: 4  Win sequence:  Points: 0 0  Terminal?: 0 "
+InformationStateTensor(0).turn_based_sim_played_action: ◯◯◯◯
+InformationStateTensor(0).turn_based_sim_progress: ◉◯
 InformationStateTensor(0).point_totals: ◉◯◯◯◯◯◯◯◯◯◯
                                         ◉◯◯◯◯◯◯◯◯◯◯
 InformationStateTensor(0).player_hand: ◉◉◉◉
@@ -65,6 +62,8 @@ InformationStateTensor(0).player_action_sequence: ◯◯◯◯
                                                   ◯◯◯◯
                                                   ◯◯◯◯
                                                   ◯◯◯◯
+InformationStateTensor(1).turn_based_sim_played_action: ◯◯◯◯
+InformationStateTensor(1).turn_based_sim_progress: ◉◯
 InformationStateTensor(1).point_totals: ◉◯◯◯◯◯◯◯◯◯◯
                                         ◉◯◯◯◯◯◯◯◯◯◯
 InformationStateTensor(1).player_hand: ◉◉◉◉
@@ -81,11 +80,13 @@ InformationStateTensor(1).player_action_sequence: ◯◯◯◯
                                                   ◯◯◯◯
                                                   ◯◯◯◯
                                                   ◯◯◯◯
-ObservationString(0) = "Current point card: 4\nRemaining Point Cards: 123\nPoints: 0 0 \nP0 hand: 1 2 3 4 \nWin sequence: \n"
-ObservationString(1) = "Current point card: 4\nRemaining Point Cards: 123\nPoints: 0 0 \nP1 hand: 1 2 3 4 \nWin sequence: \n"
-PublicObservationString() = "Current point card: 4\nRemaining Point Cards: 123\nWin sequence: \nPoints: 0 0 \n"
-PrivateObservationString(0) = "Current point card: 4\nRemaining Point Cards: 123\nPoints: 0 0 \nP0 hand: 1 2 3 4 \nWin sequence: \n"
-PrivateObservationString(1) = "Current point card: 4\nRemaining Point Cards: 123\nPoints: 0 0 \nP1 hand: 1 2 3 4 \nWin sequence: \n"
+ObservationString(0) = "Current player: 0\nCurrent point card: 4 Remaining Point Cards: 123 Points: 0 0  P0 hand: 1 2 3 4  Win sequence:  "
+ObservationString(1) = "Current player: 0\nCurrent point card: 4 Remaining Point Cards: 123 Points: 0 0  P1 hand: 1 2 3 4  Win sequence:  "
+PublicObservationString() = "Current player: 0\nCurrent point card: 4 Remaining Point Cards: 123 Win sequence:  Points: 0 0  "
+PrivateObservationString(0) = "Current point card: 4 Remaining Point Cards: 123 Points: 0 0  P0 hand: 1 2 3 4  Win sequence:  "
+PrivateObservationString(1) = "Current point card: 4 Remaining Point Cards: 123 Points: 0 0  P1 hand: 1 2 3 4  Win sequence:  "
+ObservationTensor(0).turn_based_sim_played_action: ◯◯◯◯
+ObservationTensor(0).turn_based_sim_progress: ◉◯
 ObservationTensor(0).current_point_card: ◯◯◯◉
 ObservationTensor(0).remaining_point_cards: ◉◉◉◯
 ObservationTensor(0).point_totals: ◉◯◯◯◯◯◯◯◯◯◯
@@ -96,6 +97,8 @@ ObservationTensor(0).win_sequence: ◯◯
                                    ◯◯
                                    ◯◯
 ObservationTensor(0).tie_sequence: ◯◯◯◯
+ObservationTensor(1).turn_based_sim_played_action: ◯◯◯◯
+ObservationTensor(1).turn_based_sim_progress: ◉◯
 ObservationTensor(1).current_point_card: ◯◯◯◉
 ObservationTensor(1).remaining_point_cards: ◉◉◉◯
 ObservationTensor(1).point_totals: ◉◯◯◯◯◯◯◯◯◯◯
@@ -116,20 +119,17 @@ action: 2
 
 # State 1
 # Partial joint action: 2
-# P0 hand: 1 2 3 4
-# P1 hand: 1 2 3 4
-# P0 actions:
-# P1 actions:
-# Point card sequence: 4
-# Points: 0 0
+# P0 hand: 1 2 3 4  P1 hand: 1 2 3 4  P0 actions:  P1 actions:  Point card sequence: 4  Points: 0 0
 IsTerminal() = False
 History() = [2]
 HistoryString() = "2"
 IsChanceNode() = False
 IsSimultaneousNode() = False
 CurrentPlayer() = 1
-InformationStateString(0) = "P0 hand: 1 2 3 4 \nP0 action sequence: \nPoint card sequence: 4 \nWin sequence: \nPoints: 0 0 \nTerminal?: 0\n Used action 2"
-InformationStateString(1) = "P1 hand: 1 2 3 4 \nP1 action sequence: \nPoint card sequence: 4 \nWin sequence: \nPoints: 0 0 \nTerminal?: 0\n"
+InformationStateString(0) = "Current player: 1\nPlayer 0 picked 2\nP0 hand: 1 2 3 4  P0 action sequence:  Point card sequence: 4  Win sequence:  Points: 0 0  Terminal?: 0 "
+InformationStateString(1) = "Current player: 1\nP1 hand: 1 2 3 4  P1 action sequence:  Point card sequence: 4  Win sequence:  Points: 0 0  Terminal?: 0 "
+InformationStateTensor(0).turn_based_sim_played_action: ◯◯◉◯
+InformationStateTensor(0).turn_based_sim_progress: ◯◉
 InformationStateTensor(0).point_totals: ◉◯◯◯◯◯◯◯◯◯◯
                                         ◉◯◯◯◯◯◯◯◯◯◯
 InformationStateTensor(0).player_hand: ◉◉◉◉
@@ -146,6 +146,8 @@ InformationStateTensor(0).player_action_sequence: ◯◯◯◯
                                                   ◯◯◯◯
                                                   ◯◯◯◯
                                                   ◯◯◯◯
+InformationStateTensor(1).turn_based_sim_played_action: ◯◯◯◯
+InformationStateTensor(1).turn_based_sim_progress: ◯◉
 InformationStateTensor(1).point_totals: ◉◯◯◯◯◯◯◯◯◯◯
                                         ◉◯◯◯◯◯◯◯◯◯◯
 InformationStateTensor(1).player_hand: ◉◉◉◉
@@ -162,11 +164,13 @@ InformationStateTensor(1).player_action_sequence: ◯◯◯◯
                                                   ◯◯◯◯
                                                   ◯◯◯◯
                                                   ◯◯◯◯
-ObservationString(0) = "Current point card: 4\nRemaining Point Cards: 123\nPoints: 0 0 \nP0 hand: 1 2 3 4 \nWin sequence: \n Used action 2"
-ObservationString(1) = "Current point card: 4\nRemaining Point Cards: 123\nPoints: 0 0 \nP1 hand: 1 2 3 4 \nWin sequence: \n"
-PublicObservationString() = "Current point card: 4\nRemaining Point Cards: 123\nWin sequence: \nPoints: 0 0 \n Used action 2"
-PrivateObservationString(0) = "Current point card: 4\nRemaining Point Cards: 123\nPoints: 0 0 \nP0 hand: 1 2 3 4 \nWin sequence: \n Used action 2"
-PrivateObservationString(1) = "Current point card: 4\nRemaining Point Cards: 123\nPoints: 0 0 \nP1 hand: 1 2 3 4 \nWin sequence: \n"
+ObservationString(0) = "Current player: 1\nPlayer 0 picked 2\nCurrent point card: 4 Remaining Point Cards: 123 Points: 0 0  P0 hand: 1 2 3 4  Win sequence:  "
+ObservationString(1) = "Current player: 1\nCurrent point card: 4 Remaining Point Cards: 123 Points: 0 0  P1 hand: 1 2 3 4  Win sequence:  "
+PublicObservationString() = "Current player: 1\nCurrent point card: 4 Remaining Point Cards: 123 Win sequence:  Points: 0 0  "
+PrivateObservationString(0) = "Player 0 picked 2\nCurrent point card: 4 Remaining Point Cards: 123 Points: 0 0  P0 hand: 1 2 3 4  Win sequence:  "
+PrivateObservationString(1) = "Current point card: 4 Remaining Point Cards: 123 Points: 0 0  P1 hand: 1 2 3 4  Win sequence:  "
+ObservationTensor(0).turn_based_sim_played_action: ◯◯◉◯
+ObservationTensor(0).turn_based_sim_progress: ◯◉
 ObservationTensor(0).current_point_card: ◯◯◯◉
 ObservationTensor(0).remaining_point_cards: ◉◉◉◯
 ObservationTensor(0).point_totals: ◉◯◯◯◯◯◯◯◯◯◯
@@ -177,6 +181,8 @@ ObservationTensor(0).win_sequence: ◯◯
                                    ◯◯
                                    ◯◯
 ObservationTensor(0).tie_sequence: ◯◯◯◯
+ObservationTensor(1).turn_based_sim_played_action: ◯◯◯◯
+ObservationTensor(1).turn_based_sim_progress: ◯◉
 ObservationTensor(1).current_point_card: ◯◯◯◉
 ObservationTensor(1).remaining_point_cards: ◉◉◉◯
 ObservationTensor(1).point_totals: ◉◯◯◯◯◯◯◯◯◯◯
@@ -197,20 +203,17 @@ action: 3
 
 # State 2
 # Partial joint action:
-# P0 hand: 1 2 4
-# P1 hand: 1 2 3
-# P0 actions: 2
-# P1 actions: 3
-# Point card sequence: 4 3
-# Points: 0 4
+# P0 hand: 1 2 4  P1 hand: 1 2 3  P0 actions: 2  P1 actions: 3  Point card sequence: 4 3  Points: 0 4
 IsTerminal() = False
 History() = [2, 3]
 HistoryString() = "2, 3"
 IsChanceNode() = False
 IsSimultaneousNode() = False
 CurrentPlayer() = 0
-InformationStateString(0) = "P0 hand: 1 2 4 \nP0 action sequence: 2 \nPoint card sequence: 4 3 \nWin sequence: 1 \nPoints: 0 4 \nTerminal?: 0\n"
-InformationStateString(1) = "P1 hand: 1 2 3 \nP1 action sequence: 3 \nPoint card sequence: 4 3 \nWin sequence: 1 \nPoints: 0 4 \nTerminal?: 0\n"
+InformationStateString(0) = "Current player: 0\nPlayer 0 picked 2\nP0 hand: 1 2 4  P0 action sequence: 2  Point card sequence: 4 3  Win sequence: 1  Points: 0 4  Terminal?: 0 "
+InformationStateString(1) = "Current player: 0\nPlayer 1 picked 3\nP1 hand: 1 2 3  P1 action sequence: 3  Point card sequence: 4 3  Win sequence: 1  Points: 0 4  Terminal?: 0 "
+InformationStateTensor(0).turn_based_sim_played_action: ◯◯◉◯
+InformationStateTensor(0).turn_based_sim_progress: ◉◯
 InformationStateTensor(0).point_totals: ◉◯◯◯◯◯◯◯◯◯◯
                                         ◯◯◯◯◉◯◯◯◯◯◯
 InformationStateTensor(0).player_hand: ◉◉◯◉
@@ -227,6 +230,8 @@ InformationStateTensor(0).player_action_sequence: ◯◯◉◯
                                                   ◯◯◯◯
                                                   ◯◯◯◯
                                                   ◯◯◯◯
+InformationStateTensor(1).turn_based_sim_played_action: ◯◯◯◉
+InformationStateTensor(1).turn_based_sim_progress: ◉◯
 InformationStateTensor(1).point_totals: ◯◯◯◯◉◯◯◯◯◯◯
                                         ◉◯◯◯◯◯◯◯◯◯◯
 InformationStateTensor(1).player_hand: ◉◉◉◯
@@ -243,11 +248,13 @@ InformationStateTensor(1).player_action_sequence: ◯◯◯◉
                                                   ◯◯◯◯
                                                   ◯◯◯◯
                                                   ◯◯◯◯
-ObservationString(0) = "Current point card: 3\nRemaining Point Cards: 12\nPoints: 0 4 \nP0 hand: 1 2 4 \nWin sequence: 1 \n"
-ObservationString(1) = "Current point card: 3\nRemaining Point Cards: 12\nPoints: 0 4 \nP1 hand: 1 2 3 \nWin sequence: 1 \n"
-PublicObservationString() = "Current point card: 3\nRemaining Point Cards: 12\nWin sequence: 1 \nPoints: 0 4 \n"
-PrivateObservationString(0) = "Current point card: 3\nRemaining Point Cards: 12\nPoints: 0 4 \nP0 hand: 1 2 4 \nWin sequence: 1 \n"
-PrivateObservationString(1) = "Current point card: 3\nRemaining Point Cards: 12\nPoints: 0 4 \nP1 hand: 1 2 3 \nWin sequence: 1 \n"
+ObservationString(0) = "Current player: 0\nPlayer 0 picked 2\nCurrent point card: 3 Remaining Point Cards: 12 Points: 0 4  P0 hand: 1 2 4  Win sequence: 1  "
+ObservationString(1) = "Current player: 0\nPlayer 1 picked 3\nCurrent point card: 3 Remaining Point Cards: 12 Points: 0 4  P1 hand: 1 2 3  Win sequence: 1  "
+PublicObservationString() = "Current player: 0\nCurrent point card: 3 Remaining Point Cards: 12 Win sequence: 1  Points: 0 4  "
+PrivateObservationString(0) = "Player 0 picked 2\nCurrent point card: 3 Remaining Point Cards: 12 Points: 0 4  P0 hand: 1 2 4  Win sequence: 1  "
+PrivateObservationString(1) = "Player 1 picked 3\nCurrent point card: 3 Remaining Point Cards: 12 Points: 0 4  P1 hand: 1 2 3  Win sequence: 1  "
+ObservationTensor(0).turn_based_sim_played_action: ◯◯◉◯
+ObservationTensor(0).turn_based_sim_progress: ◉◯
 ObservationTensor(0).current_point_card: ◯◯◉◯
 ObservationTensor(0).remaining_point_cards: ◉◉◯◯
 ObservationTensor(0).point_totals: ◉◯◯◯◯◯◯◯◯◯◯
@@ -258,6 +265,8 @@ ObservationTensor(0).win_sequence: ◯◉
                                    ◯◯
                                    ◯◯
 ObservationTensor(0).tie_sequence: ◯◯◯◯
+ObservationTensor(1).turn_based_sim_played_action: ◯◯◯◉
+ObservationTensor(1).turn_based_sim_progress: ◉◯
 ObservationTensor(1).current_point_card: ◯◯◉◯
 ObservationTensor(1).remaining_point_cards: ◉◉◯◯
 ObservationTensor(1).point_totals: ◯◯◯◯◉◯◯◯◯◯◯
@@ -278,20 +287,17 @@ action: 1
 
 # State 3
 # Partial joint action: 1
-# P0 hand: 1 2 4
-# P1 hand: 1 2 3
-# P0 actions: 2
-# P1 actions: 3
-# Point card sequence: 4 3
-# Points: 0 4
+# P0 hand: 1 2 4  P1 hand: 1 2 3  P0 actions: 2  P1 actions: 3  Point card sequence: 4 3  Points: 0 4
 IsTerminal() = False
 History() = [2, 3, 1]
 HistoryString() = "2, 3, 1"
 IsChanceNode() = False
 IsSimultaneousNode() = False
 CurrentPlayer() = 1
-InformationStateString(0) = "P0 hand: 1 2 4 \nP0 action sequence: 2 \nPoint card sequence: 4 3 \nWin sequence: 1 \nPoints: 0 4 \nTerminal?: 0\n Used action 1"
-InformationStateString(1) = "P1 hand: 1 2 3 \nP1 action sequence: 3 \nPoint card sequence: 4 3 \nWin sequence: 1 \nPoints: 0 4 \nTerminal?: 0\n"
+InformationStateString(0) = "Current player: 1\nPlayer 0 picked 1\nP0 hand: 1 2 4  P0 action sequence: 2  Point card sequence: 4 3  Win sequence: 1  Points: 0 4  Terminal?: 0 "
+InformationStateString(1) = "Current player: 1\nPlayer 1 picked 3\nP1 hand: 1 2 3  P1 action sequence: 3  Point card sequence: 4 3  Win sequence: 1  Points: 0 4  Terminal?: 0 "
+InformationStateTensor(0).turn_based_sim_played_action: ◯◉◯◯
+InformationStateTensor(0).turn_based_sim_progress: ◯◉
 InformationStateTensor(0).point_totals: ◉◯◯◯◯◯◯◯◯◯◯
                                         ◯◯◯◯◉◯◯◯◯◯◯
 InformationStateTensor(0).player_hand: ◉◉◯◉
@@ -308,6 +314,8 @@ InformationStateTensor(0).player_action_sequence: ◯◯◉◯
                                                   ◯◯◯◯
                                                   ◯◯◯◯
                                                   ◯◯◯◯
+InformationStateTensor(1).turn_based_sim_played_action: ◯◯◯◉
+InformationStateTensor(1).turn_based_sim_progress: ◯◉
 InformationStateTensor(1).point_totals: ◯◯◯◯◉◯◯◯◯◯◯
                                         ◉◯◯◯◯◯◯◯◯◯◯
 InformationStateTensor(1).player_hand: ◉◉◉◯
@@ -324,11 +332,13 @@ InformationStateTensor(1).player_action_sequence: ◯◯◯◉
                                                   ◯◯◯◯
                                                   ◯◯◯◯
                                                   ◯◯◯◯
-ObservationString(0) = "Current point card: 3\nRemaining Point Cards: 12\nPoints: 0 4 \nP0 hand: 1 2 4 \nWin sequence: 1 \n Used action 1"
-ObservationString(1) = "Current point card: 3\nRemaining Point Cards: 12\nPoints: 0 4 \nP1 hand: 1 2 3 \nWin sequence: 1 \n"
-PublicObservationString() = "Current point card: 3\nRemaining Point Cards: 12\nWin sequence: 1 \nPoints: 0 4 \n Used action 1"
-PrivateObservationString(0) = "Current point card: 3\nRemaining Point Cards: 12\nPoints: 0 4 \nP0 hand: 1 2 4 \nWin sequence: 1 \n Used action 1"
-PrivateObservationString(1) = "Current point card: 3\nRemaining Point Cards: 12\nPoints: 0 4 \nP1 hand: 1 2 3 \nWin sequence: 1 \n"
+ObservationString(0) = "Current player: 1\nPlayer 0 picked 1\nCurrent point card: 3 Remaining Point Cards: 12 Points: 0 4  P0 hand: 1 2 4  Win sequence: 1  "
+ObservationString(1) = "Current player: 1\nPlayer 1 picked 3\nCurrent point card: 3 Remaining Point Cards: 12 Points: 0 4  P1 hand: 1 2 3  Win sequence: 1  "
+PublicObservationString() = "Current player: 1\nCurrent point card: 3 Remaining Point Cards: 12 Win sequence: 1  Points: 0 4  "
+PrivateObservationString(0) = "Player 0 picked 1\nCurrent point card: 3 Remaining Point Cards: 12 Points: 0 4  P0 hand: 1 2 4  Win sequence: 1  "
+PrivateObservationString(1) = "Player 1 picked 3\nCurrent point card: 3 Remaining Point Cards: 12 Points: 0 4  P1 hand: 1 2 3  Win sequence: 1  "
+ObservationTensor(0).turn_based_sim_played_action: ◯◉◯◯
+ObservationTensor(0).turn_based_sim_progress: ◯◉
 ObservationTensor(0).current_point_card: ◯◯◉◯
 ObservationTensor(0).remaining_point_cards: ◉◉◯◯
 ObservationTensor(0).point_totals: ◉◯◯◯◯◯◯◯◯◯◯
@@ -339,6 +349,8 @@ ObservationTensor(0).win_sequence: ◯◉
                                    ◯◯
                                    ◯◯
 ObservationTensor(0).tie_sequence: ◯◯◯◯
+ObservationTensor(1).turn_based_sim_played_action: ◯◯◯◉
+ObservationTensor(1).turn_based_sim_progress: ◯◉
 ObservationTensor(1).current_point_card: ◯◯◉◯
 ObservationTensor(1).remaining_point_cards: ◉◉◯◯
 ObservationTensor(1).point_totals: ◯◯◯◯◉◯◯◯◯◯◯
@@ -359,20 +371,17 @@ action: 0
 
 # State 4
 # Partial joint action:
-# P0 hand: 1 4
-# P1 hand: 2 3
-# P0 actions: 2 1
-# P1 actions: 3 0
-# Point card sequence: 4 3 2
-# Points: 3 4
+# P0 hand: 1 4  P1 hand: 2 3  P0 actions: 2 1  P1 actions: 3 0  Point card sequence: 4 3 2  Points: 3 4
 IsTerminal() = False
 History() = [2, 3, 1, 0]
 HistoryString() = "2, 3, 1, 0"
 IsChanceNode() = False
 IsSimultaneousNode() = False
 CurrentPlayer() = 0
-InformationStateString(0) = "P0 hand: 1 4 \nP0 action sequence: 2 1 \nPoint card sequence: 4 3 2 \nWin sequence: 1 0 \nPoints: 3 4 \nTerminal?: 0\n"
-InformationStateString(1) = "P1 hand: 2 3 \nP1 action sequence: 3 0 \nPoint card sequence: 4 3 2 \nWin sequence: 1 0 \nPoints: 3 4 \nTerminal?: 0\n"
+InformationStateString(0) = "Current player: 0\nPlayer 0 picked 1\nP0 hand: 1 4  P0 action sequence: 2 1  Point card sequence: 4 3 2  Win sequence: 1 0  Points: 3 4  Terminal?: 0 "
+InformationStateString(1) = "Current player: 0\nPlayer 1 picked 0\nP1 hand: 2 3  P1 action sequence: 3 0  Point card sequence: 4 3 2  Win sequence: 1 0  Points: 3 4  Terminal?: 0 "
+InformationStateTensor(0).turn_based_sim_played_action: ◯◉◯◯
+InformationStateTensor(0).turn_based_sim_progress: ◉◯
 InformationStateTensor(0).point_totals: ◯◯◯◉◯◯◯◯◯◯◯
                                         ◯◯◯◯◉◯◯◯◯◯◯
 InformationStateTensor(0).player_hand: ◉◯◯◉
@@ -389,6 +398,8 @@ InformationStateTensor(0).player_action_sequence: ◯◯◉◯
                                                   ◯◉◯◯
                                                   ◯◯◯◯
                                                   ◯◯◯◯
+InformationStateTensor(1).turn_based_sim_played_action: ◉◯◯◯
+InformationStateTensor(1).turn_based_sim_progress: ◉◯
 InformationStateTensor(1).point_totals: ◯◯◯◯◉◯◯◯◯◯◯
                                         ◯◯◯◉◯◯◯◯◯◯◯
 InformationStateTensor(1).player_hand: ◯◉◉◯
@@ -405,11 +416,13 @@ InformationStateTensor(1).player_action_sequence: ◯◯◯◉
                                                   ◉◯◯◯
                                                   ◯◯◯◯
                                                   ◯◯◯◯
-ObservationString(0) = "Current point card: 2\nRemaining Point Cards: 1\nPoints: 3 4 \nP0 hand: 1 4 \nWin sequence: 1 0 \n"
-ObservationString(1) = "Current point card: 2\nRemaining Point Cards: 1\nPoints: 3 4 \nP1 hand: 2 3 \nWin sequence: 1 0 \n"
-PublicObservationString() = "Current point card: 2\nRemaining Point Cards: 1\nWin sequence: 1 0 \nPoints: 3 4 \n"
-PrivateObservationString(0) = "Current point card: 2\nRemaining Point Cards: 1\nPoints: 3 4 \nP0 hand: 1 4 \nWin sequence: 1 0 \n"
-PrivateObservationString(1) = "Current point card: 2\nRemaining Point Cards: 1\nPoints: 3 4 \nP1 hand: 2 3 \nWin sequence: 1 0 \n"
+ObservationString(0) = "Current player: 0\nPlayer 0 picked 1\nCurrent point card: 2 Remaining Point Cards: 1 Points: 3 4  P0 hand: 1 4  Win sequence: 1 0  "
+ObservationString(1) = "Current player: 0\nPlayer 1 picked 0\nCurrent point card: 2 Remaining Point Cards: 1 Points: 3 4  P1 hand: 2 3  Win sequence: 1 0  "
+PublicObservationString() = "Current player: 0\nCurrent point card: 2 Remaining Point Cards: 1 Win sequence: 1 0  Points: 3 4  "
+PrivateObservationString(0) = "Player 0 picked 1\nCurrent point card: 2 Remaining Point Cards: 1 Points: 3 4  P0 hand: 1 4  Win sequence: 1 0  "
+PrivateObservationString(1) = "Player 1 picked 0\nCurrent point card: 2 Remaining Point Cards: 1 Points: 3 4  P1 hand: 2 3  Win sequence: 1 0  "
+ObservationTensor(0).turn_based_sim_played_action: ◯◉◯◯
+ObservationTensor(0).turn_based_sim_progress: ◉◯
 ObservationTensor(0).current_point_card: ◯◉◯◯
 ObservationTensor(0).remaining_point_cards: ◉◯◯◯
 ObservationTensor(0).point_totals: ◯◯◯◉◯◯◯◯◯◯◯
@@ -420,6 +433,8 @@ ObservationTensor(0).win_sequence: ◯◉
                                    ◯◯
                                    ◯◯
 ObservationTensor(0).tie_sequence: ◯◯◯◯
+ObservationTensor(1).turn_based_sim_played_action: ◉◯◯◯
+ObservationTensor(1).turn_based_sim_progress: ◉◯
 ObservationTensor(1).current_point_card: ◯◉◯◯
 ObservationTensor(1).remaining_point_cards: ◉◯◯◯
 ObservationTensor(1).point_totals: ◯◯◯◯◉◯◯◯◯◯◯
@@ -440,20 +455,17 @@ action: 3
 
 # State 5
 # Partial joint action: 3
-# P0 hand: 1 4
-# P1 hand: 2 3
-# P0 actions: 2 1
-# P1 actions: 3 0
-# Point card sequence: 4 3 2
-# Points: 3 4
+# P0 hand: 1 4  P1 hand: 2 3  P0 actions: 2 1  P1 actions: 3 0  Point card sequence: 4 3 2  Points: 3 4
 IsTerminal() = False
 History() = [2, 3, 1, 0, 3]
 HistoryString() = "2, 3, 1, 0, 3"
 IsChanceNode() = False
 IsSimultaneousNode() = False
 CurrentPlayer() = 1
-InformationStateString(0) = "P0 hand: 1 4 \nP0 action sequence: 2 1 \nPoint card sequence: 4 3 2 \nWin sequence: 1 0 \nPoints: 3 4 \nTerminal?: 0\n Used action 3"
-InformationStateString(1) = "P1 hand: 2 3 \nP1 action sequence: 3 0 \nPoint card sequence: 4 3 2 \nWin sequence: 1 0 \nPoints: 3 4 \nTerminal?: 0\n"
+InformationStateString(0) = "Current player: 1\nPlayer 0 picked 3\nP0 hand: 1 4  P0 action sequence: 2 1  Point card sequence: 4 3 2  Win sequence: 1 0  Points: 3 4  Terminal?: 0 "
+InformationStateString(1) = "Current player: 1\nPlayer 1 picked 0\nP1 hand: 2 3  P1 action sequence: 3 0  Point card sequence: 4 3 2  Win sequence: 1 0  Points: 3 4  Terminal?: 0 "
+InformationStateTensor(0).turn_based_sim_played_action: ◯◯◯◉
+InformationStateTensor(0).turn_based_sim_progress: ◯◉
 InformationStateTensor(0).point_totals: ◯◯◯◉◯◯◯◯◯◯◯
                                         ◯◯◯◯◉◯◯◯◯◯◯
 InformationStateTensor(0).player_hand: ◉◯◯◉
@@ -470,6 +482,8 @@ InformationStateTensor(0).player_action_sequence: ◯◯◉◯
                                                   ◯◉◯◯
                                                   ◯◯◯◯
                                                   ◯◯◯◯
+InformationStateTensor(1).turn_based_sim_played_action: ◉◯◯◯
+InformationStateTensor(1).turn_based_sim_progress: ◯◉
 InformationStateTensor(1).point_totals: ◯◯◯◯◉◯◯◯◯◯◯
                                         ◯◯◯◉◯◯◯◯◯◯◯
 InformationStateTensor(1).player_hand: ◯◉◉◯
@@ -486,11 +500,13 @@ InformationStateTensor(1).player_action_sequence: ◯◯◯◉
                                                   ◉◯◯◯
                                                   ◯◯◯◯
                                                   ◯◯◯◯
-ObservationString(0) = "Current point card: 2\nRemaining Point Cards: 1\nPoints: 3 4 \nP0 hand: 1 4 \nWin sequence: 1 0 \n Used action 3"
-ObservationString(1) = "Current point card: 2\nRemaining Point Cards: 1\nPoints: 3 4 \nP1 hand: 2 3 \nWin sequence: 1 0 \n"
-PublicObservationString() = "Current point card: 2\nRemaining Point Cards: 1\nWin sequence: 1 0 \nPoints: 3 4 \n Used action 3"
-PrivateObservationString(0) = "Current point card: 2\nRemaining Point Cards: 1\nPoints: 3 4 \nP0 hand: 1 4 \nWin sequence: 1 0 \n Used action 3"
-PrivateObservationString(1) = "Current point card: 2\nRemaining Point Cards: 1\nPoints: 3 4 \nP1 hand: 2 3 \nWin sequence: 1 0 \n"
+ObservationString(0) = "Current player: 1\nPlayer 0 picked 3\nCurrent point card: 2 Remaining Point Cards: 1 Points: 3 4  P0 hand: 1 4  Win sequence: 1 0  "
+ObservationString(1) = "Current player: 1\nPlayer 1 picked 0\nCurrent point card: 2 Remaining Point Cards: 1 Points: 3 4  P1 hand: 2 3  Win sequence: 1 0  "
+PublicObservationString() = "Current player: 1\nCurrent point card: 2 Remaining Point Cards: 1 Win sequence: 1 0  Points: 3 4  "
+PrivateObservationString(0) = "Player 0 picked 3\nCurrent point card: 2 Remaining Point Cards: 1 Points: 3 4  P0 hand: 1 4  Win sequence: 1 0  "
+PrivateObservationString(1) = "Player 1 picked 0\nCurrent point card: 2 Remaining Point Cards: 1 Points: 3 4  P1 hand: 2 3  Win sequence: 1 0  "
+ObservationTensor(0).turn_based_sim_played_action: ◯◯◯◉
+ObservationTensor(0).turn_based_sim_progress: ◯◉
 ObservationTensor(0).current_point_card: ◯◉◯◯
 ObservationTensor(0).remaining_point_cards: ◉◯◯◯
 ObservationTensor(0).point_totals: ◯◯◯◉◯◯◯◯◯◯◯
@@ -501,6 +517,8 @@ ObservationTensor(0).win_sequence: ◯◉
                                    ◯◯
                                    ◯◯
 ObservationTensor(0).tie_sequence: ◯◯◯◯
+ObservationTensor(1).turn_based_sim_played_action: ◉◯◯◯
+ObservationTensor(1).turn_based_sim_progress: ◯◉
 ObservationTensor(1).current_point_card: ◯◉◯◯
 ObservationTensor(1).remaining_point_cards: ◉◯◯◯
 ObservationTensor(1).point_totals: ◯◯◯◯◉◯◯◯◯◯◯
@@ -520,20 +538,17 @@ StringLegalActions() = ["[P1]Bid: 2", "[P1]Bid: 3"]
 action: 1
 
 # State 6
-# P0 hand:
-# P1 hand:
-# P0 actions: 2 1 3 0
-# P1 actions: 3 0 1 2
-# Point card sequence: 4 3 2 1
-# Points: 5 5
+# P0 hand:  P1 hand:  P0 actions: 2 1 3 0  P1 actions: 3 0 1 2  Point card sequence: 4 3 2 1  Points: 5 5
 IsTerminal() = True
 History() = [2, 3, 1, 0, 3, 1]
 HistoryString() = "2, 3, 1, 0, 3, 1"
 IsChanceNode() = False
 IsSimultaneousNode() = False
 CurrentPlayer() = -4
-InformationStateString(0) = "P0 hand: \nP0 action sequence: 2 1 3 0 \nPoint card sequence: 4 3 2 1 \nWin sequence: 1 0 0 1 \nPoints: 5 5 \nTerminal?: 1\n"
-InformationStateString(1) = "P1 hand: \nP1 action sequence: 3 0 1 2 \nPoint card sequence: 4 3 2 1 \nWin sequence: 1 0 0 1 \nPoints: 5 5 \nTerminal?: 1\n"
+InformationStateString(0) = "Current player: -4\nPlayer 0 picked 3\nP0 hand:  P0 action sequence: 2 1 3 0  Point card sequence: 4 3 2 1  Win sequence: 1 0 0 1  Points: 5 5  Terminal?: 1 "
+InformationStateString(1) = "Current player: -4\nPlayer 1 picked 1\nP1 hand:  P1 action sequence: 3 0 1 2  Point card sequence: 4 3 2 1  Win sequence: 1 0 0 1  Points: 5 5  Terminal?: 1 "
+InformationStateTensor(0).turn_based_sim_played_action: ◯◯◯◉
+InformationStateTensor(0).turn_based_sim_progress: ◯◯
 InformationStateTensor(0).point_totals: ◯◯◯◯◯◉◯◯◯◯◯
                                         ◯◯◯◯◯◉◯◯◯◯◯
 InformationStateTensor(0).player_hand: ◯◯◯◯
@@ -550,6 +565,8 @@ InformationStateTensor(0).player_action_sequence: ◯◯◉◯
                                                   ◯◉◯◯
                                                   ◯◯◯◉
                                                   ◉◯◯◯
+InformationStateTensor(1).turn_based_sim_played_action: ◯◉◯◯
+InformationStateTensor(1).turn_based_sim_progress: ◯◯
 InformationStateTensor(1).point_totals: ◯◯◯◯◯◉◯◯◯◯◯
                                         ◯◯◯◯◯◉◯◯◯◯◯
 InformationStateTensor(1).player_hand: ◯◯◯◯
@@ -566,11 +583,13 @@ InformationStateTensor(1).player_action_sequence: ◯◯◯◉
                                                   ◉◯◯◯
                                                   ◯◉◯◯
                                                   ◯◯◉◯
-ObservationString(0) = "Current point card: 1\nRemaining Point Cards: \nPoints: 5 5 \nP0 hand: \nWin sequence: 1 0 0 1 \n"
-ObservationString(1) = "Current point card: 1\nRemaining Point Cards: \nPoints: 5 5 \nP1 hand: \nWin sequence: 1 0 0 1 \n"
-PublicObservationString() = "Current point card: 1\nRemaining Point Cards: \nWin sequence: 1 0 0 1 \nPoints: 5 5 \n"
-PrivateObservationString(0) = "Current point card: 1\nRemaining Point Cards: \nPoints: 5 5 \nP0 hand: \nWin sequence: 1 0 0 1 \n"
-PrivateObservationString(1) = "Current point card: 1\nRemaining Point Cards: \nPoints: 5 5 \nP1 hand: \nWin sequence: 1 0 0 1 \n"
+ObservationString(0) = "Current player: -4\nPlayer 0 picked 3\nCurrent point card: 1 Remaining Point Cards:  Points: 5 5  P0 hand:  Win sequence: 1 0 0 1  "
+ObservationString(1) = "Current player: -4\nPlayer 1 picked 1\nCurrent point card: 1 Remaining Point Cards:  Points: 5 5  P1 hand:  Win sequence: 1 0 0 1  "
+PublicObservationString() = "Current player: -4\nCurrent point card: 1 Remaining Point Cards:  Win sequence: 1 0 0 1  Points: 5 5  "
+PrivateObservationString(0) = "Player 0 picked 3\nCurrent point card: 1 Remaining Point Cards:  Points: 5 5  P0 hand:  Win sequence: 1 0 0 1  "
+PrivateObservationString(1) = "Player 1 picked 1\nCurrent point card: 1 Remaining Point Cards:  Points: 5 5  P1 hand:  Win sequence: 1 0 0 1  "
+ObservationTensor(0).turn_based_sim_played_action: ◯◯◯◉
+ObservationTensor(0).turn_based_sim_progress: ◯◯
 ObservationTensor(0).current_point_card: ◉◯◯◯
 ObservationTensor(0).remaining_point_cards: ◯◯◯◯
 ObservationTensor(0).point_totals: ◯◯◯◯◯◉◯◯◯◯◯
@@ -581,6 +600,8 @@ ObservationTensor(0).win_sequence: ◯◉
                                    ◉◯
                                    ◯◉
 ObservationTensor(0).tie_sequence: ◯◯◯◯
+ObservationTensor(1).turn_based_sim_played_action: ◯◉◯◯
+ObservationTensor(1).turn_based_sim_progress: ◯◯
 ObservationTensor(1).current_point_card: ◉◯◯◯
 ObservationTensor(1).remaining_point_cards: ◯◯◯◯
 ObservationTensor(1).point_totals: ◯◯◯◯◯◉◯◯◯◯◯

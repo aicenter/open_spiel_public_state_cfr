@@ -290,7 +290,7 @@ class GoofspielObserver : public Observer {
     for (int c = 0; c < state.player_hands_[player].size(); ++c) {
       if (state.player_hands_[player][c]) absl::StrAppend(result, c + 1, " ");
     }
-    absl::StrAppend(result, "\n");
+    absl::StrAppend(result, " ");
   }
 
   void StringActionSequence(const GoofspielGame& game,
@@ -303,7 +303,7 @@ class GoofspielObserver : public Observer {
     for (int i = 0; i < state.actions_history_.size(); ++i) {
       absl::StrAppend(result, state.actions_history_[i][player], " ");
     }
-    absl::StrAppend(result, "\n");
+    absl::StrAppend(result, " ");
   }
   void StringPointCardSequence(const GoofspielState& state,
                                std::string* result) const {
@@ -311,7 +311,7 @@ class GoofspielObserver : public Observer {
     for (int i = 0; i < state.point_card_sequence_.size(); ++i) {
       absl::StrAppend(result, 1 + state.point_card_sequence_[i], " ");
     }
-    absl::StrAppend(result, "\n");
+    absl::StrAppend(result, " ");
   }
   void StringRemainingPointCards(const GoofspielState& state,
                                  std::string* result) const {
@@ -321,12 +321,12 @@ class GoofspielObserver : public Observer {
     for (int i = 0; i < state.num_turns_; ++i) {
       if (played.count(i) == 0) absl::StrAppend(result, 1 + i);
     }
-    absl::StrAppend(result, "\n");
+    absl::StrAppend(result, " ");
   }
   void StringCurrentPointCard(const GoofspielState& state,
                               std::string* result) const {
     absl::StrAppend(result, "Current point card: ", state.CurrentPointValue(),
-                    "\n");
+                    " ");
   }
   void StringPlayersHands(const GoofspielGame& game,
                           const GoofspielState& state,
@@ -337,7 +337,7 @@ class GoofspielObserver : public Observer {
       for (int c = 0; c < state.player_hands_[p].size(); ++c) {
         if (state.player_hands_[p][c]) absl::StrAppend(result, c + 1, " ");
       }
-      absl::StrAppend(result, "\n");
+      absl::StrAppend(result, " ");
     }
   }
   void StringWinSequence(const GoofspielState& state,
@@ -346,7 +346,7 @@ class GoofspielObserver : public Observer {
     for (int i = 0; i < state.win_sequence_.size(); ++i) {
       absl::StrAppend(result, state.win_sequence_[i], " ");
     }
-    absl::StrAppend(result, "\n");
+    absl::StrAppend(result, " ");
   }
   void StringPoints(const GoofspielGame& game, const GoofspielState& state,
                     std::string* result) const {
@@ -354,11 +354,11 @@ class GoofspielObserver : public Observer {
     for (auto p = Player{0}; p < game.NumPlayers(); ++p) {
       absl::StrAppend(result, state.points_[p], " ");
     }
-    absl::StrAppend(result, "\n");
+    absl::StrAppend(result, " ");
   }
   void StringIsTerminal(const GoofspielState& state,
                         std::string* result) const {
-    absl::StrAppend(result, "Terminal?: ", state.IsTerminal(), "\n");
+    absl::StrAppend(result, "Terminal?: ", state.IsTerminal(), " ");
   }
 
   IIGObservationType iig_obs_type_;
@@ -591,7 +591,7 @@ std::string GoofspielState::ToString() const {
         absl::StrAppend(&result, " ");
       }
     }
-    absl::StrAppend(&result, "\n");
+    absl::StrAppend(&result, " ");
   }
 
   // In imperfect information, the full state depends on both betting sequences
@@ -602,7 +602,7 @@ std::string GoofspielState::ToString() const {
         absl::StrAppend(&result, actions_history_[i][p]);
         absl::StrAppend(&result, " ");
       }
-      absl::StrAppend(&result, "\n");
+      absl::StrAppend(&result, " ");
     }
   }
 
@@ -610,9 +610,9 @@ std::string GoofspielState::ToString() const {
   for (int i = 0; i < point_card_sequence_.size(); ++i) {
     absl::StrAppend(&result, 1 + point_card_sequence_[i], " ");
   }
-  absl::StrAppend(&result, "\n");
+  absl::StrAppend(&result, " ");
 
-  return result + points_line + "\n";
+  return result + points_line + " ";
 }
 
 bool GoofspielState::IsTerminal() const {

@@ -27,7 +27,7 @@ void TestStatesInSupport() {
   std::shared_ptr <const Game> game = LoadGame(
       "goofspiel(imp_info=true,players=2,points_order=descending,num_turns=3,num_cards=6)");
 
-  SequenceFormLpSpecification lp({
+  algorithms::ortools::SequenceFormLpSpecification lp({
      algorithms::MakeInfostateTree(*game, 0, algorithms::kNoMoveAheadLimit, algorithms::kStoreAllStatesPolicy),
      algorithms::MakeInfostateTree(*game, 1, algorithms::kNoMoveAheadLimit, algorithms::kStoreAllStatesPolicy),
   });

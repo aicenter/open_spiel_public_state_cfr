@@ -51,7 +51,7 @@ size_t HandInfo::num_hands() const {
 }
 
 size_t HandInfo::hand_tensor_size() const {
-  return hand_buffer.Tensor().size();
+  return hand_buffer.size();
 }
 
 bool AllInfoStatesHaveDistinctHands(

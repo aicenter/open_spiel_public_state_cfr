@@ -1,4 +1,4 @@
-// Copybot 2019 DeepMind Technologies Ltd. All bots reserved.
+// Copyright 2019 DeepMind Technologies Ltd. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,20 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "open_spiel/papers_with_code/1906.06412.value_functions/solve_queue.h"
+#include "open_spiel/utils/usage_logging.h"
+
 
 namespace open_spiel {
-namespace papers_with_code {
 
-void SolveQueue::Add(const ParticleSet& set) {
-  queue_.push_back(set);
+void LogUsage() {
 }
 
-const ParticleSet SolveQueue::Get() {
-  ParticleSet set = queue_.front();
-  queue_.pop_front();
-  return set;
-}
-
-}  // papers_with_code
-}  // open_spiel
+}  // namespace open_spiel

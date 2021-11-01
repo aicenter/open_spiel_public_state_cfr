@@ -101,13 +101,13 @@ void TestBasicCFVs() {
   leaf_evaluator->bandit_name = "RegretMatching";
   leaf_evaluator->nonterminal_evaluator = leaf_evaluator;
   leaf_evaluator->num_cfr_iterations = 1;
-  leaf_evaluator->save_values_policy = PolicySelection::kCurrentPolicy;
+  leaf_evaluator->save_values_policy = algorithms::PolicySelection::kCurrentPolicy;
 
   auto subgame = std::make_shared<Subgame>(game, /*max_moves=*/1);
   auto subgame_solver = std::make_unique<SubgameSolver>(
       subgame, leaf_evaluator, terminal_evaluator,
       /*rnd_gen=*/nullptr, "RegretMatching",
-      PolicySelection::kCurrentPolicy, /*safe_resolving=*/true);
+      algorithms::PolicySelection::kCurrentPolicy, /*safe_resolving=*/true);
 
   // We do 5 iterations and check the CFVs after each iteration.
   for (int i = 0; i < trunk_iterations; i++) {
@@ -143,7 +143,7 @@ void TestKuhnGadget() {
   auto subgame = subgame_factory->MakeTrunk(3);
   auto solver = std::make_unique<SubgameSolver>(
       subgame, MakeApproxOracleEvaluator(game), MakeTerminalEvaluator(),
-      /*rnd_gen=*/nullptr, "FixableStrategy", PolicySelection::kAveragePolicy, true);
+      /*rnd_gen=*/nullptr, "FixableStrategy", algorithms::PolicySelection::kAveragePolicy, true);
 
   TabularPolicy optimal_policy = kuhn_poker::GetOptimalPolicy(/*alpha=*/0);
 
@@ -178,15 +178,15 @@ void TestKuhnGadget() {
             *set, player, public_state.InfostateAvgValues(1 - player),
             algorithms::kNoMoveAheadLimit);
 
-        SequenceFormLpSpecification specification(local_subgame->trees);
-        specification.SpecifyLinearProgram(player);
+        algorithms::ortools::SequenceFormLpSpecification spec(local_subgame->trees);
+        spec.SpecifyLinearProgram(player);
 
-        double game_value = specification.Solve();
+        double game_value = spec.Solve();
         SPIEL_CHECK_FLOAT_NEAR(game_value,
                                player == 0 ? -1. / 18 : 1. / 18,
                                0.001);
 
-        TabularPolicy policy = specification.OptimalPolicy(player);
+        TabularPolicy policy = spec.OptimalPolicy(player);
         SPIEL_CHECK_EQ(policy.PolicyTable().size(), 3);
 
         for (const auto&[infostate, actions_and_probs] : policy.PolicyTable()) {
@@ -275,7 +275,7 @@ void CheckNfgGame(const std::string& nfg_string,
   SPIEL_CHECK_EQ(tree_safe_opponent->root().MakeCertificate(2),
                  expected_opponent_certificate);
 
-  SequenceFormLpSpecification lp_spec(trees);
+  algorithms::ortools::SequenceFormLpSpecification lp_spec(trees);
   lp_spec.SpecifyLinearProgram(Player{1});
   SPIEL_CHECK_FLOAT_EQ(expected_game_value, lp_spec.Solve());
 
@@ -352,14 +352,18 @@ void TestResolvingNfgWithSmallerEqSupport() {
       /*chance_reach_probs=*/ {0.5, 0.5, 0},
       /*expected_policy=*/    {0.5, 0.5, 0},
       /*expected_game_value=*/-0.5,
-      /*expected_player_certificate=*/"(("
-                                      "(({-0.50})({-0.50}))"
-                                      "[({-1.00}{-1.00})({-1.00}{0.00})({-1.00}{0.00})]"
-                                      "))",
-                                      /*expected_opponent_certificat=*/"("
-                                                                       "[(({0.00})({1.00})({1.00}))(({0.50}))]"
-                                                                       "[(({0.00})({1.00})({1.00}))(({0.50}))]"
-                                                                       ")");
+      /*expected_player_certificate=*/
+        "(("
+          "(({-0.00})({-0.50})({-0.50}))"
+          "[({-1.00}{-1.00}{5.00})({-1.00}{0.00}{0.00})({-1.00}{0.00}{0.00})]"
+        "))",
+      /*expected_opponent_certificate=*/
+        "("
+          "[(({-5.00})({0.00})({0.00}))(({0.00}))]"
+          "[(({0.00})({1.00})({1.00}))(({0.50}))]"
+          "[(({0.00})({1.00})({1.00}))(({0.50}))]"
+        ")"
+      );
 }
 
 void CheckKuhnGame(std::vector<std::vector<Action>> start_histories,
@@ -392,7 +396,7 @@ void CheckKuhnGame(std::vector<std::vector<Action>> start_histories,
   SPIEL_CHECK_EQ(tree_safe_opponent->root().MakeCertificate(2),
                  expected_opponent_certificate);
 
-  SequenceFormLpSpecification specification(trees);
+  algorithms::ortools::SequenceFormLpSpecification specification(trees);
   TabularPolicy solved_slp_policy;
   for (int pl = 0; pl < 2; ++pl) {
     specification.SpecifyLinearProgram(pl);
@@ -460,8 +464,8 @@ void TestResolvingKuhnPassBetAlphaMax() {
       /*kuhn_alpha_param=*/1/3.,  // Max alpha
       /*ft_player=*/1,
       /*expected_game_values=*/{-1./3, 1./3},
-      /*expected_player_certificate=*/"(((({-1.00})({-1.40}))[({-1.00}{-1.00})({-2.00}{-2.00})])((({-1.40})({1.00}))[({-1.00}{-1.00})({-2.00}{2.00})]))",
-      /*expected_opponent_certificate=*/"([(({-1.00}))(({-2.00})({1.00}))][(({1.00})({1.00})({2.00})({2.00}))(({1.40})({1.40}))][(({1.00})({2.00}))(({1.00}))])");
+      /*expected_player_certificate=*/"(((({-1.00})({-1.40}))[({-1.00}{-1.00})({-2.00}{-2.00})])((({-1.00})({1.00}))[({-1.00}{-1.00})({2.00}{2.00})])((({-1.40})({1.00}))[({-1.00}{-1.00})({-2.00}{2.00})]))",
+      /*expected_opponent_certificate=*/"([(({-1.00})({-1.00}))(({-2.00})({-2.00})({1.00})({1.00}))][(({-2.00})({1.00})({1.00})({2.00}))(({1.00})({1.00}))][(({1.00})({1.00})({2.00})({2.00}))(({1.40})({1.40}))])");
 }
 
 }  // namespace

@@ -35,10 +35,12 @@ namespace papers_with_code {
 // tree.
 std::unique_ptr<TabularPolicy> TabularizeOnlinePolicy(
     Bot* bot, Player player, const Game& game,
-    absl::optional<int> max_actions = absl::nullopt);
+    absl::optional<int> max_actions = absl::nullopt,
+    absl::optional<int> max_depth = absl::nullopt);
 std::unique_ptr<TabularPolicy> TabularizeOnlinePolicy(
     Bot* bot, std::shared_ptr<algorithms::InfostateTree> tree,
-    absl::optional<int> max_actions = absl::nullopt);
+    absl::optional<int> max_actions = absl::nullopt,
+    absl::optional<int> max_depth = absl::nullopt);
 
 } // namespace papers_with_code
 } // namespace open_spiel

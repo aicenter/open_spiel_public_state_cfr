@@ -12,29 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifndef OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_CONSTRAINTS_
+#define OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_CONSTRAINTS_
 
-#ifndef OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_SOLVE_QUEUE_
-#define OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_SOLVE_QUEUE_
-
-#include <deque>
-
-#include "open_spiel/spiel.h"
-#include "open_spiel/papers_with_code/1906.06412.value_functions/particle.h"
-
+#include "open_spiel/spiel_bots.h"
+#include "open_spiel/papers_with_code/1906.06412.value_functions/subgame.h"
 
 namespace open_spiel {
 namespace papers_with_code {
 
-// Store particle sets that should be solved next.
-class SolveQueue {
-  // Future implementation might compress the particle sets.
-  std::deque<ParticleSet> queue_;
- public:
-  void Add(const ParticleSet& set);
-  const ParticleSet Get();
+
+enum SafeResolvingConstraints {
+  kAverageOfCurrentValues,
+  kOracleConstraints
 };
+SafeResolvingConstraints GetSafeResolvingConstraints(const std::string& cf);
 
-} // namespace papers_with_code
-} // namespace open_spiel
+std::unordered_map<std::string, double> ComputeOracleConstraints(
+    const PublicState& state, Player opponent, const Policy& player_past_policy);
 
-#endif  // OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_SOLVE_QUEUE_
+}  // namespace papers_with_code
+}  // namespace open_spiel
+
+#endif  // OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_CONSTRAINTS_

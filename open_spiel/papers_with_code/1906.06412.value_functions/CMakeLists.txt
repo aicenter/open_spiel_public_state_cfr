@@ -3,9 +3,15 @@ add_library(paper_value_functions OBJECT
         bot.h
         experience_replay.cc
         experience_replay.h
+        constraints.cc
+        constraints.h
+        evaluator.cc
+        evaluator.h
         hand_table.cc
         hand_table.h
         include_libs_ordered.h
+        infostate_tree_br.cc
+        infostate_tree_br.h
         ismcts_playthroughs.cc
         ismcts_playthroughs.h
         metrics.cc
@@ -23,12 +29,12 @@ add_library(paper_value_functions OBJECT
         particle_regeneration.h
         reusable_structs.cc
         reusable_structs.h
-        solve_queue.cc
-        solve_queue.h
         solver_factory.cc
         solver_factory.h
         snapshot.cc
         snapshot.h
+        solver.cc
+        solver.h
         subgame.cc
         subgame.h
         subgame_factory.cc
@@ -60,6 +66,8 @@ add_paper_executable(my_main my_main.cc)
 
 add_paper_executable(bot_test bot_test.cc)
 add_test(bot_test bot_test)
+add_paper_executable(evaluator_test evaluator_test.cc)
+add_test(evaluator_test evaluator_test)
 add_paper_executable(hand_table_test hand_table_test.cc)
 add_test(hand_table_test hand_table_test)
 add_paper_executable(ismcts_playthroughs_test ismcts_playthroughs_test.cc)
@@ -70,6 +78,8 @@ add_paper_executable(particle_regeneration_test particle_regeneration_test.cc)
 add_test(particle_regeneration_test particle_regeneration_test)
 add_paper_executable(pareto_frontier_test pareto_frontier_test.cc)
 add_test(pareto_frontier_test pareto_frontier_test)
+add_paper_executable(solver_test solver_test.cc)
+add_test(solver_test solver_test)
 add_paper_executable(subgame_test subgame_test.cc)
 add_test(subgame_test subgame_test)
 add_paper_executable(continual_resolving_test continual_resolving_test.cc)

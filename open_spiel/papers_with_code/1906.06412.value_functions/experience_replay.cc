@@ -184,7 +184,7 @@ void ReplayFiller::AddTrunkRandomPbsSolution() {
 void ReplayFiller::FillReplayWithTrunkDlCfrPbsSolutions() {
   SubgameSolver* solver = reuse->GetIterableTrunkWithOracle();
   Subgame* subgame = solver->subgame();
-  SequenceFormLpSpecification* sf_lp = reuse->GetSfLp();
+  algorithms::ortools::SequenceFormLpSpecification* sf_lp = reuse->GetSfLp();
 
   std::cout << "# Computing reference expls for given trunk iterations.\n";
   int num_non_terminal_leaves = 0;

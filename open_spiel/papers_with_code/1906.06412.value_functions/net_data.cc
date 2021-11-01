@@ -43,8 +43,8 @@ std::shared_ptr<BasicDims> DeduceBasicDims(
 
   Observation public_observation(game, public_observer);
   Observation hand_observation(game, hand_observer);
-  dims->public_features_size = public_observation.Tensor().size();
-  dims->hand_features_size = hand_observation.Tensor().size();
+  dims->public_features_size = public_observation.size();
+  dims->hand_features_size = hand_observation.size();
   return dims;
 }
 

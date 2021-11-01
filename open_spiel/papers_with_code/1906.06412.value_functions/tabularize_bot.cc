@@ -57,8 +57,10 @@ void LimitPolicy(ActionsAndProbs* policy, int max_actions) {
 void RecursivelySavePolicyForInfostate(Bot* bot,
                                        InfostateNode* node,
                                        TabularPolicy* policy,
-                                       absl::optional<int> max_actions) {
+                                       absl::optional<int> max_actions,
+                                       absl::optional<int> max_depth) {
   if (node->type() == algorithms::kTerminalInfostateNode) return;
+  if (max_depth.has_value() && max_depth.value() == 0) return;
 
   std::pair<ActionsAndProbs, Action> step_policy;
 
@@ -71,10 +73,17 @@ void RecursivelySavePolicyForInfostate(Bot* bot,
     step_policy = bot->StepWithPolicy(*a_state);
     if (node->type() == algorithms::kDecisionInfostateNode) {
       if (max_actions) LimitPolicy(&step_policy.first, *max_actions);
+      std::cout << "# " << node->infostate_string()
+                << " " << GetProbs(step_policy.first) << "\n";
       policy->SetStatePolicy(node->infostate_string(), step_policy.first);
     } else {
       SPIEL_CHECK_TRUE(step_policy.first.empty());
     }
+  }
+
+
+  if (max_depth.has_value()) {
+    max_depth.value()--;
   }
 
   for (InfostateNode* child : node->children()) {
@@ -86,28 +95,28 @@ void RecursivelySavePolicyForInfostate(Bot* bot,
 
     std::unique_ptr<Bot> new_bot = bot->Clone();
     RecursivelySavePolicyForInfostate(new_bot.get(), child, policy,
-                                      max_actions);
+                                      max_actions, max_depth);
   }
 }
 
 std::unique_ptr<TabularPolicy> TabularizeOnlinePolicy(
     Bot* bot, Player player, const Game& game,
-    absl::optional<int> max_actions) {
+    absl::optional<int> max_actions, absl::optional<int> max_depth) {
   auto tree = algorithms::MakeInfostateTree(game, player,
                                             algorithms::kNoMoveAheadLimit,
                                             algorithms::kStoreAllStatesPolicy);
-  return TabularizeOnlinePolicy(bot, tree, max_actions);
+  return TabularizeOnlinePolicy(bot, tree, max_actions, max_depth);
 }
 
 std::unique_ptr<TabularPolicy> TabularizeOnlinePolicy(
     Bot* bot, std::shared_ptr<algorithms::InfostateTree> tree,
-    absl::optional<int> max_actions) {
+    absl::optional<int> max_actions, absl::optional<int> max_depth) {
   SPIEL_CHECK_EQ(tree->storage_policy(), algorithms::kStoreAllStatesPolicy);
 
   auto policy = std::make_unique<TabularPolicyWithUniformDefault>();
   std::unique_ptr<Bot> tab_bot = bot->Clone();
   RecursivelySavePolicyForInfostate(
-      tab_bot.get(), tree->mutable_root(), policy.get(), max_actions);
+      tab_bot.get(), tree->mutable_root(), policy.get(), max_actions, max_depth);
 
   return policy;
 }

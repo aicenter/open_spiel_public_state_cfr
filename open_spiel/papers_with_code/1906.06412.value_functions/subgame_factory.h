@@ -33,10 +33,6 @@ constexpr int kDefaultMaxTrunkDepth = 3;
 constexpr int kDefaultMaxMoveAheadLimit = 2;
 constexpr int kDefaultMaxParticles = 1000;
 
-// A (depth-limited) subgame rooted at some perfect-information histories,
-// that have belief distribution over the infostates induced by those histories.
-using SequenceFormLpSpecification = algorithms::ortools::SequenceFormLpSpecification;
-
 // Produce a subgame given some input.
 struct SubgameFactory {
   std::shared_ptr<const Game> game;

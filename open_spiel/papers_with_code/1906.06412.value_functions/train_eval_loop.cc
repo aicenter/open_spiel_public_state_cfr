@@ -43,7 +43,6 @@ ABSL_FLAG(double, opponent_beliefs_eps, 0.,
           "infostate when constructing gadget game for safe resolving.");
 
 // -- Data generation --
-ABSL_FLAG(int, depth, 3, "Depth of the trunk.");
 ABSL_FLAG(double, prob_pure_strat, 0.1, "Params for random generation.");
 ABSL_FLAG(double, prob_fully_mixed, 0.05, "Params for random generation.");
 ABSL_FLAG(double, prob_benford_dist, 0.0, "Params for random generation.");
@@ -88,8 +87,11 @@ ABSL_FLAG(int, num_loops, 5000, "Number of train-eval loops.");
 ABSL_FLAG(std::string, optimizer, "adam", "Optimizer. One of adam/sgd");
 ABSL_FLAG(double, learning_rate, 1e-3, "Optimizer learning rate.");
 ABSL_FLAG(double, lr_decay, 1., "Learning rate decay after each loop.");
-ABSL_FLAG(int, max_particles, -1,
-          "Max particles to use. Set -1 to find an upper bound automatically.");
+ABSL_FLAG(double, max_particles, -1,
+          "Max particles to use. Use positive integer value for a specific "
+          "number. Use -1 to find an upper bound automatically. Use a fraction "
+          "0.X to select a fraction of UB number of particles automatically. "
+          "Note that 1.0 evaluates to 1 particle -- use -1 for all particles.");
 
 // -- Network --
 ABSL_FLAG(std::string, arch, "particle_vf",
@@ -123,10 +125,12 @@ ABSL_FLAG(std::string, load_snapshot, "",
 ABSL_FLAG(int, bot_particles, -1,
           "Number of particles the bot should use when stepping to the next "
           "public state. -1 to set the limit same as max_particles.");
-ABSL_FLAG(bool, bot_use_oracle, false,
-          "Use oracle instead of net as leaf evaluator.");
-ABSL_FLAG(std::string, opponent_cfvs_selection, "average",
-          "How the cf values should be computed.");
+ABSL_FLAG(std::string, bot_vf, "net",
+          "Value function to use in the bot, one of {net,approx,oracle}");
+ABSL_FLAG(std::string, resolving_constraints, "average",
+          "How the cf values for safe resolving should be computed.");
+ABSL_FLAG(std::string, lp_solver, "CLP",
+          "Which solver should be used for the oracle VF.");
 
 // -- Metrics --
 // Validation loss
@@ -139,17 +143,21 @@ ABSL_FLAG(std::string, val_init, "nothing",
 // FullTrunkExplMetric
 ABSL_FLAG(std::string, trunk_expl_iterations, "",
           "Evaluate trunk exploitability for each trunk iteration.");
+ABSL_FLAG(int, depth, 3, "Depth of the trunk.");
+
 // ReplayVisitsMetric
 ABSL_FLAG(int, replay_visits_window, -1,
           "Track the average visit count over a past window "
           "behind the head in experience replay");
 ABSL_FLAG(bool, track_time, false, "Track time between loops");
 ABSL_FLAG(bool, track_lr, false, "Track time between loops");
+
 // IigsBrMetric
 ABSL_FLAG(bool, iigs_br_metric, false,
           "Compute domain-specific BR for IIGS(N,K)");
 ABSL_FLAG(bool, iigs_approx_response, true,
           "Make an approximate version of the response, faster to compute.");
+
 // BrMetric
 ABSL_FLAG(bool, br_metric, false,
           "Compute domain-agnostic BR (can be very slow)");
@@ -278,7 +286,6 @@ void TrainEvalLoop() {
   subgame_factory->hand_observer        = game->MakeObserver(kHandHistoryObsType, {});
   subgame_factory->max_move_ahead_limit = absl::GetFlag(FLAGS_max_move_ahead_limit);
   subgame_factory->max_trunk_depth      = absl::GetFlag(FLAGS_depth);
-  subgame_factory->max_particles        = absl::GetFlag(FLAGS_max_particles);
   if (game->GetType().short_name == "goofspiel") {
     auto goof_game =
         std::dynamic_pointer_cast<const goofspiel::GoofspielGame>(game);
@@ -287,21 +294,22 @@ void TrainEvalLoop() {
   }
   //
   std::cout << "# Making oracle evaluator ..." << std::endl;
-  const PolicySelection save_values_policy =
-      GetSaveValuesPolicy(absl::GetFlag(FLAGS_save_values_policy));
+  const algorithms::PolicySelection save_values_policy =
+      algorithms::GetSaveValuesPolicy(absl::GetFlag(FLAGS_save_values_policy));
   auto terminal_evaluator = std::make_shared<TerminalEvaluator>();
-  auto oracle = std::make_shared<CFREvaluator>(
+  auto app_oracle = std::make_shared<CFREvaluator>(
       subgame_factory->game, algorithms::kNoMoveAheadLimit,
       /*no_leaf_evaluator=*/nullptr, terminal_evaluator,
       subgame_factory->public_observer, subgame_factory->infostate_observer);
-  oracle->bandit_name = absl::GetFlag(FLAGS_use_bandits_for_cfr);
-  oracle->num_cfr_iterations = absl::GetFlag(FLAGS_cfr_oracle_iterations);
-  oracle->save_values_policy = save_values_policy;
+  app_oracle->bandit_name = absl::GetFlag(FLAGS_use_bandits_for_cfr);
+  app_oracle->num_cfr_iterations = absl::GetFlag(FLAGS_cfr_oracle_iterations);
+  app_oracle->save_values_policy = save_values_policy;
+  auto oracle = MakeOracleEvaluator(game, absl::GetFlag(FLAGS_lp_solver));
   //
   std::cout << "# Init empty reusable structures ..." << std::endl;
   ReusableStructures reuse(subgame_factory.get(),
                            /*solver_factory=*/nullptr, // Supplied later.
-                           oracle);
+                           app_oracle);
   //
   std::cout << "# Setting IS-MCTS config ..." << std::endl;
   reuse.playthroughs = std::make_unique<IsmctsPlaythroughs>();
@@ -316,15 +324,18 @@ void TrainEvalLoop() {
   std::cout << "# Hand features: " << dims->hand_features_size << std::endl;
   //
   std::cout << "# Deducing dimensions for specific VFs ..." << std::endl;
-  if (subgame_factory->max_particles >= 1) {  // Static setting.
+  double max_particles = absl::GetFlag(FLAGS_max_particles);
+  if (max_particles >= 1) {  // Static setting.
     auto particle_dims = open_spiel::down_cast<ParticleDims*>(dims.get());
-    particle_dims->max_parviews = subgame_factory->max_particles * 2;
+    subgame_factory->max_particles = max_particles;
+    particle_dims->max_parviews = max_particles * 2;
     std::cout << "# Particle VF (set statically): "
-                 "max_particles = " << subgame_factory->max_particles << ' ' <<
-              "max_parviews = " << particle_dims->max_parviews << std::endl;
+                 "max_particles = " << subgame_factory->max_particles << ' '
+              << "max_parviews = " << particle_dims->max_parviews << std::endl;
   }
+  // Dynamic setting: find out number of particles that should be used.
   std::shared_ptr<HandInfo> hand_info;
-  if (arch == NetArchitecture::kPositional || subgame_factory->max_particles == -1) {
+  if (arch == NetArchitecture::kPositional || max_particles < 1) {
     std::cout << "# Finding all hands in the game (may take a while) ..."
               << std::endl;
     PublicStatesInGame* all_states = reuse.GetAllPublicStates();
@@ -354,10 +365,15 @@ void TrainEvalLoop() {
     if (arch == NetArchitecture::kParticle) {
       auto particle_dims = open_spiel::down_cast<ParticleDims*>(dims.get());
       subgame_factory->max_particles = LargestPublicState(public_states);
-      particle_dims->max_parviews = hand_info->num_hands();
+      if (max_particles > 0. && max_particles < 1.) { // Use a fraction.
+        subgame_factory->max_particles =
+            ceil(subgame_factory->max_particles * max_particles);
+      }
+      particle_dims->max_parviews = std::min((int) hand_info->num_hands(),
+                                             subgame_factory->max_particles * 2);
       std::cout << "# Particle VF (derived automatically): "
-                   "max_particles = " << subgame_factory->max_particles << ' ' <<
-                "max_parviews = " << particle_dims->max_parviews << "\n";
+                   "max_particles = " << subgame_factory->max_particles << ' '
+                << "max_parviews = " << particle_dims->max_parviews << "\n";
       std::cout << "# Full features for a particle: "
                 << particle_dims->full_features_size() << "\n";
     }
@@ -491,10 +507,16 @@ void TrainEvalLoop() {
   bot_solver_factory->rnd_gen = std::make_shared<std::mt19937>(seed);
   bot_solver_factory->safe_resolving = absl::GetFlag(FLAGS_safe_resolving);
   bot_solver_factory->noisy_values   = absl::GetFlag(FLAGS_noisy_values);
-  bot_solver_factory->opponent_cfvs_selection =
-      GetSafeResolvingOpponentCfValues(absl::GetFlag(FLAGS_opponent_cfvs_selection));
-  if (absl::GetFlag(FLAGS_bot_use_oracle)) {
+  bot_solver_factory->resolving_constraints =
+      GetSafeResolvingConstraints(absl::GetFlag(FLAGS_resolving_constraints));
+  std::string bot_vf = absl::GetFlag(FLAGS_bot_vf);
+  if (bot_vf == "net") {  // Nothing, already set by copy of subgame factory.
+  } else if (bot_vf == "approx") {
+    bot_solver_factory->leaf_evaluator = app_oracle;
+  } else if (bot_vf == "oracle") {
     bot_solver_factory->leaf_evaluator = oracle;
+  } else {
+    SpielFatalError("Unknown bot VF.");
   }
   // Make the factories accessible for reuse.
   reuse.bot_subgame_factory = bot_subgame_factory;
@@ -508,7 +530,7 @@ void TrainEvalLoop() {
     if (!trunk_expl_iterations.empty()) {
       std::cout << "# Making full trunk exploitability metric ..." << std::endl;
       metrics.push_back(MakeFullTrunkExplMetric(
-          trunk_expl_iterations, reuse.GetTrunkWithNet(), reuse.GetSfLp()));
+          trunk_expl_iterations, reuse.GetTrunkWithVf(), reuse.GetSfLp()));
     }
   }
   {

@@ -34,9 +34,9 @@ void ParticleGenerator::SetPublicOutcomes(const std::vector<int>& outcomes) {
 
 void ParticleGenerator::SetPublicState(const Observation& public_state) {
   // Build up public outcomes.
-  const auto point_cards = public_state.Tensor("point_card_sequence");
-  const int num_bets = std::accumulate(point_cards.begin(),
-                                       point_cards.end(), -1);
+  ConstDimensionedSpan point_cards = public_state.GetConstSpan("point_card_sequence");
+  const int num_bets = std::accumulate(point_cards.data.begin(),
+                                       point_cards.data.end(), -1);
   ConstDimensionedSpan wins = public_state.GetConstSpan("win_sequence");
   ConstDimensionedSpan ties = public_state.GetConstSpan("tie_sequence");
   std::vector<int> outcomes(num_bets, 0);

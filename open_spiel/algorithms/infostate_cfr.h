@@ -147,6 +147,9 @@ class InfostateCFR {
   // Computes the root value. If the algorithm is running on the full trees
   // of the game, this converges to the game value.
   double RootValue() const;
+  std::vector<double> RootValues() const;
+
+  void ResetCumulValues();
 
   std::shared_ptr<Policy> AveragePolicy();
   std::shared_ptr<Policy> CurrentPolicy();

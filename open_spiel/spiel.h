@@ -136,6 +136,15 @@ struct GameType {
   // This is similar to observation fields before, but adds additional
   // distinction between public and private observations.
   bool provides_factored_observation_string = false;
+
+  bool provides_information_state() const {
+    return provides_information_state_tensor
+        || provides_information_state_string;
+  }
+  bool provides_observation() const {
+    return provides_observation_tensor
+        || provides_observation_string;
+  }
 };
 
 // Information about a concrete Game instantiation.
@@ -224,6 +233,9 @@ class State {
   //
   // Games should implement DoApplyAction.
   virtual void ApplyAction(Action action_id);
+
+  // Helper versions of ApplyAction that first does a legality check.
+  virtual void ApplyActionWithLegalityCheck(Action action_id);
 
   // `LegalActions(Player player)` is valid for all nodes in all games,
   // returning an empty list for players who don't act at this state. The
@@ -570,6 +582,10 @@ class State {
   //
   // Simultaneous games should implement DoApplyActions.
   void ApplyActions(const std::vector<Action>& actions);
+
+  // A helper version of ApplyActions that first does legality checks.
+  void ApplyActionsWithLegalityChecks(const std::vector<Action>& actions);
+
 
   // The size of the action space. See `Game` for a full description.
   int NumDistinctActions() const { return num_distinct_actions_; }

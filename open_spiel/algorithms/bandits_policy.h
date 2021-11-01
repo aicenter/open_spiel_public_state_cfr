@@ -40,6 +40,9 @@ enum class PolicySelection {
   kCurrentPolicy,
   kAveragePolicy
 };
+constexpr PolicySelection kDefaultPolicySelection =
+    PolicySelection::kAveragePolicy;
+algorithms::PolicySelection GetSaveValuesPolicy(const std::string& s);
 
 class BanditsPolicy : public Policy {
   const std::vector<std::shared_ptr<InfostateTree>>& trees_;

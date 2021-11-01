@@ -24,6 +24,7 @@
 
 #include "open_spiel/spiel.h"
 #include "open_spiel/spiel_utils.h"
+#include "open_spiel/policy.h"
 
 // This file contains implementations of (multi-armed) bandit algorithms.
 //
@@ -133,6 +134,7 @@ class FixedStrategy final : public Bandit {
  public:
   FixedStrategy(const std::vector<double>& fixed_strategy)
       : Bandit(fixed_strategy.size()) {
+    SPIEL_CHECK_TRUE(IsValidProbDistribution(fixed_strategy));
     std::copy(fixed_strategy.begin(), fixed_strategy.end(),
               current_strategy_.begin());
   }

@@ -111,6 +111,8 @@ std::pair<ActionsAndProbs, Action> SherlockBot::StepWithPolicy(const State& stat
 
   auto opponent_CFVs = GetOpponentCfvs(*public_state, past_policy_);
 
+
+
   // We will make the gadget game if we are resolving.
   if (!first_step_ && solver_factory_->safe_resolving) {
     subgame_ = subgame_factory_->MakeSubgameSafeResolving(*set, player_id_,
@@ -155,35 +157,12 @@ void SherlockBot::StorePastPolicy(
 std::unordered_map<std::string, double> SherlockBot::GetOpponentCfvs(
     const PublicState& state, const TabularPolicy& past_policy) const {
 
-  if (solver_factory_->opponent_cfvs_selection == kAverageOfCurrentValues) {
+  if (solver_factory_->resolving_constraints == kAverageOfCurrentValues) {
     SPIEL_CHECK_TRUE(solver_factory_->save_values_policy ==
-                     PolicySelection::kAveragePolicy);
+                     algorithms::PolicySelection::kAveragePolicy);
     return state.InfostateAvgValues(1 - player_id_);
-
-  } else if(solver_factory_->opponent_cfvs_selection == kOracleValueForAverageBeliefs) {
-
-    SequenceFormLpSpecification spec(*subgame_factory_->game);
-    spec.SpecifyLinearProgram(player_id_);
-    algorithms::ortools::RecursivelyRefineSpecFixStrategyWithPolicy(
-        spec.trees()[player_id_]->mutable_root(), past_policy, &spec);
-    spec.Solve();
-
-    Player opp = 1 - player_id_;
-    std::unordered_map<std::string, double> CFVs;
-    for (int j = 0; j < state.nodes[opp].size(); j++) {
-      // Can't use the node directly: they belong to distinct trees!
-      std::string infostate_string =
-          state.nodes[opp][j]->infostate_string();
-      const algorithms::InfostateNode* node =
-          spec.trees()[opp]->DecisionNodeFromInfostateString(infostate_string);
-      double cfv = spec.node_spec()[node].var_cf_value->solution_value();
-      CFVs.emplace(infostate_string, cfv);
-//      double cfv2 = state.average_values[opp][j];
-//      std::cout << cfv << " " << cfv2 << "\n";
-    }
-//    std::cout << "---\n";
-    return CFVs;
-
+  } else if(solver_factory_->resolving_constraints == kOracleConstraints) {
+    return ComputeOracleConstraints(state, 1 - player_id_, past_policy);
   } else {
     SpielFatalError("Unrecognized option");
   }
@@ -217,6 +196,11 @@ std::unique_ptr<ParticleSet> SherlockBot::PickParticles(
     std::unique_ptr<ParticleSet> infostate_targeted_set =
         particle_generator->GenerateParticles(1, /*max_rejection_cnt=*/100);
     SPIEL_CHECK_FALSE(infostate_targeted_set->particles.empty());
+    // Remove one particle from the generated set to make space for the
+    // one targeted particle.
+    if (set->size() == subgame_factory_->max_particles) {
+      set->particles.pop_back();
+    }
     set->ImportSet(*infostate_targeted_set);
 
     // Generate even more particles if we starved too many of them between steps.

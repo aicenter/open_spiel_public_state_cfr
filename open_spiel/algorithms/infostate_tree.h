@@ -448,6 +448,7 @@ constexpr const char *kTerminatePrefix = "terminate ";
 
 class InfostateTree final {
  public:
+  std::shared_ptr<const Game> game() const { return game_; }
   // -- Root accessors ---------------------------------------------------------
   const InfostateNode &root() const { return *root_; }
   InfostateNode *mutable_root() { return root_.get(); }
@@ -468,6 +469,10 @@ class InfostateTree final {
   size_t num_ids(DecisionId) const { return num_decisions(); }
   size_t num_ids(SequenceId) const { return num_sequences(); }
   size_t num_ids(LeafId) const { return num_leaves(); }
+
+  // -- General operations -----------------------------------------------------
+  const InfostateNode* NodeFromInfostateString(
+      const std::string& infostate) const;
 
   // -- Sequence operations ----------------------------------------------------
   SequenceId empty_sequence() const;
@@ -565,6 +570,7 @@ class InfostateTree final {
       const std::unordered_map<std::string, double> &cf_value_constraints,
       int ft_player)
       : acting_player_(acting_player),
+        game_(start_states[0]->GetGame()),
         infostate_observer_(std::move(infostate_observer)),
         root_(MakeRootNode()),
         storage_policy_(storage_policy),
@@ -586,11 +592,9 @@ class InfostateTree final {
 
     for (int i = 0; i < start_states.size(); ++i) {
       SPIEL_CHECK_PROB(chance_reach_probs[i]);
-      if (chance_reach_probs[i] > 0) {
         RecursivelyBuildTree(root_.get(), /*depth=*/1,
                              *start_states[i],
                              chance_reach_probs[i]);
-      }
     }
 
     // Operations to make after building the tree.
@@ -669,6 +673,7 @@ class InfostateTree final {
       const std::unordered_map<std::string, double> &, int, int);
 
   const Player acting_player_;
+  const std::shared_ptr<const Game> game_;
   const std::shared_ptr<Observer> infostate_observer_;
   const std::unique_ptr<InfostateNode> root_;
   const int storage_policy_;
@@ -920,6 +925,7 @@ class InfostateNode final {
 
   // -- Leaf operations. -------------------------------------------------------
   bool is_leaf_node() const { return children_.empty(); }
+  bool is_terminal() const { return type_ == kTerminalInfostateNode; }
   double terminal_utility() const {
     SPIEL_CHECK_EQ(type_, kTerminalInfostateNode);
     return terminal_utility_;
