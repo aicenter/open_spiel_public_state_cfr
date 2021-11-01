@@ -54,7 +54,6 @@ macro(add_paper_executable NAME SOURCES)
       )
 endmacro()
 
-add_paper_executable(my_main my_main.cc)
 add_paper_executable(train_eval_loop train_eval_loop.cc)
 add_paper_executable(br_against_uniform br_against_uniform.cc)
 
