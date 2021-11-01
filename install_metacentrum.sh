@@ -5,7 +5,7 @@ set -eux
 module add cmake-3.14.5
 module add clang-9.0
 
-wget --show-progress -O "libtorch.zip" "https://download.pytorch.org/libtorch/cpu/libtorch-cxx11-abi-shared-with-deps-1.8.1+cpu.zip"
+wget --show-progress -O "libtorch.zip" "https://download.pytorch.org/libtorch/cpu/libtorch-cxx11-abi-shared-with-deps-1.8.1%2Bcpu.zip"
 unzip "libtorch.zip" -d "open_spiel/libtorch/"
 
 wget --show-progress -O "ortools.tar.gz" "https://github.com/google/or-tools/releases/download/v8.0/or-tools_ubuntu-18.04_v8.0.8283.tar.gz"
