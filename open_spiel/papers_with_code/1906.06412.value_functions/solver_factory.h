@@ -20,7 +20,6 @@
 #include "open_spiel/papers_with_code/1906.06412.value_functions/net_dl_evaluator.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/particle.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/subgame.h"
-#include "open_spiel/papers_with_code/1906.06412.value_functions/constraints.h"
 #include "open_spiel/algorithms/infostate_tree.h"
 
 namespace open_spiel {
@@ -41,7 +40,6 @@ struct SolverFactory {
   bool beliefs_for_average = false;
   double opponent_beliefs_eps = 0.;
   double noisy_values = 0.;
-  SafeResolvingConstraints resolving_constraints = kAverageOfCurrentValues;
 
   std::unique_ptr<SubgameSolver> MakeSolver(
       std::shared_ptr<Subgame> subgame,

@@ -156,16 +156,7 @@ void SherlockBot::StorePastPolicy(
 }
 std::unordered_map<std::string, double> SherlockBot::GetOpponentCfvs(
     const PublicState& state, const TabularPolicy& past_policy) const {
-
-  if (solver_factory_->resolving_constraints == kAverageOfCurrentValues) {
-    SPIEL_CHECK_TRUE(solver_factory_->save_values_policy ==
-                     algorithms::PolicySelection::kAveragePolicy);
-    return state.InfostateAvgValues(1 - player_id_);
-  } else if(solver_factory_->resolving_constraints == kOracleConstraints) {
-    return ComputeOracleConstraints(state, 1 - player_id_, past_policy);
-  } else {
-    SpielFatalError("Unrecognized option");
-  }
+  return state.InfostateAvgValues(1 - player_id_);
 }
 
 std::unique_ptr<ParticleSet> SherlockBot::PickParticles(
