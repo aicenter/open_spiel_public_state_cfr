@@ -88,9 +88,7 @@ std::string CreateDepthPokerCertificateFromNode(State &state, Player player, int
   return ret;
 }
 
-void UniversalPokerTurnTest() {
-  auto start = std::chrono::high_resolution_clock::now();
-
+std::pair<int, int> UniversalPokerTurnTest(int iterations) {
   std::string name = "universal_poker(betting=limit,numPlayers=2,numRounds=4,blind=10 5,"
                      "firstPlayer=2 1,numSuits=4,numRanks=13,numHoleCards=2,numBoardCards=0 3 "
                      "1 1,raiseSize=10 10 20 20,maxRaises=3 4 4 4)";
@@ -126,6 +124,7 @@ void UniversalPokerTurnTest() {
   // Deal board card (Turn)
   state->ApplyAction(cards[3]);
 
+  auto start = std::chrono::high_resolution_clock::now();
   std::shared_ptr<Observer> infostate_observer = game->MakeObserver(kInfoStateObsType, {});
   std::shared_ptr<Observer> public_observer = game->MakeObserver(kPublicStateObsType, {});
 
@@ -142,22 +141,23 @@ void UniversalPokerTurnTest() {
 
   SubgameSolver solver = SubgameSolver(out, nullptr, terminal_evaluator,
                                        std::make_shared<std::mt19937>(0), "RegretMatchingPlus");
-  solver.RunSimultaneousIterations(500);
   auto end = std::chrono::high_resolution_clock::now();
-  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-  std::cout << "Time elapsed: " << duration.count() << "ms\n";
+  auto setup_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+  start = std::chrono::high_resolution_clock::now();
+  solver.RunSimultaneousIterations(iterations);
+  end = std::chrono::high_resolution_clock::now();
+  auto run_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+  return std::pair<int, int>(setup_duration.count(), run_duration.count());
 }
 
-void UniversalPokerRiverTest(int iterations) {
-  auto start = std::chrono::high_resolution_clock::now();
-
-  std::string name = "universal_poker(betting=limit,numPlayers=2,numRounds=4,blind=10 5,"
-                     "firstPlayer=2 1,numSuits=4,numRanks=13,numHoleCards=2,numBoardCards=0 3 "
-                     "1 1,raiseSize=10 10 20 20,maxRaises=3 4 4 4)";
-//  std::string name = "universal_poker(betting=nolimit,numPlayers=2,numRounds=4,blind=100 50,"
-//                     "firstPlayer=2 1 1 "
-//                     "1,numSuits=4,numRanks=13,numHoleCards=2,numBoardCards=0 3 "
-//                     "1 1,stack=20000 20000,bettingAbstraction=fcpa)";
+std::pair<int, int> UniversalPokerRiverCFRPokerSpecific(int iterations) {
+//  std::string name = "universal_poker(betting=limit,numPlayers=2,numRounds=4,blind=10 5,"
+//                     "firstPlayer=2 1,numSuits=4,numRanks=13,numHoleCards=2,numBoardCards=0 3 "
+//                     "1 1,raiseSize=10 10 20 20,maxRaises=3 4 4 4)";
+  std::string name = "universal_poker(betting=nolimit,numPlayers=2,numRounds=4,blind=100 50,"
+                     "firstPlayer=2 1 1 "
+                     "1,numSuits=4,numRanks=13,numHoleCards=2,numBoardCards=0 3 "
+                     "1 1,stack=20000 20000,bettingAbstraction=fcpa)";
   std::shared_ptr<const Game> game = LoadGame(name);
 
   std::unique_ptr<State> state = game->NewInitialState();
@@ -193,6 +193,7 @@ void UniversalPokerRiverTest(int iterations) {
   // Deal board card (River)
   state->ApplyAction(cards[4]);
 
+  auto start = std::chrono::high_resolution_clock::now();
   std::shared_ptr<Observer> infostate_observer = game->MakeObserver(kInfoStateObsType, {});
   std::shared_ptr<Observer> public_observer = game->MakeObserver(kPublicStateObsType, {});
 
@@ -209,10 +210,14 @@ void UniversalPokerRiverTest(int iterations) {
 
   SubgameSolver solver = SubgameSolver(out, nullptr, terminal_evaluator,
                                        std::make_shared<std::mt19937>(0), "RegretMatchingPlus");
-  solver.RunSimultaneousIterations(iterations);
   auto end = std::chrono::high_resolution_clock::now();
-  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-  std::cout << "Time elapsed: " << duration.count() << "ms\n";
+  auto setup_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
+  start = std::chrono::high_resolution_clock::now();
+  solver.RunSimultaneousIterations(iterations);
+  end = std::chrono::high_resolution_clock::now();
+  auto run_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+  return std::pair<int, int>(setup_duration.count(), run_duration.count());
 }
 
 void SmallUniversalPokerTrunkTest() {
@@ -466,36 +471,128 @@ void TestSameInfostates() {
   }
 }
 
-void SolverLeducInfostate() {
+std::pair<int, int> SolverLeducCFRInfostate(int iterations) {
   std::string name = "leduc_poker";
 
   std::shared_ptr<const Game> game = LoadGame(name);
 
+  auto start = std::chrono::high_resolution_clock::now();
   algorithms::InfostateCFR solver(*game);
+  auto end = std::chrono::high_resolution_clock::now();
+  auto setup_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
-  solver.RunSimultaneousIterations(1000);
+  start = std::chrono::high_resolution_clock::now();
+  solver.RunSimultaneousIterations(iterations);
+  end = std::chrono::high_resolution_clock::now();
+  auto run_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+  return std::pair<int, int>(setup_duration.count(), run_duration.count());
 }
 
-void SolverLeducCFR() {
+std::pair<int, int> SolverLeducCFREfg(int iterations) {
   std::string name = "leduc_poker";
 
   std::shared_ptr<const Game> game = LoadGame(name);
 
+  auto start = std::chrono::high_resolution_clock::now();
   algorithms::CFRSolverBase solver(*game, false, false, true);
-  for (int i = 0; i < 1000; i++) {
+  auto end = std::chrono::high_resolution_clock::now();
+  auto setup_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
+  start = std::chrono::high_resolution_clock::now();
+  for (int i = 0; i < iterations; i++) {
     solver.EvaluateAndUpdatePolicy();
   }
+  end = std::chrono::high_resolution_clock::now();
+  auto run_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+  return std::pair<int, int>(setup_duration.count(), run_duration.count());
 }
 
-void MeasureTime(int runs, int iterations) {
+std::pair<int, int> SolverLeducCFREfgHashed(int iterations) {
+  std::string name = "leduc_poker";
+
+  std::shared_ptr<const Game> game = LoadGame(name);
+
   auto start = std::chrono::high_resolution_clock::now();
-  for (int i = 0; i < runs; i++) {
-    UniversalPokerRiverTest(iterations);
-  }
+  algorithms::CFRSolverBase solver(*game, false, false, true, true);
   auto end = std::chrono::high_resolution_clock::now();
-  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-  std::cout << "Full time elapsed: " << duration.count() << "ms\n";
-  std::cout << "Average time elapsed: " << duration.count() / runs << "ms\n";
+  auto setup_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
+  start = std::chrono::high_resolution_clock::now();
+  for (int i = 0; i < iterations; i++) {
+    solver.EvaluateAndUpdatePolicy();
+  }
+  end = std::chrono::high_resolution_clock::now();
+  auto run_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+  return std::pair<int, int>(setup_duration.count(), run_duration.count());
+}
+
+std::pair<int, int> UniversalPokerRiverCFREfg(int iterations) {
+  std::mt19937 rng(0);
+
+  int pot_size = 200;
+  std::string board_cards = "9s7c5s4h3c";
+
+  std::vector<double> uniform_reaches;
+  uniform_reaches.reserve(2 * universal_poker::kSubgameUniqueHands);
+  for (int i = 0; i < 2 * universal_poker::kSubgameUniqueHands; ++i) {
+    uniform_reaches.push_back(1. / (2 * universal_poker::kSubgameUniqueHands));
+  }
+  std::shared_ptr<const Game> game = universal_poker::MakeRandomSubgame(rng, pot_size, board_cards, uniform_reaches);
+
+  auto start = std::chrono::high_resolution_clock::now();
+  algorithms::CFRSolverBase solver(*game, false, false, true);
+  auto end = std::chrono::high_resolution_clock::now();
+  auto setup_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
+  start = std::chrono::high_resolution_clock::now();
+  for (int i = 0; i < iterations; i++) {
+    solver.EvaluateAndUpdatePolicy();
+  }
+  end = std::chrono::high_resolution_clock::now();
+  auto run_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+  return std::pair<int, int>(setup_duration.count(), run_duration.count());
+}
+
+std::pair<int, int> UniversalPokerRiverCFREfgHashed(int iterations) {
+  std::mt19937 rng(0);
+
+  int pot_size = 200;
+  std::string board_cards = "9s7c5s4h3c";
+
+  std::vector<double> uniform_reaches;
+  uniform_reaches.reserve(2 * universal_poker::kSubgameUniqueHands);
+  for (int i = 0; i < 2 * universal_poker::kSubgameUniqueHands; ++i) {
+    uniform_reaches.push_back(1. / (2 * universal_poker::kSubgameUniqueHands));
+  }
+  std::shared_ptr<const Game> game = universal_poker::MakeRandomSubgame(rng, pot_size, board_cards, uniform_reaches);
+
+  auto start = std::chrono::high_resolution_clock::now();
+  algorithms::CFRSolverBase solver(*game, false, false, true, true);
+  auto end = std::chrono::high_resolution_clock::now();
+  auto setup_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
+  start = std::chrono::high_resolution_clock::now();
+  for (int i = 0; i < iterations; i++) {
+    solver.EvaluateAndUpdatePolicy();
+  }
+  end = std::chrono::high_resolution_clock::now();
+  auto run_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+  return std::pair<int, int>(setup_duration.count(), run_duration.count());
+}
+
+void MeasureTime(int runs, int iterations, std::pair<int, int> (*f)(int)) {
+  std::vector<std::pair<int, int>> collected_times;
+  collected_times.reserve(runs);
+  for (int i = 0; i < runs; i++) {
+    collected_times.push_back(f(iterations));
+  }
+  std::pair<int, int> cumulative_times(0, 0);
+  for (auto &time_pair : collected_times) {
+    cumulative_times.first += time_pair.first;
+    cumulative_times.second += time_pair.second;
+  }
+  std::cout << "Average setup time: " << cumulative_times.first / runs << "ms\n";
+  std::cout << "Average runin time: " << cumulative_times.second / runs << "ms\n";
 }
 
 }
@@ -503,9 +600,22 @@ void MeasureTime(int runs, int iterations) {
 }
 
 int main(int argc, char **argv) {
-  open_spiel::papers_with_code::MeasureTime(10,500);
-//  open_spiel::papers_with_code::UniversalPokerSubgameTest();
+  int iterations = 1;
+  int runs = 1;
+  // Leduc tests
+//  open_spiel::papers_with_code::MeasureTime(runs, iterations, open_spiel::papers_with_code::SolverLeducCFREfgHashed);
+//  open_spiel::papers_with_code::MeasureTime(runs, iterations, open_spiel::papers_with_code::SolverLeducCFREfg);
+//  open_spiel::papers_with_code::MeasureTime(runs, iterations, open_spiel::papers_with_code::SolverLeducCFRInfostate);
+
+  //Limit tests
+  open_spiel::papers_with_code::MeasureTime(
+      runs, iterations, open_spiel::papers_with_code::UniversalPokerRiverCFRPokerSpecific);
+  open_spiel::papers_with_code::MeasureTime(
+      runs, iterations, open_spiel::papers_with_code::UniversalPokerRiverCFREfg);
+  open_spiel::papers_with_code::MeasureTime(
+      runs, iterations, open_spiel::papers_with_code::UniversalPokerRiverCFREfgHashed);
+
+
 //  open_spiel::papers_with_code::SmallUniversalPokerTrunkTest();
 //  open_spiel::papers_with_code::TestSameInfostates();
-//  open_spiel::papers_with_code::CFRTest();
 }
