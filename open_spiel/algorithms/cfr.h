@@ -189,7 +189,7 @@ class CFRSolverBase {
  public:
   CFRSolverBase(const Game& game, bool alternating_updates,
                 bool linear_averaging, bool regret_matching_plus,
-                bool random_initial_regrets = false, int seed = 0);
+                bool hash_states=false, bool random_initial_regrets = false, int seed = 0);
   // The constructor below is used for deserialization purposes.
   CFRSolverBase(std::shared_ptr<const Game> game, bool alternating_updates,
                 bool linear_averaging, bool regret_matching_plus, int iteration,
@@ -233,6 +233,10 @@ class CFRSolverBase {
   CFRInfoStateValuesTable info_states_;
   const std::unique_ptr<State> root_state_;
   const std::vector<double> root_reach_probs_;
+
+  // Variables for state hashing to speed up the computation
+  bool hash_states_;
+  std::unordered_map<std::string, std::unique_ptr<State>> hashed_states;
 
   // Compute the counterfactual regret and update the average policy for the
   // specified player.

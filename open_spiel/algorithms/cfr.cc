@@ -187,12 +187,13 @@ TabularPolicy CFRCurrentPolicy::AsTabular() const {
   return policy;
 }
 
-CFRSolverBase::CFRSolverBase(const Game& game, bool alternating_updates,
+CFRSolverBase::CFRSolverBase(const Game &game, bool alternating_updates,
                              bool linear_averaging, bool regret_matching_plus,
-                             bool random_initial_regrets, int seed)
+                             bool hash_states, bool random_initial_regrets, int seed)
     : game_(game.shared_from_this()),
       root_state_(game.NewInitialState()),
       root_reach_probs_(game_->NumPlayers() + 1, 1.0),
+      hash_states_(hash_states),
       regret_matching_plus_(regret_matching_plus),
       alternating_updates_(alternating_updates),
       linear_averaging_(linear_averaging),
@@ -236,7 +237,13 @@ void CFRSolverBase::InitializeInfostateNodes(const State& state) {
   }
   if (state.IsChanceNode()) {
     for (const auto& action_prob : state.ChanceOutcomes()) {
-      InitializeInfostateNodes(*state.Child(action_prob.first));
+      if (hash_states_) {
+        hashed_states[state.ToString() + state.ActionToString(action_prob.first)] =
+            std::move(state.Child(action_prob.first));
+        InitializeInfostateNodes(*hashed_states[state.ToString() + state.ActionToString(action_prob.first)]);
+      } else {
+        InitializeInfostateNodes(*state.Child(action_prob.first));
+      }
     }
     return;
   }
@@ -255,7 +262,12 @@ void CFRSolverBase::InitializeInfostateNodes(const State& state) {
   }
 
   for (const Action& action : legal_actions) {
-    InitializeInfostateNodes(*state.Child(action));
+    if (hash_states_) {
+      hashed_states[state.ToString() + state.ActionToString(action)] = std::move(state.Child(action));
+      InitializeInfostateNodes(*hashed_states[state.ToString() + state.ActionToString(action)]);
+    } else {
+      InitializeInfostateNodes(*state.Child(action));
+    }
   }
 }
 
@@ -451,12 +463,18 @@ std::vector<double> CFRSolverBase::ComputeCounterFactualRegretForActionProbs(
   for (int aidx = 0; aidx < legal_actions.size(); ++aidx) {
     const Action action = legal_actions[aidx];
     const double prob = info_state_policy[aidx];
-    const std::unique_ptr<State> new_state = state.Child(action);
     std::vector<double> new_reach_probabilities(reach_probabilities);
     new_reach_probabilities[current_player] *= prob;
-    std::vector<double> child_value =
-        ComputeCounterFactualRegret(*new_state, alternating_player,
-                                    new_reach_probabilities, policy_overrides);
+    std::vector<double> child_value;
+    if (hash_states_) {
+      child_value = ComputeCounterFactualRegret(*hashed_states[state.ToString() + state.ActionToString(action)],
+                                                alternating_player, new_reach_probabilities, policy_overrides);
+    } else {
+      const std::unique_ptr<State> new_state = state.Child(action);
+      child_value =
+          ComputeCounterFactualRegret(*new_state, alternating_player, new_reach_probabilities, policy_overrides);
+    }
+
     for (int i = 0; i < state_value.size(); ++i) {
       state_value[i] += prob * child_value[i];
     }
