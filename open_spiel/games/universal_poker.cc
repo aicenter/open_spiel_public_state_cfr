@@ -749,15 +749,16 @@ UniversalPokerState::DistributeHandCardsInSubgame() const {
         break;
       }
     }
-
-    outcomes.push_back({encoded, p});
+    if(p > 0) {
+      outcomes.emplace_back(encoded, p);
+    }
     normalizer += p;
   };
   DistributeHands(full_deck, NumPlayers(), num_hole_cards, add_outcome);
 
   SPIEL_CHECK_GT(normalizer, 0.);
   for (auto&[action, p] : outcomes) p /= normalizer;
-  SPIEL_CHECK_EQ(outcomes.size(), possible_hand_pairs);
+  SPIEL_CHECK_LE(outcomes.size(), possible_hand_pairs);
   return outcomes;
 }
 
