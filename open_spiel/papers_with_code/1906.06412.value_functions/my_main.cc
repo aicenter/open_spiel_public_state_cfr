@@ -602,19 +602,34 @@ void MeasureTime(int runs, int iterations, std::pair<int, int> (*f)(int)) {
 int main(int argc, char **argv) {
   int iterations = 1;
   int runs = 1;
+
   // Leduc tests
 //  open_spiel::papers_with_code::MeasureTime(runs, iterations, open_spiel::papers_with_code::SolverLeducCFREfgHashed);
 //  open_spiel::papers_with_code::MeasureTime(runs, iterations, open_spiel::papers_with_code::SolverLeducCFREfg);
 //  open_spiel::papers_with_code::MeasureTime(runs, iterations, open_spiel::papers_with_code::SolverLeducCFRInfostate);
 
   //Limit tests
-  open_spiel::papers_with_code::MeasureTime(
-      runs, iterations, open_spiel::papers_with_code::UniversalPokerRiverCFRPokerSpecific);
-  open_spiel::papers_with_code::MeasureTime(
-      runs, iterations, open_spiel::papers_with_code::UniversalPokerRiverCFREfg);
-  open_spiel::papers_with_code::MeasureTime(
-      runs, iterations, open_spiel::papers_with_code::UniversalPokerRiverCFREfgHashed);
+  if (argc > 1) {
+    if (std::strcmp(argv[1], "-is") == 0 or strcmp(argv[1], "-all") == 0) {
+      std::cout << "Infostate CFR experiment:\n";
+      open_spiel::papers_with_code::MeasureTime(
+          runs, iterations, open_spiel::papers_with_code::UniversalPokerRiverCFRPokerSpecific);
+    }
+    if (std::strcmp(argv[1], "-efg") == 0 or strcmp(argv[1], "-all") == 0) {
+      std::cout << "EFG CFR experiment:\n";
+      open_spiel::papers_with_code::MeasureTime(
+          runs, iterations, open_spiel::papers_with_code::UniversalPokerRiverCFREfg);
+    }
 
+    if (std::strcmp(argv[1], "-efgh") == 0 or strcmp(argv[1], "-all") == 0) {
+      std::cout << "Hashed EFG CFR experiment:\n";
+      open_spiel::papers_with_code::MeasureTime(
+          runs, iterations, open_spiel::papers_with_code::UniversalPokerRiverCFREfgHashed);
+    }
+  } else {
+    std::cout
+        << "Please specify the experiment to run. -is for infostate CFR, -efg for EFG CFR, -efgh for hashed EFG CFR and -all for all experiments";
+  }
 
 //  open_spiel::papers_with_code::SmallUniversalPokerTrunkTest();
 //  open_spiel::papers_with_code::TestSameInfostates();
