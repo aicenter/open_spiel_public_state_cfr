@@ -603,7 +603,7 @@ void MeasureTime(int runs, int iterations, std::pair<int, int> (*f)(int)) {
 }
 
 int main(int argc, char **argv) {
-  int iterations = 1;
+  int iterations = 1000;
   int runs = 1;
 
   // Leduc tests
@@ -618,11 +618,11 @@ int main(int argc, char **argv) {
       open_spiel::papers_with_code::MeasureTime(
           runs, iterations, open_spiel::papers_with_code::UniversalPokerRiverCFRPokerSpecific);
     }
-    if (std::strcmp(argv[1], "-efg") == 0 or strcmp(argv[1], "-all") == 0) {
-      std::cout << "EFG CFR experiment:\n";
-      open_spiel::papers_with_code::MeasureTime(
-          runs, iterations, open_spiel::papers_with_code::UniversalPokerRiverCFREfg);
-    }
+//    if (std::strcmp(argv[1], "-efg") == 0 or strcmp(argv[1], "-all") == 0) {
+//      std::cout << "EFG CFR experiment:\n";
+//      open_spiel::papers_with_code::MeasureTime(
+//          runs, iterations, open_spiel::papers_with_code::UniversalPokerRiverCFREfg);
+//    }
 
     if (std::strcmp(argv[1], "-efgh") == 0 or strcmp(argv[1], "-all") == 0) {
       std::cout << "Hashed EFG CFR experiment:\n";
