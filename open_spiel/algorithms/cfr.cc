@@ -236,7 +236,7 @@ CFRSolverBase::CFRSolverBase(std::shared_ptr<const Game> game,
 
 void CFRSolverBase::InitializeInfostateNodes(const State &state, CfrState &cfr_state) {
   states_++;
-  std::cout << states_ << "\n";
+//  std::cout << states_ << "\n";
   if (state.IsTerminal()) {
     return;
   }
