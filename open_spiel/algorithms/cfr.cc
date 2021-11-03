@@ -206,7 +206,10 @@ CFRSolverBase::CFRSolverBase(const Game &game, bool alternating_updates,
         "on a simultaneous (or normal-form) game, please first transform it "
         "using turn_based_simultaneous_game.");
   }
-  InitializeInfostateNodes(*root_state_);
+  cfr_root_state_ = std::make_shared<CfrState>(*root_state_);
+  InitializeInfostateNodes(*root_state_, *cfr_root_state_);
+//  std::cout << "Game has " << states_ << " states.\n";
+//  std::cout << "Game has " << InfoStateValuesTable().size() << " infostates.\n";
 }
 
 CFRSolverBase::CFRSolverBase(std::shared_ptr<const Game> game,
@@ -231,19 +234,18 @@ CFRSolverBase::CFRSolverBase(std::shared_ptr<const Game> game,
   }
 }
 
-void CFRSolverBase::InitializeInfostateNodes(const State& state) {
+void CFRSolverBase::InitializeInfostateNodes(const State &state, CfrState &cfr_state) {
+  states_++;
+  std::cout << states_ << "\n";
   if (state.IsTerminal()) {
     return;
   }
   if (state.IsChanceNode()) {
-    for (const auto& action_prob : state.ChanceOutcomes()) {
-      if (hash_states_) {
-        hashed_states[state.ToString() + state.ActionToString(action_prob.first)] =
-            std::move(state.Child(action_prob.first));
-        InitializeInfostateNodes(*hashed_states[state.ToString() + state.ActionToString(action_prob.first)]);
-      } else {
-        InitializeInfostateNodes(*state.Child(action_prob.first));
-      }
+    for (const auto &action_prob : state.ChanceOutcomes()) {
+      auto child_state = state.Child(action_prob.first);
+      auto child_cfr_state = std::make_shared<CfrState>(*child_state);
+      cfr_state.AddChild(child_cfr_state, action_prob.first);
+      InitializeInfostateNodes(*child_state, *child_cfr_state);
     }
     return;
   }
@@ -262,12 +264,10 @@ void CFRSolverBase::InitializeInfostateNodes(const State& state) {
   }
 
   for (const Action& action : legal_actions) {
-    if (hash_states_) {
-      hashed_states[state.ToString() + state.ActionToString(action)] = std::move(state.Child(action));
-      InitializeInfostateNodes(*hashed_states[state.ToString() + state.ActionToString(action)]);
-    } else {
-      InitializeInfostateNodes(*state.Child(action));
-    }
+    auto child_state = state.Child(action);
+    auto child_cfr_state = std::make_shared<CfrState>(*child_state);
+    cfr_state.AddChild(child_cfr_state, action);
+    InitializeInfostateNodes(*child_state, *child_cfr_state);
   }
 }
 
@@ -275,7 +275,7 @@ void CFRSolverBase::EvaluateAndUpdatePolicy() {
   ++iteration_;
   if (alternating_updates_) {
     for (int player = 0; player < game_->NumPlayers(); player++) {
-      ComputeCounterFactualRegret(*root_state_, player, root_reach_probs_,
+      ComputeCounterFactualRegret(*cfr_root_state_, player, root_reach_probs_,
                                   nullptr);
       if (regret_matching_plus_) {
         ApplyRegretMatchingPlusReset();
@@ -283,7 +283,7 @@ void CFRSolverBase::EvaluateAndUpdatePolicy() {
       ApplyRegretMatching();
     }
   } else {
-    ComputeCounterFactualRegret(*root_state_, absl::nullopt, root_reach_probs_,
+    ComputeCounterFactualRegret(*cfr_root_state_, absl::nullopt, root_reach_probs_,
                                 nullptr);
     if (regret_matching_plus_) {
       ApplyRegretMatchingPlusReset();
@@ -340,9 +340,9 @@ static double CounterFactualReachProb(
 // Returns:
 //   The value of the state for each player (excluding the chance player).
 std::vector<double> CFRSolverBase::ComputeCounterFactualRegret(
-    const State& state, const absl::optional<int>& alternating_player,
-    const std::vector<double>& reach_probabilities,
-    const std::vector<const Policy*>* policy_overrides) {
+    CfrState &state, const absl::optional<int> &alternating_player,
+    const std::vector<double> &reach_probabilities,
+    const std::vector<const Policy *> *policy_overrides) {
   if (state.IsTerminal()) {
     return state.Returns();
   }
@@ -452,12 +452,12 @@ void CFRSolverBase::GetInfoStatePolicyFromPolicy(
 // Returns:
 //   The value of the state for each player (excluding the chance player).
 std::vector<double> CFRSolverBase::ComputeCounterFactualRegretForActionProbs(
-    const State& state, const absl::optional<int>& alternating_player,
-    const std::vector<double>& reach_probabilities, const int current_player,
-    const std::vector<double>& info_state_policy,
-    const std::vector<Action>& legal_actions,
-    std::vector<double>* child_values_out,
-    const std::vector<const Policy*>* policy_overrides) {
+    CfrState &state, const absl::optional<int> &alternating_player,
+    const std::vector<double> &reach_probabilities, const int current_player,
+    const std::vector<double> &info_state_policy,
+    const std::vector<Action> &legal_actions,
+    std::vector<double> *child_values_out,
+    const std::vector<const Policy *> *policy_overrides) {
   std::vector<double> state_value(game_->NumPlayers());
 
   for (int aidx = 0; aidx < legal_actions.size(); ++aidx) {
@@ -466,14 +466,9 @@ std::vector<double> CFRSolverBase::ComputeCounterFactualRegretForActionProbs(
     std::vector<double> new_reach_probabilities(reach_probabilities);
     new_reach_probabilities[current_player] *= prob;
     std::vector<double> child_value;
-    if (hash_states_) {
-      child_value = ComputeCounterFactualRegret(*hashed_states[state.ToString() + state.ActionToString(action)],
-                                                alternating_player, new_reach_probabilities, policy_overrides);
-    } else {
-      const std::unique_ptr<State> new_state = state.Child(action);
-      child_value =
-          ComputeCounterFactualRegret(*new_state, alternating_player, new_reach_probabilities, policy_overrides);
-    }
+    auto new_state = state.Child(action);
+    child_value =
+        ComputeCounterFactualRegret(*new_state, alternating_player, new_reach_probabilities, policy_overrides);
 
     for (int i = 0; i < state_value.size(); ++i) {
       state_value[i] += prob * child_value[i];

@@ -75,7 +75,7 @@ void CFRBRSolver::EvaluateAndUpdatePolicy() {
     }
 
     // Then collect regret and update p's average strategy.
-    ComputeCounterFactualRegret(*root_state_, p, root_reach_probs_,
+    ComputeCounterFactualRegret(*cfr_root_state_, p, root_reach_probs_,
                                 &policy_overrides_);
   }
   ApplyRegretMatching();

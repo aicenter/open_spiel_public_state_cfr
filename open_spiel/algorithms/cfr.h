@@ -185,6 +185,74 @@ class CFRCurrentPolicy : public Policy {
 // CFR can be view as a policy iteration algorithm. Importantly, the policies
 // themselves do not converge to a Nash policy, but their average does.
 //
+struct CfrState {
+  CfrState(const State& state) {
+    children_ = std::unordered_map<Action, std::shared_ptr<CfrState>>();
+    if(state.IsTerminal()) {
+      player_ = kTerminalPlayerId;
+      utilities_ = state.Rewards();
+    } else if(state.IsChanceNode()) {
+      player_ = kChancePlayerId;
+      chance_outcomes_ = state.ChanceOutcomes();
+    } else {
+      player_ = state.CurrentPlayer();
+      current_player_ = state.CurrentPlayer();
+      legal_actions_ = state.LegalActions(current_player_);
+      infostate_string_ = state.InformationStateString();
+    }
+  }
+
+  bool IsTerminal() const {
+    return player_ == kTerminalPlayerId;
+  }
+
+  bool IsChanceNode() const {
+    return player_ == kChancePlayerId;
+  }
+
+  std::vector<double> Returns() const {
+    return utilities_;
+  }
+
+  ActionsAndProbs ChanceOutcomes() const {
+    return chance_outcomes_;
+  }
+
+  Player CurrentPlayer() const {
+    return current_player_;
+  }
+
+  std::string InformationStateString() const {
+    return infostate_string_;
+  }
+
+  std::string InformationStateString(Player player) const {
+    SPIEL_CHECK_EQ(player, current_player_);
+    return infostate_string_;
+  }
+
+  std::vector<Action> LegalActions(Player player) const {
+    SPIEL_CHECK_EQ(player, current_player_);
+    return legal_actions_;
+  }
+
+  std::shared_ptr<CfrState> Child(Action action) {
+    return children_[action];
+  }
+
+  void AddChild(const std::shared_ptr<CfrState> &child, Action action){
+    children_[action] = child;
+  }
+
+  std::unordered_map<Action, std::shared_ptr<CfrState>> children_;
+  std::vector<Action> legal_actions_;
+  Player current_player_;
+  ActionsAndProbs chance_outcomes_;
+  std::string infostate_string_;
+  int player_;
+  std::vector<double> utilities_;
+};
+
 class CFRSolverBase {
  public:
   CFRSolverBase(const Game& game, bool alternating_updates,
@@ -231,12 +299,15 @@ class CFRSolverBase {
   // Iteration to support linear_policy.
   int iteration_ = 0;
   CFRInfoStateValuesTable info_states_;
+  std::shared_ptr<CfrState> cfr_root_state_;
   const std::unique_ptr<State> root_state_;
   const std::vector<double> root_reach_probs_;
 
   // Variables for state hashing to speed up the computation
   bool hash_states_;
-  std::unordered_map<std::string, std::unique_ptr<State>> hashed_states;
+
+  //Collecting state
+  int states_ = 0;
 
   // Compute the counterfactual regret and update the average policy for the
   // specified player.
@@ -246,7 +317,7 @@ class CFRSolverBase {
   // and if `policy_overrides[p] != nullptr` it will be used instead of the
   // current policy. This feature exists to support CFR-BR.
   std::vector<double> ComputeCounterFactualRegret(
-      const State& state, const absl::optional<int>& alternating_player,
+      CfrState &state, const absl::optional<int> &alternating_player,
       const std::vector<double>& reach_probabilities,
       const std::vector<const Policy*>* policy_overrides);
 
@@ -263,14 +334,14 @@ class CFRSolverBase {
 
  private:
   std::vector<double> ComputeCounterFactualRegretForActionProbs(
-      const State& state, const absl::optional<int>& alternating_player,
+      CfrState& state, const absl::optional<int>& alternating_player,
       const std::vector<double>& reach_probabilities, const int current_player,
       const std::vector<double>& info_state_policy,
       const std::vector<Action>& legal_actions,
       std::vector<double>* child_values_out,
       const std::vector<const Policy*>* policy_overrides);
 
-  void InitializeInfostateNodes(const State& state);
+  void InitializeInfostateNodes(const State& state, CfrState& cfr_state);
 
   // Fills `info_state_policy` to be a [num_actions] vector of the probabilities
   // found in `policy` at the given `info_state`.

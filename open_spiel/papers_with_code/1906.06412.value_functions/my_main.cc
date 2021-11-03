@@ -197,13 +197,16 @@ std::pair<int, int> UniversalPokerRiverCFRPokerSpecific(int iterations) {
   std::shared_ptr<Observer> infostate_observer = game->MakeObserver(kInfoStateObsType, {});
   std::shared_ptr<Observer> public_observer = game->MakeObserver(kPublicStateObsType, {});
 
-  std::vector<std::shared_ptr<algorithms::InfostateTree>>
-      trees = algorithms::MakePokerInfostateTrees(state, std::vector<double>(1326, 1. / 1326),
-                                                  infostate_observer, 1000, kDlCfrInfostateTreeStorage);
-
-  auto out = std::make_shared<Subgame>(game, public_observer, trees);
+  std::vector<double> chance_reaches(1326, 1. / 1326);
 
   algorithms::PokerData poker_data = algorithms::PokerData(*state);
+
+  UpdateChanceReaches(chance_reaches, poker_data, cards);
+
+  std::vector<std::shared_ptr<algorithms::InfostateTree>> trees =
+      algorithms::MakePokerInfostateTrees(state, chance_reaches, infostate_observer, 1000, kDlCfrInfostateTreeStorage);
+
+  auto out = std::make_shared<Subgame>(game, public_observer, trees);
 
   std::shared_ptr<const PublicStateEvaluator>
       terminal_evaluator = std::make_shared<const PokerTerminalEvaluatorLinear>(poker_data, cards);
@@ -608,7 +611,7 @@ int main(int argc, char **argv) {
 //  open_spiel::papers_with_code::MeasureTime(runs, iterations, open_spiel::papers_with_code::SolverLeducCFREfg);
 //  open_spiel::papers_with_code::MeasureTime(runs, iterations, open_spiel::papers_with_code::SolverLeducCFRInfostate);
 
-  //Limit tests
+  // Limit tests
   if (argc > 1) {
     if (std::strcmp(argv[1], "-is") == 0 or strcmp(argv[1], "-all") == 0) {
       std::cout << "Infostate CFR experiment:\n";
