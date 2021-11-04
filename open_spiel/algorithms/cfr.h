@@ -257,7 +257,7 @@ class CFRSolverBase {
  public:
   CFRSolverBase(const Game& game, bool alternating_updates,
                 bool linear_averaging, bool regret_matching_plus,
-                bool hash_states=false, bool random_initial_regrets = false, int seed = 0);
+                bool save_states=false, bool random_initial_regrets = false, int seed = 0);
   // The constructor below is used for deserialization purposes.
   CFRSolverBase(std::shared_ptr<const Game> game, bool alternating_updates,
                 bool linear_averaging, bool regret_matching_plus, int iteration,
@@ -303,8 +303,8 @@ class CFRSolverBase {
   const std::unique_ptr<State> root_state_;
   const std::vector<double> root_reach_probs_;
 
-  // Variables for state hashing to speed up the computation
-  bool hash_states_;
+  // Variables for state saving to speed up the computation
+  bool save_states_;
 
   //Collecting state
   int states_ = 0;
@@ -318,6 +318,11 @@ class CFRSolverBase {
   // current policy. This feature exists to support CFR-BR.
   std::vector<double> ComputeCounterFactualRegret(
       CfrState &state, const absl::optional<int> &alternating_player,
+      const std::vector<double>& reach_probabilities,
+      const std::vector<const Policy*>* policy_overrides);
+
+  std::vector<double> ComputeCounterFactualRegret(
+      const State &state, const absl::optional<int> &alternating_player,
       const std::vector<double>& reach_probabilities,
       const std::vector<const Policy*>* policy_overrides);
 
@@ -335,6 +340,14 @@ class CFRSolverBase {
  private:
   std::vector<double> ComputeCounterFactualRegretForActionProbs(
       CfrState& state, const absl::optional<int>& alternating_player,
+      const std::vector<double>& reach_probabilities, const int current_player,
+      const std::vector<double>& info_state_policy,
+      const std::vector<Action>& legal_actions,
+      std::vector<double>* child_values_out,
+      const std::vector<const Policy*>* policy_overrides);
+
+  std::vector<double> ComputeCounterFactualRegretForActionProbs(
+      const State& state, const absl::optional<int>& alternating_player,
       const std::vector<double>& reach_probabilities, const int current_player,
       const std::vector<double>& info_state_policy,
       const std::vector<Action>& legal_actions,

@@ -558,7 +558,7 @@ class State {
   virtual std::unique_ptr<State> Clone() const = 0;
 
   // Creates the child from State corresponding to action.
-  std::unique_ptr<State> Child(Action action) const {
+  virtual std::unique_ptr<State> Child(Action action) const {
     std::unique_ptr<State> child = Clone();
     child->ApplyAction(action);
     return child;
