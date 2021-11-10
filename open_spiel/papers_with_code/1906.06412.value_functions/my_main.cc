@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+#include "algorithms/tabular_exploitability.h"
 #include "open_spiel/algorithms/infostate_tree.h"
 #include "subgame.h"
 #include "algorithms/cfr.h"
@@ -150,7 +151,80 @@ std::pair<int, int> UniversalPokerTurnTest(int iterations) {
   return std::pair<int, int>(setup_duration.count(), run_duration.count());
 }
 
-std::pair<int, int> UniversalPokerRiverCFRPokerSpecific(int iterations) {
+std::pair<int, int> UniversalPokerRiverCFRPokerSpecificQuadratic(int iterations) {
+//  std::string name = "universal_poker(betting=limit,numPlayers=2,numRounds=4,blind=10 5,"
+//                     "firstPlayer=2 1,numSuits=4,numRanks=13,numHoleCards=2,numBoardCards=0 3 "
+//                     "1 1,raiseSize=10 10 20 20,maxRaises=3 4 4 4)";
+  std::string name = "universal_poker(betting=nolimit,numPlayers=2,numRounds=4,blind=100 50,"
+                     "firstPlayer=2 1 1 "
+                     "1,numSuits=4,numRanks=13,numHoleCards=2,numBoardCards=0 3 "
+                     "1 1,stack=20000 20000,bettingAbstraction=fcpa)";
+  std::shared_ptr<const Game> game = LoadGame(name);
+
+  std::unique_ptr<State> state = game->NewInitialState();
+
+  std::vector<int> cards = {4, 31, 10, 15, 20};
+
+  // Deal 4 cards
+  state->ApplyAction(0);
+  state->ApplyAction(1);
+  state->ApplyAction(2);
+  state->ApplyAction(3);
+
+  // BothCall
+  state->ApplyAction(1);
+  state->ApplyAction(1);
+
+  // Deal 3 board cards (Flop)
+  state->ApplyAction(cards[0]);
+  state->ApplyAction(cards[1]);
+  state->ApplyAction(cards[2]);
+
+  // BothCall
+  state->ApplyAction(1);
+  state->ApplyAction(1);
+
+  // Deal board card (Turn)
+  state->ApplyAction(cards[3]);
+
+  // BothCall
+  state->ApplyAction(1);
+  state->ApplyAction(1);
+
+  // Deal board card (River)
+  state->ApplyAction(cards[4]);
+
+  auto start = std::chrono::high_resolution_clock::now();
+  std::shared_ptr<Observer> infostate_observer = game->MakeObserver(kInfoStateObsType, {});
+  std::shared_ptr<Observer> public_observer = game->MakeObserver(kPublicStateObsType, {});
+
+  std::vector<double> chance_reaches(1326, 1. / 1326);
+
+  algorithms::PokerData poker_data = algorithms::PokerData(*state);
+
+  UpdateChanceReaches(chance_reaches, poker_data, cards);
+
+  std::vector<std::shared_ptr<algorithms::InfostateTree>> trees =
+      algorithms::MakePokerInfostateTrees(state, chance_reaches, infostate_observer, 1000, kDlCfrInfostateTreeStorage);
+
+  auto out = std::make_shared<Subgame>(game, public_observer, trees);
+
+  std::shared_ptr<const PublicStateEvaluator>
+      terminal_evaluator = std::make_shared<const PokerTerminalEvaluatorQuadratic>(poker_data, cards);
+
+  SubgameSolver solver = SubgameSolver(out, nullptr, terminal_evaluator,
+                                       std::make_shared<std::mt19937>(0), "RegretMatchingPlus");
+  auto end = std::chrono::high_resolution_clock::now();
+  auto setup_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
+  start = std::chrono::high_resolution_clock::now();
+  solver.RunSimultaneousIterations(iterations);
+  end = std::chrono::high_resolution_clock::now();
+  auto run_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+  return std::pair<int, int>(setup_duration.count(), run_duration.count());
+}
+
+std::pair<int, int> UniversalPokerRiverCFRPokerSpecificLinear(int iterations) {
 //  std::string name = "universal_poker(betting=limit,numPlayers=2,numRounds=4,blind=10 5,"
 //                     "firstPlayer=2 1,numSuits=4,numRanks=13,numHoleCards=2,numBoardCards=0 3 "
 //                     "1 1,raiseSize=10 10 20 20,maxRaises=3 4 4 4)";
@@ -598,6 +672,61 @@ void MeasureTime(int runs, int iterations, std::pair<int, int> (*f)(int)) {
   std::cout << "Average runin time: " << cumulative_times.second / runs << "ms\n";
 }
 
+void CheckExploitabilityTwo() {
+  int iterations = 100000;
+
+  std::string name = "leduc_poker";
+
+  std::shared_ptr<const Game> game = LoadGame(name);
+
+  algorithms::CFRSolverBase solver_efg(*game, false, false, true, true);
+
+  for (int i = 0; i < iterations; i++) {
+    solver_efg.EvaluateAndUpdatePolicy();
+  }
+
+  auto policy_efg = solver_efg.AveragePolicy();
+  std::cout << "Normal efg cfr exploitability: " << algorithms::Exploitability(*game, *policy_efg) << "\n";
+
+  algorithms::InfostateCFR solver_is(*game);
+
+  solver_is.RunSimultaneousIterations(iterations);
+  auto policy_is = solver_is.AveragePolicy();
+  std::cout << "Infostate cfr exploitability: " << algorithms::Exploitability(*game, *policy_is) << "\n";
+}
+
+void CheckExploitability() {
+  int iterations = 100000;
+
+  std::string name = "leduc_poker";
+
+  std::shared_ptr<const Game> game = LoadGame(name);
+
+  algorithms::CFRSolverBase solver_efgsave(*game, true, false, true);
+
+  for (int i = 0; i < iterations; i++) {
+    solver_efgsave.EvaluateAndUpdatePolicy();
+  }
+
+  auto policy_efgsave = solver_efgsave.AveragePolicy();
+  std::cout << "Save states efg exploitability: " << algorithms::Exploitability(*game, *policy_efgsave) << "\n";
+
+  algorithms::CFRSolverBase solver_efg(*game, true, false, true, false);
+
+  for (int i = 0; i < iterations; i++) {
+    solver_efg.EvaluateAndUpdatePolicy();
+  }
+
+  auto policy_efg = solver_efg.AveragePolicy();
+  std::cout << "Normal efg exploitability: " << algorithms::Exploitability(*game, *policy_efg) << "\n";
+
+  algorithms::InfostateCFR solver_is(*game);
+
+  solver_is.RunSimultaneousIterations(iterations);
+  auto policy_is = solver_is.AveragePolicy();
+  std::cout << "Infostate exploitability: " << algorithms::Exploitability(*game, *policy_is) << "\n";
+}
+
 }
 }
 }
@@ -606,6 +735,9 @@ int main(int argc, char **argv) {
   int iterations = 1000;
   int runs = 1;
 
+
+//  open_spiel::papers_with_code::CheckExploitability();
+//  open_spiel::papers_with_code::CheckExploitabilityTwo();
   // Leduc tests
 //  open_spiel::papers_with_code::MeasureTime(runs, iterations, open_spiel::papers_with_code::SolverLeducCFREfgHashed);
 //  open_spiel::papers_with_code::MeasureTime(runs, iterations, open_spiel::papers_with_code::SolverLeducCFREfg);
@@ -613,25 +745,64 @@ int main(int argc, char **argv) {
 
   // Limit tests
   if (argc > 1) {
-    if (std::strcmp(argv[1], "-is") == 0 or strcmp(argv[1], "-all") == 0) {
-      std::cout << "Infostate CFR experiment:\n";
-      open_spiel::papers_with_code::MeasureTime(
-          runs, iterations, open_spiel::papers_with_code::UniversalPokerRiverCFRPokerSpecific);
+    int n_arguments = argc;
+    // Linear evaluator infostate CFR
+    bool do_next_part = false;
+    for (int argument_index = 1; argument_index < n_arguments; argument_index++) {
+      if (std::strcmp(argv[argument_index], "-isl") == 0 or strcmp(argv[argument_index], "-all") == 0) {
+        do_next_part = true;
+        break;
+      }
     }
-//    if (std::strcmp(argv[1], "-efg") == 0 or strcmp(argv[1], "-all") == 0) {
-//      std::cout << "EFG CFR experiment:\n";
-//      open_spiel::papers_with_code::MeasureTime(
-//          runs, iterations, open_spiel::papers_with_code::UniversalPokerRiverCFREfg);
-//    }
-
-    if (std::strcmp(argv[1], "-efgh") == 0 or strcmp(argv[1], "-all") == 0) {
+    if (do_next_part) {
+      std::cout << "Infostate CFR experiment with Linear evaluator:\n";
+      open_spiel::papers_with_code::MeasureTime(
+          runs, iterations, open_spiel::papers_with_code::UniversalPokerRiverCFRPokerSpecificLinear);
+    }
+    // Quadratic evaluator infostate CFR
+    do_next_part = false;
+    for (int argument_index = 1; argument_index < n_arguments; argument_index++) {
+      if (std::strcmp(argv[argument_index], "-isq") == 0 or strcmp(argv[argument_index], "-all") == 0) {
+        do_next_part = true;
+        break;
+      }
+    }
+    if (do_next_part) {
+      std::cout << "Infostate CFR experiment with Quadratic evaluator:\n";
+      open_spiel::papers_with_code::MeasureTime(
+          runs, iterations, open_spiel::papers_with_code::UniversalPokerRiverCFRPokerSpecificQuadratic);
+    }
+    // Efg CFR without saving structure
+    do_next_part = false;
+    for (int argument_index = 1; argument_index < n_arguments; argument_index++) {
+      if (std::strcmp(argv[argument_index], "-efg") == 0 or strcmp(argv[argument_index], "-all") == 0) {
+        do_next_part = true;
+        break;
+      }
+    }
+    if (do_next_part) {
+      std::cout << "EFG CFR experiment:\n";
+      open_spiel::papers_with_code::MeasureTime(
+          runs, iterations, open_spiel::papers_with_code::UniversalPokerRiverCFREfg);
+    }
+    // Efg CFR with saving the structure
+    do_next_part = false;
+    for (int argument_index = 1; argument_index < n_arguments; argument_index++) {
+      if (std::strcmp(argv[argument_index], "-efgh") == 0 or strcmp(argv[argument_index], "-all") == 0) {
+        do_next_part = true;
+        break;
+      }
+    }
+    if (do_next_part) {
       std::cout << "Hashed EFG CFR experiment:\n";
       open_spiel::papers_with_code::MeasureTime(
           runs, iterations, open_spiel::papers_with_code::UniversalPokerRiverCFREfgHashed);
     }
   } else {
     std::cout
-        << "Please specify the experiment to run. -is for infostate CFR, -efg for EFG CFR, -efgh for hashed EFG CFR and -all for all experiments";
+        << "Please specify the experiment to run. -isl for infostate CFR with linear evaluator, -efg for EFG CFR, "
+           "-efgh for EFG CFR where the tree is build and saved, -isq for infostate CFR with quadratic evaluator and "
+           "-all for all experiments";
   }
 
 //  open_spiel::papers_with_code::SmallUniversalPokerTrunkTest();
