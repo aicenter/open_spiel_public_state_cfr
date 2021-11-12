@@ -206,10 +206,8 @@ CFRSolverBase::CFRSolverBase(const Game &game, bool alternating_updates,
         "on a simultaneous (or normal-form) game, please first transform it "
         "using turn_based_simultaneous_game.");
   }
-  if (save_states_) {
-    cfr_root_state_ = std::make_shared<CfrState>(*root_state_);
-    InitializeInfostateNodes(*root_state_, *cfr_root_state_);
-  }
+  cfr_root_state_ = std::make_shared<CfrState>(*root_state_);
+  InitializeInfostateNodes(*root_state_, *cfr_root_state_);
 //  std::cout << "Game has " << states_ << " states.\n";
 //  std::cout << "Game has " << InfoStateValuesTable().size() << " infostates.\n";
 }

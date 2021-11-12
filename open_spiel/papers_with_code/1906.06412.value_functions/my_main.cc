@@ -194,6 +194,10 @@ std::pair<int, int> UniversalPokerRiverCFRPokerSpecificQuadratic(int iterations)
   // Deal board card (River)
   state->ApplyAction(cards[4]);
 
+  universal_poker::logic::CardSet card_set(cards);
+  std::cout << card_set.ToString() << "\n";
+
+
   auto start = std::chrono::high_resolution_clock::now();
   std::shared_ptr<Observer> infostate_observer = game->MakeObserver(kInfoStateObsType, {});
   std::shared_ptr<Observer> public_observer = game->MakeObserver(kPublicStateObsType, {});
@@ -732,7 +736,7 @@ void CheckExploitability() {
 }
 
 int main(int argc, char **argv) {
-  int iterations = 1000;
+  int iterations = 10;
   int runs = 1;
 
 
