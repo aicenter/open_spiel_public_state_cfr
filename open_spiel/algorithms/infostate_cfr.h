@@ -154,6 +154,7 @@ class InfostateCFR {
   std::shared_ptr<Policy> AveragePolicy();
   std::shared_ptr<Policy> CurrentPolicy();
 
+  std::vector<BanditVector>& bandits_modifiable() { return bandits_; }
   const std::vector<BanditVector>& bandits() const { return bandits_; }
   const std::vector<std::shared_ptr<InfostateTree>>& trees() const {
     return trees_;
