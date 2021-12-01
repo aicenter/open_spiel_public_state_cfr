@@ -304,6 +304,10 @@ constexpr PolicySelection kDefaultPolicySelection =
 
 // CFR-based subgame solver that evaluates public leaves using terminal
 // or non-terminal evaluator.
+double RootCfValue(int root_branching_factor,
+                   absl::Span<const double> cf_values,
+                   absl::Span<const double> range = {});
+
 class SubgameSolver {
  public:
   SubgameSolver(
@@ -328,6 +332,8 @@ class SubgameSolver {
   // Policy available only for the infostates of the subgame!
   std::shared_ptr<Policy> AveragePolicy();
   std::shared_ptr<Policy> CurrentPolicy();
+  std::vector<std::vector<double>> GetCfValues() const { return cf_values_;};
+  std::vector<double> RootValues() const;
  private:
   const std::shared_ptr<Subgame> subgame_;
   const std::shared_ptr<const PublicStateEvaluator> nonterminal_evaluator_;

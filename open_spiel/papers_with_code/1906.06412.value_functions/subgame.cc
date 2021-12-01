@@ -923,6 +923,31 @@ void SubgameSolver::IncrementallyAverageValuesInState(PublicState *state) {
   }
 }
 
+double RootCfValue(int root_branching_factor,
+                   absl::Span<const double> cf_values,
+                   absl::Span<const double> range) {
+  SPIEL_CHECK_TRUE(range.empty() ||
+      (range.size() == root_branching_factor
+          && range.size() == cf_values.size()));
+  double root_cf_value = 0.;
+  if (range.empty()) {
+    for (int i = 0; i < root_branching_factor; ++i) {
+      root_cf_value += cf_values[i];
+    }
+  } else {
+    for (int i = 0; i < root_branching_factor; ++i) {
+      root_cf_value += range[i] * cf_values[i];
+    }
+  }
+  return root_cf_value;
+}
+
+std::vector<double> SubgameSolver::RootValues() const {
+  return {
+      RootCfValue(subgame_->trees[0]->root_branching_factor(), cf_values_[0]),
+      RootCfValue(subgame_->trees[1]->root_branching_factor(), cf_values_[1])
+  };
+}
 
 // -- CFR evaluator ------------------------------------------------------------
 
