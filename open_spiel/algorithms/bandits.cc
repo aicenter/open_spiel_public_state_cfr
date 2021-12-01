@@ -86,10 +86,10 @@ void RegretMatching::Reset() {
 // -- RegretMatchingPlus -------------------------------------------------------
 
 // RM uses x+ = max(0, x), this constant sets this to 1e-5
-constexpr double kRegretMatchingMinRegret = 1e-5;
+constexpr double kRegretMatchingMinRegret = 0;
 // Pure strategies with prob smaller than this constant are cut off,
 // and the remaining probs are normalized again.
-constexpr double kRegretMatchingStrategyCutoff = 1e-2;
+constexpr double kRegretMatchingStrategyCutoff = 0;
 
 RegretMatchingPlus::RegretMatchingPlus(int num_actions)
     : Bandit(num_actions),
@@ -158,18 +158,6 @@ std::vector<double> RegretMatchingPlus::AverageStrategy() const {
         strategy.push_back(cumulative_strategy_[i] / normalization);
       } else {
         strategy.push_back(0.);
-      }
-    }
-    double renormalization = 0.;
-    for (int i = 0; i < num_actions(); ++i) {
-      if (strategy[i] > kRegretMatchingStrategyCutoff)
-        renormalization += strategy[i];
-    }
-    for (int i = 0; i < num_actions(); ++i) {
-      if (strategy[i] > kRegretMatchingStrategyCutoff) {
-        strategy[i] /= renormalization;
-      } else {
-        strategy[i] = 0.;
       }
     }
   } else {
