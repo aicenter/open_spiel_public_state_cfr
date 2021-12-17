@@ -17,6 +17,7 @@
 #include "algorithms/cfr.h"
 #include "algorithms/best_response.h"
 #include "infostate_tree_br.h"
+#include "libratus_endgame_values.h"
 
 #include <iostream>
 
@@ -773,6 +774,110 @@ void CheckExploitability(int iterations) {
   std::cout << "Infostate exploitability: " << algorithms::Exploitability(*game, *policy_is) << "\n";
 }
 
+std::vector<int> GenerateNewBoardCard(const std::vector<int> &board_cards, std::mt19937 &mt) {
+  std::vector<int> new_board_cards = board_cards;
+  std::uniform_int_distribution<int> dist(0, 51);
+  new_board_cards.push_back(dist(mt));
+  while (std::find(board_cards.begin(), board_cards.end(), new_board_cards.back()) != board_cards.end()) {
+    new_board_cards[4] = dist(mt);
+  }
+  return new_board_cards;
+}
+
+std::array<std::vector<double>, 2> GenerateRanges(
+    const std::vector<int> &board_cards, int new_board_card, std::mt19937 &mt,
+    const std::array<std::vector<double>, 2> &ranges) {
+  int range_index = 0;
+  std::array<std::vector<double>, 2> new_ranges = ranges;
+  for (int card_one = 0; card_one < 51; card_one++) {
+    for (int card_two = card_one + 1; card_two < 52; card_two++) {
+      open_spiel::universal_poker::logic::CardSet hand(std::vector<int>({card_one, card_two}));
+      if (std::find(board_cards.begin(), board_cards.end(), card_two) != board_cards.end() or
+          std::find(board_cards.begin(), board_cards.end(), card_one) != board_cards.end()) {
+        SPIEL_CHECK_EQ(ranges[0][range_index], 0);
+        SPIEL_CHECK_EQ(ranges[1][range_index], 0);
+      } else if (card_one == new_board_card or card_two == new_board_card) {
+        new_ranges[0][range_index] = 0;
+        new_ranges[1][range_index] = 0;
+      } else {
+        for (int player = 0; player < 2; player++) {
+          std::uniform_real_distribution<double> distribution(0., new_ranges[player][range_index]);
+          new_ranges[player][range_index] = distribution(mt);
+        }
+      }
+      range_index++;
+    }
+  }
+  return new_ranges;
+}
+
+std::vector<int> GenerateActions(
+    const std::shared_ptr<const Game> &game, std::mt19937 &mt, const std::vector<int> &actions_so_far) {
+  std::vector<int> action_sequence = actions_so_far;
+  std::unique_ptr<State> state = game->NewInitialState();
+  int chance_visited = 0;
+  int action_index = 0;
+  while (chance_visited < 9) {
+    if (state->IsChanceNode()) {
+      chance_visited++;
+      state->ApplyAction(state->LegalActions()[0]);
+    } else {
+      if (action_index < actions_so_far.size()) {
+        state->ApplyAction(actions_so_far[action_index]);
+        action_index++;
+      } else {
+        std::vector<Action> actions = state->LegalActions();
+        SPIEL_CHECK_GT(actions.size(), 0);
+        absl::uniform_int_distribution<> dis(0, actions.size() - 1);
+        Action action = universal_poker::kFold;
+        while (action == universal_poker::kFold) {
+          action = actions[dis(mt)];
+        }
+        state->ApplyAction(action);
+        action_sequence.push_back(action);
+      }
+    }
+  }
+  return action_sequence;
+}
+
+void GenerateAndSaveRiverSubgamesFromTurnSubgame(
+    int n_situations, const std::string &file_name, std::mt19937 &mt, const std::vector<int> &prev_board_cards,
+    const std::vector<int> &prev_action_sequence, const std::array<std::vector<double>, 2> &prev_ranges) {
+  std::string name = "universal_poker(betting=limit,numPlayers=2,numRounds=4,blind=10 5,"
+                     "firstPlayer=2 1,numSuits=4,numRanks=13,numHoleCards=2,numBoardCards=0 3 "
+                     "1 1,raiseSize=10 10 20 20,maxRaises=3 4 4 4)";
+  std::shared_ptr<const Game> game = LoadGame(name);
+  std::ofstream oss;
+  oss.open(file_name);
+  oss.flags(std::ios::scientific);
+  oss.precision(std::numeric_limits<double>::digits10 + 1);
+  for (int situation = 0; situation < n_situations; situation++) {
+    std::vector<int> board_cards = GenerateNewBoardCard(prev_board_cards, mt);
+    std::array<std::vector<double>, 2> ranges = GenerateRanges(prev_board_cards, board_cards.back(), mt, prev_ranges);
+    std::vector<int> action_sequence = GenerateActions(game, mt, prev_action_sequence);
+
+    // Writing to file
+    oss << "b ";
+    for (int card : board_cards) {
+      oss << card << " ";
+    }
+    oss << "r ";
+    for (double probability : ranges[0]) {
+      oss << probability << " ";
+    }
+    for (double probability : ranges[1]) {
+      oss << probability << " ";
+    }
+    oss << "a ";
+    oss << action_sequence.size() << " ";
+    for (int action : action_sequence) {
+      oss << action << " ";
+    }
+    oss << "\n";
+  }
+}
+
 template<class bidiiter>
 bidiiter RandomUnique(bidiiter begin, bidiiter end, size_t num_random, std::mt19937 &mt) {
   size_t left = std::distance(begin, end);
@@ -1087,19 +1192,76 @@ void SolvePokerSubgames(const std::string &file_in, const std::string &file_out,
 }
 }
 
+std::array<std::vector<double>, 2> GetReachesFromVector(const std::vector<double> &range_vector) {
+  std::array<std::vector<double>, 2> ranges = {std::vector<double>(1326, 0.), std::vector<double>(1326, 0.)};
+
+  for (int player = 0; player < 2; player++) {
+    for (int i = 0; i < 1326; i++) {
+      ranges[player][i] = range_vector[i + player * 1326];
+    }
+  }
+  return ranges;
+}
+
+void ConvertRangesFromDescendingSuitToAscendingSuit() {
+  std::string ranks = "23456789TJQKA";
+  std::string suits_des = "shdc";
+  std::string suits_asc = "cdhs";
+  std::vector<std::string> cards_asc(52);
+  std::vector<std::string> cards_des(52);
+  int card_index = 0;
+  for (int card_rank = 0; card_rank < 13; card_rank++) {
+    for (int card_suit = 0; card_suit < 4; card_suit++) {
+      cards_asc[card_index] = ranks.substr(card_rank, 1) + suits_asc.substr(card_suit, 1);
+      cards_des[card_index] = ranks.substr(card_rank, 1) + suits_des.substr(card_suit, 1);
+      card_index++;
+    }
+  }
+  std::unordered_map<std::string, int> hands_to_index_asc;
+  std::vector<std::string> index_to_hand_des(1326);
+  int hand_index = 0;
+  for (int card_one = 0; card_one < 51; card_one++) {
+    for (int card_two = card_one + 1; card_two < 52; card_two++) {
+      if (card_one / 4 == card_two / 4) {
+        index_to_hand_des[hand_index] = cards_des[card_two] + cards_des[card_one];
+      } else {
+        index_to_hand_des[hand_index] = cards_des[card_one] + cards_des[card_two];
+      }
+      hands_to_index_asc[cards_asc[card_one] + cards_asc[card_two]] = hand_index;
+      hand_index++;
+    }
+  }
+  std::cout << index_to_hand_des << "\n";
+  std::vector<double> transformed_ranges(2652, -1);
+  std::stringstream range_stream(SUBGAME_TWO_STRING);
+  for (int i = 0; i < 1326; i++) {
+    range_stream >> transformed_ranges[hands_to_index_asc[index_to_hand_des[i]]];
+  }
+  for (int i = 0; i < 1326; i++) {
+    range_stream >> transformed_ranges[hands_to_index_asc[index_to_hand_des[i]] + 1326];
+  }
+  std::cout << std::setprecision(16);
+  for (float f : transformed_ranges) {
+    std::cout << f << ", ";
+  }
+}
+
 int main(int argc, char **argv) {
   if (argc > 2) {
     int iterations = 1000;
-    int situations = 100000;
-    int machines = 50;
+    int situations = 48000;
+    int machines = 8;
     // Linear evaluator infostate CFR
     if (std::strcmp(argv[1], "-gen") == 0) {
       std::string file_in = argv[2];
+      std::vector<int> board_cards = {23, 28, 30, 32};
+      std::vector<int> action_sequence = {1, 1, 2, 2, 1};
+      std::array<std::vector<double>, 2> ranges = GetReachesFromVector(SUBGAME_ONE_RANGES);
       std::random_device rd;
       std::mt19937 mt(rd());
       for (int i = 0; i < machines; i++) {
-        open_spiel::papers_with_code::GenerateAndSavePokerSituations(
-            situations / machines, file_in + std::to_string(i), mt);
+        open_spiel::papers_with_code::GenerateAndSaveRiverSubgamesFromTurnSubgame(
+            situations / machines, file_in + std::to_string(i), mt, board_cards, action_sequence, ranges);
       }
     }
 
@@ -1112,6 +1274,30 @@ int main(int argc, char **argv) {
     std::cout
         << "Please specify the experiment to run. -gen + filename to generate data and -sol + file_in + file_out to solve the situations";
   }
+//  if (argc > 2) {
+//    int iterations = 1000;
+//    int situations = 100000;
+//    int machines = 50;
+//    // Linear evaluator infostate CFR
+//    if (std::strcmp(argv[1], "-gen") == 0) {
+//      std::string file_in = argv[2];
+//      std::random_device rd;
+//      std::mt19937 mt(rd());
+//      for (int i = 0; i < machines; i++) {
+//        open_spiel::papers_with_code::GenerateAndSavePokerSituations(
+//            situations / machines, file_in + std::to_string(i), mt);
+//      }
+//    }
+//
+//    if (std::strcmp(argv[1], "-sol") == 0) {
+//      std::string file_in = argv[2];
+//      std::string file_out = argv[3];
+//      open_spiel::papers_with_code::SolvePokerSubgames(file_in, file_out, situations / machines, iterations);
+//    }
+//  } else {
+//    std::cout
+//        << "Please specify the experiment to run. -gen + filename to generate data and -sol + file_in + file_out to solve the situations";
+//  }
 //  open_spiel::papers_with_code::GenerateAndSavePokerSituations(poker_situations, file_name);
 
 //  open_spiel::papers_with_code::CheckExploitability();

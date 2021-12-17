@@ -36,7 +36,7 @@ add_library(paper_value_functions OBJECT
         tabularize_bot.h
         tabularize_bot.cc
         torch_utils.h
-        )
+        libratus_endgame_values.h)
 
 #find_package(OpenMP)
 

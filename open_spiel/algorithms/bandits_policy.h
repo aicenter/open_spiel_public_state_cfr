@@ -32,8 +32,8 @@ using BanditVector = DecisionVector<std::unique_ptr<bandits::Bandit>>;
 
 std::vector<BanditVector> MakeBanditVectors(
     const std::vector<std::shared_ptr<InfostateTree>>& trees,
-//    const std::string& bandit_name = "RegretMatchingPlus",
-    const std::string& bandit_name = "RegretMatching",
+    const std::string& bandit_name = "RegretMatchingPlus",
+//    const std::string& bandit_name = "RegretMatching",
     GameParameters bandit_params = {});
 
 enum class PolicySelection {
