@@ -35,6 +35,7 @@ add_library(paper_value_functions OBJECT
         subgame_factory.h
         tabularize_bot.h
         tabularize_bot.cc
+        turn_poker_net.h
         torch_utils.h
         libratus_endgame_values.h)
 

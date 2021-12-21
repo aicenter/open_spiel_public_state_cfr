@@ -18,6 +18,7 @@
 #include "algorithms/best_response.h"
 #include "infostate_tree_br.h"
 #include "libratus_endgame_values.h"
+#include "turn_poker_net.h"
 
 #include <iostream>
 
@@ -1031,6 +1032,19 @@ std::vector<int> ReadBoardCards(std::ifstream &file) {
   return board_cards;
 }
 
+std::array<std::vector<double>, 2> ReadCFVs(std::ifstream &file) {
+  std::array<std::vector<double>, 2> cfvs = {std::vector<double>(1326, 0.), std::vector<double>(1326, 0.)};
+  std::string read_label;
+  file >> read_label;
+  SPIEL_CHECK_EQ(read_label, "v");
+  for (int player = 0; player < 2; player++) {
+    for (int i = 0; i < 1326; i++) {
+      file >> cfvs[player][i];
+    }
+  }
+  return cfvs;
+}
+
 std::array<std::vector<double>, 2> ReadRanges(std::ifstream &file) {
   std::array<std::vector<double>, 2> ranges = {std::vector<double>(1326, 0.), std::vector<double>(1326, 0.)};
   std::string read_label;
@@ -1188,6 +1202,81 @@ void SolvePokerSubgames(const std::string &file_in, const std::string &file_out,
   }
 }
 
+void NetworkTraining(const std::string &file_name, int training_samples, int validation_samples) {
+  auto net = std::make_shared<Net>();
+
+  torch::Device device("cpu");
+
+  net->to(device);
+
+  std::ifstream read_file(file_name);
+
+  torch::Tensor training_data_tensor = torch::zeros({training_samples, 2704});
+  torch::Tensor training_target_tensor = torch::zeros({training_samples, 2652});
+  for (int i = 0; i < 5; i++) {
+    std::vector<int> board_cards = ReadBoardCards(read_file);
+    std::array<std::vector<double>, 2> ranges = ReadRanges(read_file);
+    std::vector<int> action_sequence = ReadActions(read_file);
+    std::array<std::vector<double>, 2> cfvs = ReadCFVs(read_file);
+
+    training_data_tensor[i][board_cards[4]] = 1;
+    for (int card_index = 0; card_index < 1326; card_index++) {
+      training_data_tensor[i][card_index + 52] = ranges[0][card_index];
+      training_data_tensor[i][card_index + 1326 + 52] = ranges[1][card_index];
+
+      training_target_tensor[i][card_index] = cfvs[0][card_index];
+      training_target_tensor[i][card_index + 1326] = cfvs[1][card_index];
+    }
+  }
+
+  torch::Tensor validation_data_tensor = torch::zeros({validation_samples, 2704});
+  torch::Tensor validation_target_tensor = torch::zeros({validation_samples, 2652});
+  for (int i = 0; i < 5; i++) {
+    std::vector<int> board_cards = ReadBoardCards(read_file);
+    std::array<std::vector<double>, 2> ranges = ReadRanges(read_file);
+    std::vector<int> action_sequence = ReadActions(read_file);
+    std::array<std::vector<double>, 2> cfvs = ReadCFVs(read_file);
+
+    training_data_tensor[i][board_cards[4]] = 1;
+    for (int card_index = 0; card_index < 1326; card_index++) {
+      validation_data_tensor[i][card_index + 52] = ranges[0][card_index];
+      validation_data_tensor[i][card_index + 1326 + 52] = ranges[1][card_index];
+
+      validation_target_tensor[i][card_index] = cfvs[0][card_index];
+      validation_target_tensor[i][card_index + 1326] = cfvs[1][card_index];
+    }
+  }
+
+  auto optimizer = std::make_shared<torch::optim::Adam>(net->parameters(), torch::optim::AdamOptions(1e-3));
+  int epochs = 100;
+  int batch_size = 100;
+  int batches = training_samples / batch_size;
+
+  torch::Tensor init_output = net->forward(validation_data_tensor);
+  torch::Tensor init_loss = torch::mse_loss(init_output, validation_target_tensor);
+  std::cout << "Validation loss: " << init_loss.item().to<double>() << "\n";
+
+  for (int epoch = 0; epoch < epochs; epoch++) {
+    std::cout << "Epoch " << epoch << ":   ";
+    double cumulative_loss = 0;
+    for (int batch = 0; batch < batches; batch++) {
+      int i_s = batch * batch_size;
+      int i_e = (batch + 1) * batch_size - 1;
+      optimizer->zero_grad();
+      torch::Tensor output = net->forward(training_data_tensor[i_s, i_e]);
+      torch::Tensor loss = torch::mse_loss(output, training_target_tensor[i_s, i_e]);
+      loss.backward();
+      optimizer->step();
+      cumulative_loss += loss.item().to<double>();
+      std::cout << "." << std::flush;
+    }
+    std::cout << "\nTraining loss: " << cumulative_loss / batches << "   ";
+    torch::Tensor output = net->forward(validation_data_tensor);
+    torch::Tensor loss = torch::mse_loss(output, validation_target_tensor);
+    std::cout << "Validation loss: " << loss.item().to<double>() << "\n";
+  }
+}
+
 }
 }
 }
@@ -1247,33 +1336,37 @@ void ConvertRangesFromDescendingSuitToAscendingSuit() {
 }
 
 int main(int argc, char **argv) {
-  if (argc > 2) {
-    int iterations = 1000;
-    int situations = 48000;
-    int machines = 8;
-    // Linear evaluator infostate CFR
-    if (std::strcmp(argv[1], "-gen") == 0) {
-      std::string file_in = argv[2];
-      std::vector<int> board_cards = {23, 28, 30, 32};
-      std::vector<int> action_sequence = {1, 1, 2, 2, 1};
-      std::array<std::vector<double>, 2> ranges = GetReachesFromVector(SUBGAME_ONE_RANGES);
-      std::random_device rd;
-      std::mt19937 mt(rd());
-      for (int i = 0; i < machines; i++) {
-        open_spiel::papers_with_code::GenerateAndSaveRiverSubgamesFromTurnSubgame(
-            situations / machines, file_in + std::to_string(i), mt, board_cards, action_sequence, ranges);
-      }
-    }
-
-    if (std::strcmp(argv[1], "-sol") == 0) {
-      std::string file_in = argv[2];
-      std::string file_out = argv[3];
-      open_spiel::papers_with_code::SolvePokerSubgames(file_in, file_out, situations / machines, iterations);
-    }
-  } else {
-    std::cout
-        << "Please specify the experiment to run. -gen + filename to generate data and -sol + file_in + file_out to solve the situations";
-  }
+  std::string file_template = argv[1];
+  int training_samples = std::atoi(argv[2]);
+  int validation_samples = std::atoi(argv[3]);
+  open_spiel::papers_with_code::NetworkTraining(file_template, training_samples, validation_samples);
+//  if (argc > 2) {
+//    int iterations = 1000;
+//    int situations = 1;
+//    int machines = 1;
+//    // Linear evaluator infostate CFR
+//    if (std::strcmp(argv[1], "-gen") == 0) {
+//      std::string file_in = argv[2];
+//      std::vector<int> board_cards = {23, 28, 30, 32};
+//      std::vector<int> action_sequence = {1, 1, 2, 2, 1};
+//      std::array<std::vector<double>, 2> ranges = GetReachesFromVector(SUBGAME_ONE_RANGES);
+//      std::random_device rd;
+//      std::mt19937 mt(rd());
+//      for (int i = 0; i < machines; i++) {
+//        open_spiel::papers_with_code::GenerateAndSaveRiverSubgamesFromTurnSubgame(
+//            situations / machines, file_in + std::to_string(i), mt, board_cards, action_sequence, ranges);
+//      }
+//    }
+//
+//    if (std::strcmp(argv[1], "-sol") == 0) {
+//      std::string file_in = argv[2];
+//      std::string file_out = argv[3];
+//      open_spiel::papers_with_code::SolvePokerSubgames(file_in, file_out, situations / machines, iterations);
+//    }
+//  } else {
+//    std::cout
+//        << "Please specify the experiment to run. -gen + filename to generate data and -sol + file_in + file_out to solve the situations";
+//  }
 //  if (argc > 2) {
 //    int iterations = 1000;
 //    int situations = 100000;
