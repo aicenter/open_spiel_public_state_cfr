@@ -1202,7 +1202,14 @@ void SolvePokerSubgames(const std::string &file_in, const std::string &file_out,
   }
 }
 
-void NetworkTraining(const std::string &file_name, int training_samples, int validation_samples) {
+void NetworkTraining(const std::string &file_name,
+                     int training_samples,
+                     int validation_samples,
+                     int epochs,
+                     int batch_size) {
+
+  std::cout << training_samples << " " << validation_samples << " " << epochs << " " << batch_size << "\n";
+
   auto net = std::make_shared<Net>();
 
   torch::Device device("cpu");
@@ -1213,7 +1220,7 @@ void NetworkTraining(const std::string &file_name, int training_samples, int val
 
   torch::Tensor training_data_tensor = torch::zeros({training_samples, 2704});
   torch::Tensor training_target_tensor = torch::zeros({training_samples, 2652});
-  for (int i = 0; i < 5; i++) {
+  for (int i = 0; i < training_samples; i++) {
     std::vector<int> board_cards = ReadBoardCards(read_file);
     std::array<std::vector<double>, 2> ranges = ReadRanges(read_file);
     std::vector<int> action_sequence = ReadActions(read_file);
@@ -1231,7 +1238,7 @@ void NetworkTraining(const std::string &file_name, int training_samples, int val
 
   torch::Tensor validation_data_tensor = torch::zeros({validation_samples, 2704});
   torch::Tensor validation_target_tensor = torch::zeros({validation_samples, 2652});
-  for (int i = 0; i < 5; i++) {
+  for (int i = 0; i < validation_samples; i++) {
     std::vector<int> board_cards = ReadBoardCards(read_file);
     std::array<std::vector<double>, 2> ranges = ReadRanges(read_file);
     std::vector<int> action_sequence = ReadActions(read_file);
@@ -1248,9 +1255,13 @@ void NetworkTraining(const std::string &file_name, int training_samples, int val
   }
 
   auto optimizer = std::make_shared<torch::optim::Adam>(net->parameters(), torch::optim::AdamOptions(1e-3));
-  int epochs = 100;
-  int batch_size = 100;
   int batches = training_samples / batch_size;
+
+  std::cout << "Initial:   ";
+
+  torch::Tensor init_train_output = net->forward(training_data_tensor);
+  torch::Tensor init_train_loss = torch::mse_loss(init_train_output, training_target_tensor);
+  std::cout << "Training loss: " << init_train_loss.item().to<double>() << "   ";
 
   torch::Tensor init_output = net->forward(validation_data_tensor);
   torch::Tensor init_loss = torch::mse_loss(init_output, validation_target_tensor);
@@ -1339,7 +1350,10 @@ int main(int argc, char **argv) {
   std::string file_template = argv[1];
   int training_samples = std::atoi(argv[2]);
   int validation_samples = std::atoi(argv[3]);
-  open_spiel::papers_with_code::NetworkTraining(file_template, training_samples, validation_samples);
+  int epochs = std::atoi(argv[4]);
+  int batch_size = std::atoi(argv[5]);
+  open_spiel::papers_with_code::NetworkTraining(
+      file_template, training_samples, validation_samples, epochs, batch_size);
 //  if (argc > 2) {
 //    int iterations = 1000;
 //    int situations = 1;
