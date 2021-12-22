@@ -1202,6 +1202,81 @@ void SolvePokerSubgames(const std::string &file_in, const std::string &file_out,
   }
 }
 
+int GetPotFromActions(const std::vector<int> &action_sequence) {
+  int round = 0;
+  int pot = 20;
+  bool first_round_action = true;
+
+  for (int action : action_sequence) {
+    if (action == 2) {
+      if (round < 2) {
+        pot += 20;
+      } else {
+        pot += 40;
+      }
+      first_round_action = false;
+    } else {
+      if (first_round_action) {
+        first_round_action = false;
+      } else {
+        round++;
+        first_round_action = true;
+      }
+    }
+  }
+
+  return pot;
+}
+
+int GetGamePotFromActions(std::vector<int> action_sequence) {
+  std::string name = "universal_poker(betting=limit,numPlayers=2,numRounds=4,blind=10 5,"
+                     "firstPlayer=2 1,numSuits=4,numRanks=13,numHoleCards=2,numBoardCards=0 3 "
+                     "1 1,raiseSize=10 10 20 20,maxRaises=3 4 4 4)";
+  std::shared_ptr<const Game> game = LoadGame(name);
+
+  std::unique_ptr<State> state = game->NewInitialState();
+
+  // Deal 4 cards
+  state->ApplyAction(0);
+  state->ApplyAction(1);
+  state->ApplyAction(2);
+  state->ApplyAction(3);
+
+  // Pre-flop betting
+  int action_index = 0;
+  while (state->IsPlayerNode()) {
+    state->ApplyAction(action_sequence[action_index]);
+    action_index++;
+  }
+
+  // Deal 3 board cards (Flop)
+  state->ApplyAction(4);
+  state->ApplyAction(5);
+  state->ApplyAction(6);
+
+  // Flop betting
+  while (state->IsPlayerNode()) {
+    state->ApplyAction(action_sequence[action_index]);
+    action_index++;
+  }
+
+  // Deal board card (Turn)
+  state->ApplyAction(7);
+
+  // Turn betting
+  while (state->IsPlayerNode()) {
+    state->ApplyAction(action_sequence[action_index]);
+    action_index++;
+  }
+
+  const auto &poker_state = open_spiel::down_cast<const universal_poker::UniversalPokerState &>(*state);
+  int pot = 0;
+  for (int p = 0; p < 2; p++) {
+    pot += poker_state.acpc_state().Ante(p);
+  }
+  return pot;
+}
+
 void NetworkTraining(const std::string &file_name,
                      int training_samples,
                      int validation_samples,
@@ -1218,12 +1293,13 @@ void NetworkTraining(const std::string &file_name,
 
   std::ifstream read_file(file_name);
 
-  torch::Tensor training_data_tensor = torch::zeros({training_samples, 2704});
+  torch::Tensor training_data_tensor = torch::zeros({training_samples, 2705});
   torch::Tensor training_target_tensor = torch::zeros({training_samples, 2652});
   for (int i = 0; i < training_samples; i++) {
     std::vector<int> board_cards = ReadBoardCards(read_file);
     std::array<std::vector<double>, 2> ranges = ReadRanges(read_file);
     std::vector<int> action_sequence = ReadActions(read_file);
+    int pot = GetPotFromActions(action_sequence);
     std::array<std::vector<double>, 2> cfvs = ReadCFVs(read_file);
 
     training_data_tensor[i][board_cards[4]] = 1;
@@ -1234,14 +1310,16 @@ void NetworkTraining(const std::string &file_name,
       training_target_tensor[i][card_index] = cfvs[0][card_index];
       training_target_tensor[i][card_index + 1326] = cfvs[1][card_index];
     }
+    training_data_tensor[i][2704] = pot;
   }
 
-  torch::Tensor validation_data_tensor = torch::zeros({validation_samples, 2704});
+  torch::Tensor validation_data_tensor = torch::zeros({validation_samples, 2705});
   torch::Tensor validation_target_tensor = torch::zeros({validation_samples, 2652});
   for (int i = 0; i < validation_samples; i++) {
     std::vector<int> board_cards = ReadBoardCards(read_file);
     std::array<std::vector<double>, 2> ranges = ReadRanges(read_file);
     std::vector<int> action_sequence = ReadActions(read_file);
+    int pot = GetPotFromActions(action_sequence);
     std::array<std::vector<double>, 2> cfvs = ReadCFVs(read_file);
 
     training_data_tensor[i][board_cards[4]] = 1;
@@ -1252,7 +1330,11 @@ void NetworkTraining(const std::string &file_name,
       validation_target_tensor[i][card_index] = cfvs[0][card_index];
       validation_target_tensor[i][card_index + 1326] = cfvs[1][card_index];
     }
+    validation_data_tensor[i][2704] = pot;
   }
+
+  std::ofstream oss;
+  oss.open("subgame1_loss");
 
   auto optimizer = std::make_shared<torch::optim::Adam>(net->parameters(), torch::optim::AdamOptions(1e-3));
   int batches = training_samples / batch_size;
@@ -1260,12 +1342,14 @@ void NetworkTraining(const std::string &file_name,
   std::cout << "Initial:   ";
 
   torch::Tensor init_train_output = net->forward(training_data_tensor);
-  torch::Tensor init_train_loss = torch::mse_loss(init_train_output, training_target_tensor);
+  torch::Tensor init_train_loss = torch::nn::functional::smooth_l1_loss(init_train_output, training_target_tensor);
   std::cout << "Training loss: " << init_train_loss.item().to<double>() << "   ";
 
   torch::Tensor init_output = net->forward(validation_data_tensor);
-  torch::Tensor init_loss = torch::mse_loss(init_output, validation_target_tensor);
+  torch::Tensor init_loss = torch::nn::functional::smooth_l1_loss(init_output, validation_target_tensor);
   std::cout << "Validation loss: " << init_loss.item().to<double>() << "\n";
+
+  oss << init_train_loss.item().to<double>() << " " << init_loss.item().to<double>() << "\n";
 
   for (int epoch = 0; epoch < epochs; epoch++) {
     std::cout << "Epoch " << epoch << ":   ";
@@ -1275,16 +1359,20 @@ void NetworkTraining(const std::string &file_name,
       int i_e = (batch + 1) * batch_size - 1;
       optimizer->zero_grad();
       torch::Tensor output = net->forward(training_data_tensor[i_s, i_e]);
-      torch::Tensor loss = torch::mse_loss(output, training_target_tensor[i_s, i_e]);
+      torch::Tensor loss = torch::nn::functional::smooth_l1_loss(output, training_target_tensor[i_s, i_e]);
       loss.backward();
       optimizer->step();
       cumulative_loss += loss.item().to<double>();
-      std::cout << "." << std::flush;
+//      std::cout << "." << std::flush;
+      if (epoch % 10 == 0) {
+        torch::save(net, "models/subgame1_epoch_" + std::to_string(epoch));
+      }
     }
     std::cout << "\nTraining loss: " << cumulative_loss / batches << "   ";
     torch::Tensor output = net->forward(validation_data_tensor);
-    torch::Tensor loss = torch::mse_loss(output, validation_target_tensor);
+    torch::Tensor loss = torch::nn::functional::smooth_l1_loss(output, validation_target_tensor);
     std::cout << "Validation loss: " << loss.item().to<double>() << "\n";
+    oss << cumulative_loss / batches << " " << loss.item().to<double>() << "\n";
   }
 }
 
