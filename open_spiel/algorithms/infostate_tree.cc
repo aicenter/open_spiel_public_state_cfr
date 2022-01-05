@@ -360,7 +360,7 @@ void InfostateTree::BuildTerminalPokerNodes(
 void InfostateTree::BuildDecisionPokerNodes(
     const std::vector<InfostateNode *> &parents, size_t depth, const State &state,
     const std::vector<double> &chance_reach_probs, const PokerData &poker_data, int round) {
-  const bool is_leaf_node = state.MoveNumber() >= move_limit_;
+  const bool is_leaf_node = round >= move_limit_;
   std::pair<std::string, std::string>
       parts = ExtractInfostateString(infostate_observer_->StringFrom(state, acting_player_));
 
