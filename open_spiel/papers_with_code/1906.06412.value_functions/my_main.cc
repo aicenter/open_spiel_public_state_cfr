@@ -1524,7 +1524,7 @@ void ConvertRangesFromDescendingSuitToAscendingSuit() {
 }
 
 int main(int argc, char **argv) {
-  open_spiel::papers_with_code::SolvePokerSubgames("test_file_0", "solved_file_0", 1, 1);
+//  open_spiel::papers_with_code::SolvePokerSubgames("test_file_0", "solved_file_0", 1, 1);
 
 //  open_spiel::papers_with_code::TestGeneralPokerEvaluator();
 
@@ -1535,33 +1535,33 @@ int main(int argc, char **argv) {
 //  int batch_size = std::atoi(argv[5]);
 //  open_spiel::papers_with_code::NetworkTraining(
 //      file_template, training_samples, validation_samples, epochs, batch_size);
-//  if (argc > 2) {
-//    int iterations = 1000;
-//    int situations = 1;
-//    int machines = 1;
-//    // Linear evaluator infostate CFR
-//    if (std::strcmp(argv[1], "-gen") == 0) {
-//      std::string file_in = argv[2];
-//      std::vector<int> board_cards = {23, 28, 30, 32};
-//      std::vector<int> action_sequence = {1, 1, 2, 2, 1};
-//      std::array<std::vector<double>, 2> ranges = GetReachesFromVector(SUBGAME_ONE_RANGES);
-//      std::random_device rd;
-//      std::mt19937 mt(rd());
-//      for (int i = 0; i < machines; i++) {
-//        open_spiel::papers_with_code::GenerateAndSaveRiverSubgamesFromTurnSubgame(
-//            situations / machines, file_in + std::to_string(i), mt, board_cards, action_sequence, ranges);
-//      }
-//    }
-//
-//    if (std::strcmp(argv[1], "-sol") == 0) {
-//      std::string file_in = argv[2];
-//      std::string file_out = argv[3];
-//      open_spiel::papers_with_code::SolvePokerSubgames(file_in, file_out, situations / machines, iterations);
-//    }
-//  } else {
-//    std::cout
-//        << "Please specify the experiment to run. -gen + filename to generate data and -sol + file_in + file_out to solve the situations";
-//  }
+  if (argc > 2) {
+    int iterations = 1000;
+    int situations = 100000;
+    int machines = 25;
+    // Linear evaluator infostate CFR
+    if (std::strcmp(argv[1], "-gen") == 0) {
+      std::string file_in = argv[2];
+      std::vector<int> board_cards = {23, 28, 30, 32};
+      std::vector<int> action_sequence = {1, 1, 2, 2, 1};
+      std::array<std::vector<double>, 2> ranges = GetReachesFromVector(SUBGAME_ONE_RANGES);
+      std::random_device rd;
+      std::mt19937 mt(rd());
+      for (int i = 0; i < machines; i++) {
+        open_spiel::papers_with_code::GenerateAndSaveRiverSubgamesFromTurnSubgame(
+            situations / machines, file_in + std::to_string(i), mt, board_cards, action_sequence, ranges);
+      }
+    }
+
+    if (std::strcmp(argv[1], "-sol") == 0) {
+      std::string file_in = argv[2];
+      std::string file_out = argv[3];
+      open_spiel::papers_with_code::SolvePokerSubgames(file_in, file_out, situations / machines, iterations);
+    }
+  } else {
+    std::cout
+        << "Please specify the experiment to run. -gen + filename to generate data and -sol + file_in + file_out to solve the situations";
+  }
 //  if (argc > 2) {
 //    int iterations = 1000;
 //    int situations = 100000;
