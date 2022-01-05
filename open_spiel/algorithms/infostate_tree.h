@@ -608,10 +608,10 @@ class InfostateTree final {
                 const std::vector<double> &chance_reach_probs,
                 const std::shared_ptr<Observer> &infostate_observer,
                 Player acting_player,
-                int max_move_ahead_limit,
+                int round_limit,
                 int storage_policy)
       : InfostateTree(start_state, chance_reach_probs, infostate_observer,
-                      acting_player, max_move_ahead_limit, storage_policy,
+                      acting_player, round_limit, storage_policy,
                       {}, kInvalidPlayer) {}
 
   InfostateTree(
@@ -619,7 +619,7 @@ class InfostateTree final {
       const std::vector<double> &chance_reach_probs,
       std::shared_ptr<Observer> infostate_observer,
       Player acting_player,
-      int max_move_ahead_limit,
+      int round_limit,
       int storage_policy,
       const std::unordered_map<std::string, double> &cf_value_constraints,
       int ft_player)
@@ -635,13 +635,13 @@ class InfostateTree final {
     SPIEL_CHECK_LT(acting_player_, start_state->GetGame()->NumPlayers());
     SPIEL_CHECK_TRUE(infostate_observer_->HasString());
 
-    move_limit_ = start_state->MoveNumber() + max_move_ahead_limit;
+    move_limit_ = round_limit;
 
     PokerData poker_data = PokerData(*start_state);
 
     RecursivelyBuildPokerTree(
         std::vector<InfostateNode *>(poker_data.num_hands_, root_.get()), /*depth=*/1,
-        *start_state, chance_reach_probs, poker_data);
+        *start_state, chance_reach_probs, poker_data, 0);
 
     // Operations to make after building the tree.
     RebalanceTree();
@@ -735,19 +735,19 @@ class InfostateTree final {
   // Build tree specifically for poker
   void RecursivelyBuildPokerTree(
       const std::vector<InfostateNode *> &parents, size_t depth, const State &state,
-      const std::vector<double> &chance_reach_probs, const PokerData& poker_data);
+      const std::vector<double> &chance_reach_probs, const PokerData& poker_data, int round);
 
   void BuildTerminalPokerNodes(
       const std::vector<InfostateNode *> &parents, size_t depth, const State &state,
-      const std::vector<double> &chance_reach_probs, const PokerData &poker_data);
+      const std::vector<double> &chance_reach_probs, const PokerData &poker_data, int round);
 
   void BuildDecisionPokerNodes(
       const std::vector<InfostateNode *> &parents, size_t depth, const State &state,
-      const std::vector<double> &chance_reach_probs, const PokerData &poker_data);
+      const std::vector<double> &chance_reach_probs, const PokerData &poker_data, int round);
 
   void BuildObservationPokerNode(
       const std::vector<InfostateNode *> &parents, size_t depth, const State &state,
-      const std::vector<double> &chance_reach_probs, const PokerData &poker_data);
+      const std::vector<double> &chance_reach_probs, const PokerData &poker_data, int round);
 
   void CollectNodesAtDepth(InfostateNode *node, size_t depth);
   void LabelNodesWithIds();
