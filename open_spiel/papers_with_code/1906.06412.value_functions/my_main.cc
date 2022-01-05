@@ -1141,8 +1141,11 @@ std::array<std::vector<double>, 2> SolveLimitPokerSituationFromInputs(const std:
 
   auto out = std::make_shared<Subgame>(game, public_observer, trees);
 
+  out->initial_state().beliefs = ranges;
+
   std::shared_ptr<const PublicStateEvaluator>
       terminal_evaluator = std::make_shared<const PokerTerminalEvaluatorLinear>(poker_data, board_cards);
+
 
   SubgameSolver solver = SubgameSolver(out, nullptr, terminal_evaluator,
                                        std::make_shared<std::mt19937>(0), "RegretMatchingPlus");
@@ -1376,7 +1379,7 @@ void NetworkTraining(const std::string &file_name,
   }
 }
 
-void TestNetEvaluator() {
+std::pair<int, int> TestNetEvaluator(int iterations) {
   std::vector<int> board_cards = {5, 8, 10, 12, 15};
   std::vector<int> action_sequence = {1, 1, 1, 2, 1, 1, 1, 1, 1};
   std::string name = "universal_poker(betting=limit,numPlayers=2,numRounds=4,blind=10 5,"
@@ -1422,16 +1425,43 @@ void TestNetEvaluator() {
   // Deal board card (Turn)
   state->ApplyAction(board_cards[3]);
 
-  // Turn betting
-  while (state->IsPlayerNode()) {
-    state->ApplyAction(action_sequence[action_index]);
-    action_index++;
-  }
+  auto start = std::chrono::high_resolution_clock::now();
 
-  // Deal board card (River)
-  state->ApplyAction(board_cards[4]);
+  std::shared_ptr<Observer> infostate_observer = game->MakeObserver(kInfoStateObsType, {});
+  std::shared_ptr<Observer> public_observer = game->MakeObserver(kPublicStateObsType, {});
 
-  const auto &poker_state = open_spiel::down_cast<const universal_poker::UniversalPokerState &>(*state);
+  algorithms::PokerData poker_data = algorithms::PokerData(*state);
+
+  std::vector<double> chance_reaches(1326, 1. / 1326);
+
+  UpdateChanceReaches(chance_reaches, poker_data, board_cards);
+
+  std::vector<std::shared_ptr<algorithms::InfostateTree>> trees =
+      algorithms::MakePokerInfostateTrees(state, chance_reaches, infostate_observer, 1, kDlCfrInfostateTreeStorage);
+
+  auto out = std::make_shared<Subgame>(game, public_observer, trees);
+
+  std::shared_ptr<const PublicStateEvaluator>
+      terminal_evaluator = std::make_shared<const GeneralPokerTerminalEvaluatorLinear>();
+
+  std::shared_ptr<const PublicStateEvaluator>
+      leaf_evaluator = std::make_shared<const RiverNetworkLeafEvaluator>("subgame1_epoch_70");
+
+  SubgameSolver solver = SubgameSolver(out, leaf_evaluator, terminal_evaluator,
+                                       std::make_shared<std::mt19937>(0), "RegretMatchingPlus");
+
+  auto end = std::chrono::high_resolution_clock::now();
+  auto setup_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+  start = std::chrono::high_resolution_clock::now();
+  solver.RunSimultaneousIterations(iterations);
+  end = std::chrono::high_resolution_clock::now();
+  auto run_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+  return std::pair<int, int>(setup_duration.count(), run_duration.count());
+}
+
+void ComputeTrunkStrategyOfTurnSubgame(std::vector<int> board_cards,
+                                       std::vector<int> action_sequence,
+                                       std::array<std::vector<double>, 2> ranges) {
 
 }
 
@@ -1494,6 +1524,8 @@ void ConvertRangesFromDescendingSuitToAscendingSuit() {
 }
 
 int main(int argc, char **argv) {
+  open_spiel::papers_with_code::SolvePokerSubgames("test_file_0", "solved_file_0", 1, 1);
+
 //  open_spiel::papers_with_code::TestGeneralPokerEvaluator();
 
 //  std::string file_template = argv[1];
@@ -1629,5 +1661,7 @@ int main(int argc, char **argv) {
 
 //  open_spiel::papers_with_code::SmallUniversalPokerTrunkTest();
 //  open_spiel::papers_with_code::TestSameInfostates();
-  open_spiel::papers_with_code::MeasureTime(1, 10, open_spiel::papers_with_code::UniversalPokerTurnTest);
+//  open_spiel::papers_with_code::MeasureTime(1, 10, open_spiel::papers_with_code::UniversalPokerTurnTest);
+//    open_spiel::papers_with_code::MeasureTime(1,10,open_spiel::papers_with_code::TestNetEvaluator);
+//  open_spiel::papers_with_code::TestNetEvaluator(10);
 }
