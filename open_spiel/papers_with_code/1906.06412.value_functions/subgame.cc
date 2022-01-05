@@ -385,6 +385,208 @@ bool CompatibleHands(const std::vector<int> &hand_one, const std::vector<int> &h
       hand_one[1] != hand_two[0] and hand_one[1] != hand_two[1];
 }
 
+std::unique_ptr<PublicStateContext> GeneralPokerTerminalEvaluatorLinear::CreateContext(
+    const PublicState &state) const {
+  return std::make_unique<GeneralPokerTerminalPublicStateContext>(state);
+}
+
+// River network evaluator
+RiverNetworkPublicStateContext::RiverNetworkPublicStateContext(const PublicState &state) {
+  const auto &poker_state =
+      open_spiel::down_cast<const universal_poker::UniversalPokerState &>(*state.nodes[0][0]->corresponding_states()[0]);
+  data_tensor[0][2704] = poker_state.GetCurrentPot();
+  data_tensor[0][poker_state.History().back()] = 1;
+  std::cout << poker_state.InformationStateString(0);
+  std::cout << data_tensor << "\n";
+}
+
+std::unique_ptr<PublicStateContext> RiverNetworkLeafEvaluator::CreateContext(const PublicState &state) const {
+  return std::make_unique<RiverNetworkPublicStateContext>(state);
+}
+
+RiverNetworkLeafEvaluator::RiverNetworkLeafEvaluator(const std::string &network_file) {
+  torch::load(net, network_file);
+}
+
+void RiverNetworkLeafEvaluator::EvaluatePublicState(PublicState *state, PublicStateContext *context) const {
+  auto *net_context = open_spiel::down_cast<RiverNetworkPublicStateContext *>(context);
+  for (int belief_index = 0; belief_index < state->beliefs[0].size(); belief_index++) {
+    net_context->data_tensor[52 + belief_index] = state->beliefs[0][belief_index];
+    net_context->data_tensor[1326 + 52 + belief_index] = state->beliefs[0][belief_index];
+  }
+}
+
+// General poker evaluator
+GeneralPokerTerminalPublicStateContext::GeneralPokerTerminalPublicStateContext(const PublicState &state)
+    : poker_data_(*state.nodes[0][0]->corresponding_states()[0]) {
+  const auto &poker_state =
+      open_spiel::down_cast<const universal_poker::UniversalPokerState &>(*state.nodes[0][0]->corresponding_states()[0]);
+
+  std::vector<int> board_cards;
+  for (int card : poker_state.BoardCards().ToCardArray()) {
+    board_cards.push_back(card);
+  }
+
+  SPIEL_CHECK_TRUE(state.IsTerminal());
+  auto &leaf_nodes = state.nodes;
+  SPIEL_CHECK_EQ(leaf_nodes[0].size(), leaf_nodes[1].size());
+
+  fold_state_ = (state.nodes[0][0]->corresponding_states()[0]->History().back() == universal_poker::kFold);
+
+  const int num_terminals = leaf_nodes[0].size();
+  utilities_.reserve(num_terminals);
+
+  for (int i = 0; i < num_terminals; ++i) {
+    const algorithms::InfostateNode *leaf = leaf_nodes[0][i];
+    const double v = leaf->terminal_utility();
+    const double chn = leaf->terminal_chance_reach_prob();
+    utilities_.push_back(v * chn);
+  }
+
+  belief_size_ = ((poker_data_.num_cards_ - 7) * (poker_data_.num_cards_ - 8)) / 2;
+  std::vector<int> full_cards = board_cards;
+  full_cards.insert(full_cards.begin(), 1);
+  full_cards.insert(full_cards.begin(), 0);
+  std::vector<int> hand_strength;
+  hand_strength.reserve(poker_data_.num_hands_);
+  // Compute strengths and mapping from cards to possible hands
+  int hand_index = 0;
+  for (int card = 0; card < poker_data_.num_cards_; card++) {
+    card_to_possible_hands_[card] = {};
+  }
+  for (int card_one = 0; card_one < poker_data_.num_cards_ - 1; card_one++) {
+    full_cards[0] = ConvertToFullPokerCard(card_one, poker_data_);
+    for (int card_two = card_one + 1; card_two < poker_data_.num_cards_; card_two++) {
+      full_cards[1] = ConvertToFullPokerCard(card_two, poker_data_);
+      if (std::find(board_cards.begin(), board_cards.end(), full_cards[0]) != board_cards.end() or
+          std::find(board_cards.begin(), board_cards.end(), full_cards[1]) != board_cards.end()) {
+        hand_strength.push_back(-1);
+      } else {
+        universal_poker::logic::CardSet cards = universal_poker::logic::CardSet(full_cards);
+        hand_strength.push_back(cards.RankCards());
+        card_to_possible_hands_[card_one].push_back(hand_index);
+        card_to_possible_hands_[card_two].push_back(hand_index);
+      }
+      hand_index++;
+    }
+  }
+  // Sort cards by strength
+  std::vector<size_t> idx(hand_strength.size());
+  iota(idx.begin(), idx.end(), 0);
+  std::stable_sort(idx.begin(), idx.end(),
+                   [&hand_strength](size_t i1, size_t i2) { return hand_strength[i1] < hand_strength[i2]; });
+  std::vector<std::vector<int>> sorted_with_ties;
+  int current_hand_strength = -1;
+  for (int strength_hand_index : idx) {
+    if (hand_strength[strength_hand_index] == -1) {
+      continue;
+    }
+    if (hand_strength[strength_hand_index] > current_hand_strength) {
+      sorted_with_ties.push_back({strength_hand_index});
+      current_hand_strength = hand_strength[strength_hand_index];
+    } else {
+      sorted_with_ties.back().push_back(strength_hand_index);
+    }
+  }
+  hand_strengths_ = std::move(hand_strength);
+  ordered_hands_ = std::move(sorted_with_ties);
+}
+
+void GeneralPokerTerminalEvaluatorLinear::EvaluatePublicState(PublicState *state, PublicStateContext *context) const {
+  auto *general_poker_context = open_spiel::down_cast<GeneralPokerTerminalPublicStateContext *>(context);
+  SPIEL_CHECK_EQ(state->nodes[0].size(), state->nodes[1].size());
+  SPIEL_CHECK_EQ(state->nodes[0].size(), general_poker_context->poker_data_.num_hands_);
+  SPIEL_CHECK_EQ(state->beliefs[0].size(), state->beliefs[1].size());
+  if (general_poker_context->fold_state_) {
+    // Fold state
+    std::vector<double> beliefs(2, 0);
+    std::vector<std::vector<double>>
+        sub_beliefs(2, std::vector<double>(general_poker_context->hand_strengths_.size(), 0));
+    for (const std::vector<int> &hand_indexes : general_poker_context->ordered_hands_) {
+      for (int hand_index : hand_indexes) {
+        beliefs[0] += state->beliefs[0][hand_index];
+        beliefs[1] += state->beliefs[1][hand_index];
+        for (int card : general_poker_context->poker_data_.hand_to_cards_.at(hand_index)) {
+          for (int impossible_hand : general_poker_context->card_to_possible_hands_.at(card)) {
+            sub_beliefs[0][hand_index] += state->beliefs[0][impossible_hand];
+            sub_beliefs[1][hand_index] += state->beliefs[1][impossible_hand];
+          }
+        }
+        sub_beliefs[0][hand_index] -= state->beliefs[0][hand_index];
+        sub_beliefs[1][hand_index] -= state->beliefs[1][hand_index];
+      }
+    }
+    for (int hand_index = 0; hand_index < state->beliefs[0].size(); hand_index++) {
+      state->values[0][hand_index] =
+          general_poker_context->utilities_[hand_index] * (beliefs[1] - sub_beliefs[1][hand_index])
+              / general_poker_context->belief_size_;
+      state->values[1][hand_index] =
+          -general_poker_context->utilities_[hand_index] * (beliefs[0] - sub_beliefs[0][hand_index])
+              / general_poker_context->belief_size_;
+    }
+  } else {
+    // Showdown state
+    std::vector<double> beliefs(2, 0);
+    std::vector<double> current_beliefs(2, 0);
+    std::vector<double> full_belief(2, 0);
+    for (const std::vector<int> &hand_indexes : general_poker_context->ordered_hands_) {
+      for (int hand_index : hand_indexes) {
+        full_belief[0] += state->beliefs[0][hand_index];
+        full_belief[1] += state->beliefs[1][hand_index];
+      }
+    }
+    for (const std::vector<int> &hand_indexes : general_poker_context->ordered_hands_) {
+      // collect beliefs
+      current_beliefs[0] = current_beliefs[1] = 0;
+      // I win
+      std::vector<std::vector<double>> impossible_win_beliefs(2, std::vector<double>(hand_indexes.size(), 0));
+      // I lose
+      std::vector<std::vector<double>> impossible_loss_beliefs(2, std::vector<double>(hand_indexes.size(), 0));
+      int position_index = 0;
+      for (int hand_index : hand_indexes) {
+        current_beliefs[0] += state->beliefs[0][hand_index];
+        current_beliefs[1] += state->beliefs[1][hand_index];
+        for (int card : general_poker_context->poker_data_.hand_to_cards_.at(hand_index)) {
+          for (int impossible_hand : general_poker_context->card_to_possible_hands_.at(card)) {
+            if (general_poker_context->hand_strengths_[impossible_hand]
+                > general_poker_context->hand_strengths_[hand_index]) {
+              impossible_loss_beliefs[0][position_index] += state->beliefs[0][impossible_hand];
+              impossible_loss_beliefs[1][position_index] += state->beliefs[1][impossible_hand];
+            }
+            if (general_poker_context->hand_strengths_[impossible_hand]
+                < general_poker_context->hand_strengths_[hand_index]) {
+              impossible_win_beliefs[0][position_index] += state->beliefs[0][impossible_hand];
+              impossible_win_beliefs[1][position_index] += state->beliefs[1][impossible_hand];
+            }
+          }
+        }
+        position_index++;
+      }
+      // compute value
+      position_index = 0;
+      for (int hand_index : hand_indexes) {
+        state->values[0][hand_index] =
+            general_poker_context->utilities_[hand_index] / general_poker_context->belief_size_ *
+                (2 * beliefs[1] + current_beliefs[1] - full_belief[1]
+                    - impossible_win_beliefs[1][position_index] + impossible_loss_beliefs[1][position_index]);
+        state->values[1][hand_index] =
+            general_poker_context->utilities_[hand_index] / general_poker_context->belief_size_ *
+                (2 * beliefs[0] + current_beliefs[0] - full_belief[0]
+                    - impossible_win_beliefs[0][position_index] + impossible_loss_beliefs[0][position_index]);
+        position_index++;
+      }
+      beliefs[0] += current_beliefs[0];
+      beliefs[1] += current_beliefs[1];
+    }
+  }
+}
+
+std::unique_ptr<PublicStateContext> PokerTerminalEvaluatorQuadratic::CreateContext(
+    const PublicState &state) const {
+  return std::make_unique<PokerTerminalPublicStateContext>(state);
+}
+
+// River specific evaluators
 PokerTerminalPublicStateContext::PokerTerminalPublicStateContext(const PublicState &state) {
   SPIEL_CHECK_TRUE(state.IsTerminal());
   auto &leaf_nodes = state.nodes;
@@ -401,11 +603,6 @@ PokerTerminalPublicStateContext::PokerTerminalPublicStateContext(const PublicSta
     const double chn = leaf->terminal_chance_reach_prob();
     utilities_.push_back(v * chn);
   }
-}
-
-std::unique_ptr<PublicStateContext> PokerTerminalEvaluatorQuadratic::CreateContext(
-    const PublicState &state) const {
-  return std::make_unique<PokerTerminalPublicStateContext>(state);
 }
 
 PokerTerminalEvaluatorQuadratic::PokerTerminalEvaluatorQuadratic(

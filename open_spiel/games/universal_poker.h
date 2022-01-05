@@ -108,6 +108,24 @@ class UniversalPokerState : public State {
   int AllInSize() const;
   void ApplyChoiceAction(StateActionType action_type, int size);
 
+  logic::CardSet BoardCards() const {
+    logic::CardSet board_cards;
+    const int num_board_cards =
+        std::min(board_cards_dealt_,
+                 static_cast<int>(acpc_game_->GetTotalNbBoardCards()));
+    for (int i = 0; i < num_board_cards; ++i) {
+      board_cards.AddCard(acpc_state_.board_cards(i));
+    }
+    return board_cards;
+  }
+
+  int GetCurrentPot() const {
+    int pot = 0;
+    for (auto p = Player{0}; p < acpc_game_->GetNbPlayers(); p++) {
+      pot = pot + acpc_state_.Ante(p);
+    }
+    return pot;
+  }
  protected:
   void DoApplyAction(Action action_id) override;
 
@@ -155,17 +173,6 @@ class UniversalPokerState : public State {
       hole_cards.AddCard(acpc_state_.hole_cards(player, i));
     }
     return hole_cards;
-  }
-
-  logic::CardSet BoardCards() const {
-    logic::CardSet board_cards;
-    const int num_board_cards =
-        std::min(board_cards_dealt_,
-                 static_cast<int>(acpc_game_->GetTotalNbBoardCards()));
-    for (int i = 0; i < num_board_cards; ++i) {
-      board_cards.AddCard(acpc_state_.board_cards(i));
-    }
-    return board_cards;
   }
 
   const acpc_cpp::ACPCGame *acpc_game_;

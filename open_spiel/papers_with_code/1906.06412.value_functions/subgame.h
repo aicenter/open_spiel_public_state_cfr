@@ -29,6 +29,7 @@
 #include "open_spiel/spiel.h"
 #include "open_spiel/spiel_utils.h"
 #include "open_spiel/utils/data_structures.h"
+#include "turn_poker_net.h"
 
 // Depth-limited CFR is conceptually similar to what `infostate_cfr.h` does.
 // Additionally it saves structure of public states in the root and leaves
@@ -226,18 +227,54 @@ class PublicStateEvaluator {
  public:
   virtual ~PublicStateEvaluator() = default;
   virtual std::unique_ptr<PublicStateContext> CreateContext(
-      const PublicState& state) const { return nullptr; };
-  virtual void ResetContext(PublicStateContext* context) const {}
+      const PublicState &state) const { return nullptr; };
+  virtual void ResetContext(PublicStateContext *context) const {}
   virtual void EvaluatePublicState(
-      PublicState* public_state, PublicStateContext* context) const = 0;
+      PublicState *public_state, PublicStateContext *context) const = 0;
 };
 
-// Terminal evaluator for poker
+// River network evaluator
+struct RiverNetworkPublicStateContext final : public PublicStateContext {
+  torch::Tensor data_tensor = torch::zeros({1, 2705});
+  explicit RiverNetworkPublicStateContext(const PublicState &state);
+};
 
+class RiverNetworkLeafEvaluator final : public PublicStateEvaluator {
+ public:
+  RiverNetworkLeafEvaluator(const std::string& network_file);
+  std::unique_ptr<PublicStateContext> CreateContext(
+      const PublicState &state) const override;
+  void EvaluatePublicState(
+      PublicState *state, PublicStateContext *context) const override;
+ private:
+  std::shared_ptr<Net> net = std::make_shared<Net>();
+};
+
+// General poker terminal evaluator
+struct GeneralPokerTerminalPublicStateContext final : public PublicStateContext {
+  bool fold_state_;
+  std::vector<double> utilities_;
+  algorithms::PokerData poker_data_;
+  int belief_size_;
+  std::vector<std::vector<int>> ordered_hands_;
+  std::unordered_map<int, std::vector<int>> card_to_possible_hands_;
+  std::vector<int> hand_strengths_;
+  explicit GeneralPokerTerminalPublicStateContext(const PublicState &state);
+};
+
+class GeneralPokerTerminalEvaluatorLinear final : public PublicStateEvaluator {
+ public:
+  std::unique_ptr<PublicStateContext> CreateContext(
+      const PublicState &state) const override;
+  void EvaluatePublicState(
+      PublicState *state, PublicStateContext *context) const override;
+};
+
+// Terminal evaluator for poker for river subgame
 struct PokerTerminalPublicStateContext final : public PublicStateContext {
   bool fold_state_;
   std::vector<double> utilities_;
-  explicit PokerTerminalPublicStateContext(const PublicState& state);
+  explicit PokerTerminalPublicStateContext(const PublicState &state);
 };
 
 class PokerTerminalEvaluatorQuadratic final : public PublicStateEvaluator {
