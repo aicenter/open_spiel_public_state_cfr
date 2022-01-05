@@ -1135,6 +1135,11 @@ std::array<std::vector<double>, 2> SolveLimitPokerSituationFromInputs(const std:
   algorithms::PokerData poker_data = algorithms::PokerData(*state);
 
   UpdateChanceReaches(chance_reaches, poker_data, board_cards);
+  for (auto &chance_reach : chance_reaches) {
+    if (chance_reach > 0) {
+      chance_reach = 1;
+    }
+  }
 
   std::vector<std::shared_ptr<algorithms::InfostateTree>> trees =
       algorithms::MakePokerInfostateTrees(state, chance_reaches, infostate_observer, 1000, kDlCfrInfostateTreeStorage);
@@ -1379,7 +1384,7 @@ void NetworkTraining(const std::string &file_name,
   }
 }
 
-std::pair<int, int> TestNetEvaluator(int iterations) {
+std::pair<int, int> SaveNetTrunkStrategy(int iterations, int full_iterations) {
   std::vector<int> board_cards = {5, 8, 10, 12, 15};
   std::vector<int> action_sequence = {1, 1, 1, 2, 1, 1, 1, 1, 1};
   std::string name = "universal_poker(betting=limit,numPlayers=2,numRounds=4,blind=10 5,"
@@ -1450,12 +1455,42 @@ std::pair<int, int> TestNetEvaluator(int iterations) {
   SubgameSolver solver = SubgameSolver(out, leaf_evaluator, terminal_evaluator,
                                        std::make_shared<std::mt19937>(0), "RegretMatchingPlus");
 
+  // Create solver for full TURN
+  std::vector<std::shared_ptr<algorithms::InfostateTree>> full_trees =
+      algorithms::MakePokerInfostateTrees(state, chance_reaches, infostate_observer, 1000, kDlCfrInfostateTreeStorage);
+
+  auto full_out = std::make_shared<Subgame>(game, public_observer, full_trees);
+
+  SubgameSolver full_solver = SubgameSolver(full_out, nullptr, terminal_evaluator,
+                                            std::make_shared<std::mt19937>(0), "RegretMatchingPlus");
+
   auto end = std::chrono::high_resolution_clock::now();
   auto setup_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
   start = std::chrono::high_resolution_clock::now();
   solver.RunSimultaneousIterations(iterations);
   end = std::chrono::high_resolution_clock::now();
   auto run_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
+  auto strategy = solver.AveragePolicy();
+
+  int opponent = 1;
+  algorithms::BanditVector &opponent_bandits = full_solver.bandits()[opponent];
+  for (algorithms::DecisionId id : opponent_bandits.range()) {
+    algorithms::InfostateNode *node = full_solver.subgame()->trees[opponent]->decision_infostate(id);
+    std::string infostate = node->infostate_string();
+    auto poker_state =
+        open_spiel::down_cast<const universal_poker::UniversalPokerState &>(*node->corresponding_states()[0]);
+    if(poker_state.acpc_state().GetRound() == 3) {
+      continue;
+    }
+    ActionsAndProbs infostate_policy = strategy->GetStatePolicy(infostate);
+    std::vector<double> probs = GetProbs(infostate_policy);
+    auto fixable_bandit = std::make_unique<algorithms::bandits::FixableStrategy>(probs);
+    opponent_bandits[id] = std::move(fixable_bandit);
+  }
+  full_solver.RunSimultaneousIterations(full_iterations);
+  std::cout << full_solver.RootValues() << "\n";
+
   return std::pair<int, int>(setup_duration.count(), run_duration.count());
 }
 
@@ -1535,33 +1570,33 @@ int main(int argc, char **argv) {
 //  int batch_size = std::atoi(argv[5]);
 //  open_spiel::papers_with_code::NetworkTraining(
 //      file_template, training_samples, validation_samples, epochs, batch_size);
-  if (argc > 2) {
-    int iterations = 1000;
-    int situations = 100000;
-    int machines = 25;
-    // Linear evaluator infostate CFR
-    if (std::strcmp(argv[1], "-gen") == 0) {
-      std::string file_in = argv[2];
-      std::vector<int> board_cards = {23, 28, 30, 32};
-      std::vector<int> action_sequence = {1, 1, 2, 2, 1};
-      std::array<std::vector<double>, 2> ranges = GetReachesFromVector(SUBGAME_ONE_RANGES);
-      std::random_device rd;
-      std::mt19937 mt(rd());
-      for (int i = 0; i < machines; i++) {
-        open_spiel::papers_with_code::GenerateAndSaveRiverSubgamesFromTurnSubgame(
-            situations / machines, file_in + std::to_string(i), mt, board_cards, action_sequence, ranges);
-      }
-    }
-
-    if (std::strcmp(argv[1], "-sol") == 0) {
-      std::string file_in = argv[2];
-      std::string file_out = argv[3];
-      open_spiel::papers_with_code::SolvePokerSubgames(file_in, file_out, situations / machines, iterations);
-    }
-  } else {
-    std::cout
-        << "Please specify the experiment to run. -gen + filename to generate data and -sol + file_in + file_out to solve the situations";
-  }
+//  if (argc > 2) {
+//    int iterations = 1000;
+//    int situations = 1;
+//    int machines = 1;
+//    // Linear evaluator infostate CFR
+//    if (std::strcmp(argv[1], "-gen") == 0) {
+//      std::string file_in = argv[2];
+//      std::vector<int> board_cards = {23, 28, 30, 32};
+//      std::vector<int> action_sequence = {1, 1, 2, 2, 1};
+//      std::array<std::vector<double>, 2> ranges = GetReachesFromVector(SUBGAME_ONE_RANGES);
+//      std::random_device rd;
+//      std::mt19937 mt(rd());
+//      for (int i = 0; i < machines; i++) {
+//        open_spiel::papers_with_code::GenerateAndSaveRiverSubgamesFromTurnSubgame(
+//            situations / machines, file_in + std::to_string(i), mt, board_cards, action_sequence, ranges);
+//      }
+//    }
+//
+//    if (std::strcmp(argv[1], "-sol") == 0) {
+//      std::string file_in = argv[2];
+//      std::string file_out = argv[3];
+//      open_spiel::papers_with_code::SolvePokerSubgames(file_in, file_out, situations / machines, iterations);
+//    }
+//  } else {
+//    std::cout
+//        << "Please specify the experiment to run. -gen + filename to generate data and -sol + file_in + file_out to solve the situations";
+//  }
 //  if (argc > 2) {
 //    int iterations = 1000;
 //    int situations = 100000;
@@ -1663,5 +1698,7 @@ int main(int argc, char **argv) {
 //  open_spiel::papers_with_code::TestSameInfostates();
 //  open_spiel::papers_with_code::MeasureTime(1, 10, open_spiel::papers_with_code::UniversalPokerTurnTest);
 //    open_spiel::papers_with_code::MeasureTime(1,10,open_spiel::papers_with_code::TestNetEvaluator);
-//  open_spiel::papers_with_code::TestNetEvaluator(10);
+  int iterations = std::atoi(argv[1]);
+  int full_iterations = std::atoi(argv[2]);
+  open_spiel::papers_with_code::SaveNetTrunkStrategy(iterations, full_iterations);
 }
