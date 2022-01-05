@@ -3,7 +3,6 @@
 //
 
 #include "include_libs_ordered.h"
-#include "torch_utils.h"
 
 #ifndef OPEN_SPIEL_OPEN_SPIEL_PAPERS_WITH_CODE_TURNPOKERNET_H_
 #define OPEN_SPIEL_OPEN_SPIEL_PAPERS_WITH_CODE_TURNPOKERNET_H_
