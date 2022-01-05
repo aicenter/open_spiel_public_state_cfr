@@ -396,8 +396,6 @@ RiverNetworkPublicStateContext::RiverNetworkPublicStateContext(const PublicState
       open_spiel::down_cast<const universal_poker::UniversalPokerState &>(*state.nodes[0][0]->corresponding_states()[0]);
   data_tensor[0][2704] = poker_state.GetCurrentPot();
   data_tensor[0][poker_state.History().back()] = 1;
-  std::cout << poker_state.InformationStateString(0);
-  std::cout << data_tensor << "\n";
 }
 
 std::unique_ptr<PublicStateContext> RiverNetworkLeafEvaluator::CreateContext(const PublicState &state) const {
@@ -411,8 +409,13 @@ RiverNetworkLeafEvaluator::RiverNetworkLeafEvaluator(const std::string &network_
 void RiverNetworkLeafEvaluator::EvaluatePublicState(PublicState *state, PublicStateContext *context) const {
   auto *net_context = open_spiel::down_cast<RiverNetworkPublicStateContext *>(context);
   for (int belief_index = 0; belief_index < state->beliefs[0].size(); belief_index++) {
-    net_context->data_tensor[52 + belief_index] = state->beliefs[0][belief_index];
-    net_context->data_tensor[1326 + 52 + belief_index] = state->beliefs[0][belief_index];
+    net_context->data_tensor[0][52 + belief_index] = state->beliefs[0][belief_index];
+    net_context->data_tensor[0][1326 + 52 + belief_index] = state->beliefs[0][belief_index];
+  }
+  torch::Tensor output = net->forward(net_context->data_tensor);
+  for(int value_index = 0; value_index < state->values[0].size(); value_index++) {
+    state->values[0][value_index] = output[0][value_index].item<double>();
+    state->values[1][value_index] = output[0][value_index + 1326].item<double>();
   }
 }
 
