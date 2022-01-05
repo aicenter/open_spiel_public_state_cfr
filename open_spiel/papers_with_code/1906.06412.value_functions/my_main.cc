@@ -142,7 +142,7 @@ std::pair<int, int> UniversalPokerTurnTest(int iterations) {
   algorithms::PokerData poker_data = algorithms::PokerData(*state);
 
   std::shared_ptr<const PublicStateEvaluator>
-      terminal_evaluator = std::make_shared<const PokerTerminalEvaluatorQuadratic>(poker_data, cards);
+      terminal_evaluator = std::make_shared<const GeneralPokerTerminalEvaluatorLinear>();
 
   SubgameSolver solver = SubgameSolver(out, nullptr, terminal_evaluator,
                                        std::make_shared<std::mt19937>(0), "RegretMatchingPlus");
@@ -1376,6 +1376,65 @@ void NetworkTraining(const std::string &file_name,
   }
 }
 
+void TestNetEvaluator() {
+  std::vector<int> board_cards = {5, 8, 10, 12, 15};
+  std::vector<int> action_sequence = {1, 1, 1, 2, 1, 1, 1, 1, 1};
+  std::string name = "universal_poker(betting=limit,numPlayers=2,numRounds=4,blind=10 5,"
+                     "firstPlayer=2 1,numSuits=4,numRanks=13,numHoleCards=2,numBoardCards=0 3 "
+                     "1 1,raiseSize=10 10 20 20,maxRaises=3 4 4 4)";
+  std::shared_ptr<const Game> game = LoadGame(name);
+
+  std::unique_ptr<State> state = game->NewInitialState();
+
+  std::vector<int> initial_cards;
+  int card = 0;
+  while (initial_cards.size() < 4) {
+    if (std::find(board_cards.begin(), board_cards.end(), card) == board_cards.end()) {
+      initial_cards.push_back(card);
+    }
+    card++;
+  }
+
+  // Deal 4 cards
+  state->ApplyAction(initial_cards[0]);
+  state->ApplyAction(initial_cards[1]);
+  state->ApplyAction(initial_cards[2]);
+  state->ApplyAction(initial_cards[3]);
+
+  // Pre-flop betting
+  int action_index = 0;
+  while (state->IsPlayerNode()) {
+    state->ApplyAction(action_sequence[action_index]);
+    action_index++;
+  }
+
+  // Deal 3 board cards (Flop)
+  state->ApplyAction(board_cards[0]);
+  state->ApplyAction(board_cards[1]);
+  state->ApplyAction(board_cards[2]);
+
+  // Flop betting
+  while (state->IsPlayerNode()) {
+    state->ApplyAction(action_sequence[action_index]);
+    action_index++;
+  }
+
+  // Deal board card (Turn)
+  state->ApplyAction(board_cards[3]);
+
+  // Turn betting
+  while (state->IsPlayerNode()) {
+    state->ApplyAction(action_sequence[action_index]);
+    action_index++;
+  }
+
+  // Deal board card (River)
+  state->ApplyAction(board_cards[4]);
+
+  const auto &poker_state = open_spiel::down_cast<const universal_poker::UniversalPokerState &>(*state);
+
+}
+
 }
 }
 }
@@ -1435,13 +1494,15 @@ void ConvertRangesFromDescendingSuitToAscendingSuit() {
 }
 
 int main(int argc, char **argv) {
-  std::string file_template = argv[1];
-  int training_samples = std::atoi(argv[2]);
-  int validation_samples = std::atoi(argv[3]);
-  int epochs = std::atoi(argv[4]);
-  int batch_size = std::atoi(argv[5]);
-  open_spiel::papers_with_code::NetworkTraining(
-      file_template, training_samples, validation_samples, epochs, batch_size);
+//  open_spiel::papers_with_code::TestGeneralPokerEvaluator();
+
+//  std::string file_template = argv[1];
+//  int training_samples = std::atoi(argv[2]);
+//  int validation_samples = std::atoi(argv[3]);
+//  int epochs = std::atoi(argv[4]);
+//  int batch_size = std::atoi(argv[5]);
+//  open_spiel::papers_with_code::NetworkTraining(
+//      file_template, training_samples, validation_samples, epochs, batch_size);
 //  if (argc > 2) {
 //    int iterations = 1000;
 //    int situations = 1;
@@ -1568,4 +1629,5 @@ int main(int argc, char **argv) {
 
 //  open_spiel::papers_with_code::SmallUniversalPokerTrunkTest();
 //  open_spiel::papers_with_code::TestSameInfostates();
+  open_spiel::papers_with_code::MeasureTime(1, 10, open_spiel::papers_with_code::UniversalPokerTurnTest);
 }
