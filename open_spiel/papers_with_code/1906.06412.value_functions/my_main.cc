@@ -1384,6 +1384,13 @@ void NetworkTraining(const std::string &file_name,
   }
 }
 
+void Log(const std::string& text) {
+  std::ofstream logfile;
+  logfile.open ("log_file", std::ios_base::app);
+  logfile << text << "\n";
+  logfile.close();
+}
+
 std::pair<int, int> SaveNetTrunkStrategy(int iterations, int full_iterations, std::string net_file) {
   std::vector<int> board_cards = {5, 8, 10, 12, 15};
   std::vector<int> action_sequence = {1, 1, 1, 2, 1, 1, 1, 1, 1};
@@ -1455,7 +1462,8 @@ std::pair<int, int> SaveNetTrunkStrategy(int iterations, int full_iterations, st
   SubgameSolver solver = SubgameSolver(out, leaf_evaluator, terminal_evaluator,
                                        std::make_shared<std::mt19937>(0), "RegretMatchingPlus");
 
-  std::cout << "Created solver for network turn\n";
+
+  Log("Created solver for network turn");
 
   // Create solver for full TURN
   std::vector<std::shared_ptr<algorithms::InfostateTree>> full_trees =
@@ -1466,7 +1474,7 @@ std::pair<int, int> SaveNetTrunkStrategy(int iterations, int full_iterations, st
   SubgameSolver full_solver = SubgameSolver(full_out, nullptr, terminal_evaluator,
                                             std::make_shared<std::mt19937>(0), "RegretMatchingPlus");
 
-  std::cout << "Created solver for full turn\n";
+  Log("Created solver for full turn");
 
   auto end = std::chrono::high_resolution_clock::now();
   auto setup_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
@@ -1477,32 +1485,32 @@ std::pair<int, int> SaveNetTrunkStrategy(int iterations, int full_iterations, st
 
   auto strategy = solver.AveragePolicy();
 
-  std::cout << "Created trunk strategy\n";
+  Log("Created trunk strategy");
 
   int opponent = 1;
   algorithms::BanditVector &opponent_bandits = full_solver.bandits()[opponent];
-  std::cout << "I have opponent bandits\n";
+  Log("I have opponent bandits");
   for (algorithms::DecisionId id : opponent_bandits.range()) {
     algorithms::InfostateNode *node = full_solver.subgame()->trees[opponent]->decision_infostate(id);
-    std::cout << "I have the node\n";
+    Log("I have the node");
     std::string infostate = node->infostate_string();
-    std::cout << "I have infoset string\n";
+    Log("I have infoset string");
     auto poker_state =
         open_spiel::down_cast<const universal_poker::UniversalPokerState &>(*node->corresponding_states()[0]);
-    std::cout << "I have poker state\n";
+    Log("I have poker state");
     if(poker_state.acpc_state().GetRound() == 3) {
       continue;
     }
-    std::cout << "It is a poker state where I change the strategy\n";
+    Log("It is a poker state where I change the strategy");
     ActionsAndProbs infostate_policy = strategy->GetStatePolicy(infostate);
-    std::cout << "Getting policy\n";
+    Log("Getting policy");
     std::vector<double> probs = GetProbs(infostate_policy);
-    std::cout << "Creating fixable bandits\n";
+    Log("Creating fixable bandits");
     auto fixable_bandit = std::make_unique<algorithms::bandits::FixableStrategy>(probs);
-    std::cout << "Putting them to opponent bandits\n";
+    Log("Putting them to opponent bandits");
     opponent_bandits[id] = std::move(fixable_bandit);
   }
-  std::cout << "Strategy fixed - running iterations\n";
+  Log("Strategy fixed - running iterations");
   full_solver.RunSimultaneousIterations(full_iterations);
   std::cout << "Iterations done\n";
 
