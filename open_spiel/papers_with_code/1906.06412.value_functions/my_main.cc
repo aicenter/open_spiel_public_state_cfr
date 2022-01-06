@@ -1495,6 +1495,7 @@ std::pair<int, int> SaveNetTrunkStrategy(int iterations, int full_iterations, st
     Log("I have the node");
     std::string infostate = node->infostate_string();
     Log("I have infoset string");
+    Log(std::to_string(node->corresponding_states().size()));
     auto poker_state =
         open_spiel::down_cast<const universal_poker::UniversalPokerState &>(*node->corresponding_states()[0]);
     Log("I have poker state");
