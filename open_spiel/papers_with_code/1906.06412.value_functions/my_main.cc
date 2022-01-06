@@ -1455,6 +1455,8 @@ std::pair<int, int> SaveNetTrunkStrategy(int iterations, int full_iterations, st
   SubgameSolver solver = SubgameSolver(out, leaf_evaluator, terminal_evaluator,
                                        std::make_shared<std::mt19937>(0), "RegretMatchingPlus");
 
+  std::cout << "Created solver for network turn\n";
+
   // Create solver for full TURN
   std::vector<std::shared_ptr<algorithms::InfostateTree>> full_trees =
       algorithms::MakePokerInfostateTrees(state, chance_reaches, infostate_observer, 1000, kDlCfrInfostateTreeStorage);
@@ -1463,6 +1465,8 @@ std::pair<int, int> SaveNetTrunkStrategy(int iterations, int full_iterations, st
 
   SubgameSolver full_solver = SubgameSolver(full_out, nullptr, terminal_evaluator,
                                             std::make_shared<std::mt19937>(0), "RegretMatchingPlus");
+
+  std::cout << "Created solver for full turn\n";
 
   auto end = std::chrono::high_resolution_clock::now();
   auto setup_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
@@ -1473,22 +1477,35 @@ std::pair<int, int> SaveNetTrunkStrategy(int iterations, int full_iterations, st
 
   auto strategy = solver.AveragePolicy();
 
+  std::cout << "Created trunk strategy\n";
+
   int opponent = 1;
   algorithms::BanditVector &opponent_bandits = full_solver.bandits()[opponent];
+  std::cout << "I have opponent bandits\n";
   for (algorithms::DecisionId id : opponent_bandits.range()) {
     algorithms::InfostateNode *node = full_solver.subgame()->trees[opponent]->decision_infostate(id);
+    std::cout << "I have the node\n";
     std::string infostate = node->infostate_string();
+    std::cout << "I have infoset string\n";
     auto poker_state =
         open_spiel::down_cast<const universal_poker::UniversalPokerState &>(*node->corresponding_states()[0]);
+    std::cout << "I have poker state\n";
     if(poker_state.acpc_state().GetRound() == 3) {
       continue;
     }
+    std::cout << "It is a poker state where I change the strategy\n";
     ActionsAndProbs infostate_policy = strategy->GetStatePolicy(infostate);
+    std::cout << "Getting policy\n";
     std::vector<double> probs = GetProbs(infostate_policy);
+    std::cout << "Creating fixable bandits\n";
     auto fixable_bandit = std::make_unique<algorithms::bandits::FixableStrategy>(probs);
+    std::cout << "Putting them to opponent bandits\n";
     opponent_bandits[id] = std::move(fixable_bandit);
   }
+  std::cout << "Strategy fixed - running iterations\n";
   full_solver.RunSimultaneousIterations(full_iterations);
+  std::cout << "Iterations done\n";
+
   std::cout << full_solver.RootValues() << "\n";
 
   return std::pair<int, int>(setup_duration.count(), run_duration.count());
