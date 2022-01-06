@@ -15,7 +15,6 @@
 #ifndef OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_SUBGAME_
 #define OPEN_SPIEL_PAPERS_WITH_CODE_VALUE_FUNCTIONS_SUBGAME_
 
-#include <map>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -241,7 +240,7 @@ struct RiverNetworkPublicStateContext final : public PublicStateContext {
 
 class RiverNetworkLeafEvaluator final : public PublicStateEvaluator {
  public:
-  RiverNetworkLeafEvaluator(const std::string& network_file);
+  RiverNetworkLeafEvaluator(const std::string &network_file);
   std::unique_ptr<PublicStateContext> CreateContext(
       const PublicState &state) const override;
   void EvaluatePublicState(
@@ -251,23 +250,31 @@ class RiverNetworkLeafEvaluator final : public PublicStateEvaluator {
 };
 
 // General poker terminal evaluator
-struct GeneralPokerTerminalPublicStateContext final : public PublicStateContext {
-  bool fold_state_;
-  std::vector<double> utilities_;
+struct GeneralPokerTerminalFullBoardCardsContext {
   algorithms::PokerData poker_data_;
   int belief_size_;
   std::vector<std::vector<int>> ordered_hands_;
   std::unordered_map<int, std::vector<int>> card_to_possible_hands_;
   std::vector<int> hand_strengths_;
+  explicit GeneralPokerTerminalFullBoardCardsContext(const PublicState &state);
+};
+
+struct GeneralPokerTerminalPublicStateContext final : public PublicStateContext {
+  bool fold_state_;
+  std::vector<double> utilities_;
+  std::string board_cards_string_;
   explicit GeneralPokerTerminalPublicStateContext(const PublicState &state);
 };
 
-class GeneralPokerTerminalEvaluatorLinear final : public PublicStateEvaluator {
+class GeneralPokerTerminalEvaluatorLinear : public PublicStateEvaluator {
  public:
   std::unique_ptr<PublicStateContext> CreateContext(
       const PublicState &state) const override;
   void EvaluatePublicState(
       PublicState *state, PublicStateContext *context) const override;
+ private:
+  std::shared_ptr<std::unordered_map<std::string, std::shared_ptr<GeneralPokerTerminalFullBoardCardsContext>>>
+      contexts = std::make_shared<std::unordered_map<std::string, std::shared_ptr<GeneralPokerTerminalFullBoardCardsContext>>>();
 };
 
 // Terminal evaluator for poker for river subgame
