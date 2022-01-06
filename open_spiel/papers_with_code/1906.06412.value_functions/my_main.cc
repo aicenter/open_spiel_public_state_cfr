@@ -1384,7 +1384,7 @@ void NetworkTraining(const std::string &file_name,
   }
 }
 
-std::pair<int, int> SaveNetTrunkStrategy(int iterations, int full_iterations) {
+std::pair<int, int> SaveNetTrunkStrategy(int iterations, int full_iterations, std::string net_file) {
   std::vector<int> board_cards = {5, 8, 10, 12, 15};
   std::vector<int> action_sequence = {1, 1, 1, 2, 1, 1, 1, 1, 1};
   std::string name = "universal_poker(betting=limit,numPlayers=2,numRounds=4,blind=10 5,"
@@ -1450,7 +1450,7 @@ std::pair<int, int> SaveNetTrunkStrategy(int iterations, int full_iterations) {
       terminal_evaluator = std::make_shared<const GeneralPokerTerminalEvaluatorLinear>();
 
   std::shared_ptr<const PublicStateEvaluator>
-      leaf_evaluator = std::make_shared<const RiverNetworkLeafEvaluator>("subgame1_epoch_70");
+      leaf_evaluator = std::make_shared<const RiverNetworkLeafEvaluator>(net_file);
 
   SubgameSolver solver = SubgameSolver(out, leaf_evaluator, terminal_evaluator,
                                        std::make_shared<std::mt19937>(0), "RegretMatchingPlus");
@@ -1700,5 +1700,6 @@ int main(int argc, char **argv) {
 //    open_spiel::papers_with_code::MeasureTime(1,10,open_spiel::papers_with_code::TestNetEvaluator);
   int iterations = std::atoi(argv[1]);
   int full_iterations = std::atoi(argv[2]);
-  open_spiel::papers_with_code::SaveNetTrunkStrategy(iterations, full_iterations);
+  std::string net_file = argv[3];
+  open_spiel::papers_with_code::SaveNetTrunkStrategy(iterations, full_iterations, net_file);
 }
