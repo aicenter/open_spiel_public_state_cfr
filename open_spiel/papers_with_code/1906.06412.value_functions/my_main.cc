@@ -22,9 +22,126 @@
 
 #include <iostream>
 
+
+std::array<std::vector<double>, 2> GetReachesFromVector(const std::vector<double> &range_vector) {
+  std::array<std::vector<double>, 2> ranges = {std::vector<double>(1326, 0.), std::vector<double>(1326, 0.)};
+
+  for (int player = 0; player < 2; player++) {
+    for (int i = 0; i < 1326; i++) {
+      ranges[player][i] = range_vector[i + player * 1326];
+    }
+  }
+  return ranges;
+}
+
+void ConvertRangesFromDescendingSuitToAscendingSuit() {
+  std::string ranks = "23456789TJQKA";
+  std::string suits_des = "shdc";
+  std::string suits_asc = "cdhs";
+  std::vector<std::string> cards_asc(52);
+  std::vector<std::string> cards_des(52);
+  int card_index = 0;
+  for (int card_rank = 0; card_rank < 13; card_rank++) {
+    for (int card_suit = 0; card_suit < 4; card_suit++) {
+      cards_asc[card_index] = ranks.substr(card_rank, 1) + suits_asc.substr(card_suit, 1);
+      cards_des[card_index] = ranks.substr(card_rank, 1) + suits_des.substr(card_suit, 1);
+      card_index++;
+    }
+  }
+  std::unordered_map<std::string, int> hands_to_index_asc;
+  std::vector<std::string> index_to_hand_des(1326);
+  int hand_index = 0;
+  for (int card_one = 0; card_one < 51; card_one++) {
+    for (int card_two = card_one + 1; card_two < 52; card_two++) {
+      if (card_one / 4 == card_two / 4) {
+        index_to_hand_des[hand_index] = cards_des[card_two] + cards_des[card_one];
+      } else {
+        index_to_hand_des[hand_index] = cards_des[card_one] + cards_des[card_two];
+      }
+      hands_to_index_asc[cards_asc[card_one] + cards_asc[card_two]] = hand_index;
+      hand_index++;
+    }
+  }
+  std::cout << index_to_hand_des << "\n";
+  std::vector<double> transformed_ranges(2652, -1);
+  std::stringstream range_stream(SUBGAME_TWO_STRING);
+  for (int i = 0; i < 1326; i++) {
+    range_stream >> transformed_ranges[hands_to_index_asc[index_to_hand_des[i]]];
+  }
+  for (int i = 0; i < 1326; i++) {
+    range_stream >> transformed_ranges[hands_to_index_asc[index_to_hand_des[i]] + 1326];
+  }
+  std::cout << std::setprecision(16);
+  for (float f : transformed_ranges) {
+    std::cout << f << ", ";
+  }
+}
+
 namespace open_spiel {
 namespace papers_with_code {
 namespace {
+
+std::unique_ptr<State> GetPokerStatesAfterMoves(const std::shared_ptr<const Game> &game,
+                                                std::vector<int> board_cards,
+                                                std::vector<int> action_sequence) {
+  std::unique_ptr<State> state = game->NewInitialState();
+
+  std::vector<int> initial_cards;
+  int card = 0;
+  while (initial_cards.size() < 4) {
+    if (std::find(board_cards.begin(), board_cards.end(), card) == board_cards.end()) {
+      initial_cards.push_back(card);
+    }
+    card++;
+  }
+
+  // Deal Initial cards
+  state->ApplyAction(initial_cards[0]);
+  state->ApplyAction(initial_cards[1]);
+  state->ApplyAction(initial_cards[2]);
+  state->ApplyAction(initial_cards[3]);
+
+  // First round
+  int action_index = 0;
+  while (state->IsPlayerNode()) {
+    if (action_sequence.size() == action_index) {
+      return state;
+    }
+    state->ApplyAction(action_sequence[action_index]);
+    action_index++;
+  }
+
+  // Deal 3 board cards (Flop)
+  if (board_cards.empty()) {
+    return state;
+  }
+  state->ApplyAction(board_cards[0]);
+  if (board_cards.size() == 1) {
+    return state;
+  }
+  state->ApplyAction(board_cards[1]);
+  if (board_cards.size() == 2) {
+    return state;
+  }
+  state->ApplyAction(board_cards[2]);
+
+  // Other rounds
+  int board_card_index = 3;
+  while (true) {
+    while (state->IsPlayerNode()) {
+      if (action_sequence.size() == action_index) {
+        return state;
+      }
+      state->ApplyAction(action_sequence[action_index]);
+      action_index++;
+    }
+    if (board_cards.size() == board_card_index) {
+      return state;
+    }
+    state->ApplyAction(board_cards[board_card_index]);
+    board_card_index++;
+  }
+}
 
 void UpdateChanceReaches(std::vector<double> &chance_reaches,
                          const algorithms::PokerData &poker_data,
@@ -1384,58 +1501,32 @@ void NetworkTraining(const std::string &file_name,
   }
 }
 
-void Log(const std::string& text) {
+void Log(const std::string &text) {
   std::ofstream logfile;
-  logfile.open ("log_file", std::ios_base::app);
+  logfile.open("log_file", std::ios_base::app);
   logfile << text << "\n";
   logfile.close();
 }
 
+void ClearLog() {
+  std::ofstream logfile;
+  logfile.open("log_file");
+  logfile.close();
+}
+
 std::pair<int, int> SaveNetTrunkStrategy(int iterations, int full_iterations, std::string net_file) {
-  std::vector<int> board_cards = {5, 8, 10, 12, 15};
-  std::vector<int> action_sequence = {1, 1, 1, 2, 1, 1, 1, 1, 1};
+  ClearLog();
+  std::vector<int> board_cards = {23, 28, 30, 32};
+  std::vector<int> action_sequence = {1, 1, 1, 2, 1};
   std::string name = "universal_poker(betting=limit,numPlayers=2,numRounds=4,blind=10 5,"
                      "firstPlayer=2 1,numSuits=4,numRanks=13,numHoleCards=2,numBoardCards=0 3 "
                      "1 1,raiseSize=10 10 20 20,maxRaises=3 4 4 4)";
   std::shared_ptr<const Game> game = LoadGame(name);
 
-  std::unique_ptr<State> state = game->NewInitialState();
+  std::array<std::vector<double>, 2> ranges = GetReachesFromVector(SUBGAME_ONE_RANGES);
 
-  std::vector<int> initial_cards;
-  int card = 0;
-  while (initial_cards.size() < 4) {
-    if (std::find(board_cards.begin(), board_cards.end(), card) == board_cards.end()) {
-      initial_cards.push_back(card);
-    }
-    card++;
-  }
-
-  // Deal 4 cards
-  state->ApplyAction(initial_cards[0]);
-  state->ApplyAction(initial_cards[1]);
-  state->ApplyAction(initial_cards[2]);
-  state->ApplyAction(initial_cards[3]);
-
-  // Pre-flop betting
-  int action_index = 0;
-  while (state->IsPlayerNode()) {
-    state->ApplyAction(action_sequence[action_index]);
-    action_index++;
-  }
-
-  // Deal 3 board cards (Flop)
-  state->ApplyAction(board_cards[0]);
-  state->ApplyAction(board_cards[1]);
-  state->ApplyAction(board_cards[2]);
-
-  // Flop betting
-  while (state->IsPlayerNode()) {
-    state->ApplyAction(action_sequence[action_index]);
-    action_index++;
-  }
-
-  // Deal board card (Turn)
-  state->ApplyAction(board_cards[3]);
+  std::unique_ptr<State> state = GetPokerStatesAfterMoves(game, board_cards, action_sequence);
+  std::unique_ptr<State> full_state = GetPokerStatesAfterMoves(game, board_cards, action_sequence);
 
   auto start = std::chrono::high_resolution_clock::now();
 
@@ -1444,37 +1535,42 @@ std::pair<int, int> SaveNetTrunkStrategy(int iterations, int full_iterations, st
 
   algorithms::PokerData poker_data = algorithms::PokerData(*state);
 
-  std::vector<double> chance_reaches(1326, 1. / 1326);
+  std::vector<double> chance_reaches(poker_data.num_hands_, 1. / poker_data.num_hands_);
 
   UpdateChanceReaches(chance_reaches, poker_data, board_cards);
+
+  std::vector<double> full_chance_reaches = chance_reaches;
 
   std::vector<std::shared_ptr<algorithms::InfostateTree>> trees =
       algorithms::MakePokerInfostateTrees(state, chance_reaches, infostate_observer, 1, kDlCfrInfostateTreeStorage);
 
   auto out = std::make_shared<Subgame>(game, public_observer, trees);
 
+  out->initial_state().beliefs = ranges;
+
   std::shared_ptr<const PublicStateEvaluator>
       terminal_evaluator = std::make_shared<const GeneralPokerTerminalEvaluatorLinear>();
 
-  std::shared_ptr<const PublicStateEvaluator>
-      leaf_evaluator = std::make_shared<const RiverNetworkLeafEvaluator>(net_file);
+  std::shared_ptr<const PublicStateEvaluator> leaf_evaluator =
+      std::make_shared<const RiverNetworkLeafEvaluator>(net_file);
 
   SubgameSolver solver = SubgameSolver(out, leaf_evaluator, terminal_evaluator,
                                        std::make_shared<std::mt19937>(0), "RegretMatchingPlus");
 
-
-  Log("Created solver for network turn");
-
   // Create solver for full TURN
   std::vector<std::shared_ptr<algorithms::InfostateTree>> full_trees =
-      algorithms::MakePokerInfostateTrees(state, chance_reaches, infostate_observer, 1000, kDlCfrInfostateTreeStorage);
+      algorithms::MakePokerInfostateTrees(full_state,
+                                          full_chance_reaches,
+                                          infostate_observer,
+                                          1000,
+                                          kDlCfrInfostateTreeStorage);
 
   auto full_out = std::make_shared<Subgame>(game, public_observer, full_trees);
 
+  full_out->initial_state().beliefs = ranges;
+
   SubgameSolver full_solver = SubgameSolver(full_out, nullptr, terminal_evaluator,
                                             std::make_shared<std::mt19937>(0), "RegretMatchingPlus");
-
-  Log("Created solver for full turn");
 
   auto end = std::chrono::high_resolution_clock::now();
   auto setup_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
@@ -1485,103 +1581,33 @@ std::pair<int, int> SaveNetTrunkStrategy(int iterations, int full_iterations, st
 
   auto strategy = solver.AveragePolicy();
 
-  Log("Created trunk strategy");
+  Log("Solved network part\n");
 
   int opponent = 1;
   algorithms::BanditVector &opponent_bandits = full_solver.bandits()[opponent];
-  Log("I have opponent bandits");
   for (algorithms::DecisionId id : opponent_bandits.range()) {
     algorithms::InfostateNode *node = full_solver.subgame()->trees[opponent]->decision_infostate(id);
-    Log("I have the node");
     std::string infostate = node->infostate_string();
-    Log("I have infoset string");
     Log(std::to_string(node->corresponding_states().size()));
     auto poker_state =
         open_spiel::down_cast<const universal_poker::UniversalPokerState &>(*node->corresponding_states()[0]);
-    Log("I have poker state");
     if(poker_state.acpc_state().GetRound() == 3) {
       continue;
     }
-    Log("It is a poker state where I change the strategy");
     ActionsAndProbs infostate_policy = strategy->GetStatePolicy(infostate);
-    Log("Getting policy");
     std::vector<double> probs = GetProbs(infostate_policy);
-    Log("Creating fixable bandits");
     auto fixable_bandit = std::make_unique<algorithms::bandits::FixableStrategy>(probs);
-    Log("Putting them to opponent bandits");
     opponent_bandits[id] = std::move(fixable_bandit);
   }
-  Log("Strategy fixed - running iterations");
   full_solver.RunSimultaneousIterations(full_iterations);
-  std::cout << "Iterations done\n";
 
   std::cout << full_solver.RootValues() << "\n";
 
   return std::pair<int, int>(setup_duration.count(), run_duration.count());
 }
 
-void ComputeTrunkStrategyOfTurnSubgame(std::vector<int> board_cards,
-                                       std::vector<int> action_sequence,
-                                       std::array<std::vector<double>, 2> ranges) {
-
-}
-
 }
 }
-}
-
-std::array<std::vector<double>, 2> GetReachesFromVector(const std::vector<double> &range_vector) {
-  std::array<std::vector<double>, 2> ranges = {std::vector<double>(1326, 0.), std::vector<double>(1326, 0.)};
-
-  for (int player = 0; player < 2; player++) {
-    for (int i = 0; i < 1326; i++) {
-      ranges[player][i] = range_vector[i + player * 1326];
-    }
-  }
-  return ranges;
-}
-
-void ConvertRangesFromDescendingSuitToAscendingSuit() {
-  std::string ranks = "23456789TJQKA";
-  std::string suits_des = "shdc";
-  std::string suits_asc = "cdhs";
-  std::vector<std::string> cards_asc(52);
-  std::vector<std::string> cards_des(52);
-  int card_index = 0;
-  for (int card_rank = 0; card_rank < 13; card_rank++) {
-    for (int card_suit = 0; card_suit < 4; card_suit++) {
-      cards_asc[card_index] = ranks.substr(card_rank, 1) + suits_asc.substr(card_suit, 1);
-      cards_des[card_index] = ranks.substr(card_rank, 1) + suits_des.substr(card_suit, 1);
-      card_index++;
-    }
-  }
-  std::unordered_map<std::string, int> hands_to_index_asc;
-  std::vector<std::string> index_to_hand_des(1326);
-  int hand_index = 0;
-  for (int card_one = 0; card_one < 51; card_one++) {
-    for (int card_two = card_one + 1; card_two < 52; card_two++) {
-      if (card_one / 4 == card_two / 4) {
-        index_to_hand_des[hand_index] = cards_des[card_two] + cards_des[card_one];
-      } else {
-        index_to_hand_des[hand_index] = cards_des[card_one] + cards_des[card_two];
-      }
-      hands_to_index_asc[cards_asc[card_one] + cards_asc[card_two]] = hand_index;
-      hand_index++;
-    }
-  }
-  std::cout << index_to_hand_des << "\n";
-  std::vector<double> transformed_ranges(2652, -1);
-  std::stringstream range_stream(SUBGAME_TWO_STRING);
-  for (int i = 0; i < 1326; i++) {
-    range_stream >> transformed_ranges[hands_to_index_asc[index_to_hand_des[i]]];
-  }
-  for (int i = 0; i < 1326; i++) {
-    range_stream >> transformed_ranges[hands_to_index_asc[index_to_hand_des[i]] + 1326];
-  }
-  std::cout << std::setprecision(16);
-  for (float f : transformed_ranges) {
-    std::cout << f << ", ";
-  }
 }
 
 int main(int argc, char **argv) {
