@@ -436,7 +436,7 @@ std::vector<std::shared_ptr<InfostateTree>> MakePokerInfostateTrees(
     const std::unique_ptr<State> &start_state,
     const std::vector<double> &chance_reach_probs,
     const std::shared_ptr<Observer> &infostate_observer,
-    int max_move_ahead_limit,
+    int round_limit,
     int storage_policy);
 
 // Used for construction of resolving trees.
@@ -717,6 +717,8 @@ class InfostateTree final {
 
   void UpdateLeafNode(size_t leaf_depth);
   void AddCorrespondingState(InfostateNode *node, const State &state,
+                             double chance_reach_probs);
+  void AddPokerCorrespondingState(InfostateNode *node, const State &state,
                              double chance_reach_probs);
 
   // Build the tree.

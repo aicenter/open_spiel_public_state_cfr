@@ -286,6 +286,13 @@ void InfostateTree::AddCorrespondingState(InfostateNode *node,
   }
 }
 
+void InfostateTree::AddPokerCorrespondingState(InfostateNode *node,
+                                          const State &state,
+                                          double chance_reach_probs) {
+  node->corresponding_states_.push_back(state.Clone());
+  node->corresponding_ch_reaches_.push_back(chance_reach_probs);
+}
+
 std::pair<std::string, std::string> InfostateTree::ExtractInfostateString(const std::string &infostate_string) {
   return {infostate_string.substr(0, 13), infostate_string.substr(28)};
 }
@@ -348,7 +355,7 @@ void InfostateTree::BuildTerminalPokerNodes(
           MakeNode(parents[hand_index], kTerminalInfostateNode,
                    ConstructInfostateString(parts, card_one, card_two, poker_data),
                    terminal_utility, chance_reach_probs[hand_index], depth, &state));
-      AddCorrespondingState(node, state, chance_reach_probs[hand_index]);
+      AddPokerCorrespondingState(node, state, chance_reach_probs[hand_index]);
 
       hand_index++;
     }
@@ -374,7 +381,7 @@ void InfostateTree::BuildDecisionPokerNodes(
           MakeNode(parents[hand_index], kDecisionInfostateNode,
                    ConstructInfostateString(parts, card_one, card_two, poker_data),
               /*terminal_utility=*/NAN, /*chance_reach_prob=*/NAN, depth, &state)));
-      AddCorrespondingState(new_parents.back(), state, chance_reach_probs[hand_index]);
+      AddPokerCorrespondingState(new_parents.back(), state, chance_reach_probs[hand_index]);
       hand_index++;
     }
   }
@@ -424,7 +431,7 @@ void InfostateTree::BuildObservationPokerNode(
           MakeNode(parents[hand_index], kObservationInfostateNode,
                    ConstructInfostateString(parts, card_one, card_two, poker_data),
               /*terminal_utility=*/NAN, /*chance_reach_prob=*/NAN, depth, &state)));
-      AddCorrespondingState(new_parents.back(), state, chance_reach_probs[hand_index]);
+      AddPokerCorrespondingState(new_parents.back(), state, chance_reach_probs[hand_index]);
       hand_index++;
     }
   }
@@ -449,7 +456,7 @@ void InfostateTree::BuildObservationPokerNode(
 void InfostateTree::RecursivelyBuildTree(InfostateNode *parent, size_t depth,
                                          const State &state,
                                          double chance_reach_prob) {
-  SPIEL_CHECK_GT(chance_reach_prob, 0);
+//  SPIEL_CHECK_GT(chance_reach_prob, 0);
 
   // If we are building safe resolving trees, we have to add additional
   // nodes before going into the actual nodes.
