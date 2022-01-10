@@ -74,7 +74,9 @@ void RecursiveMakeResponseBandits(algorithms::InfostateNode* node,
                                   double reach,
                                   const Policy& optimal_brs,
                                   algorithms::BanditVector& bandits) {
-
+  if(node->is_leaf_node()) {
+    return;
+  }
   if (node->type() == algorithms::kDecisionInfostateNode) {
     auto policy = optimal_brs.GetStatePolicy(node->infostate_string());
     std::vector<double> ps;
@@ -102,12 +104,22 @@ void RecursiveMakeResponseBandits(algorithms::InfostateNode* node,
 }
 
 std::vector<algorithms::BanditVector> MakeResponseBandits(
-    const std::vector<std::shared_ptr<algorithms::InfostateTree>>& trees,
-    const std::array<std::vector<double>, 2>& beliefs,
-    const Policy& optimal_brs) {
+    const std::vector<std::shared_ptr<algorithms::InfostateTree>> &trees,
+    const Policy &optimal_brs) {
+  std::array<std::vector<double>, 2> beliefs;
+  for (int pl = 0; pl < 2; ++pl) {
+    beliefs[pl] = std::vector<double>(trees[pl]->root().num_children(), 1.);
+  }
+  return MakeResponseBandits(trees, beliefs, optimal_brs);
+}
+
+std::vector<algorithms::BanditVector> MakeResponseBandits(
+    const std::vector<std::shared_ptr<algorithms::InfostateTree>> &trees,
+    const std::array<std::vector<double>, 2> &beliefs,
+    const Policy &optimal_brs) {
   std::vector<algorithms::BanditVector> out;
   out.reserve(2);
-  for (const std::shared_ptr<algorithms::InfostateTree>& tree : trees) {
+  for (const std::shared_ptr<algorithms::InfostateTree> &tree : trees) {
     algorithms::BanditVector bandits(tree.get());
     for (int i = 0; i < tree->root().num_children(); ++i) {
       auto* node = tree->root().child_at(i);

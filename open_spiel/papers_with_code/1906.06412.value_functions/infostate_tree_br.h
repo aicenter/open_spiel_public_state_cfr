@@ -32,6 +32,10 @@ std::vector<algorithms::BanditVector> MakeResponseBandits(
     const std::array<std::vector<double>, 2>& beliefs,
     const Policy& optimal_brs);
 
+std::vector<algorithms::BanditVector> MakeResponseBandits(
+    const std::vector<std::shared_ptr<algorithms::InfostateTree>>& trees,
+    const Policy& optimal_brs);
+
 }  // namespace papers_with_code
 }  // namespace open_spiel
 
