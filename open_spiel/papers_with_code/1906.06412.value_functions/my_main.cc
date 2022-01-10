@@ -22,6 +22,25 @@
 
 #include <iostream>
 
+void LogLine(const std::string &text) {
+  std::ofstream logfile;
+  logfile.open("log_file", std::ios_base::app);
+  logfile << text << "\n";
+  logfile.close();
+}
+
+void Log(const std::string &text) {
+  std::ofstream logfile;
+  logfile.open("log_file", std::ios_base::app);
+  logfile << text;
+  logfile.close();
+}
+
+void ClearLog() {
+  std::ofstream logfile;
+  logfile.open("log_file");
+  logfile.close();
+}
 
 std::array<std::vector<double>, 2> GetReachesFromVector(const std::vector<double> &range_vector) {
   std::array<std::vector<double>, 2> ranges = {std::vector<double>(1326, 0.), std::vector<double>(1326, 0.)};
@@ -419,25 +438,32 @@ std::pair<int, int> UniversalPokerRiverCFRPokerSpecificLinear(int iterations) {
   solver.RunSimultaneousIterations(iterations);
   end = std::chrono::high_resolution_clock::now();
   auto run_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
+  auto fixed_policy = solver.AveragePolicy();
+
+  std::array<TabularPolicy, 2> separated_policies = {TabularPolicy(), TabularPolicy()};
+
+  for (int player = 0; player < 2; player++) {
+    algorithms::BanditVector &bandits = solver.bandits()[player];
+    for (algorithms::DecisionId id : bandits.range()) {
+      algorithms::InfostateNode *node = solver.subgame()->trees[player]->decision_infostate(id);
+      const std::string &infostate = node->infostate_string();
+      ActionsAndProbs infostate_policy = fixed_policy->GetStatePolicy(infostate);
+      separated_policies[player].SetStatePolicy(infostate, infostate_policy);
+    }
+  }
+
+  double nash_conv = 0;
+
   for (int player = 0; player < 2; player++) {
     SubgameSolver best_response = SubgameSolver(out, nullptr, terminal_evaluator,
                                                 std::make_shared<std::mt19937>(0), "RegretMatchingPlus");
-    int opponent = 1 - player;
-    auto fixed_policy = solver.AveragePolicy();
-    algorithms::BanditVector &opponent_bandits = best_response.bandits()[opponent];
-    for (algorithms::DecisionId id : opponent_bandits.range()) {
-      algorithms::InfostateNode *node = out->trees[opponent]->decision_infostate(id);
-      std::string infostate = node->infostate_string();
-      ActionsAndProbs infostate_policy = fixed_policy->GetStatePolicy(infostate);
-      std::vector<double> probs = GetProbs(infostate_policy);
-      auto fixable_bandit = std::make_unique<algorithms::bandits::FixableStrategy>(probs);
-      opponent_bandits[id] = std::move(fixable_bandit);
-    }
-    best_response.RunSimultaneousIterations(100);
-    auto cf_values = best_response.GetCfValues();
-    std::cout << cf_values[0][0] << ";" << cf_values[1][0] << "\n";
+    best_response.bandits() = MakeResponseBandits(trees, separated_policies[1 - player]);
+    best_response.RunSimultaneousIterations(1);
     std::cout << best_response.RootValues() << "\n";
+    nash_conv += best_response.RootValues()[player];
   }
+  std::cout << "Exploitability: " << nash_conv / 2 << "\n";
   return std::pair<int, int>(setup_duration.count(), run_duration.count());
 }
 
@@ -842,24 +868,29 @@ void CheckExploitabilityTwo() {
   std::cout << best_response_ptwo.Value(*game->NewInitialState()) << "\n";
   std::cout << BestResponse(solver_is.trees(), *policy_is) << "\n";
 
+  double nash_conv = 0.;
+
+  std::array<TabularPolicy, 2> separated_policies = {TabularPolicy(), TabularPolicy()};
+
   for (int player = 0; player < 2; player++) {
     algorithms::InfostateCFR best_response_is = algorithms::InfostateCFR(*game);
     int opponent = 1 - player;
     algorithms::BanditVector &opponent_bandits = best_response_is.bandits_modifiable()[opponent];
     for (algorithms::DecisionId id : opponent_bandits.range()) {
       algorithms::InfostateNode *node = best_response_is.trees()[opponent]->decision_infostate(id);
-      std::string infostate = node->infostate_string();
+      const std::string &infostate = node->infostate_string();
       ActionsAndProbs infostate_policy = policy_is->GetStatePolicy(infostate);
-      std::vector<double> probs = GetProbs(infostate_policy);
-      auto fixable_bandit = std::make_unique<algorithms::bandits::FixableStrategy>(probs);
-      opponent_bandits[id] = std::move(fixable_bandit);
+      separated_policies[player].SetStatePolicy(infostate, infostate_policy);
     }
-    best_response_is.RunSimultaneousIterations(100);
-    auto cf_values = best_response_is.RootValues();
-    std::cout << cf_values << "\n";
   }
 
-  std::cout << "Infostate cfr exploitability: " << algorithms::Exploitability(*game, *policy_is) << "\n";
+  for (int player = 0; player < 2; player++) {
+    algorithms::InfostateCFR best_response_is = algorithms::InfostateCFR(*game);
+    best_response_is.bandits_modifiable() =
+        MakeResponseBandits(algorithms::MakeInfostateTrees(*game), separated_policies[player]);
+    best_response_is.RunSimultaneousIterations(1);
+    std::cout << best_response_is.RootValues() << "\n";
+  }
 }
 
 void CheckExploitability(int iterations) {
@@ -1406,9 +1437,10 @@ void NetworkTraining(const std::string &file_name,
                      int training_samples,
                      int validation_samples,
                      int epochs,
-                     int batch_size) {
+                     int batch_size,
+                     bool normalize) {
 
-  std::cout << training_samples << " " << validation_samples << " " << epochs << " " << batch_size << "\n";
+  ClearLog();
 
   auto net = std::make_shared<Net>();
 
@@ -1428,12 +1460,19 @@ void NetworkTraining(const std::string &file_name,
     std::array<std::vector<double>, 2> cfvs = ReadCFVs(read_file);
 
     training_data_tensor[i][board_cards[4]] = 1;
+    std::vector<double> range_magnitudes(2);
+    if (normalize) {
+      for (int card_index = 0; card_index < 1326; card_index++) {
+        range_magnitudes[0] += ranges[0][card_index];
+        range_magnitudes[1] += ranges[1][card_index];
+      }
+    }
     for (int card_index = 0; card_index < 1326; card_index++) {
-      training_data_tensor[i][card_index + 52] = ranges[0][card_index];
-      training_data_tensor[i][card_index + 1326 + 52] = ranges[1][card_index];
+      training_data_tensor[i][card_index + 52] = ranges[0][card_index] / (normalize ? range_magnitudes[0] : 1);
+      training_data_tensor[i][card_index + 1326 + 52] = ranges[1][card_index] / (normalize ? range_magnitudes[1] : 1);
 
-      training_target_tensor[i][card_index] = cfvs[0][card_index];
-      training_target_tensor[i][card_index + 1326] = cfvs[1][card_index];
+      training_target_tensor[i][card_index] = cfvs[0][card_index] / (normalize ? range_magnitudes[1] : 1);
+      training_target_tensor[i][card_index + 1326] = cfvs[1][card_index] / (normalize ? range_magnitudes[0] : 1);
     }
     training_data_tensor[i][2704] = pot;
   }
@@ -1448,12 +1487,21 @@ void NetworkTraining(const std::string &file_name,
     std::array<std::vector<double>, 2> cfvs = ReadCFVs(read_file);
 
     training_data_tensor[i][board_cards[4]] = 1;
-    for (int card_index = 0; card_index < 1326; card_index++) {
-      validation_data_tensor[i][card_index + 52] = ranges[0][card_index];
-      validation_data_tensor[i][card_index + 1326 + 52] = ranges[1][card_index];
 
-      validation_target_tensor[i][card_index] = cfvs[0][card_index];
-      validation_target_tensor[i][card_index + 1326] = cfvs[1][card_index];
+    std::vector<double> range_magnitudes(2);
+    if (normalize) {
+      for (int card_index = 0; card_index < 1326; card_index++) {
+        range_magnitudes[0] += ranges[0][card_index];
+        range_magnitudes[1] += ranges[1][card_index];
+      }
+    }
+
+    for (int card_index = 0; card_index < 1326; card_index++) {
+      validation_data_tensor[i][card_index + 52] = ranges[0][card_index] / (normalize ? range_magnitudes[0] : 1);
+      validation_data_tensor[i][card_index + 1326 + 52] = ranges[1][card_index] / (normalize ? range_magnitudes[1] : 1);
+
+      validation_target_tensor[i][card_index] = cfvs[0][card_index] / (normalize ? range_magnitudes[1] : 1);
+      validation_target_tensor[i][card_index + 1326] = cfvs[1][card_index] / (normalize ? range_magnitudes[0] : 1);
     }
     validation_data_tensor[i][2704] = pot;
   }
@@ -1464,20 +1512,28 @@ void NetworkTraining(const std::string &file_name,
   auto optimizer = std::make_shared<torch::optim::Adam>(net->parameters(), torch::optim::AdamOptions(1e-3));
   int batches = training_samples / batch_size;
 
-  std::cout << "Initial:   ";
+  LogLine("Initial:   ");
 
   torch::Tensor init_train_output = net->forward(training_data_tensor);
   torch::Tensor init_train_loss = torch::nn::functional::smooth_l1_loss(init_train_output, training_target_tensor);
-  std::cout << "Training loss: " << init_train_loss.item().to<double>() << "   ";
+  Log("Training loss: ");
+  Log(std::to_string(init_train_loss.item().to<double>()));
+  Log("   ");
 
   torch::Tensor init_output = net->forward(validation_data_tensor);
   torch::Tensor init_loss = torch::nn::functional::smooth_l1_loss(init_output, validation_target_tensor);
   std::cout << "Validation loss: " << init_loss.item().to<double>() << "\n";
+  Log("Validation loss: ");
+  Log(std::to_string(init_loss.item().to<double>()));
+  LogLine("   ");
 
   oss << init_train_loss.item().to<double>() << " " << init_loss.item().to<double>() << "\n";
 
   for (int epoch = 0; epoch < epochs; epoch++) {
     std::cout << "Epoch " << epoch << ":   ";
+    Log("Epoch ");
+    Log(std::to_string(epoch));
+    LogLine(":   ");
     double cumulative_loss = 0;
     for (int batch = 0; batch < batches; batch++) {
       int i_s = batch * batch_size;
@@ -1489,37 +1545,31 @@ void NetworkTraining(const std::string &file_name,
       optimizer->step();
       cumulative_loss += loss.item().to<double>();
 //      std::cout << "." << std::flush;
-      if (epoch % 10 == 0) {
-        torch::save(net, "models/subgame1_epoch_" + std::to_string(epoch));
-      }
+//      if (epoch % 10 == 0) {
+//        torch::save(net, "models/subgame1_epoch_" + std::to_string(epoch));
+//      }
     }
+    Log("Training loss: ");
+    Log(std::to_string(cumulative_loss / batches));
+    Log("   ");
     std::cout << "\nTraining loss: " << cumulative_loss / batches << "   ";
     torch::Tensor output = net->forward(validation_data_tensor);
     torch::Tensor loss = torch::nn::functional::smooth_l1_loss(output, validation_target_tensor);
     std::cout << "Validation loss: " << loss.item().to<double>() << "\n";
+    Log("Validation loss: ");
+    Log(std::to_string(loss.item().to<double>()));
+    LogLine("   ");
     oss << cumulative_loss / batches << " " << loss.item().to<double>() << "\n";
   }
 }
 
-void Log(const std::string &text) {
-  std::ofstream logfile;
-  logfile.open("log_file", std::ios_base::app);
-  logfile << text << "\n";
-  logfile.close();
-}
-
-void ClearLog() {
-  std::ofstream logfile;
-  logfile.open("log_file");
-  logfile.close();
-}
-
 std::pair<int, int> SaveNetTrunkStrategy(int iterations, int full_iterations, std::string net_file) {
   ClearLog();
-  std::vector<int> board_cards = {23, 28, 30, 32};
+  std::vector<int> board_cards = {1, 3, 5, 9};
+//  std::vector<int> board_cards = {23, 28, 30, 32};
   std::vector<int> action_sequence = {1, 1, 1, 2, 1};
   std::string name = "universal_poker(betting=limit,numPlayers=2,numRounds=4,blind=10 5,"
-                     "firstPlayer=2 1,numSuits=4,numRanks=13,numHoleCards=2,numBoardCards=0 3 "
+                     "firstPlayer=2 1,numSuits=2,numRanks=6,numHoleCards=2,numBoardCards=0 3 "
                      "1 1,raiseSize=10 10 20 20,maxRaises=3 4 4 4)";
   std::shared_ptr<const Game> game = LoadGame(name);
 
@@ -1583,25 +1633,33 @@ std::pair<int, int> SaveNetTrunkStrategy(int iterations, int full_iterations, st
 
   Log("Solved network part\n");
 
-  int opponent = 1;
-  algorithms::BanditVector &opponent_bandits = full_solver.bandits()[opponent];
-  for (algorithms::DecisionId id : opponent_bandits.range()) {
-    algorithms::InfostateNode *node = full_solver.subgame()->trees[opponent]->decision_infostate(id);
-    std::string infostate = node->infostate_string();
-    Log(std::to_string(node->corresponding_states().size()));
-    auto poker_state =
-        open_spiel::down_cast<const universal_poker::UniversalPokerState &>(*node->corresponding_states()[0]);
-    if(poker_state.acpc_state().GetRound() == 3) {
-      continue;
-    }
-    ActionsAndProbs infostate_policy = strategy->GetStatePolicy(infostate);
-    std::vector<double> probs = GetProbs(infostate_policy);
-    auto fixable_bandit = std::make_unique<algorithms::bandits::FixableStrategy>(probs);
-    opponent_bandits[id] = std::move(fixable_bandit);
-  }
-  full_solver.RunSimultaneousIterations(full_iterations);
+  std::array<TabularPolicy, 2> separated_policies = {TabularPolicy(), TabularPolicy()};
 
-  std::cout << full_solver.RootValues() << "\n";
+  for (int player = 0; player < 2; player++) {
+    algorithms::BanditVector &bandits = solver.bandits()[player];
+    for (algorithms::DecisionId id : bandits.range()) {
+      algorithms::InfostateNode *node = solver.subgame()->trees[player]->decision_infostate(id);
+      const std::string &infostate = node->infostate_string();
+      ActionsAndProbs infostate_policy = strategy->GetStatePolicy(infostate);
+      separated_policies[player].SetStatePolicy(infostate, infostate_policy);
+    }
+  }
+
+  double nash_conv = 0;
+
+  for (int player = 0; player < 2; player++) {
+    SubgameSolver best_response = SubgameSolver(full_out, nullptr, terminal_evaluator,
+                                                std::make_shared<std::mt19937>(0), "RegretMatchingPlus");
+    std::vector<algorithms::BanditVector> dl_bandits = MakeResponseBandits(trees, separated_policies[1 - player]);
+    best_response.bandits() = algorithms::MakeBanditVectors(full_trees);
+    for (algorithms::DecisionId id : dl_bandits[1 - player].range()) {
+      best_response.bandits()[1 - player][id] = std::move(dl_bandits[1 - player][id]);
+    }
+    best_response.RunSimultaneousIterations(full_iterations);
+    std::cout << best_response.RootValues() << "\n";
+    nash_conv += best_response.RootValues()[player];
+  }
+  std::cout << "Exploitability: " << nash_conv / 2 << "\n";
 
   return std::pair<int, int>(setup_duration.count(), run_duration.count());
 }
@@ -1615,13 +1673,14 @@ int main(int argc, char **argv) {
 
 //  open_spiel::papers_with_code::TestGeneralPokerEvaluator();
 
-//  std::string file_template = argv[1];
-//  int training_samples = std::atoi(argv[2]);
-//  int validation_samples = std::atoi(argv[3]);
-//  int epochs = std::atoi(argv[4]);
-//  int batch_size = std::atoi(argv[5]);
-//  open_spiel::papers_with_code::NetworkTraining(
-//      file_template, training_samples, validation_samples, epochs, batch_size);
+  std::string file_template = argv[1];
+  int training_samples = std::atoi(argv[2]);
+  int validation_samples = std::atoi(argv[3]);
+  int epochs = std::atoi(argv[4]);
+  int batch_size = std::atoi(argv[5]);
+  bool normalize = true;
+  open_spiel::papers_with_code::NetworkTraining(
+      file_template, training_samples, validation_samples, epochs, batch_size, normalize);
 //  if (argc > 2) {
 //    int iterations = 1000;
 //    int situations = 1;
@@ -1750,8 +1809,11 @@ int main(int argc, char **argv) {
 //  open_spiel::papers_with_code::TestSameInfostates();
 //  open_spiel::papers_with_code::MeasureTime(1, 10, open_spiel::papers_with_code::UniversalPokerTurnTest);
 //    open_spiel::papers_with_code::MeasureTime(1,10,open_spiel::papers_with_code::TestNetEvaluator);
-  int iterations = std::atoi(argv[1]);
-  int full_iterations = std::atoi(argv[2]);
-  std::string net_file = argv[3];
-  open_spiel::papers_with_code::SaveNetTrunkStrategy(iterations, full_iterations, net_file);
+//  int iterations = std::atoi(argv[1]);
+//  int full_iterations = std::atoi(argv[2]);
+//  std::string net_file = argv[3];
+//  open_spiel::papers_with_code::SaveNetTrunkStrategy(iterations, full_iterations, net_file);
+
+//  open_spiel::papers_with_code::UniversalPokerRiverCFRPokerSpecificLinear(1000);
+//  open_spiel::papers_with_code::CheckExploitabilityTwo();
 }
