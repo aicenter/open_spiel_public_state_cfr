@@ -1545,9 +1545,9 @@ void NetworkTraining(const std::string &file_name,
       optimizer->step();
       cumulative_loss += loss.item().to<double>();
 //      std::cout << "." << std::flush;
-//      if (epoch % 10 == 0) {
-//        torch::save(net, "models/subgame1_epoch_" + std::to_string(epoch));
-//      }
+      if (epoch % 10 == 0) {
+        torch::save(net, "models/subgame1_epoch_" + std::to_string(epoch));
+      }
     }
     Log("Training loss: ");
     Log(std::to_string(cumulative_loss / batches));
