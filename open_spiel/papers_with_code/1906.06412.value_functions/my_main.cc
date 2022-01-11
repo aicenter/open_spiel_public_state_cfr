@@ -21,7 +21,6 @@
 #include "turn_poker_net.h"
 
 #include <iostream>
-#include <filesystem>
 
 void LogLine(const std::string &text) {
   std::ofstream logfile;
@@ -1745,7 +1744,8 @@ std::pair<int, int> SaveNetTrunkStrategy(int iterations, int full_iterations, st
   return std::pair<int, int>(setup_duration.count(), run_duration.count());
 }
 
-void ComputeNetLosses(const std::string& data_file, int samples_from, int samples, const std::string& net_directory, bool normalize) {
+void ComputeNetLosses(const std::string &data_file, int samples_from, int samples,
+                      const std::string &net_directory, int models, bool normalize) {
   ClearLog();
 
   auto net = std::make_shared<Net>();
@@ -1793,14 +1793,14 @@ void ComputeNetLosses(const std::string& data_file, int samples_from, int sample
     data_tensor[i][2704] = pot;
   }
 
-  for(const auto & entry : std::filesystem::directory_iterator(net_directory)) {
-    std::string net_file = entry.path();
+  for (int i = 0; i < models; i++) {
+    std::string net_file = net_directory + "/subgame1_epoch_" + std::to_string(i * 10);
     torch::load(net, net_file);
 
     torch::Tensor output = net->forward(data_tensor);
     torch::Tensor loss = torch::nn::functional::smooth_l1_loss(output, target_tensor);
 //    torch::Tensor loss_inf = torch::subtract(output, target_tensor).max();
-    std::cout << net_file  << "Loss: " << loss.item().to<double>() << "\n";
+    std::cout << net_file << "Loss: " << loss.item().to<double>() << "\n";
 //    std::cout << net_file  << "Loss inf: " << loss_inf.item().to<double>() << "\n";
   }
 }
@@ -1968,6 +1968,7 @@ int main(int argc, char **argv) {
     std::string data_file = argv[3];
     int samples_from = std::atoi(argv[4]);
     int samples = std::atoi(argv[5]);
-    open_spiel::papers_with_code::ComputeNetLosses(data_file, samples_from, samples, net_dir, true);
+    int models = std::atoi(argv[6]);
+    open_spiel::papers_with_code::ComputeNetLosses(data_file, samples_from, samples, net_dir, models, true);
   }
 }
