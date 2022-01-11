@@ -432,7 +432,8 @@ GeneralPokerTerminalFullBoardCardsContext::GeneralPokerTerminalFullBoardCardsCon
 
   SPIEL_CHECK_TRUE(state.IsTerminal());
 
-  belief_size_ = ((poker_data_.num_cards_ - 7) * (poker_data_.num_cards_ - 8)) / 2;
+  belief_size_ = ((poker_data_.num_cards_ - int(board_cards.size()) - 2) *
+      (poker_data_.num_cards_ - int(board_cards.size()) - 3)) / 2;
   std::vector<int> full_cards = board_cards;
   full_cards.insert(full_cards.begin(), 1);
   full_cards.insert(full_cards.begin(), 0);
