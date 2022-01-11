@@ -1647,13 +1647,13 @@ void NetworkTraining(const std::string &file_name,
   }
 }
 
-std::pair<int, int> SaveNetTrunkStrategy(int iterations, int full_iterations, std::string net_file) {
+std::pair<int, int> NetExploitabilityTrunkStrategy(int iterations, int full_iterations, std::string net_file) {
   ClearLog();
-  std::vector<int> board_cards = {1, 3, 5, 9};
-//  std::vector<int> board_cards = {23, 28, 30, 32};
+//  std::vector<int> board_cards = {1, 3, 5, 9};
+  std::vector<int> board_cards = {23, 28, 30, 32};
   std::vector<int> action_sequence = {1, 1, 1, 2, 1};
   std::string name = "universal_poker(betting=limit,numPlayers=2,numRounds=4,blind=10 5,"
-                     "firstPlayer=2 1,numSuits=2,numRanks=6,numHoleCards=2,numBoardCards=0 3 "
+                     "firstPlayer=2 1,numSuits=4,numRanks=13,numHoleCards=2,numBoardCards=0 3 "
                      "1 1,raiseSize=10 10 20 20,maxRaises=3 4 4 4)";
   std::shared_ptr<const Game> game = LoadGame(name);
 
@@ -1970,5 +1970,12 @@ int main(int argc, char **argv) {
     int samples = std::atoi(argv[5]);
     int models = std::atoi(argv[6]);
     open_spiel::papers_with_code::ComputeNetLosses(data_file, samples_from, samples, net_dir, models, true);
+  }
+
+  if(strcmp(argv[1], "expl") == 0) {
+    std::string net_file = argv[2];
+    int iterations = std::atoi(argv[3]);
+    int full_iterations = std::atoi(argv[4]);
+    open_spiel::papers_with_code::NetExploitabilityTrunkStrategy(iterations, full_iterations, net_file);
   }
 }
