@@ -21,6 +21,7 @@
 #include "turn_poker_net.h"
 
 #include <iostream>
+#include <filesystem>
 
 void LogLine(const std::string &text) {
   std::ofstream logfile;
@@ -271,7 +272,7 @@ std::pair<int, int> UniversalPokerTurnTest(int iterations) {
 
   std::vector<std::shared_ptr<algorithms::InfostateTree>>
       trees = algorithms::MakePokerInfostateTrees(state, std::vector<double>(1326, 1. / 1326),
-                                                  infostate_observer, 1000, kDlCfrInfostateTreeStorage);
+                                                  infostate_observer, 1000, kDlCfrInfostateTreeStorage, cards);
 
   auto out = std::make_shared<Subgame>(game, public_observer, trees);
 
@@ -349,7 +350,12 @@ std::pair<int, int> UniversalPokerRiverCFRPokerSpecificQuadratic(int iterations)
   UpdateChanceReaches(chance_reaches, poker_data, cards);
 
   std::vector<std::shared_ptr<algorithms::InfostateTree>> trees =
-      algorithms::MakePokerInfostateTrees(state, chance_reaches, infostate_observer, 1000, kDlCfrInfostateTreeStorage);
+      algorithms::MakePokerInfostateTrees(state,
+                                          chance_reaches,
+                                          infostate_observer,
+                                          1000,
+                                          kDlCfrInfostateTreeStorage,
+                                          cards);
 
   auto out = std::make_shared<Subgame>(game, public_observer, trees);
 
@@ -422,12 +428,88 @@ std::pair<int, int> UniversalPokerRiverCFRPokerSpecificLinear(int iterations) {
   UpdateChanceReaches(chance_reaches, poker_data, cards);
 
   std::vector<std::shared_ptr<algorithms::InfostateTree>> trees =
-      algorithms::MakePokerInfostateTrees(state, chance_reaches, infostate_observer, 1000, kDlCfrInfostateTreeStorage);
+      algorithms::MakePokerInfostateTrees(state,
+                                          chance_reaches,
+                                          infostate_observer,
+                                          1000,
+                                          kDlCfrInfostateTreeStorage,
+                                          cards);
 
   auto out = std::make_shared<Subgame>(game, public_observer, trees);
 
   std::shared_ptr<const PublicStateEvaluator>
       terminal_evaluator = std::make_shared<const PokerTerminalEvaluatorLinear>(poker_data, cards);
+
+  SubgameSolver solver = SubgameSolver(out, nullptr, terminal_evaluator,
+                                       std::make_shared<std::mt19937>(0), "RegretMatchingPlus");
+  auto end = std::chrono::high_resolution_clock::now();
+  auto setup_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
+  start = std::chrono::high_resolution_clock::now();
+  solver.RunSimultaneousIterations(iterations);
+  end = std::chrono::high_resolution_clock::now();
+  auto run_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
+  auto fixed_policy = solver.AveragePolicy();
+
+  std::array<TabularPolicy, 2> separated_policies = {TabularPolicy(), TabularPolicy()};
+
+  for (int player = 0; player < 2; player++) {
+    algorithms::BanditVector &bandits = solver.bandits()[player];
+    for (algorithms::DecisionId id : bandits.range()) {
+      algorithms::InfostateNode *node = solver.subgame()->trees[player]->decision_infostate(id);
+      const std::string &infostate = node->infostate_string();
+      ActionsAndProbs infostate_policy = fixed_policy->GetStatePolicy(infostate);
+      separated_policies[player].SetStatePolicy(infostate, infostate_policy);
+    }
+  }
+
+  double nash_conv = 0;
+
+  for (int player = 0; player < 2; player++) {
+    SubgameSolver best_response = SubgameSolver(out, nullptr, terminal_evaluator,
+                                                std::make_shared<std::mt19937>(0), "RegretMatchingPlus");
+    best_response.bandits() = MakeResponseBandits(trees, separated_policies[1 - player]);
+    best_response.RunSimultaneousIterations(1);
+    std::cout << best_response.RootValues() << "\n";
+    nash_conv += best_response.RootValues()[player];
+  }
+  std::cout << "Exploitability: " << nash_conv / 2 << "\n";
+  return std::pair<int, int>(setup_duration.count(), run_duration.count());
+}
+
+std::pair<int, int> UniversalPokerTurnCFRPokerSpecificLinear(int iterations) {
+  std::string name = "universal_poker(betting=limit,numPlayers=2,numRounds=4,blind=10 5,"
+                     "firstPlayer=2 1,numSuits=2,numRanks=5,numHoleCards=2,numBoardCards=0 3 "
+                     "1 1,raiseSize=10 10 20 20,maxRaises=3 4 4 4)";
+//  std::string name = "universal_poker(betting=nolimit,numPlayers=2,numRounds=4,blind=100 50,"
+//                     "firstPlayer=2 1 1 "
+//                     "1,numSuits=4,numRanks=13,numHoleCards=2,numBoardCards=0 3 "
+//                     "1 1,stack=20000 20000,bettingAbstraction=fcpa)";
+  std::shared_ptr<const Game> game = LoadGame(name);
+
+  std::vector<int> board_cards = {0, 2, 7, 9};
+  std::vector<int> action_sequence = {1, 1, 1, 1};
+
+  std::unique_ptr<State> state = GetPokerStatesAfterMoves(game, board_cards, action_sequence);
+
+  auto start = std::chrono::high_resolution_clock::now();
+  std::shared_ptr<Observer> infostate_observer = game->MakeObserver(kInfoStateObsType, {});
+  std::shared_ptr<Observer> public_observer = game->MakeObserver(kPublicStateObsType, {});
+
+  std::vector<double> chance_reaches(1326, 1. / 1326);
+
+  algorithms::PokerData poker_data = algorithms::PokerData(*state);
+
+  UpdateChanceReaches(chance_reaches, poker_data, board_cards);
+
+  std::vector<std::shared_ptr<algorithms::InfostateTree>> trees = algorithms::MakePokerInfostateTrees(
+      state, chance_reaches, infostate_observer, 1000, kDlCfrInfostateTreeStorage, board_cards);
+
+  auto out = std::make_shared<Subgame>(game, public_observer, trees);
+
+  std::shared_ptr<const PublicStateEvaluator>
+      terminal_evaluator = std::make_shared<const GeneralPokerTerminalEvaluatorLinear>();
 
   SubgameSolver solver = SubgameSolver(out, nullptr, terminal_evaluator,
                                        std::make_shared<std::mt19937>(0), "RegretMatchingPlus");
@@ -539,8 +621,9 @@ void SmallUniversalPokerTrunkTest() {
   state->ApplyAction(8);
 
   std::vector<std::shared_ptr<algorithms::InfostateTree>>
-      tree_poker = algorithms::MakePokerInfostateTrees(state, std::vector<double>(66, 1. / 66),
-                                                       infostate_observer, 1000, kDlCfrInfostateTreeStorage);
+      tree_poker = algorithms::MakePokerInfostateTrees(
+      state, std::vector<double>(66, 1. / 66),
+      infostate_observer, 1000, kDlCfrInfostateTreeStorage, {4, 5, 6, 7, 8});
 
   std::unordered_map<char, char> reverse_brackets = {
       {'(', ')'},
@@ -627,7 +710,7 @@ void TestSameInfostates() {
     std::shared_ptr<Observer> public_observer = game->MakeObserver(kPublicStateObsType, {});
 
     std::vector<std::shared_ptr<algorithms::InfostateTree>> trees = algorithms::MakePokerInfostateTrees(
-        state, chance_reaches, infostate_observer, 1000, kDlCfrInfostateTreeStorage);
+        state, chance_reaches, infostate_observer, 1000, kDlCfrInfostateTreeStorage, board_cards);
 
     auto poker_specific_subgame = std::make_shared<Subgame>(game, public_observer, trees);
 
@@ -1290,7 +1373,8 @@ std::array<std::vector<double>, 2> SolveLimitPokerSituationFromInputs(const std:
   }
 
   std::vector<std::shared_ptr<algorithms::InfostateTree>> trees =
-      algorithms::MakePokerInfostateTrees(state, chance_reaches, infostate_observer, 1000, kDlCfrInfostateTreeStorage);
+      algorithms::MakePokerInfostateTrees(
+          state, chance_reaches, infostate_observer, 1000, kDlCfrInfostateTreeStorage, board_cards);
 
   auto out = std::make_shared<Subgame>(game, public_observer, trees);
 
@@ -1486,7 +1570,7 @@ void NetworkTraining(const std::string &file_name,
     int pot = GetPotFromActions(action_sequence);
     std::array<std::vector<double>, 2> cfvs = ReadCFVs(read_file);
 
-    training_data_tensor[i][board_cards[4]] = 1;
+    validation_data_tensor[i][board_cards[4]] = 1;
 
     std::vector<double> range_magnitudes(2);
     if (normalize) {
@@ -1516,6 +1600,7 @@ void NetworkTraining(const std::string &file_name,
 
   torch::Tensor init_train_output = net->forward(training_data_tensor);
   torch::Tensor init_train_loss = torch::nn::functional::smooth_l1_loss(init_train_output, training_target_tensor);
+  std::cout << "Training loss: " << init_train_loss.item().to<double>() << "\n";
   Log("Training loss: ");
   Log(std::to_string(init_train_loss.item().to<double>()));
   Log("   ");
@@ -1591,8 +1676,8 @@ std::pair<int, int> SaveNetTrunkStrategy(int iterations, int full_iterations, st
 
   std::vector<double> full_chance_reaches = chance_reaches;
 
-  std::vector<std::shared_ptr<algorithms::InfostateTree>> trees =
-      algorithms::MakePokerInfostateTrees(state, chance_reaches, infostate_observer, 1, kDlCfrInfostateTreeStorage);
+  std::vector<std::shared_ptr<algorithms::InfostateTree>> trees = algorithms::MakePokerInfostateTrees(
+      state, chance_reaches, infostate_observer, 1, kDlCfrInfostateTreeStorage, board_cards);
 
   auto out = std::make_shared<Subgame>(game, public_observer, trees);
 
@@ -1608,12 +1693,8 @@ std::pair<int, int> SaveNetTrunkStrategy(int iterations, int full_iterations, st
                                        std::make_shared<std::mt19937>(0), "RegretMatchingPlus");
 
   // Create solver for full TURN
-  std::vector<std::shared_ptr<algorithms::InfostateTree>> full_trees =
-      algorithms::MakePokerInfostateTrees(full_state,
-                                          full_chance_reaches,
-                                          infostate_observer,
-                                          1000,
-                                          kDlCfrInfostateTreeStorage);
+  std::vector<std::shared_ptr<algorithms::InfostateTree>> full_trees = algorithms::MakePokerInfostateTrees(
+      full_state, full_chance_reaches, infostate_observer, 1000, kDlCfrInfostateTreeStorage, board_cards);
 
   auto full_out = std::make_shared<Subgame>(game, public_observer, full_trees);
 
@@ -1664,6 +1745,66 @@ std::pair<int, int> SaveNetTrunkStrategy(int iterations, int full_iterations, st
   return std::pair<int, int>(setup_duration.count(), run_duration.count());
 }
 
+void ComputeNetLosses(const std::string& data_file, int samples_from, int samples, const std::string& net_directory, bool normalize) {
+  ClearLog();
+
+  auto net = std::make_shared<Net>();
+
+  torch::Device device("cpu");
+
+  net->to(device);
+
+  std::ifstream read_file(data_file);
+
+  torch::Tensor data_tensor = torch::zeros({samples, 2705});
+  torch::Tensor target_tensor = torch::zeros({samples, 2652});
+  for (int i = 0; i < samples_from; i++) {
+    std::vector<int> board_cards = ReadBoardCards(read_file);
+    std::array<std::vector<double>, 2> ranges = ReadRanges(read_file);
+    std::vector<int> action_sequence = ReadActions(read_file);
+    int pot = GetPotFromActions(action_sequence);
+    std::array<std::vector<double>, 2> cfvs = ReadCFVs(read_file);
+  }
+
+  for (int i = 0; i < samples; i++) {
+    std::vector<int> board_cards = ReadBoardCards(read_file);
+    std::array<std::vector<double>, 2> ranges = ReadRanges(read_file);
+    std::vector<int> action_sequence = ReadActions(read_file);
+    int pot = GetPotFromActions(action_sequence);
+    std::array<std::vector<double>, 2> cfvs = ReadCFVs(read_file);
+
+    data_tensor[i][board_cards[4]] = 1;
+
+    std::vector<double> range_magnitudes(2);
+    if (normalize) {
+      for (int card_index = 0; card_index < 1326; card_index++) {
+        range_magnitudes[0] += ranges[0][card_index];
+        range_magnitudes[1] += ranges[1][card_index];
+      }
+    }
+
+    for (int card_index = 0; card_index < 1326; card_index++) {
+      data_tensor[i][card_index + 52] = ranges[0][card_index] / (normalize ? range_magnitudes[0] : 1);
+      data_tensor[i][card_index + 1326 + 52] = ranges[1][card_index] / (normalize ? range_magnitudes[1] : 1);
+
+      target_tensor[i][card_index] = cfvs[0][card_index] / (normalize ? range_magnitudes[1] : 1);
+      target_tensor[i][card_index + 1326] = cfvs[1][card_index] / (normalize ? range_magnitudes[0] : 1);
+    }
+    data_tensor[i][2704] = pot;
+  }
+
+  for(const auto & entry : std::filesystem::directory_iterator(net_directory)) {
+    std::string net_file = entry.path();
+    torch::load(net, net_file);
+
+    torch::Tensor output = net->forward(data_tensor);
+    torch::Tensor loss = torch::nn::functional::smooth_l1_loss(output, target_tensor);
+//    torch::Tensor loss_inf = torch::subtract(output, target_tensor).max();
+    std::cout << net_file  << "Loss: " << loss.item().to<double>() << "\n";
+//    std::cout << net_file  << "Loss inf: " << loss_inf.item().to<double>() << "\n";
+  }
+}
+
 }
 }
 }
@@ -1672,15 +1813,6 @@ int main(int argc, char **argv) {
 //  open_spiel::papers_with_code::SolvePokerSubgames("test_file_0", "solved_file_0", 1, 1);
 
 //  open_spiel::papers_with_code::TestGeneralPokerEvaluator();
-
-  std::string file_template = argv[1];
-  int training_samples = std::atoi(argv[2]);
-  int validation_samples = std::atoi(argv[3]);
-  int epochs = std::atoi(argv[4]);
-  int batch_size = std::atoi(argv[5]);
-  bool normalize = true;
-  open_spiel::papers_with_code::NetworkTraining(
-      file_template, training_samples, validation_samples, epochs, batch_size, normalize);
 //  if (argc > 2) {
 //    int iterations = 1000;
 //    int situations = 1;
@@ -1813,7 +1945,29 @@ int main(int argc, char **argv) {
 //  int full_iterations = std::atoi(argv[2]);
 //  std::string net_file = argv[3];
 //  open_spiel::papers_with_code::SaveNetTrunkStrategy(iterations, full_iterations, net_file);
-
+//
+//  open_spiel::papers_with_code::UniversalPokerTurnCFRPokerSpecificLinear(1000);
 //  open_spiel::papers_with_code::UniversalPokerRiverCFRPokerSpecificLinear(1000);
 //  open_spiel::papers_with_code::CheckExploitabilityTwo();
+
+
+// Networks
+  if(strcmp(argv[1], "train") == 0) {
+    std::string file_template = argv[2];
+    int training_samples = std::atoi(argv[3]);
+    int validation_samples = std::atoi(argv[4]);
+    int epochs = std::atoi(argv[5]);
+    int batch_size = std::atoi(argv[6]);
+    bool normalize = true;
+    open_spiel::papers_with_code::NetworkTraining(
+        file_template, training_samples, validation_samples, epochs, batch_size, normalize);
+  }
+
+  if(strcmp(argv[1], "test") == 0) {
+    std::string net_dir = argv[2];
+    std::string data_file = argv[3];
+    int samples_from = std::atoi(argv[4]);
+    int samples = std::atoi(argv[5]);
+    open_spiel::papers_with_code::ComputeNetLosses(data_file, samples_from, samples, net_dir, true);
+  }
 }
