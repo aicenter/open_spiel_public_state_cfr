@@ -398,18 +398,14 @@ void InfostateTree::BuildDecisionPokerNodes(
 }
 
 std::vector<double> UpdateChanceReaches(const std::vector<double> &chance_reaches,
-                                        const PokerData &poker_data,
-                                        int card) {
+                                        const PokerData &poker_data, int card, const std::vector<int>& board_cards) {
   std::vector<double> new_chance_reaches = chance_reaches;
   for (int hand_index : poker_data.card_to_hands_.at(card)) {
     new_chance_reaches[hand_index] = 0;
   }
-  double mag = 0;
-  for (double mag_part : new_chance_reaches) {
-    mag += mag_part;
-  }
+  auto div = double(poker_data.num_cards_ - board_cards.size() - 2);
   for (double &new_chance_reach : new_chance_reaches) {
-    new_chance_reach /= mag;
+    new_chance_reach /= div;
   }
   return new_chance_reaches;
 }
@@ -449,7 +445,7 @@ void InfostateTree::BuildObservationPokerNode(
         std::unique_ptr<State> child = state.Child(next_card);
         std::vector<int> new_board_cards = board_cards;
         new_board_cards.push_back(next_card);
-        std::vector<double> new_chance_reaches = UpdateChanceReaches(chance_reach_probs, poker_data, next_card);
+        std::vector<double> new_chance_reaches = UpdateChanceReaches(chance_reach_probs, poker_data, next_card, board_cards);
         RecursivelyBuildPokerTree(
             new_parents, depth + 1, *child, new_chance_reaches, poker_data, round + 1, new_board_cards);
       }
