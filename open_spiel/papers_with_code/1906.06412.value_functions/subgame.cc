@@ -408,14 +408,20 @@ RiverNetworkLeafEvaluator::RiverNetworkLeafEvaluator(const std::string &network_
 
 void RiverNetworkLeafEvaluator::EvaluatePublicState(PublicState *state, PublicStateContext *context) const {
   auto *net_context = open_spiel::down_cast<RiverNetworkPublicStateContext *>(context);
+  std::vector<double> belief_magnitudes(2,0.);
   for (int belief_index = 0; belief_index < state->beliefs[0].size(); belief_index++) {
-    net_context->data_tensor[0][52 + belief_index] = state->beliefs[0][belief_index];
-    net_context->data_tensor[0][1326 + 52 + belief_index] = state->beliefs[0][belief_index];
+    for(Player player = 0; player < 2; player++) {
+      belief_magnitudes[player] += state->beliefs[player][belief_index];
+    }
+  }
+  for (int belief_index = 0; belief_index < state->beliefs[0].size(); belief_index++) {
+    net_context->data_tensor[0][52 + belief_index] = state->beliefs[0][belief_index] / belief_magnitudes[0];
+    net_context->data_tensor[0][1326 + 52 + belief_index] = state->beliefs[0][belief_index] / belief_magnitudes[1];
   }
   torch::Tensor output = net->forward(net_context->data_tensor);
   for (int value_index = 0; value_index < state->values[0].size(); value_index++) {
-    state->values[0][value_index] = output[0][value_index].item<double>();
-    state->values[1][value_index] = output[0][value_index + 1326].item<double>();
+    state->values[0][value_index] = output[0][value_index].item<double>() * belief_magnitudes[1];
+    state->values[1][value_index] = output[0][value_index + 1326].item<double>() * belief_magnitudes[0];
   }
 }
 
