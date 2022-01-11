@@ -283,6 +283,15 @@ void PokerTerminalEvaluatorTest() {
   std::vector<int> board_in_one = {3, 5, 8, 10, 13};
   std::pair<int, int> game_specification_in_one = {2, 8};
   test_configurations.emplace_back(game_specification_in_one, board_in_one, beliefs_in_one);
+  // Third test configuration
+  std::vector<double> beliefs_in_two(45, 0);
+  std::iota(beliefs_in_two.begin(), beliefs_in_two.end(), 1);
+  for (double &i : beliefs_in_two) {
+    i /= 45;
+  }
+  std::vector<int> board_in_two = {0, 2, 7, 9, 6};
+  std::pair<int, int> game_specification_in_two = {2, 5};
+  test_configurations.emplace_back(game_specification_in_two, board_in_two, beliefs_in_two);
   // More test configurations can be added
   for (const TestInputs &test_inputs : test_configurations) {
     int num_suits = test_inputs.game_specification.first;
@@ -344,7 +353,7 @@ void PokerTerminalEvaluatorTest() {
     std::shared_ptr<Observer> public_observer = game->MakeObserver(kPublicStateObsType, {});
 
     std::vector<std::shared_ptr<algorithms::InfostateTree>> trees = algorithms::MakePokerInfostateTrees(
-        state, chance_reaches, infostate_observer, 1000, kDlCfrInfostateTreeStorage);
+        state, chance_reaches, infostate_observer, 1000, kDlCfrInfostateTreeStorage, board_cards);
 
     auto poker_specific_subgame = std::make_shared<Subgame>(game, public_observer, trees);
 
@@ -424,6 +433,7 @@ void PokerTerminalEvaluatorTest() {
       }
       auto poker_public_state = &poker_specific_subgame->public_states[i];
       std::vector<double> beliefs = test_inputs.beliefs;
+      SPIEL_CHECK_EQ(poker_public_state->public_tensor.Tensor(), general_public_state->public_tensor.Tensor());
       for (int node_index = 0; node_index < poker_public_state->nodes[0].size(); node_index++) {
         std::string infostate_string_one = poker_public_state->nodes[0][node_index]->infostate_string();
         std::string infostate_string_two = poker_public_state->nodes[1][node_index]->infostate_string();
@@ -567,7 +577,7 @@ void GeneralPokerTerminalEvaluatorTest() {
     std::shared_ptr<Observer> public_observer = game->MakeObserver(kPublicStateObsType, {});
 
     std::vector<std::shared_ptr<algorithms::InfostateTree>> trees = algorithms::MakePokerInfostateTrees(
-        state, chance_reaches, infostate_observer, 1000, kDlCfrInfostateTreeStorage);
+        state, chance_reaches, infostate_observer, 1000, kDlCfrInfostateTreeStorage, board_cards);
 
     auto poker_specific_subgame = std::make_shared<Subgame>(game, public_observer, trees);
 
@@ -617,6 +627,207 @@ void GeneralPokerTerminalEvaluatorTest() {
   }
 }
 
+void GeneralPokerTerminalEvaluatorTurnTest() {
+  std::vector<TestInputs> test_configurations;
+  // Adding first test configuration
+  std::vector<double> beliefs_in(45, 0);
+  std::iota(beliefs_in.begin(), beliefs_in.end(), 1);
+  for (double &i : beliefs_in) {
+    i /= 45;
+  }
+  std::vector<int> board_in = {0, 2, 7, 9};
+  std::pair<int, int> game_specification_in = {2, 5};
+  test_configurations.emplace_back(game_specification_in, board_in, beliefs_in);
+  // Second test configuration
+  std::vector<double> beliefs_in_one(45, 0);
+  beliefs_in_one[37] = 1;
+  std::vector<int> board_in_one = {1, 3, 6, 7};
+  std::pair<int, int> game_specification_in_one = {2, 5};
+  test_configurations.emplace_back(game_specification_in_one, board_in_one, beliefs_in_one);
+  // Third test configuration
+  std::vector<double> beliefs_in_two(36, 0);
+  std::iota(beliefs_in_two.begin(), beliefs_in_two.end(), 1);
+  for (double &i : beliefs_in_two) {
+    i /= 36;
+  }
+  std::vector<int> board_in_two = {0, 1, 5, 8};
+  std::pair<int, int> game_specification_in_two = {3, 3};
+  test_configurations.emplace_back(game_specification_in_two, board_in_two, beliefs_in_two);
+  // More test configurations can be added
+  int test = 0;
+  for (const TestInputs &test_inputs : test_configurations) {
+    int num_suits = test_inputs.game_specification.first;
+    int num_ranks = test_inputs.game_specification.second;
+    SPIEL_CHECK_LE(num_suits, 4);
+    SPIEL_CHECK_LE(num_ranks, 13);
+    SPIEL_CHECK_EQ(test_inputs.beliefs.size(), (num_suits * num_ranks) * (num_suits * num_ranks - 1) / 2);
+    std::string name = "universal_poker(betting=limit,numPlayers=2,numRounds=4,blind=10 5,"
+                       "firstPlayer=2 1,numSuits=" + std::to_string(num_suits) + ",numRanks="
+        + std::to_string(num_ranks)
+        + ",numHoleCards=2,numBoardCards=0 3 1 1,raiseSize=10 10 20 20,maxRaises=3 4 4 4)";
+
+    std::shared_ptr<const Game> game = LoadGame(name);
+
+    std::unique_ptr<State> state = game->NewInitialState();
+
+    std::vector<int> board_cards = test_inputs.board;
+    for (int board_card : board_cards) {
+      SPIEL_CHECK_LE(board_card, num_suits * num_ranks);
+    }
+
+    //Poker specific part to construct the subgame
+
+    // Deal 4 cards
+    state->ApplyAction(0);
+    state->ApplyAction(1);
+    state->ApplyAction(2);
+    state->ApplyAction(3);
+
+    // BothCall
+    state->ApplyAction(1);
+    state->ApplyAction(1);
+
+    // Deal 3 board cards (Flop)
+    state->ApplyAction(board_cards[0]);
+    state->ApplyAction(board_cards[1]);
+    state->ApplyAction(board_cards[2]);
+
+    // BothCall
+    state->ApplyAction(1);
+    state->ApplyAction(1);
+
+    // Deal board card (Turn)
+    state->ApplyAction(board_cards[3]);
+
+    algorithms::PokerData poker_data = algorithms::PokerData(*state);
+
+    std::vector<double> chance_reaches(poker_data.num_hands_, 1. / poker_data.num_hands_);
+    UpdateChanceReaches(chance_reaches, poker_data, board_cards);
+
+    std::shared_ptr<Observer> infostate_observer = game->MakeObserver(kInfoStateObsType, {});
+    std::shared_ptr<Observer> public_observer = game->MakeObserver(kPublicStateObsType, {});
+
+    std::vector<std::shared_ptr<algorithms::InfostateTree>> trees = algorithms::MakePokerInfostateTrees(
+        state, chance_reaches, infostate_observer, 1000, kDlCfrInfostateTreeStorage, board_cards);
+
+    auto poker_specific_subgame = std::make_shared<Subgame>(game, public_observer, trees);
+
+    std::shared_ptr<const PublicStateEvaluator>
+        poker_terminal_evaluator = std::make_shared<const GeneralPokerTerminalEvaluatorLinear>();
+
+    // General subgame construction
+    std::vector<std::unique_ptr<State>> starting_states;
+    std::unique_ptr<State> initial_state = game->NewInitialState();
+
+    for (Action action : initial_state->LegalActions()) {
+      if (std::find(board_cards.begin(), board_cards.end(), action) != board_cards.end()) {
+        continue;
+      }
+      auto child_one = initial_state->Child(action);
+      for (Action action_one : child_one->LegalActions()) {
+        if (std::find(board_cards.begin(), board_cards.end(), action_one) != board_cards.end()) {
+          continue;
+        }
+        auto child_two = child_one->Child(action_one);
+        for (Action action_two : child_two->LegalActions()) {
+          if (std::find(board_cards.begin(), board_cards.end(), action_two) != board_cards.end()) {
+            continue;
+          }
+          auto child_three = child_two->Child(action_two);
+          for (Action action_three : child_three->LegalActions()) {
+            if (std::find(board_cards.begin(), board_cards.end(), action_three) != board_cards.end()) {
+              continue;
+            }
+            auto child_four = child_three->Child(action_three);
+            // BothCall
+            child_four->ApplyAction(1);
+            child_four->ApplyAction(1);
+
+            // Deal 3 board cards (Flop)
+            child_four->ApplyAction(board_cards[0]);
+            child_four->ApplyAction(board_cards[1]);
+            child_four->ApplyAction(board_cards[2]);
+
+            // BothCall
+            child_four->ApplyAction(1);
+            child_four->ApplyAction(1);
+
+            // Deal board card (Turn)
+            child_four->ApplyAction(board_cards[3]);
+            starting_states.push_back(std::move(child_four));
+          }
+        }
+      }
+    }
+
+    std::vector<double> general_chance_reaches(starting_states.size(), 1. / starting_states.size());
+
+    std::vector<std::shared_ptr<algorithms::InfostateTree>>
+        trees_general = algorithms::MakeInfostateTrees(
+        starting_states, general_chance_reaches, infostate_observer, 1000, kDlCfrInfostateTreeStorage);
+
+    auto general_subgame = std::make_shared<Subgame>(game, public_observer, trees_general);
+
+    auto general_terminal_evaluator = MakeTerminalEvaluator();
+
+    SPIEL_CHECK_EQ(general_subgame->public_states.size(), poker_specific_subgame->public_states.size());
+    for (int i = 0; i < general_subgame->public_states.size(); i++) {
+      auto general_public_state = &general_subgame->public_states[i];
+      if (!general_public_state->IsTerminal()) {
+        continue;
+      }
+      PublicState *poker_public_state = nullptr;
+      for (int j = 0; j < poker_specific_subgame->public_states.size(); j++) {
+        poker_public_state = &poker_specific_subgame->public_states[j];
+        if (poker_public_state->public_tensor.Tensor() == general_public_state->public_tensor.Tensor()) {
+          break;
+        }
+      }
+      SPIEL_CHECK_TRUE(poker_public_state);
+      std::vector<double> beliefs = test_inputs.beliefs;
+      for (int node_index = 0; node_index < poker_public_state->nodes[0].size(); node_index++) {
+        std::string infostate_string_one = poker_public_state->nodes[0][node_index]->infostate_string();
+        std::string infostate_string_two = poker_public_state->nodes[1][node_index]->infostate_string();
+        poker_public_state->beliefs[0][node_index] = beliefs[node_index];
+        poker_public_state->beliefs[1][node_index] = beliefs[node_index];
+        for (int general_node_index = 0; general_node_index < general_public_state->nodes[0].size();
+             general_node_index++) {
+          if (general_public_state->nodes[0][general_node_index]->infostate_string() == infostate_string_one) {
+            general_public_state->beliefs[0][general_node_index] = beliefs[node_index];
+          }
+          if (general_public_state->nodes[1][general_node_index]->infostate_string() == infostate_string_two) {
+            general_public_state->beliefs[1][general_node_index] = beliefs[node_index];
+          }
+        }
+      }
+      auto general_context = general_terminal_evaluator->CreateContext(*general_public_state);
+      auto poker_context = poker_terminal_evaluator->CreateContext(*poker_public_state);
+      general_terminal_evaluator->EvaluatePublicState(general_public_state, general_context.get());
+      poker_terminal_evaluator->EvaluatePublicState(poker_public_state, poker_context.get());
+      for (int node_index = 0; node_index < poker_public_state->nodes[0].size(); node_index++) {
+        std::string infostate_string = poker_public_state->nodes[0][node_index]->infostate_string();
+        double general_value = 0;
+        for (int general_node_index = 0; general_node_index < general_public_state->nodes[0].size();
+             general_node_index++) {
+          if (general_public_state->nodes[0][general_node_index]->infostate_string() == infostate_string) {
+            general_value += general_public_state->values[0][general_node_index];
+          }
+        }
+        SPIEL_CHECK_FLOAT_NEAR(poker_public_state->values[0][node_index], general_value, 0.000001);
+      }
+      double general_sum = 0;
+      double poker_sum = 0;
+      for (double poker_value : poker_public_state->values[0]) {
+        poker_sum += poker_value;
+      }
+      for (double general_value : general_public_state->values[0]) {
+        general_sum += general_value;
+      }
+      SPIEL_CHECK_FLOAT_NEAR(poker_sum, general_sum, 0.001);
+    }
+  }
+}
+
 }  // namespace
 }  // namespace papers_with_code
 }  // namespace open_spiel
@@ -640,4 +851,6 @@ int main(int argc, char **argv) {
   open_spiel::papers_with_code::PokerTerminalEvaluatorTest();
 
   open_spiel::papers_with_code::GeneralPokerTerminalEvaluatorTest();
+
+  open_spiel::papers_with_code::GeneralPokerTerminalEvaluatorTurnTest();
 }
