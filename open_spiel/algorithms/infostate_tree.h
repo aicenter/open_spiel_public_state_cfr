@@ -397,6 +397,7 @@ std::shared_ptr<InfostateTree> MakePokerInfostateTree(
     const std::vector<double> &chance_reach_probs,
     const std::shared_ptr<Observer> &infostate_observer,
     Player acting_player,
+    const std::vector<int> &board_cards,
     int max_move_ahead_limit = kNoMoveAheadLimit,
     int storage_policy = kDefaultStoragePolicy);
 
@@ -437,7 +438,8 @@ std::vector<std::shared_ptr<InfostateTree>> MakePokerInfostateTrees(
     const std::vector<double> &chance_reach_probs,
     const std::shared_ptr<Observer> &infostate_observer,
     int round_limit,
-    int storage_policy);
+    int storage_policy,
+    const std::vector<int> &board_cards);
 
 // Used for construction of resolving trees.
 constexpr Action kActionFollow = 0;
@@ -609,10 +611,11 @@ class InfostateTree final {
                 const std::shared_ptr<Observer> &infostate_observer,
                 Player acting_player,
                 int round_limit,
-                int storage_policy)
+                int storage_policy,
+                std::vector<int> board_cards)
       : InfostateTree(start_state, chance_reach_probs, infostate_observer,
                       acting_player, round_limit, storage_policy,
-                      {}, kInvalidPlayer) {}
+                      {}, kInvalidPlayer, std::move(board_cards)) {}
 
   InfostateTree(
       const std::unique_ptr<State> &start_state,
@@ -622,7 +625,8 @@ class InfostateTree final {
       int round_limit,
       int storage_policy,
       const std::unordered_map<std::string, double> &cf_value_constraints,
-      int ft_player)
+      int ft_player,
+      std::vector<int> board_cards)
       : acting_player_(acting_player),
         infostate_observer_(std::move(infostate_observer)),
         root_(MakeRootNode()),
@@ -641,7 +645,7 @@ class InfostateTree final {
 
     RecursivelyBuildPokerTree(
         std::vector<InfostateNode *>(poker_data.num_hands_, root_.get()), /*depth=*/1,
-        *start_state, chance_reach_probs, poker_data, 0);
+        *start_state, chance_reach_probs, poker_data, 0, board_cards);
 
     // Operations to make after building the tree.
     RebalanceTree();
@@ -656,7 +660,8 @@ class InfostateTree final {
   // the collected pointers are valid throughout the tree's lifetime even if
   // they are moved around.
   friend std::shared_ptr<InfostateTree> MakePokerInfostateTree(
-      const std::unique_ptr<State> &, const std::vector<double> &, const std::shared_ptr<Observer> &, Player, int, int);
+      const std::unique_ptr<State> &, const std::vector<double> &,
+      const std::shared_ptr<Observer> &, Player, const std::vector<int>&, int, int);
   friend std::shared_ptr<InfostateTree> MakeInfostateTree(
       const Game &, Player, int, int);
   friend std::shared_ptr<InfostateTree> MakeInfostateTree(
@@ -737,7 +742,7 @@ class InfostateTree final {
   // Build tree specifically for poker
   void RecursivelyBuildPokerTree(
       const std::vector<InfostateNode *> &parents, size_t depth, const State &state,
-      const std::vector<double> &chance_reach_probs, const PokerData& poker_data, int round);
+      const std::vector<double> &chance_reach_probs, const PokerData& poker_data, int round, const std::vector<int> &board_cards);
 
   void BuildTerminalPokerNodes(
       const std::vector<InfostateNode *> &parents, size_t depth, const State &state,
@@ -745,11 +750,13 @@ class InfostateTree final {
 
   void BuildDecisionPokerNodes(
       const std::vector<InfostateNode *> &parents, size_t depth, const State &state,
-      const std::vector<double> &chance_reach_probs, const PokerData &poker_data, int round);
+      const std::vector<double> &chance_reach_probs, const PokerData &poker_data, int round,
+      const std::vector<int> &board_cards);
 
   void BuildObservationPokerNode(
       const std::vector<InfostateNode *> &parents, size_t depth, const State &state,
-      const std::vector<double> &chance_reach_probs, const PokerData &poker_data, int round);
+      const std::vector<double> &chance_reach_probs, const PokerData &poker_data, int round,
+      const std::vector<int> &board_cards);
 
   void CollectNodesAtDepth(InfostateNode *node, size_t depth);
   void LabelNodesWithIds();
