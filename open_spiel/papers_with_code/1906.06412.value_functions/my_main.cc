@@ -1710,8 +1710,6 @@ std::pair<int, int> NetExploitabilityTrunkStrategy(int iterations, int full_iter
 
   auto strategy = solver.AveragePolicy();
 
-  std::cout << "Solved network part\n";
-
   std::array<TabularPolicy, 2> separated_policies = {TabularPolicy(), TabularPolicy()};
 
   for (int player = 0; player < 2; player++) {
@@ -1741,7 +1739,6 @@ std::pair<int, int> NetExploitabilityTrunkStrategy(int iterations, int full_iter
     best_response.RunSimultaneousIterations(full_iterations);
     auto response_strategy = best_response.AveragePolicy();
     for (Player bandit_player = 0; bandit_player < 2; bandit_player++) {
-      std::cout << "Going through bandits\n";
       auto policy = best_response.AveragePolicy();
       algorithms::BanditVector &local_bandits = best_response.bandits()[bandit_player];
       for (algorithms::DecisionId id : local_bandits.range()) {
