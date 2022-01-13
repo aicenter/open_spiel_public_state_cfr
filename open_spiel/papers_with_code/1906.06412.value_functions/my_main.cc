@@ -1738,10 +1738,7 @@ std::pair<int, int> NetExploitabilityTrunkStrategy(int iterations, int full_iter
         bandits[id] = std::make_unique<algorithms::bandits::FixedStrategy>(GetProbs(infostate_policy));
       }
     }
-    for (int i = 0; i < full_iterations; i++) {
-      best_response.RunSimultaneousIterations(1);
-      std::cout << best_response.RootValues() << "\n";
-    }
+    best_response.RunSimultaneousIterations(full_iterations);
     auto response_strategy = best_response.AveragePolicy();
     for (Player bandit_player = 0; bandit_player < 2; bandit_player++) {
       std::cout << "Going through bandits\n";
