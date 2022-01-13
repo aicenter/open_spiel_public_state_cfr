@@ -141,6 +141,9 @@ class FixedStrategy final : public Bandit {
   void ComputeStrategy(size_t current_time, double weight = 1.) override {}
   void ObserveRewards(absl::Span<const double> rewards) override {}
   void Reset() override {}  // No need to reset anything.
+  std::vector<double> AverageStrategy() const override{
+    return current_strategy();
+  };
 };
 
 // A bandit that can be dynamically set to return a requested strategy,
