@@ -27,12 +27,21 @@ std::vector<double> BestResponse(
     std::vector<std::shared_ptr<algorithms::InfostateTree>> trees,
     const Policy& fixed_policy);
 
+std::vector<algorithms::BanditVector> MakeDLResponseBandits(
+    const std::vector<std::shared_ptr<algorithms::InfostateTree>>& trees,
+    const std::array<std::vector<double>, 2>& beliefs,
+    const Policy& optimal_brs);
+
 std::vector<algorithms::BanditVector> MakeResponseBandits(
     const std::vector<std::shared_ptr<algorithms::InfostateTree>>& trees,
     const std::array<std::vector<double>, 2>& beliefs,
     const Policy& optimal_brs);
 
 std::vector<algorithms::BanditVector> MakeResponseBandits(
+    const std::vector<std::shared_ptr<algorithms::InfostateTree>>& trees,
+    const Policy& optimal_brs);
+
+std::vector<algorithms::BanditVector> MakeDLResponseBandits(
     const std::vector<std::shared_ptr<algorithms::InfostateTree>>& trees,
     const Policy& optimal_brs);
 

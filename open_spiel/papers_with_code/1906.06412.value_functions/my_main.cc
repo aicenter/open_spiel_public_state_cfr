@@ -1648,11 +1648,11 @@ void NetworkTraining(const std::string &file_name,
 }
 
 std::pair<int, int> NetExploitabilityTrunkStrategy(int iterations, int full_iterations, std::string net_file) {
-  std::vector<int> board_cards = {1, 3, 5, 9};
-//  std::vector<int> board_cards = {23, 28, 30, 32};
+//  std::vector<int> board_cards = {1, 3, 5, 9};
+  std::vector<int> board_cards = {23, 28, 30, 32};
   std::vector<int> action_sequence = {1, 1, 1, 2, 1};
   std::string name = "universal_poker(betting=limit,numPlayers=2,numRounds=4,blind=10 5,"
-                     "firstPlayer=2 1,numSuits=2,numRanks=6,numHoleCards=2,numBoardCards=0 3 "
+                     "firstPlayer=2 1,numSuits=4,numRanks=13,numHoleCards=2,numBoardCards=0 3 "
                      "1 1,raiseSize=10 10 20 20,maxRaises=3 4 4 4)";
   std::shared_ptr<const Game> game = LoadGame(name);
 
@@ -1729,21 +1729,37 @@ std::pair<int, int> NetExploitabilityTrunkStrategy(int iterations, int full_iter
   for (int player = 0; player < 2; player++) {
     SubgameSolver best_response = SubgameSolver(full_out, nullptr, terminal_evaluator,
                                                 std::make_shared<std::mt19937>(0), "RegretMatchingPlus");
-    std::vector<algorithms::BanditVector> dl_bandits = MakeResponseBandits(trees, separated_policies[1 - player]);
-    best_response.bandits() = algorithms::MakeBanditVectors(full_trees);
-    for (algorithms::DecisionId id : dl_bandits[1 - player].range()) {
-      best_response.bandits()[1 - player][id] = std::move(dl_bandits[1 - player][id]);
+        algorithms::BanditVector &bandits = best_response.bandits()[player];
+    for (algorithms::DecisionId id : bandits.range()) {
+      algorithms::InfostateNode *node = best_response.subgame()->trees[player]->decision_infostate(id);
+      const std::string &infostate = node->infostate_string();
+      ActionsAndProbs infostate_policy = strategy->GetStatePolicy(infostate);
+      if (!infostate_policy.empty()) {
+        bandits[id] = std::make_unique<algorithms::bandits::FixedStrategy>(GetProbs(infostate_policy));
+      }
     }
     for (int i = 0; i < full_iterations; i++) {
       best_response.RunSimultaneousIterations(1);
       std::cout << best_response.RootValues() << "\n";
-      nash_conv += best_response.RootValues()[player];
     }
-    auto br_strategy = best_response.AveragePolicy();
-    best_response.bandits() = MakeResponseBandits(full_trees, *br_strategy);
+    auto response_strategy = best_response.AveragePolicy();
+    for (Player bandit_player = 0; bandit_player < 2; bandit_player++) {
+      std::cout << "Going through bandits\n";
+      auto policy = best_response.AveragePolicy();
+      algorithms::BanditVector &local_bandits = best_response.bandits()[bandit_player];
+      for (algorithms::DecisionId id : local_bandits.range()) {
+        algorithms::InfostateNode *node = best_response.subgame()->trees[bandit_player]->decision_infostate(id);
+        const std::string &infostate = node->infostate_string();
+        ActionsAndProbs infostate_policy = response_strategy->GetStatePolicy(infostate);
+        if (!infostate_policy.empty()) {
+          local_bandits[id] = std::make_unique<algorithms::bandits::FixedStrategy>(GetProbs(infostate_policy));
+        }
+      }
+    }
     best_response.Reset();
     best_response.RunSimultaneousIterations(2);
-    std::cout << "Fixed: " << best_response.RootValues() << "\n";
+    std::cout << "Best response: " << best_response.RootValues() << "\n";
+    nash_conv += best_response.RootValues()[1-player];
   }
   std::cout << "Exploitability: " << nash_conv / 2 << "\n";
 
