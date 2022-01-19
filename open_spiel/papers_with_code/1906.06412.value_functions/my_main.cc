@@ -1370,7 +1370,6 @@ std::array<std::vector<double>, 2> SolveLimitPokerSituationFromInputs(const std:
       chance_reach = 1;
     }
   }
-
   std::vector<std::shared_ptr<algorithms::InfostateTree>> trees =
       algorithms::MakePokerInfostateTrees(
           state, chance_reaches, infostate_observer, 1000, kDlCfrInfostateTreeStorage, board_cards);
@@ -1554,8 +1553,8 @@ void NetworkTraining(const std::string &file_name,
       training_data_tensor[i][card_index + 52] = ranges[0][card_index] / (normalize ? range_magnitudes[0] : 1);
       training_data_tensor[i][card_index + 1326 + 52] = ranges[1][card_index] / (normalize ? range_magnitudes[1] : 1);
 
-      training_target_tensor[i][card_index] = cfvs[0][card_index] / (normalize ? range_magnitudes[1] : 1);
-      training_target_tensor[i][card_index + 1326] = cfvs[1][card_index] / (normalize ? range_magnitudes[0] : 1);
+      training_target_tensor[i][card_index] = cfvs[0][card_index] * 1081 / (normalize ? range_magnitudes[1] : 1);
+      training_target_tensor[i][card_index + 1326] = cfvs[1][card_index] * 1081 / (normalize ? range_magnitudes[0] : 1);
     }
     training_data_tensor[i][2704] = pot;
   }
@@ -1583,8 +1582,9 @@ void NetworkTraining(const std::string &file_name,
       validation_data_tensor[i][card_index + 52] = ranges[0][card_index] / (normalize ? range_magnitudes[0] : 1);
       validation_data_tensor[i][card_index + 1326 + 52] = ranges[1][card_index] / (normalize ? range_magnitudes[1] : 1);
 
-      validation_target_tensor[i][card_index] = cfvs[0][card_index] / (normalize ? range_magnitudes[1] : 1);
-      validation_target_tensor[i][card_index + 1326] = cfvs[1][card_index] / (normalize ? range_magnitudes[0] : 1);
+      validation_target_tensor[i][card_index] = cfvs[0][card_index] * 1081 / (normalize ? range_magnitudes[1] : 1);
+      validation_target_tensor[i][card_index + 1326] =
+          cfvs[1][card_index] * 1081 / (normalize ? range_magnitudes[0] : 1);
     }
     validation_data_tensor[i][2704] = pot;
   }
@@ -1628,7 +1628,7 @@ void NetworkTraining(const std::string &file_name,
       loss.backward();
       optimizer->step();
       cumulative_loss += loss.item().to<double>();
-//      std::cout << "." << std::flush;
+      std::cout << "." << std::flush;
       if (epoch % 10 == 0) {
         torch::save(net, "models/subgame1_epoch_" + std::to_string(epoch));
       }
