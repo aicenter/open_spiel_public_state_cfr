@@ -22,23 +22,33 @@
 
 #include <iostream>
 
-void LogLine(const std::string &text) {
+std::chrono::high_resolution_clock::time_point GetTime() {
+  return std::chrono::high_resolution_clock::now();
+}
+
+int ElapsedTime(std::chrono::high_resolution_clock::time_point start) {
+  auto end = std::chrono::high_resolution_clock::now();
+  auto setup_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+  return setup_duration.count();
+}
+
+void LogLine(const std::string &text, const std::string &suffix) {
   std::ofstream logfile;
-  logfile.open("log_file", std::ios_base::app);
+  logfile.open("log_file_" + suffix, std::ios_base::app);
   logfile << text << "\n";
   logfile.close();
 }
 
-void Log(const std::string &text) {
+void Log(const std::string &text, const std::string &suffix) {
   std::ofstream logfile;
-  logfile.open("log_file", std::ios_base::app);
+  logfile.open("log_file_" + suffix, std::ios_base::app);
   logfile << text;
   logfile.close();
 }
 
-void ClearLog() {
+void ClearLog(const std::string &suffix) {
   std::ofstream logfile;
-  logfile.open("log_file");
+  logfile.open("log_file_" + suffix);
   logfile.close();
 }
 
@@ -1520,9 +1530,10 @@ void NetworkTraining(const std::string &file_name,
                      int validation_samples,
                      int epochs,
                      int batch_size,
-                     bool normalize) {
+                     bool normalize,
+                     const std::string &log_file) {
 
-  ClearLog();
+  ClearLog(log_file);
 
   auto net = std::make_shared<Net>();
 
@@ -1549,9 +1560,14 @@ void NetworkTraining(const std::string &file_name,
         range_magnitudes[1] += ranges[1][card_index];
       }
     }
+    std::vector<double> range_means(2);
+    range_means[0] = range_magnitudes[0] / 1326;
+    range_means[1] = range_magnitudes[1] / 1326;
     for (int card_index = 0; card_index < 1326; card_index++) {
-      training_data_tensor[i][card_index + 52] = ranges[0][card_index] / (normalize ? range_magnitudes[0] : 1);
-      training_data_tensor[i][card_index + 1326 + 52] = ranges[1][card_index] / (normalize ? range_magnitudes[1] : 1);
+      training_data_tensor[i][card_index + 52] =
+          (ranges[0][card_index] / (normalize ? range_magnitudes[0] : 1)) - range_means[0];
+      training_data_tensor[i][card_index + 1326 + 52] =
+          (ranges[1][card_index] / (normalize ? range_magnitudes[1] : 1)) - range_means[1];
 
       training_target_tensor[i][card_index] = cfvs[0][card_index] * 1081 / (normalize ? range_magnitudes[1] : 1);
       training_target_tensor[i][card_index + 1326] = cfvs[1][card_index] * 1081 / (normalize ? range_magnitudes[0] : 1);
@@ -1577,10 +1593,14 @@ void NetworkTraining(const std::string &file_name,
         range_magnitudes[1] += ranges[1][card_index];
       }
     }
-
+    std::vector<double> range_means(2);
+    range_means[0] = range_magnitudes[0] / 1326;
+    range_means[1] = range_magnitudes[1] / 1326;
     for (int card_index = 0; card_index < 1326; card_index++) {
-      validation_data_tensor[i][card_index + 52] = ranges[0][card_index] / (normalize ? range_magnitudes[0] : 1);
-      validation_data_tensor[i][card_index + 1326 + 52] = ranges[1][card_index] / (normalize ? range_magnitudes[1] : 1);
+      validation_data_tensor[i][card_index + 52] =
+          (ranges[0][card_index] / (normalize ? range_magnitudes[0] : 1)) - range_means[0];
+      validation_data_tensor[i][card_index + 1326 + 52] =
+          (ranges[1][card_index] / (normalize ? range_magnitudes[1] : 1)) - range_means[1];
 
       validation_target_tensor[i][card_index] = cfvs[0][card_index] * 1081 / (normalize ? range_magnitudes[1] : 1);
       validation_target_tensor[i][card_index + 1326] =
@@ -1595,29 +1615,29 @@ void NetworkTraining(const std::string &file_name,
   auto optimizer = std::make_shared<torch::optim::Adam>(net->parameters(), torch::optim::AdamOptions(1e-3));
   int batches = training_samples / batch_size;
 
-  LogLine("Initial:   ");
+  LogLine("Initial:   ", log_file);
 
   torch::Tensor init_train_output = net->forward(training_data_tensor);
   torch::Tensor init_train_loss = torch::nn::functional::smooth_l1_loss(init_train_output, training_target_tensor);
   std::cout << "Training loss: " << init_train_loss.item().to<double>() << "\n";
-  Log("Training loss: ");
-  Log(std::to_string(init_train_loss.item().to<double>()));
-  Log("   ");
+  Log("Training loss: ", log_file);
+  Log(std::to_string(init_train_loss.item().to<double>()), log_file);
+  Log("   ", log_file);
 
   torch::Tensor init_output = net->forward(validation_data_tensor);
   torch::Tensor init_loss = torch::nn::functional::smooth_l1_loss(init_output, validation_target_tensor);
   std::cout << "Validation loss: " << init_loss.item().to<double>() << "\n";
-  Log("Validation loss: ");
-  Log(std::to_string(init_loss.item().to<double>()));
-  LogLine("   ");
+  Log("Validation loss: ", log_file);
+  Log(std::to_string(init_loss.item().to<double>()), log_file);
+  LogLine("   ", log_file);
 
   oss << init_train_loss.item().to<double>() << " " << init_loss.item().to<double>() << "\n";
 
   for (int epoch = 0; epoch < epochs; epoch++) {
     std::cout << "Epoch " << epoch << ":   ";
-    Log("Epoch ");
-    Log(std::to_string(epoch));
-    LogLine(":   ");
+    Log("Epoch ", log_file);
+    Log(std::to_string(epoch), log_file);
+    LogLine(":   ", log_file);
     double cumulative_loss = 0;
     for (int batch = 0; batch < batches; batch++) {
       int i_s = batch * batch_size;
@@ -1633,33 +1653,49 @@ void NetworkTraining(const std::string &file_name,
         torch::save(net, "models/subgame1_epoch_" + std::to_string(epoch));
       }
     }
-    Log("Training loss: ");
-    Log(std::to_string(cumulative_loss / batches));
-    Log("   ");
+    Log("Training loss: ", log_file);
+    Log(std::to_string(cumulative_loss / batches), log_file);
+    Log("   ", log_file);
     std::cout << "\nTraining loss: " << cumulative_loss / batches << "   ";
     torch::Tensor output = net->forward(validation_data_tensor);
     torch::Tensor loss = torch::nn::functional::smooth_l1_loss(output, validation_target_tensor);
     std::cout << "Validation loss: " << loss.item().to<double>() << "\n";
-    Log("Validation loss: ");
-    Log(std::to_string(loss.item().to<double>()));
-    LogLine("   ");
+    Log("Validation loss: ", log_file);
+    Log(std::to_string(loss.item().to<double>()), log_file);
+    LogLine("   ", log_file);
     oss << cumulative_loss / batches << " " << loss.item().to<double>() << "\n";
   }
 }
 
-std::pair<int, int> NetExploitabilityTrunkStrategy(int iterations, int full_iterations, std::string net_file) {
-//  std::vector<int> board_cards = {1, 3, 5, 9};
-  std::vector<int> board_cards = {23, 28, 30, 32};
+void NetExploitabilityTrunkStrategy(
+    int iterations, int full_iterations, const std::string &net_file,
+    const std::string &log_file, const std::string &poker) {
+  ClearLog(log_file);
+  LogLine("Exploitability experiment", log_file);
+  auto start_time = GetTime();
+  std::vector<int> board_cards;
+  std::string name;
+  if (poker == "full") {
+    board_cards = {23, 28, 30, 32};
+    name = "universal_poker(betting=limit,numPlayers=2,numRounds=4,blind=10 5,"
+           "firstPlayer=2 1,numSuits=4,numRanks=13,numHoleCards=2,numBoardCards=0 3 "
+           "1 1,raiseSize=10 10 20 20,maxRaises=3 4 4 4)";
+  } else {
+    board_cards = {1, 3, 5, 9};
+    name = "universal_poker(betting=limit,numPlayers=2,numRounds=4,blind=10 5,"
+           "firstPlayer=2 1,numSuits=2,numRanks=6,numHoleCards=2,numBoardCards=0 3 "
+           "1 1,raiseSize=10 10 20 20,maxRaises=3 4 4 4)";
+  }
   std::vector<int> action_sequence = {1, 1, 1, 2, 1};
-  std::string name = "universal_poker(betting=limit,numPlayers=2,numRounds=4,blind=10 5,"
-                     "firstPlayer=2 1,numSuits=4,numRanks=13,numHoleCards=2,numBoardCards=0 3 "
-                     "1 1,raiseSize=10 10 20 20,maxRaises=3 4 4 4)";
   std::shared_ptr<const Game> game = LoadGame(name);
 
   std::array<std::vector<double>, 2> ranges = GetReachesFromVector(SUBGAME_ONE_RANGES);
 
   std::unique_ptr<State> state = GetPokerStatesAfterMoves(game, board_cards, action_sequence);
   std::unique_ptr<State> full_state = GetPokerStatesAfterMoves(game, board_cards, action_sequence);
+
+  LogLine("States created: " + std::to_string(ElapsedTime(start_time)), log_file);
+  start_time = GetTime();
 
   auto start = std::chrono::high_resolution_clock::now();
 
@@ -1677,6 +1713,9 @@ std::pair<int, int> NetExploitabilityTrunkStrategy(int iterations, int full_iter
   std::vector<std::shared_ptr<algorithms::InfostateTree>> trees = algorithms::MakePokerInfostateTrees(
       state, chance_reaches, infostate_observer, 1, kDlCfrInfostateTreeStorage, board_cards);
 
+  LogLine("Made DL trees: " + std::to_string(ElapsedTime(start_time)), log_file);
+  start_time = GetTime();
+
   auto out = std::make_shared<Subgame>(game, public_observer, trees);
 
   out->initial_state().beliefs = ranges;
@@ -1690,9 +1729,15 @@ std::pair<int, int> NetExploitabilityTrunkStrategy(int iterations, int full_iter
   SubgameSolver solver = SubgameSolver(out, leaf_evaluator, terminal_evaluator,
                                        std::make_shared<std::mt19937>(0), "RegretMatchingPlus");
 
+  LogLine("Made DL solver: " + std::to_string(ElapsedTime(start_time)), log_file);
+  start_time = GetTime();
+
   // Create solver for full TURN
   std::vector<std::shared_ptr<algorithms::InfostateTree>> full_trees = algorithms::MakePokerInfostateTrees(
       full_state, full_chance_reaches, infostate_observer, 1000, kDlCfrInfostateTreeStorage, board_cards);
+
+  LogLine("Made full trees: " + std::to_string(ElapsedTime(start_time)), log_file);
+  start_time = GetTime();
 
   auto full_out = std::make_shared<Subgame>(game, public_observer, full_trees);
 
@@ -1701,12 +1746,16 @@ std::pair<int, int> NetExploitabilityTrunkStrategy(int iterations, int full_iter
   SubgameSolver full_solver = SubgameSolver(full_out, nullptr, terminal_evaluator,
                                             std::make_shared<std::mt19937>(0), "RegretMatchingPlus");
 
-  auto end = std::chrono::high_resolution_clock::now();
-  auto setup_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-  start = std::chrono::high_resolution_clock::now();
-  solver.RunSimultaneousIterations(iterations);
-  end = std::chrono::high_resolution_clock::now();
-  auto run_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+  LogLine("Made full solver: " + std::to_string(ElapsedTime(start_time)), log_file);
+  start_time = GetTime();
+
+  for (int iteration = 0; iteration < iterations; iteration++) {
+    solver.RunSimultaneousIterations(1, true);
+    LogLine("Iteration: " + std::to_string(iteration), log_file);
+  }
+
+  LogLine("Computed trunk strategy: " + std::to_string(ElapsedTime(start_time)), log_file);
+  start_time = GetTime();
 
   auto strategy = solver.AveragePolicy();
 
@@ -1722,12 +1771,15 @@ std::pair<int, int> NetExploitabilityTrunkStrategy(int iterations, int full_iter
     }
   }
 
+  LogLine("Created separated policies from trunk strategy: " + std::to_string(ElapsedTime(start_time)), log_file);
+  start_time = GetTime();
+
   double nash_conv = 0;
 
   for (int player = 0; player < 2; player++) {
     SubgameSolver best_response = SubgameSolver(full_out, nullptr, terminal_evaluator,
                                                 std::make_shared<std::mt19937>(0), "RegretMatchingPlus");
-        algorithms::BanditVector &bandits = best_response.bandits()[player];
+    algorithms::BanditVector &bandits = best_response.bandits()[player];
     for (algorithms::DecisionId id : bandits.range()) {
       algorithms::InfostateNode *node = best_response.subgame()->trees[player]->decision_infostate(id);
       const std::string &infostate = node->infostate_string();
@@ -1736,7 +1788,18 @@ std::pair<int, int> NetExploitabilityTrunkStrategy(int iterations, int full_iter
         bandits[id] = std::make_unique<algorithms::bandits::FixedStrategy>(GetProbs(infostate_policy));
       }
     }
-    best_response.RunSimultaneousIterations(full_iterations);
+
+    LogLine("Prepared solver for DL BR: " + std::to_string(ElapsedTime(start_time)), log_file);
+    start_time = GetTime();
+
+    for (int full_iteration = 0; full_iteration < full_iterations; full_iteration++) {
+      best_response.RunSimultaneousIterations(1);
+      LogLine("Iteration " + std::to_string(full_iteration), log_file);
+    }
+
+    LogLine("Solved the exploitability: " + std::to_string(ElapsedTime(start_time)), log_file);
+    start_time = GetTime();
+
     auto response_strategy = best_response.AveragePolicy();
     for (Player bandit_player = 0; bandit_player < 2; bandit_player++) {
       auto policy = best_response.AveragePolicy();
@@ -1750,19 +1813,28 @@ std::pair<int, int> NetExploitabilityTrunkStrategy(int iterations, int full_iter
         }
       }
     }
+
+    LogLine("Copied strategies: " + std::to_string(ElapsedTime(start_time)), log_file);
+    start_time = GetTime();
+
     best_response.Reset();
     best_response.RunSimultaneousIterations(2);
     std::cout << "Best response: " << best_response.RootValues() << "\n";
-    nash_conv += best_response.RootValues()[1-player];
+    Log("Best response ", log_file);
+    Log(std::to_string(best_response.RootValues()[1]) + ", ", log_file);
+    LogLine(std::to_string(best_response.RootValues()[1]), log_file);
+    nash_conv += best_response.RootValues()[1 - player];
+
+    LogLine("Best response evaluated: " + std::to_string(ElapsedTime(start_time)), log_file);
+    start_time = GetTime();
   }
   std::cout << "Exploitability: " << nash_conv / 2 << "\n";
-
-  return std::pair<int, int>(setup_duration.count(), run_duration.count());
+  LogLine("Exploitability: " + std::to_string(nash_conv / 2), log_file);
 }
 
 void ComputeNetLosses(const std::string &data_file, int samples_from, int samples,
-                      const std::string &net_directory, int models, bool normalize) {
-  ClearLog();
+                      const std::string &net_directory, int models, bool normalize, const std::string &log_file) {
+  ClearLog(log_file);
 
   auto net = std::make_shared<Net>();
 
@@ -1821,13 +1893,26 @@ void ComputeNetLosses(const std::string &data_file, int samples_from, int sample
   }
 }
 
-std::pair<int, int> CDBR(int iterations, int bad_iterations, const std::string &net_file) {
-//  std::vector<int> board_cards = {1, 3, 5, 9};
-  std::vector<int> board_cards = {23, 28, 30, 32};
+void CDBR(int iterations, int bad_iterations,
+          const std::string &net_file, const std::string &log_file, const std::string &poker) {
+  ClearLog(log_file);
+  LogLine("Started CDBR", log_file);
+
+  auto start = GetTime();
+  std::vector<int> board_cards;
+  std::string name;
+  if (poker == "full") {
+    board_cards = {23, 28, 30, 32};
+    name = "universal_poker(betting=limit,numPlayers=2,numRounds=4,blind=10 5,"
+           "firstPlayer=2 1,numSuits=4,numRanks=13,numHoleCards=2,numBoardCards=0 3 "
+           "1 1,raiseSize=10 10 20 20,maxRaises=3 4 4 4)";
+  } else {
+    board_cards = {1, 3, 5, 9};
+    name = "universal_poker(betting=limit,numPlayers=2,numRounds=4,blind=10 5,"
+           "firstPlayer=2 1,numSuits=2,numRanks=6,numHoleCards=2,numBoardCards=0 3 "
+           "1 1,raiseSize=10 10 20 20,maxRaises=3 4 4 4)";
+  }
   std::vector<int> action_sequence = {1, 1, 1, 2, 1};
-  std::string name = "universal_poker(betting=limit,numPlayers=2,numRounds=4,blind=10 5,"
-                     "firstPlayer=2 1,numSuits=4,numRanks=13,numHoleCards=2,numBoardCards=0 3 "
-                     "1 1,raiseSize=10 10 20 20,maxRaises=3 4 4 4)";
   std::shared_ptr<const Game> game = LoadGame(name);
 
   std::array<std::vector<double>, 2> ranges = GetReachesFromVector(SUBGAME_ONE_RANGES);
@@ -1835,7 +1920,8 @@ std::pair<int, int> CDBR(int iterations, int bad_iterations, const std::string &
   std::unique_ptr<State> state = GetPokerStatesAfterMoves(game, board_cards, action_sequence);
   std::unique_ptr<State> full_state = GetPokerStatesAfterMoves(game, board_cards, action_sequence);
 
-  auto start = std::chrono::high_resolution_clock::now();
+  LogLine("States created: " + std::to_string(ElapsedTime(start)), log_file);
+  start = GetTime();
 
   std::shared_ptr<Observer> infostate_observer = game->MakeObserver(kInfoStateObsType, {});
   std::shared_ptr<Observer> public_observer = game->MakeObserver(kPublicStateObsType, {});
@@ -1851,6 +1937,9 @@ std::pair<int, int> CDBR(int iterations, int bad_iterations, const std::string &
   std::vector<std::shared_ptr<algorithms::InfostateTree>> trees = algorithms::MakePokerInfostateTrees(
       state, chance_reaches, infostate_observer, 1, kDlCfrInfostateTreeStorage, board_cards);
 
+  LogLine("Trees done: " + std::to_string(ElapsedTime(start)), log_file);
+  start = GetTime();
+
   auto out = std::make_shared<Subgame>(game, public_observer, trees);
 
   out->initial_state().beliefs = ranges;
@@ -1864,9 +1953,15 @@ std::pair<int, int> CDBR(int iterations, int bad_iterations, const std::string &
   SubgameSolver solver = SubgameSolver(out, leaf_evaluator, terminal_evaluator,
                                        std::make_shared<std::mt19937>(0), "RegretMatchingPlus");
 
+  LogLine("Solver done: " + std::to_string(ElapsedTime(start)), log_file);
+  start = GetTime();
+
   // Create solver for full TURN
   std::vector<std::shared_ptr<algorithms::InfostateTree>> full_trees = algorithms::MakePokerInfostateTrees(
       full_state, full_chance_reaches, infostate_observer, 1000, kDlCfrInfostateTreeStorage, board_cards);
+
+  LogLine("Full trees done: " + std::to_string(ElapsedTime(start)), log_file);
+  start = GetTime();
 
   auto full_out = std::make_shared<Subgame>(game, public_observer, full_trees);
 
@@ -1874,6 +1969,9 @@ std::pair<int, int> CDBR(int iterations, int bad_iterations, const std::string &
 
   SubgameSolver full_solver = SubgameSolver(full_out, nullptr, terminal_evaluator,
                                             std::make_shared<std::mt19937>(0), "RegretMatchingPlus");
+
+  LogLine("Full solver done: " + std::to_string(ElapsedTime(start)), log_file);
+  start = GetTime();
 
   full_solver.RunSimultaneousIterations(bad_iterations);
 
@@ -1891,28 +1989,8 @@ std::pair<int, int> CDBR(int iterations, int bad_iterations, const std::string &
     }
   }
 
-  auto end = std::chrono::high_resolution_clock::now();
-  auto setup_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-  start = std::chrono::high_resolution_clock::now();
-  solver.RunSimultaneousIterations(iterations);
-  end = std::chrono::high_resolution_clock::now();
-  auto run_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-
-  auto strategy = solver.AveragePolicy();
-
-  std::cout << "Solved network part\n";
-
-  std::array<TabularPolicy, 2> separated_policies = {TabularPolicy(), TabularPolicy()};
-
-  for (int player = 0; player < 2; player++) {
-    algorithms::BanditVector &bandits = solver.bandits()[player];
-    for (algorithms::DecisionId id : bandits.range()) {
-      algorithms::InfostateNode *node = solver.subgame()->trees[player]->decision_infostate(id);
-      const std::string &infostate = node->infostate_string();
-      ActionsAndProbs infostate_policy = strategy->GetStatePolicy(infostate);
-      separated_policies[player].SetStatePolicy(infostate, infostate_policy);
-    }
-  }
+  LogLine("Bad policy generation: " + std::to_string(ElapsedTime(start)), log_file);
+  start = GetTime();
 
   std::vector<algorithms::BanditVector> dl_bandits = MakeResponseBandits(trees, bad_separated_policies[1]);
 
@@ -1920,7 +1998,16 @@ std::pair<int, int> CDBR(int iterations, int bad_iterations, const std::string &
     solver.bandits()[1][id] = std::move(dl_bandits[1][id]);
   }
 
-  solver.RunSimultaneousIterations(iterations);
+  LogLine("Response saving: " + std::to_string(ElapsedTime(start)), log_file);
+  start = GetTime();
+
+  for (int iteration = 0; iteration < iterations; iteration++) {
+    solver.RunSimultaneousIterations(1, true);
+    LogLine("Iteration: " + std::to_string(iteration), log_file);
+  }
+
+  LogLine("Rest of the response computation: " + std::to_string(ElapsedTime(start)), log_file);
+  start = GetTime();
 
   auto cdbr_trunk = solver.AveragePolicy();
 
@@ -1934,18 +2021,30 @@ std::pair<int, int> CDBR(int iterations, int bad_iterations, const std::string &
   }
 
   SubgameSolver cdbr_solver = SubgameSolver(full_out, nullptr, terminal_evaluator,
-                                              std::make_shared<std::mt19937>(0), "RegretMatchingPlus");
+                                            std::make_shared<std::mt19937>(0), "RegretMatchingPlus");
   cdbr_solver.bandits() = MakeResponseBandits(full_trees, cdbr_policy_with_opponent);
+
+  LogLine("Response saving for BR: " + std::to_string(ElapsedTime(start)), log_file);
+  start = GetTime();
+
   cdbr_solver.RunSimultaneousIterations(2);
   std::cout << "CD best response: " << cdbr_solver.RootValues() << "\n";
+  LogLine("CD best response: " + std::to_string(cdbr_solver.RootValues()[0]) + ", "
+              + std::to_string(cdbr_solver.RootValues()[1]) + "\n", log_file);
+
+  LogLine("BR: " + std::to_string(ElapsedTime(start)), log_file);
+  start = GetTime();
 
   SubgameSolver best_response = SubgameSolver(full_out, nullptr, terminal_evaluator,
-                                            std::make_shared<std::mt19937>(0), "RegretMatchingPlus");
+                                              std::make_shared<std::mt19937>(0), "RegretMatchingPlus");
   best_response.bandits() = MakeResponseBandits(full_trees, bad_separated_policies[1]);
   best_response.RunSimultaneousIterations(2);
-  std::cout << "Best response: " <<best_response.RootValues() << "\n";
+  std::cout << "Best response: " << best_response.RootValues() << "\n";
+  LogLine("Best response: " + std::to_string(best_response.RootValues()[0]) + ", "
+              + std::to_string(best_response.RootValues()[1]) + "\n", log_file);
 
-  return std::pair<int, int>(setup_duration.count(), run_duration.count());
+  LogLine("Full BR: " + std::to_string(ElapsedTime(start)), log_file);
+  start = GetTime();
 }
 
 }
@@ -2101,9 +2200,10 @@ int main(int argc, char **argv) {
     int validation_samples = std::atoi(argv[4]);
     int epochs = std::atoi(argv[5]);
     int batch_size = std::atoi(argv[6]);
+    std::string log_file = argv[7];
     bool normalize = true;
     open_spiel::papers_with_code::NetworkTraining(
-        file_template, training_samples, validation_samples, epochs, batch_size, normalize);
+        file_template, training_samples, validation_samples, epochs, batch_size, normalize, log_file);
   }
 
   if(strcmp(argv[1], "test") == 0) {
@@ -2112,20 +2212,26 @@ int main(int argc, char **argv) {
     int samples_from = std::atoi(argv[4]);
     int samples = std::atoi(argv[5]);
     int models = std::atoi(argv[6]);
-    open_spiel::papers_with_code::ComputeNetLosses(data_file, samples_from, samples, net_dir, models, true);
+    std::string log_file = argv[7];
+    open_spiel::papers_with_code::ComputeNetLosses(data_file, samples_from, samples, net_dir, models, true, log_file);
   }
 
   if (strcmp(argv[1], "expl") == 0) {
     std::string net_file = argv[2];
     int iterations = std::atoi(argv[3]);
     int full_iterations = std::atoi(argv[4]);
-    open_spiel::papers_with_code::NetExploitabilityTrunkStrategy(iterations, full_iterations, net_file);
+    std::string log_file = argv[5];
+    std::string poker = argv[6];
+    open_spiel::papers_with_code::NetExploitabilityTrunkStrategy(
+        iterations, full_iterations, net_file, log_file, poker);
   }
 
   if (strcmp(argv[1], "cdbr") == 0) {
     std::string net_file = argv[2];
     int iterations = std::atoi(argv[3]);
     int bad_iterations = std::atoi(argv[4]);
-    open_spiel::papers_with_code::CDBR(iterations, bad_iterations, net_file);
+    std::string log_file = argv[5];
+    std::string poker = argv[6];
+    open_spiel::papers_with_code::CDBR(iterations, bad_iterations, net_file, log_file, poker);
   }
 }

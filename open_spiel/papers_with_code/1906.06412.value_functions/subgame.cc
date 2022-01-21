@@ -394,8 +394,13 @@ std::unique_ptr<PublicStateContext> GeneralPokerTerminalEvaluatorLinear::CreateC
 RiverNetworkPublicStateContext::RiverNetworkPublicStateContext(const PublicState &state) {
   const auto &poker_state =
       open_spiel::down_cast<const universal_poker::UniversalPokerState &>(*state.nodes[0][0]->corresponding_states()[0]);
-  data_tensor[0][2704] = poker_state.GetCurrentPot();
-  data_tensor[0][poker_state.History().back()] = 1;
+  pot_ = poker_state.GetCurrentPot();
+  card_ = poker_state.History().back();
+  int i = 0;
+  while(state.nodes[0][i]->corresponding_chance_reach_probs()[0] == 0) {
+    i++;
+  }
+  chance_reach_ = state.nodes[0][i]->corresponding_chance_reach_probs()[0];
 }
 
 std::unique_ptr<PublicStateContext> RiverNetworkLeafEvaluator::CreateContext(const PublicState &state) const {
@@ -407,22 +412,37 @@ RiverNetworkLeafEvaluator::RiverNetworkLeafEvaluator(const std::string &network_
 }
 
 void RiverNetworkLeafEvaluator::EvaluatePublicState(PublicState *state, PublicStateContext *context) const {
-  auto *net_context = open_spiel::down_cast<RiverNetworkPublicStateContext *>(context);
-  std::vector<double> belief_magnitudes(2,0.);
-  for (int belief_index = 0; belief_index < state->beliefs[0].size(); belief_index++) {
-    for(Player player = 0; player < 2; player++) {
-      belief_magnitudes[player] += state->beliefs[player][belief_index];
-    }
-  }
-  for (int belief_index = 0; belief_index < state->beliefs[0].size(); belief_index++) {
-    net_context->data_tensor[0][52 + belief_index] = state->beliefs[0][belief_index] / belief_magnitudes[0];
-    net_context->data_tensor[0][1326 + 52 + belief_index] = state->beliefs[0][belief_index] / belief_magnitudes[1];
-  }
-  torch::Tensor output = net->forward(net_context->data_tensor);
-  for (int value_index = 0; value_index < state->values[0].size(); value_index++) {
-    state->values[0][value_index] = output[0][value_index].item<double>() * belief_magnitudes[1];
-    state->values[1][value_index] = output[0][value_index + 1326].item<double>() * belief_magnitudes[0];
-  }
+  SpielFatalError("Evaluation should be done in bulk.");
+//  auto *net_context = open_spiel::down_cast<RiverNetworkPublicStateContext *>(context);
+//  std::vector<double> belief_magnitudes(2, 0.);
+//  for (int belief_index = 0; belief_index < state->beliefs[0].size(); belief_index++) {
+//    for (Player player = 0; player < 2; player++) {
+//      belief_magnitudes[player] += state->beliefs[player][belief_index];
+//    }
+//  }
+//  for(Player pl = 0; pl < 2; pl++) {
+//    if(belief_magnitudes[pl] < 0.001) {
+//      belief_magnitudes[pl] = 1;
+//    }
+//  }
+//  std::vector<double> belief_means(2);
+//  belief_means[0] = belief_magnitudes[0] / 1326;
+//  belief_means[1] = belief_magnitudes[1] / 1326;
+//  for (int belief_index = 0; belief_index < state->beliefs[0].size(); belief_index++) {
+//    net_context->data_tensor[0][52 + belief_index] =
+//        (state->beliefs[0][belief_index] / belief_magnitudes[0]) - belief_means[0];
+//    net_context->data_tensor[0][1326 + 52 + belief_index] =
+//        (state->beliefs[1][belief_index] / belief_magnitudes[1]) - belief_means[1];
+//  }
+//  torch::Tensor output = net->forward(net_context->data_tensor);
+//  for (int value_index = 0; value_index < state->values[0].size(); value_index++) {
+//    state->values[0][value_index] = output[0][value_index].item<double>() * belief_magnitudes[1];
+//    state->values[1][value_index] = output[0][value_index + 1326].item<double>() * belief_magnitudes[0];
+//  }
+}
+
+torch::Tensor RiverNetworkLeafEvaluator::EvaluateAllStates(const torch::Tensor &input) const {
+  return net->forward(input);
 }
 
 // General poker evaluator
@@ -970,7 +990,7 @@ std::shared_ptr<Policy> SubgameSolver::CurrentPolicy() {
                                                             bandits_);
 }
 
-void SubgameSolver::RunSimultaneousIterations(int iterations) {
+void SubgameSolver::RunSimultaneousIterations(int iterations, bool network_evaluation) {
   for (int t = 0; t < iterations; ++t) {
     ++num_iterations_;
 
@@ -1008,7 +1028,11 @@ void SubgameSolver::RunSimultaneousIterations(int iterations) {
     }
 
     // 3. Evaluate leaves using current reach probs.
-    EvaluateLeaves();
+    if (network_evaluation) {
+      EvaluateLeavesNetwork();
+    } else {
+      EvaluateLeaves();
+    }
 
     // 4. Propagate updated values up the tree.
     for (int pl = 0; pl < 2; ++pl) {
@@ -1026,6 +1050,77 @@ void SubgameSolver::RunSimultaneousIterations(int iterations) {
 
   if (init_save_values_ == PolicySelection::kCurrentPolicy) {
     CopyCurrentValuesToInitialState();
+  }
+}
+
+void SubgameSolver::EvaluateLeavesNetwork() {
+  SPIEL_CHECK_EQ(subgame()->public_states.size(), contexts_.size());
+  int network_leaf_states = 0;
+  for (int i = 0; i < subgame()->public_states.size(); ++i) {
+    PublicState *state = &subgame()->public_states[i];
+    if (state->IsLeaf() and !state->IsTerminal()) {
+      network_leaf_states++;
+    }
+  }
+  std::vector<std::vector<double>> normalization_factors;
+  normalization_factors.reserve(network_leaf_states);
+  torch::Tensor network_input = torch::zeros({network_leaf_states, 2705});
+  int state_index = 0;
+  for (int i = 0; i < subgame()->public_states.size(); ++i) {
+    PublicState *state = &subgame()->public_states[i];
+    if (!state->IsLeaf()) continue;
+    PublicStateContext *context = contexts_[i].get();
+    if (state->IsTerminal()) {
+      EvaluateLeaf(state, context);
+    } else {
+      std::vector<double> range_magnitudes(2, 0.);
+      std::vector<double> range_means(2, 0.);
+      for (int pl = 0; pl < 2; pl++) {
+        const int num_leaves = state->nodes[pl].size();
+        for (int j = 0; j < num_leaves; ++j) {
+          const algorithms::InfostateNode *leaf_node = state->nodes[pl][j];
+          const int trunk_position = state->nodes_positions.at(leaf_node);
+          range_magnitudes[pl] += reach_probs_[pl][trunk_position];
+        }
+        if (range_magnitudes[pl] < 0.001) {
+          range_magnitudes[pl] = 1;
+        }
+        range_means[pl] = range_magnitudes[pl] / 1326;
+        for (int j = 0; j < num_leaves; ++j) {
+          const algorithms::InfostateNode *leaf_node = state->nodes[pl][j];
+          const int trunk_position = state->nodes_positions.at(leaf_node);
+          network_input[state_index][j + 52 + 1326 * pl] =
+              (reach_probs_[pl][trunk_position] / range_magnitudes[pl]) - range_means[pl];
+        }
+      }
+      normalization_factors.push_back(range_magnitudes);
+      auto *net_context = open_spiel::down_cast<RiverNetworkPublicStateContext *>(context);
+      network_input[state_index][2704] = net_context->pot_;
+      network_input[state_index][net_context->card_] = 1;
+      state_index++;
+    }
+  }
+  const auto net_evaluator = open_spiel::down_cast<const RiverNetworkLeafEvaluator>(*nonterminal_evaluator_);
+  torch::Tensor network_output = net_evaluator.EvaluateAllStates(network_input);
+  state_index = 0;
+  for (int i = 0; i < subgame()->public_states.size(); ++i) {
+    PublicState *state = &subgame()->public_states[i];
+    if (!state->IsLeaf()) continue;
+    if (!state->IsTerminal()) {
+      PublicStateContext *context = contexts_[i].get();
+      auto *net_context = open_spiel::down_cast<RiverNetworkPublicStateContext *>(context);
+      for (int pl = 0; pl < 2; pl++) {
+        const int num_leaves = state->nodes[pl].size();
+        for (int j = 0; j < num_leaves; ++j) {
+          const algorithms::InfostateNode *leaf_node = state->nodes[pl][j];
+          const int trunk_position = state->nodes_positions.at(leaf_node);
+          cf_values_[pl][trunk_position] =
+              network_output[state_index][j + 1326 * pl].item<double>()
+                  * normalization_factors[state_index][1 - pl] * net_context->chance_reach_;
+        }
+      }
+      state_index++;
+    }
   }
 }
 
@@ -1153,9 +1248,9 @@ void SubgameSolver::IncrementallyAverageValuesInState(PublicState *state) {
 double RootCfValue(int root_branching_factor,
                    absl::Span<const double> cf_values,
                    absl::Span<const double> range) {
-  SPIEL_CHECK_TRUE(range.empty() ||
-      (range.size() == root_branching_factor
-          && range.size() == cf_values.size()));
+//  SPIEL_CHECK_TRUE(range.empty() ||
+//      (range.size() == root_branching_factor
+//          && range.size() == cf_values.size()));
   double root_cf_value = 0.;
   if (range.empty()) {
     for (int i = 0; i < root_branching_factor; ++i) {
@@ -1171,8 +1266,8 @@ double RootCfValue(int root_branching_factor,
 
 std::vector<double> SubgameSolver::RootValues() const {
   return {
-      RootCfValue(subgame_->trees[0]->root_branching_factor(), cf_values_[0]),
-      RootCfValue(subgame_->trees[1]->root_branching_factor(), cf_values_[1])
+      RootCfValue(subgame_->trees[0]->root_branching_factor(), cf_values_[0], subgame_->initial_state().beliefs[0]),
+      RootCfValue(subgame_->trees[1]->root_branching_factor(), cf_values_[1], subgame_->initial_state().beliefs[1])
   };
 }
 

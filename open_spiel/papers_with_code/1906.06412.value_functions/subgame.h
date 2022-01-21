@@ -234,7 +234,9 @@ class PublicStateEvaluator {
 
 // River network evaluator
 struct RiverNetworkPublicStateContext final : public PublicStateContext {
-  torch::Tensor data_tensor = torch::zeros({1, 2705});
+  int pot_;
+  int card_;
+  double chance_reach_;
   explicit RiverNetworkPublicStateContext(const PublicState &state);
 };
 
@@ -245,6 +247,7 @@ class RiverNetworkLeafEvaluator final : public PublicStateEvaluator {
       const PublicState &state) const override;
   void EvaluatePublicState(
       PublicState *state, PublicStateContext *context) const override;
+  torch::Tensor EvaluateAllStates(const torch::Tensor &input) const;
  private:
   std::shared_ptr<Net> net = std::make_shared<Net>();
 };
@@ -365,7 +368,7 @@ class SubgameSolver {
       bool beliefs_for_average = false,
       double noisy_values = 0.);
 
-  void RunSimultaneousIterations(int iterations);
+  void RunSimultaneousIterations(int iterations, bool network_evaluation = false);
   void Reset();
 
   // Accessors.
@@ -378,6 +381,7 @@ class SubgameSolver {
   std::shared_ptr<Policy> CurrentPolicy();
   std::vector<std::vector<double>> GetCfValues() const { return cf_values_;};
   std::vector<double> RootValues() const;
+  std::vector<std::vector<double>> GetReaches() const {return reach_probs_;};
  private:
   const std::shared_ptr<Subgame> subgame_;
   const std::shared_ptr<const PublicStateEvaluator> nonterminal_evaluator_;
@@ -401,6 +405,7 @@ class SubgameSolver {
   PolicySelection init_save_values_;
 
   void EvaluateLeaves();
+  void EvaluateLeavesNetwork();
   void EvaluateLeaf(PublicState* state, PublicStateContext* context);
   void CopyCurrentValuesToInitialState();
   void IncrementallyAverageValuesInState(PublicState* state);
