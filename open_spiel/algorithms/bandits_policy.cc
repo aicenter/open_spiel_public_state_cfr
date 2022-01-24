@@ -43,6 +43,32 @@ std::vector<BanditVector> MakeBanditVectors(
   return out;
 }
 
+TabularPolicy BanditsPolicy::TabularizeAveragePlayer(Player player) {
+  SPIEL_CHECK_LE(player, trees_.size() - 1);
+  SPIEL_CHECK_GE(player, 0);
+  TabularPolicy policy;
+  for(InfostateNode * node : trees_[player]->AllDecisionInfostates()) {
+    const bandits::Bandit* bandit = bandits_[player][node->decision_id()].get();
+    std::vector<double> probs;
+    probs = bandit->AverageStrategy();
+    std::vector<std::pair<Action, double>> out;
+    const std::vector<Action>& actions = node->legal_actions();
+    Zip(actions.begin(), actions.end(), probs.begin(), out);
+    policy.SetStatePolicy(node->infostate_string(), out);
+  }
+  return policy;
+}
+
+std::vector<TabularPolicy> BanditsPolicy::TabularizeAverage() {
+  std::vector<TabularPolicy> policies(trees_.size());
+
+  for(Player player = 0; player < trees_.size(); player++) {
+    policies[player] = (TabularizeAveragePlayer(player));
+  }
+
+  return policies;
+}
+
 ActionsAndProbs BanditsPolicy::GetInfoStatePolicy(
     const std::string& info_state,
     PolicySelection selection) const {

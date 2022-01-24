@@ -1697,8 +1697,6 @@ void NetExploitabilityTrunkStrategy(
   LogLine("States created: " + std::to_string(ElapsedTime(start_time)), log_file);
   start_time = GetTime();
 
-  auto start = std::chrono::high_resolution_clock::now();
-
   std::shared_ptr<Observer> infostate_observer = game->MakeObserver(kInfoStateObsType, {});
   std::shared_ptr<Observer> public_observer = game->MakeObserver(kPublicStateObsType, {});
 
@@ -1757,19 +1755,22 @@ void NetExploitabilityTrunkStrategy(
   LogLine("Computed trunk strategy: " + std::to_string(ElapsedTime(start_time)), log_file);
   start_time = GetTime();
 
-  auto strategy = solver.AveragePolicy();
+  auto strategy = down_cast<algorithms::BanditsAveragePolicy>(*solver.AveragePolicy());
 
   std::array<TabularPolicy, 2> separated_policies = {TabularPolicy(), TabularPolicy()};
 
-  for (int player = 0; player < 2; player++) {
-    algorithms::BanditVector &bandits = solver.bandits()[player];
-    for (algorithms::DecisionId id : bandits.range()) {
-      algorithms::InfostateNode *node = solver.subgame()->trees[player]->decision_infostate(id);
-      const std::string &infostate = node->infostate_string();
-      ActionsAndProbs infostate_policy = strategy->GetStatePolicy(infostate);
-      separated_policies[player].SetStatePolicy(infostate, infostate_policy);
-    }
-  }
+  separated_policies[0] = strategy.TabularizeAveragePlayer(0);
+  separated_policies[1] = strategy.TabularizeAveragePlayer(1);
+
+//  for (int player = 0; player < 2; player++) {
+//    algorithms::BanditVector &bandits = solver.bandits()[player];
+//    for (algorithms::DecisionId id : bandits.range()) {
+//      algorithms::InfostateNode *node = solver.subgame()->trees[player]->decision_infostate(id);
+//      const std::string &infostate = node->infostate_string();
+//      ActionsAndProbs infostate_policy = strategy->GetStatePolicy(infostate);
+//      separated_policies[player].SetStatePolicy(infostate, infostate_policy);
+//    }
+//  }
 
   LogLine("Created separated policies from trunk strategy: " + std::to_string(ElapsedTime(start_time)), log_file);
   start_time = GetTime();
@@ -1783,7 +1784,7 @@ void NetExploitabilityTrunkStrategy(
     for (algorithms::DecisionId id : bandits.range()) {
       algorithms::InfostateNode *node = best_response.subgame()->trees[player]->decision_infostate(id);
       const std::string &infostate = node->infostate_string();
-      ActionsAndProbs infostate_policy = strategy->GetStatePolicy(infostate);
+      ActionsAndProbs infostate_policy = strategy.GetStatePolicy(infostate);
       if (!infostate_policy.empty()) {
         bandits[id] = std::make_unique<algorithms::bandits::FixedStrategy>(GetProbs(infostate_policy));
       }
@@ -1800,14 +1801,16 @@ void NetExploitabilityTrunkStrategy(
     LogLine("Solved the exploitability: " + std::to_string(ElapsedTime(start_time)), log_file);
     start_time = GetTime();
 
-    auto response_strategy = best_response.AveragePolicy();
+    auto response_strategy = down_cast<algorithms::BanditsAveragePolicy>(*best_response.AveragePolicy());
+    auto separated_response_strategy = response_strategy.TabularizeAverage();
+
     for (Player bandit_player = 0; bandit_player < 2; bandit_player++) {
       auto policy = best_response.AveragePolicy();
       algorithms::BanditVector &local_bandits = best_response.bandits()[bandit_player];
       for (algorithms::DecisionId id : local_bandits.range()) {
         algorithms::InfostateNode *node = best_response.subgame()->trees[bandit_player]->decision_infostate(id);
         const std::string &infostate = node->infostate_string();
-        ActionsAndProbs infostate_policy = response_strategy->GetStatePolicy(infostate);
+        ActionsAndProbs infostate_policy = separated_response_strategy[bandit_player].GetStatePolicy(infostate);
         if (!infostate_policy.empty()) {
           local_bandits[id] = std::make_unique<algorithms::bandits::FixedStrategy>(GetProbs(infostate_policy));
         }
@@ -1898,6 +1901,7 @@ void CDBR(int iterations, int bad_iterations,
   ClearLog(log_file);
   LogLine("Started CDBR", log_file);
 
+  auto complete_beginning = GetTime();
   auto start = GetTime();
   std::vector<int> board_cards;
   std::string name;
@@ -1975,21 +1979,17 @@ void CDBR(int iterations, int bad_iterations,
 
   full_solver.RunSimultaneousIterations(bad_iterations);
 
-  auto bad_strategy = full_solver.AveragePolicy();
+  auto bad_policy = down_cast<algorithms::BanditsAveragePolicy>(*full_solver.AveragePolicy());
+
+  LogLine("Bad policy creation: " + std::to_string(ElapsedTime(start)), log_file);
+  start = GetTime();
 
   std::array<TabularPolicy, 2> bad_separated_policies = {TabularPolicy(), TabularPolicy()};
 
-  for (int player = 0; player < 2; player++) {
-    algorithms::BanditVector &bandits = full_solver.bandits()[player];
-    for (algorithms::DecisionId id : bandits.range()) {
-      algorithms::InfostateNode *node = full_solver.subgame()->trees[player]->decision_infostate(id);
-      const std::string &infostate = node->infostate_string();
-      ActionsAndProbs infostate_policy = bad_strategy->GetStatePolicy(infostate);
-      bad_separated_policies[player].SetStatePolicy(infostate, infostate_policy);
-    }
-  }
+  bad_separated_policies[0] = bad_policy.TabularizeAveragePlayer(0);
+  bad_separated_policies[1] = bad_policy.TabularizeAveragePlayer(1);
 
-  LogLine("Bad policy generation: " + std::to_string(ElapsedTime(start)), log_file);
+  LogLine("Bad policy copying: " + std::to_string(ElapsedTime(start)), log_file);
   start = GetTime();
 
   std::vector<algorithms::BanditVector> dl_bandits = MakeResponseBandits(trees, bad_separated_policies[1]);
@@ -2009,16 +2009,10 @@ void CDBR(int iterations, int bad_iterations,
   LogLine("Rest of the response computation: " + std::to_string(ElapsedTime(start)), log_file);
   start = GetTime();
 
-  auto cdbr_trunk = solver.AveragePolicy();
+  auto cdbr_trunk = down_cast<algorithms::BanditsAveragePolicy>(*solver.AveragePolicy());
 
   auto cdbr_policy_with_opponent = bad_separated_policies[1];
-  algorithms::BanditVector &bandits = solver.bandits()[0];
-  for (algorithms::DecisionId id : bandits.range()) {
-    algorithms::InfostateNode *node = solver.subgame()->trees[0]->decision_infostate(id);
-    const std::string &infostate = node->infostate_string();
-    ActionsAndProbs infostate_policy = cdbr_trunk->GetStatePolicy(infostate);
-    cdbr_policy_with_opponent.SetStatePolicy(infostate, infostate_policy);
-  }
+  cdbr_policy_with_opponent.ImportPolicy(cdbr_trunk.TabularizeAveragePlayer(0));
 
   SubgameSolver cdbr_solver = SubgameSolver(full_out, nullptr, terminal_evaluator,
                                             std::make_shared<std::mt19937>(0), "RegretMatchingPlus");
@@ -2044,7 +2038,8 @@ void CDBR(int iterations, int bad_iterations,
               + std::to_string(best_response.RootValues()[1]) + "\n", log_file);
 
   LogLine("Full BR: " + std::to_string(ElapsedTime(start)), log_file);
-  start = GetTime();
+
+  LogLine("Full time: " + std::to_string(ElapsedTime(complete_beginning)), log_file);
 }
 
 }

@@ -53,6 +53,8 @@ class BanditsPolicy : public Policy {
       const std::vector<BanditVector>& bandits)
       : trees_(trees), bandits_(bandits) {}
 
+  TabularPolicy TabularizeAveragePlayer(Player player);
+  std::vector<TabularPolicy> TabularizeAverage();
   ActionsAndProbs GetInfoStatePolicy(
       const std::string& info_state, PolicySelection selection) const;
 };
