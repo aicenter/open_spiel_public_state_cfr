@@ -828,6 +828,106 @@ void GeneralPokerTerminalEvaluatorTurnTest() {
   }
 }
 
+void GeneralPokerTerminalEvaluatorLeducTest() {
+  std::string name = "universal_poker(betting=limit,numPlayers=2,numRounds=2,blind=1 1,"
+                     "firstPlayer=1 1,numSuits=2,numRanks=3,numHoleCards=1,numBoardCards=0 1"
+                     ",raiseSize=2 4,maxRaises=2 2)";
+
+  std::shared_ptr<const Game> game = LoadGame(name);
+
+  std::unique_ptr<State> state = game->NewInitialState();
+
+  state->ApplyAction(0);
+  state->ApplyAction(1);
+
+  std::vector<int> board_cards = {};
+
+  algorithms::PokerData poker_data = algorithms::PokerData(*state);
+
+  std::vector<double> chance_reaches(poker_data.num_hands_, 1. / poker_data.num_hands_);
+
+  std::shared_ptr<Observer> infostate_observer = game->MakeObserver(kInfoStateObsType, {});
+  std::shared_ptr<Observer> public_observer = game->MakeObserver(kPublicStateObsType, {});
+
+  std::vector<std::shared_ptr<algorithms::InfostateTree>> trees = algorithms::MakePokerInfostateTrees(
+      state, chance_reaches, infostate_observer, 1000, kDlCfrInfostateTreeStorage, board_cards);
+
+  auto poker_specific_subgame = std::make_shared<Subgame>(game, public_observer, trees);
+
+  std::shared_ptr<const PublicStateEvaluator>
+      poker_terminal_evaluator = std::make_shared<const GeneralPokerTerminalEvaluatorLinear>();
+
+  // General subgame construction
+  std::vector<std::unique_ptr<State>> starting_states;
+  std::unique_ptr<State> initial_state = game->NewInitialState();
+
+  for (Action action : initial_state->LegalActions()) {
+    if (std::find(board_cards.begin(), board_cards.end(), action) != board_cards.end()) {
+      continue;
+    }
+    auto child_one = initial_state->Child(action);
+    for (Action action_one : child_one->LegalActions()) {
+      if (std::find(board_cards.begin(), board_cards.end(), action_one) != board_cards.end()) {
+        continue;
+      }
+      auto child_two = child_one->Child(action_one);
+      starting_states.push_back(std::move(child_two));
+    }
+  }
+
+  std::vector<double> general_chance_reaches(starting_states.size(), 1. / starting_states.size());
+
+  std::vector<std::shared_ptr<algorithms::InfostateTree>>
+      trees_general = algorithms::MakeInfostateTrees(
+      starting_states, general_chance_reaches, infostate_observer, 1000, kDlCfrInfostateTreeStorage);
+
+  auto general_subgame = std::make_shared<Subgame>(game, public_observer, trees_general);
+
+  auto general_terminal_evaluator = MakeTerminalEvaluator();
+
+  SPIEL_CHECK_EQ(general_subgame->public_states.size(), poker_specific_subgame->public_states.size());
+  for (int i = 0; i < general_subgame->public_states.size(); i++) {
+    auto general_public_state = &general_subgame->public_states[i];
+    if (!general_public_state->IsTerminal()) {
+      continue;
+    }
+    PublicState *poker_public_state = nullptr;
+    for (int j = 0; j < poker_specific_subgame->public_states.size(); j++) {
+      poker_public_state = &poker_specific_subgame->public_states[j];
+      if (poker_public_state->public_tensor.Tensor() == general_public_state->public_tensor.Tensor()) {
+        break;
+      }
+    }
+    SPIEL_CHECK_TRUE(poker_public_state);
+    auto general_context = general_terminal_evaluator->CreateContext(*general_public_state);
+    auto poker_context = poker_terminal_evaluator->CreateContext(*poker_public_state);
+    general_terminal_evaluator->EvaluatePublicState(general_public_state, general_context.get());
+    poker_terminal_evaluator->EvaluatePublicState(poker_public_state, poker_context.get());
+    for (int node_index = 0; node_index < poker_public_state->nodes[0].size(); node_index++) {
+      std::string infostate_string = poker_public_state->nodes[0][node_index]->infostate_string();
+      double general_value = 0;
+      for (int general_node_index = 0; general_node_index < general_public_state->nodes[0].size();
+           general_node_index++) {
+        if (general_public_state->nodes[0][general_node_index]->infostate_string() == infostate_string) {
+          general_value += general_public_state->values[0][general_node_index];
+        }
+      }
+//      std::cout << "Poker: " << poker_public_state->values[0][node_index] << " General: " << general_value << "\n";
+      SPIEL_CHECK_FLOAT_NEAR(poker_public_state->values[0][node_index], general_value, 0.000001);
+    }
+    double general_sum = 0;
+    double poker_sum = 0;
+    for (double poker_value : poker_public_state->values[0]) {
+      poker_sum += poker_value;
+    }
+    for (double general_value : general_public_state->values[0]) {
+      general_sum += general_value;
+    }
+//    std::cout << "Poker sum: " << poker_sum << " General sum: " << general_sum << "\n";
+    SPIEL_CHECK_FLOAT_NEAR(poker_sum, general_sum, 0.001);
+  }
+}
+
 }  // namespace
 }  // namespace papers_with_code
 }  // namespace open_spiel
@@ -846,11 +946,13 @@ int main(int argc, char **argv) {
 //    open_spiel::papers_with_code::TestMakeAllPublicStates(game_name);
 //  }
 
-  open_spiel::papers_with_code::TestFullPokerCardConversion();
+//  open_spiel::papers_with_code::TestFullPokerCardConversion();
+//
+//  open_spiel::papers_with_code::PokerTerminalEvaluatorTest();
+//
+//  open_spiel::papers_with_code::GeneralPokerTerminalEvaluatorTest();
+//
+//  open_spiel::papers_with_code::GeneralPokerTerminalEvaluatorTurnTest();
 
-  open_spiel::papers_with_code::PokerTerminalEvaluatorTest();
-
-  open_spiel::papers_with_code::GeneralPokerTerminalEvaluatorTest();
-
-  open_spiel::papers_with_code::GeneralPokerTerminalEvaluatorTurnTest();
+  open_spiel::papers_with_code::GeneralPokerTerminalEvaluatorLeducTest();
 }

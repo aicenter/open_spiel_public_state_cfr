@@ -396,18 +396,17 @@ RiverNetworkPublicStateContext::RiverNetworkPublicStateContext(const PublicState
       open_spiel::down_cast<const universal_poker::UniversalPokerState &>(*state.nodes[0][0]->corresponding_states()[0]);
   pot_ = poker_state.GetCurrentPot();
   card_ = poker_state.History().back();
-  int i = 0;
-  while(state.nodes[0][i]->corresponding_chance_reach_probs()[0] == 0) {
-    i++;
-  }
-  chance_reach_ = state.nodes[0][i]->corresponding_chance_reach_probs()[0];
 }
 
 std::unique_ptr<PublicStateContext> RiverNetworkLeafEvaluator::CreateContext(const PublicState &state) const {
   return std::make_unique<RiverNetworkPublicStateContext>(state);
 }
 
-RiverNetworkLeafEvaluator::RiverNetworkLeafEvaluator(const std::string &network_file) {
+RiverNetworkLeafEvaluator::RiverNetworkLeafEvaluator(
+    const std::string &network_file, int board_cards, int possible_hands, int layer_size, int hidden_layers) {
+  board_cards_ = board_cards;
+  possible_hands_ = possible_hands;
+  net = std::make_shared<Net>(board_cards, possible_hands, layer_size, hidden_layers);
   torch::load(net, network_file);
 }
 
@@ -456,34 +455,43 @@ GeneralPokerTerminalFullBoardCardsContext::GeneralPokerTerminalFullBoardCardsCon
     board_cards.push_back(card);
   }
 
+  SPIEL_CHECK_EQ(state.nodes[0].size(), poker_data_.num_hands_);
+  SPIEL_CHECK_EQ(state.nodes[1].size(), poker_data_.num_hands_);
   SPIEL_CHECK_TRUE(state.IsTerminal());
 
-  belief_size_ = ((poker_data_.num_cards_ - int(board_cards.size()) - 2) *
-      (poker_data_.num_cards_ - int(board_cards.size()) - 3)) / 2;
+  belief_size_ = 1;
+  for (int i = 0; i < poker_data_.cards_in_hand_; i++) {
+    belief_size_ *= (poker_data_.num_cards_ - int(board_cards.size()) - poker_data_.cards_in_hand_ - i);
+  }
+  belief_size_ /= poker_data_.cards_in_hand_; // This works only for 1 or 2 cards in hand
+
   std::vector<int> full_cards = board_cards;
-  full_cards.insert(full_cards.begin(), 1);
-  full_cards.insert(full_cards.begin(), 0);
+  for (int i = 0; i < poker_data_.cards_in_hand_; i++) {
+    full_cards.insert(full_cards.begin(), 0);
+  }
   std::vector<int> hand_strength;
   hand_strength.reserve(poker_data_.num_hands_);
   // Compute strengths and mapping from cards to possible hands
-  int hand_index = 0;
   for (int card = 0; card < poker_data_.num_cards_; card++) {
     card_to_possible_hands_[card] = {};
   }
-  for (int card_one = 0; card_one < poker_data_.num_cards_ - 1; card_one++) {
-    full_cards[0] = ConvertToFullPokerCard(card_one, poker_data_);
-    for (int card_two = card_one + 1; card_two < poker_data_.num_cards_; card_two++) {
-      full_cards[1] = ConvertToFullPokerCard(card_two, poker_data_);
-      if (std::find(board_cards.begin(), board_cards.end(), full_cards[0]) != board_cards.end() or
-          std::find(board_cards.begin(), board_cards.end(), full_cards[1]) != board_cards.end()) {
-        hand_strength.push_back(-1);
-      } else {
-        universal_poker::logic::CardSet cards = universal_poker::logic::CardSet(full_cards);
-        hand_strength.push_back(cards.RankCards());
-        card_to_possible_hands_[card_one].push_back(hand_index);
-        card_to_possible_hands_[card_two].push_back(hand_index);
+  for (int hand_index = 0; hand_index < poker_data_.num_hands_; hand_index++) {
+    bool card_intersecting = false;
+    for (int card : poker_data_.hand_to_cards_[hand_index]) {
+      if (std::find(board_cards.begin(), board_cards.end(), ConvertToFullPokerCard(card, poker_data_))
+          != board_cards.end()) {
+        card_intersecting = true;
       }
-      hand_index++;
+    }
+    if (card_intersecting) {
+      hand_strength.push_back(-1);
+    } else {
+      for (int i = 0; i < poker_data_.cards_in_hand_; i++) {
+        card_to_possible_hands_[poker_data_.hand_to_cards_[hand_index][i]].push_back(hand_index);
+        full_cards[i] = ConvertToFullPokerCard(poker_data_.hand_to_cards_[hand_index][i], poker_data_);
+      }
+      universal_poker::logic::CardSet cards = universal_poker::logic::CardSet(full_cards);
+      hand_strength.push_back(cards.RankCards());
     }
   }
   // Sort cards by strength
@@ -562,8 +570,10 @@ void GeneralPokerTerminalEvaluatorLinear::EvaluatePublicState(PublicState *state
             sub_beliefs[1][hand_index] += state->beliefs[1][impossible_hand];
           }
         }
-        sub_beliefs[0][hand_index] -= state->beliefs[0][hand_index];
-        sub_beliefs[1][hand_index] -= state->beliefs[1][hand_index];
+        if (general_poker_context.poker_data_.cards_in_hand_ > 1) {
+          sub_beliefs[0][hand_index] -= state->beliefs[0][hand_index];
+          sub_beliefs[1][hand_index] -= state->beliefs[1][hand_index];
+        }
       }
     }
     for (int hand_index = 0; hand_index < state->beliefs[0].size(); hand_index++) {
@@ -1033,6 +1043,10 @@ void SubgameSolver::RunSimultaneousIterations(int iterations, bool network_evalu
     } else {
       EvaluateLeaves();
     }
+//    if (nonterminal_evaluator_) {
+//      std::cout << "Reaches: " << reach_probs_ << "\n";
+//      std::cout << "CFVs: " << cf_values_ << "\n";
+//    }
 
     // 4. Propagate updated values up the tree.
     for (int pl = 0; pl < 2; ++pl) {
@@ -1062,9 +1076,13 @@ void SubgameSolver::EvaluateLeavesNetwork() {
       network_leaf_states++;
     }
   }
+
+  const auto net_evaluator = open_spiel::down_cast<const RiverNetworkLeafEvaluator>(*nonterminal_evaluator_);
   std::vector<std::vector<double>> normalization_factors;
   normalization_factors.reserve(network_leaf_states);
-  torch::Tensor network_input = torch::zeros({network_leaf_states, 2705});
+  int num_hands = net_evaluator.GetPossibleHands();
+  int num_cards = net_evaluator.GetBoardCards();
+  torch::Tensor network_input = torch::zeros({network_leaf_states, num_cards + 2 * num_hands + 1});
   int state_index = 0;
   for (int i = 0; i < subgame()->public_states.size(); ++i) {
     PublicState *state = &subgame()->public_states[i];
@@ -1073,34 +1091,41 @@ void SubgameSolver::EvaluateLeavesNetwork() {
     if (state->IsTerminal()) {
       EvaluateLeaf(state, context);
     } else {
+//      std::cout << state->public_id << "\n";
       std::vector<double> range_magnitudes(2, 0.);
-      std::vector<double> range_means(2, 0.);
       for (int pl = 0; pl < 2; pl++) {
         const int num_leaves = state->nodes[pl].size();
         for (int j = 0; j < num_leaves; ++j) {
           const algorithms::InfostateNode *leaf_node = state->nodes[pl][j];
+          if (leaf_node->terminal_chance_reach_prob() == 0) {
+            continue;
+          }
           const int trunk_position = state->nodes_positions.at(leaf_node);
           range_magnitudes[pl] += reach_probs_[pl][trunk_position];
         }
         if (range_magnitudes[pl] < 0.001) {
           range_magnitudes[pl] = 1;
         }
-        range_means[pl] = range_magnitudes[pl] / 1326;
+//        std::cout << "RMag:" << range_magnitudes << "\n";
         for (int j = 0; j < num_leaves; ++j) {
           const algorithms::InfostateNode *leaf_node = state->nodes[pl][j];
+          if (leaf_node->terminal_chance_reach_prob() == 0) {
+            continue;
+          }
           const int trunk_position = state->nodes_positions.at(leaf_node);
-          network_input[state_index][j + 52 + 1326 * pl] =
-              (reach_probs_[pl][trunk_position] / range_magnitudes[pl]) - range_means[pl];
+//          std::cout << "RP: " << reach_probs_[pl][trunk_position] << "Pl: " << pl << "Tp: " << trunk_position << "\n";
+          network_input[state_index][j + num_cards + num_hands * pl] =
+              reach_probs_[pl][trunk_position] / range_magnitudes[pl];
         }
       }
       normalization_factors.push_back(range_magnitudes);
       auto *net_context = open_spiel::down_cast<RiverNetworkPublicStateContext *>(context);
-      network_input[state_index][2704] = net_context->pot_;
       network_input[state_index][net_context->card_] = 1;
+      network_input[state_index][num_cards + 2 * num_hands] = net_context->pot_;
+//      std::cout << network_input[state_index] << "\n";
       state_index++;
     }
   }
-  const auto net_evaluator = open_spiel::down_cast<const RiverNetworkLeafEvaluator>(*nonterminal_evaluator_);
   torch::Tensor network_output = net_evaluator.EvaluateAllStates(network_input);
   state_index = 0;
   for (int i = 0; i < subgame()->public_states.size(); ++i) {
@@ -1109,16 +1134,30 @@ void SubgameSolver::EvaluateLeavesNetwork() {
     if (!state->IsTerminal()) {
       PublicStateContext *context = contexts_[i].get();
       auto *net_context = open_spiel::down_cast<RiverNetworkPublicStateContext *>(context);
+//      std::cout << state->public_id << "\n";
+//      std::cout << network_output[state_index] << "\n";
+//      std::cout << normalization_factors[state_index] << "\n";
+//      std::cout << net_context->pot_ << "\n";
+//      std::cout << "[";
       for (int pl = 0; pl < 2; pl++) {
         const int num_leaves = state->nodes[pl].size();
         for (int j = 0; j < num_leaves; ++j) {
           const algorithms::InfostateNode *leaf_node = state->nodes[pl][j];
           const int trunk_position = state->nodes_positions.at(leaf_node);
           cf_values_[pl][trunk_position] =
-              network_output[state_index][j + 1326 * pl].item<double>()
-                  * normalization_factors[state_index][1 - pl] * net_context->chance_reach_;
+              network_output[state_index][j + num_hands * pl].item<double>()
+                  * normalization_factors[state_index][1 - pl] * leaf_node->terminal_chance_reach_prob()
+                  * net_context->pot_;
+//          std::cout << cf_values_[pl][trunk_position] << "(" << leaf_node->terminal_chance_reach_prob() << "), ";
         }
+//        std::cout << "], [";
       }
+//      std::cout << "]\n";
+//      std::cout << "[";
+//      for(int j = 0; j < network_input.size(1); j++) {
+//        std::cout << network_input[state_index][j].item<double>() << ", ";
+//      }
+//      std::cout << "]\n";
       state_index++;
     }
   }
@@ -1269,6 +1308,84 @@ std::vector<double> SubgameSolver::RootValues() const {
       RootCfValue(subgame_->trees[0]->root_branching_factor(), cf_values_[0], subgame_->initial_state().beliefs[0]),
       RootCfValue(subgame_->trees[1]->root_branching_factor(), cf_values_[1], subgame_->initial_state().beliefs[1])
   };
+}
+
+// -- Poker specific CFR evaluator ---------------------------------------------
+
+PokerCFREvaluator::PokerCFREvaluator(std::shared_ptr<const Game> game,
+                                     std::shared_ptr<const PublicStateEvaluator> terminal_evaluator,
+                                     std::shared_ptr<Observer> public_observer,
+                                     std::shared_ptr<Observer> infostate_observer,
+                                     int cfr_iterations)
+    : game(game),
+      terminal_evaluator(terminal_evaluator),
+      public_observer(public_observer),
+      infostate_observer(infostate_observer),
+      num_cfr_iterations(cfr_iterations) {
+}
+
+std::unique_ptr<PublicStateContext> PokerCFREvaluator::CreateContext(
+    const PublicState &state) const {
+  if (!state.IsLeaf()) return nullptr;
+  SPIEL_CHECK_TRUE(state.IsLeaf());
+
+  const auto &poker_state =
+      open_spiel::down_cast<const universal_poker::UniversalPokerState &>(*state.nodes[0][0]->corresponding_states()[0]);
+  algorithms::PokerData poker_data = algorithms::PokerData(*state.nodes[0][0]->corresponding_states()[0]);
+  const auto &open_spiel_state = state.nodes[0][0]->corresponding_states()[0];
+
+  std::vector<double> chance_reaches;
+  chance_reaches.reserve(poker_data.num_hands_);
+  SPIEL_CHECK_EQ(poker_data.num_hands_, state.nodes[0].size());
+
+  for (auto node : state.nodes[0]) {
+    chance_reaches.push_back(node->corresponding_chance_reach_probs()[0]);
+  }
+
+  std::vector<int> board_cards;
+  for (int card : poker_state.BoardCards().ToCardArray()) {
+    board_cards.push_back(card);
+  }
+
+  std::vector<std::shared_ptr<algorithms::InfostateTree>> trees =
+      algorithms::MakePokerInfostateTrees(
+          open_spiel_state, chance_reaches, infostate_observer, 1000, kDlCfrInfostateTreeStorage, board_cards);
+
+  auto out = std::make_shared<Subgame>(game, public_observer, trees);
+
+  out->initial_state().beliefs = state.beliefs;
+
+  auto solver = std::make_unique<SubgameSolver>(out, nullptr, terminal_evaluator,
+                                                std::make_shared<std::mt19937>(0), "RegretMatchingPlus");
+  auto poker_cfr_public_state = std::make_unique<PokerCFRContext>(std::move(solver));
+  return poker_cfr_public_state;
+}
+
+void PokerCFREvaluator::ResetContext(PublicStateContext *context) const {
+  auto *cfr_state = open_spiel::down_cast<CFRContext *>(context);
+  cfr_state->dlcfr->Reset();
+}
+
+void PokerCFREvaluator::EvaluatePublicState(PublicState *state,
+                                            PublicStateContext *context) const {
+  SPIEL_CHECK_TRUE(state->IsLeaf());
+  auto *cfr_context = open_spiel::down_cast<PokerCFRContext *>(context);
+  SubgameSolver *solver = cfr_context->dlcfr.get();
+  // We pretty much always should. This only to support special test cases.
+  if (reset_subgames_on_evaluation) {
+    solver->Reset();
+  }
+  solver->initial_state().SetBeliefs(state->beliefs);
+  solver->RunSimultaneousIterations(num_cfr_iterations);
+  auto &resulting_values = solver->initial_state().values;
+  std::cout << state->public_id << "\n";
+  std::cout << resulting_values << "\n";
+  std::cout << state->beliefs << "\n";
+  // Copy the results.
+  for (int pl = 0; pl < 2; ++pl) {
+    std::copy(resulting_values[pl].begin(), resulting_values[pl].end(),
+              state->values[pl].begin());
+  }
 }
 
 // -- CFR evaluator ------------------------------------------------------------

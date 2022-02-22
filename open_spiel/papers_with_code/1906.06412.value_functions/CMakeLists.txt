@@ -37,7 +37,7 @@ add_library(paper_value_functions OBJECT
         tabularize_bot.cc
         turn_poker_net.h
         torch_utils.h
-        libratus_endgame_values.h)
+        libratus_endgame_values.h ../../algorithms/poker_data.h)
 
 #find_package(OpenMP)
 

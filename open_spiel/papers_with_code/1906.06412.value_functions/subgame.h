@@ -29,6 +29,7 @@
 #include "open_spiel/spiel_utils.h"
 #include "open_spiel/utils/data_structures.h"
 #include "turn_poker_net.h"
+#include "open_spiel/algorithms/poker_data.h"
 
 // Depth-limited CFR is conceptually similar to what `infostate_cfr.h` does.
 // Additionally it saves structure of public states in the root and leaves
@@ -236,20 +237,27 @@ class PublicStateEvaluator {
 struct RiverNetworkPublicStateContext final : public PublicStateContext {
   int pot_;
   int card_;
-  double chance_reach_;
   explicit RiverNetworkPublicStateContext(const PublicState &state);
 };
 
 class RiverNetworkLeafEvaluator final : public PublicStateEvaluator {
  public:
-  RiverNetworkLeafEvaluator(const std::string &network_file);
+  RiverNetworkLeafEvaluator(const std::string &network_file,
+                            int board_cards,
+                            int possible_hands,
+                            int layer_size,
+                            int hidden_layers);
   std::unique_ptr<PublicStateContext> CreateContext(
       const PublicState &state) const override;
   void EvaluatePublicState(
       PublicState *state, PublicStateContext *context) const override;
   torch::Tensor EvaluateAllStates(const torch::Tensor &input) const;
+  int GetBoardCards() const { return board_cards_; }
+  int GetPossibleHands() const { return possible_hands_; }
  private:
-  std::shared_ptr<Net> net = std::make_shared<Net>();
+  int board_cards_;
+  int possible_hands_;
+  std::shared_ptr<Net> net;
 };
 
 // General poker terminal evaluator
@@ -416,12 +424,43 @@ class SubgameSolver {
 // Evaluator that does nothing.
 struct DummyEvaluator : public PublicStateEvaluator {
   std::unique_ptr<PublicStateContext> CreateContext(
-      const PublicState& state) const override { return nullptr; };
-  void ResetContext(PublicStateContext* context) const override {};
-  void EvaluatePublicState(PublicState* public_state,
-                           PublicStateContext* context) const override {};
+      const PublicState &state) const override { return nullptr; };
+  void ResetContext(PublicStateContext *context) const override {};
+  void EvaluatePublicState(PublicState *public_state,
+                           PublicStateContext *context) const override {};
 };
 
+
+// -- Poker specific CFR evaluator ---------------------------------------------
+
+struct PokerCFRContext : public PublicStateContext {
+  std::unique_ptr<SubgameSolver> dlcfr;
+  explicit PokerCFRContext(std::unique_ptr<SubgameSolver> d)
+      : dlcfr(std::move(d)) {}
+};
+
+struct PokerCFREvaluator : public PublicStateEvaluator {
+  std::shared_ptr<const Game> game;
+  std::shared_ptr<const PublicStateEvaluator> terminal_evaluator;
+  std::shared_ptr<Observer> public_observer;
+  std::shared_ptr<Observer> infostate_observer;
+  bool reset_subgames_on_evaluation = true;
+  int num_cfr_iterations;
+  std::string bandit_name = "RegretMatchingPlus";
+  PolicySelection save_values_policy = kDefaultPolicySelection;
+
+  PokerCFREvaluator(std::shared_ptr<const Game> game,
+                    std::shared_ptr<const PublicStateEvaluator> terminal_evaluator,
+                    std::shared_ptr<Observer> public_observer,
+                    std::shared_ptr<Observer> infostate_observer,
+                    int cfr_iterations = 100);
+
+  std::unique_ptr<PublicStateContext> CreateContext(
+      const PublicState &state) const override;
+  void ResetContext(PublicStateContext *context) const override;
+  void EvaluatePublicState(PublicState *state,
+                           PublicStateContext *context) const override;
+};
 
 // -- CFR evaluator ------------------------------------------------------------
 

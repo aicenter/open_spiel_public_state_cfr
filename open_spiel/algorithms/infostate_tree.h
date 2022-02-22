@@ -22,6 +22,7 @@
 #include "open_spiel/spiel.h"
 #include "open_spiel/utils/tree_map.h"
 #include "open_spiel/papers_with_code/1906.06412.value_functions/include_libs_ordered.h"
+#include "poker_data.h"
 
 // This file contains data structures used in imperfect information games.
 // Specifically, we implement an infostate tree, a representation of a game
@@ -84,57 +85,6 @@ enum InfostateNodeType {
   kDecisionInfostateNode,
   kObservationInfostateNode,
   kTerminalInfostateNode
-};
-
-struct PokerData {
-  explicit PokerData(const State& state) {
-    auto poker_game = down_cast<const universal_poker::UniversalPokerGame &>(*state.GetGame()).GetACPCGame();
-    int num_suits = poker_game->NumSuitsDeck();
-    int num_ranks = poker_game->NumRanksDeck();
-    int num_cards = num_suits * num_ranks;
-    int cards_in_hand = poker_game->GetNbHoleCardsRequired();
-    int num_hands = 1;
-    for (int i = 0; i < cards_in_hand; i++) {
-      num_hands = num_hands * (num_cards - i) / (i + 1);
-    }
-
-    std::unordered_map<int, std::vector<int>> hand_to_cards;
-    std::unordered_map<int, std::vector<int>> card_to_hands;
-    int hand_index = 0;
-    for(int card = 0; card < num_cards; card++) {
-      card_to_hands.emplace(card, std::vector<int>());
-    }
-    for(int card_one = 0; card_one < num_cards - 1; card_one++) {
-      for(int card_two = card_one + 1; card_two < num_cards; card_two++) {
-        card_to_hands[card_one].push_back(hand_index);
-        card_to_hands[card_two].push_back(hand_index);
-        hand_to_cards.emplace(hand_index, std::vector<int>({card_one, card_two}));
-
-        hand_index++;
-      }
-    }
-
-    std::vector<std::string> card_mask;
-    auto initial_state = state.GetGame()->NewInitialState();
-    for (Action action : initial_state->LegalActions()) {
-      card_mask.push_back(initial_state->Child(action)->InformationStateString(0).substr(23, 2));
-    }
-    num_cards_ = num_cards;
-    num_hands_ = num_hands;
-    num_suits_ = num_suits;
-    num_ranks_ = num_ranks;
-    card_mask_ = card_mask;
-    hand_to_cards_ = hand_to_cards;
-    card_to_hands_ = card_to_hands;
-  }
-
-  int num_cards_;
-  int num_hands_;
-  int num_suits_;
-  int num_ranks_;
-  std::vector<std::string> card_mask_;
-  std::unordered_map<int, std::vector<int>> hand_to_cards_;
-  std::unordered_map<int,std::vector<int>> card_to_hands_;
 };
 
 // Representing the game via infostates leads actually to a graph structure
@@ -710,11 +660,13 @@ class InfostateTree final {
                                           bool terminate = false);
   std::unique_ptr<InfostateNode> MakeRootNode() const;
 
-  static std::pair<std::string, std::string> ExtractInfostateString(const std::string &infostate_string);
+  static std::pair<std::string, std::string> ExtractInfostateString(
+      const std::string &infostate_string, const PokerData &poker_data);
 
   static std::string ConstructInfostateString(
-      const std::pair<std::string, std::string> &parts, int card_one,
-      int card_two, const algorithms::PokerData &poker_data);
+      const std::pair<std::string, std::string> &parts,
+      const std::vector<int> &card_vector,
+      const PokerData &poker_data);
   // Makes sure that all tree leaves are at the same height.
   // It inserts a linked list of dummy observation nodes with appropriate length
   // to balance all the leaves.
@@ -940,7 +892,7 @@ class InfostateNode final {
     return terminal_utility_;
   }
   double terminal_chance_reach_prob() const {
-    SPIEL_CHECK_EQ(type_, kTerminalInfostateNode);
+//    SPIEL_CHECK_EQ(type_, kTerminalInfostateNode);
     return terminal_chn_reach_prob_;
   }
   size_t corresponding_states_size() const {

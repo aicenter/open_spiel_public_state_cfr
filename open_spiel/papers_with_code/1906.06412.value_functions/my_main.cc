@@ -19,6 +19,9 @@
 #include "infostate_tree_br.h"
 #include "libratus_endgame_values.h"
 #include "turn_poker_net.h"
+#include "algorithms/ortools/sequence_form_lp.h"
+#include "open_spiel/algorithms/poker_data.h"
+#include "algorithms/expected_returns.h"
 
 #include <iostream>
 
@@ -112,12 +115,13 @@ namespace {
 
 std::unique_ptr<State> GetPokerStatesAfterMoves(const std::shared_ptr<const Game> &game,
                                                 std::vector<int> board_cards,
-                                                std::vector<int> action_sequence) {
+                                                std::vector<int> action_sequence,
+                                                int cards_in_hand) {
   std::unique_ptr<State> state = game->NewInitialState();
 
   std::vector<int> initial_cards;
   int card = 0;
-  while (initial_cards.size() < 4) {
+  while (initial_cards.size() < 2 * cards_in_hand) {
     if (std::find(board_cards.begin(), board_cards.end(), card) == board_cards.end()) {
       initial_cards.push_back(card);
     }
@@ -125,10 +129,9 @@ std::unique_ptr<State> GetPokerStatesAfterMoves(const std::shared_ptr<const Game
   }
 
   // Deal Initial cards
-  state->ApplyAction(initial_cards[0]);
-  state->ApplyAction(initial_cards[1]);
-  state->ApplyAction(initial_cards[2]);
-  state->ApplyAction(initial_cards[3]);
+  for (int initial_card : initial_cards) {
+    state->ApplyAction(initial_card);
+  }
 
   // First round
   int action_index = 0;
@@ -500,7 +503,7 @@ std::pair<int, int> UniversalPokerTurnCFRPokerSpecificLinear(int iterations) {
   std::vector<int> board_cards = {0, 2, 7, 9};
   std::vector<int> action_sequence = {1, 1, 1, 1};
 
-  std::unique_ptr<State> state = GetPokerStatesAfterMoves(game, board_cards, action_sequence);
+  std::unique_ptr<State> state = GetPokerStatesAfterMoves(game, board_cards, action_sequence, 2);
 
   auto start = std::chrono::high_resolution_clock::now();
   std::shared_ptr<Observer> infostate_observer = game->MakeObserver(kInfoStateObsType, {});
@@ -1025,7 +1028,7 @@ std::vector<int> GenerateNewBoardCard(const std::vector<int> &board_cards, std::
   return new_board_cards;
 }
 
-std::array<std::vector<double>, 2> GenerateRanges(
+std::array<std::vector<double>, 2> GenerateRangesContinuationFullPoker(
     const std::vector<int> &board_cards, int new_board_card, std::mt19937 &mt,
     const std::array<std::vector<double>, 2> &ranges) {
   int range_index = 0;
@@ -1052,7 +1055,7 @@ std::array<std::vector<double>, 2> GenerateRanges(
   return new_ranges;
 }
 
-std::vector<int> GenerateActions(
+std::vector<int> GenerateActionsContinuationFullPoker(
     const std::shared_ptr<const Game> &game, std::mt19937 &mt, const std::vector<int> &actions_so_far) {
   std::vector<int> action_sequence = actions_so_far;
   std::unique_ptr<State> state = game->NewInitialState();
@@ -1095,8 +1098,9 @@ void GenerateAndSaveRiverSubgamesFromTurnSubgame(
   oss.precision(std::numeric_limits<double>::digits10 + 1);
   for (int situation = 0; situation < n_situations; situation++) {
     std::vector<int> board_cards = GenerateNewBoardCard(prev_board_cards, mt);
-    std::array<std::vector<double>, 2> ranges = GenerateRanges(prev_board_cards, board_cards.back(), mt, prev_ranges);
-    std::vector<int> action_sequence = GenerateActions(game, mt, prev_action_sequence);
+    std::array<std::vector<double>, 2> ranges =
+        GenerateRangesContinuationFullPoker(prev_board_cards, board_cards.back(), mt, prev_ranges);
+    std::vector<int> action_sequence = GenerateActionsContinuationFullPoker(game, mt, prev_action_sequence);
 
     // Writing to file
     oss << "b ";
@@ -1133,12 +1137,16 @@ bidiiter RandomUnique(bidiiter begin, bidiiter end, size_t num_random, std::mt19
   return begin;
 }
 
-std::vector<int> GenerateBoardCards(std::mt19937 &mt) {
-  std::vector<int> cards(52);
-  for (int i = 0; i < 52; ++i)
+std::vector<int> GenerateBoardCardsGeneral(std::mt19937 &mt, int cards_in_deck, int cards_to_generate) {
+  std::vector<int> cards(cards_in_deck);
+  for (int i = 0; i < cards_in_deck; ++i)
     cards[i] = i;
-  RandomUnique(cards.begin(), cards.end(), 5, mt);
-  return std::vector<int>(cards.begin(), cards.begin() + 5);
+  RandomUnique(cards.begin(), cards.end(), cards_to_generate, mt);
+  return std::vector<int>(cards.begin(), cards.begin() + cards_to_generate);
+}
+
+std::vector<int> GenerateBoardCardsFullRiver(std::mt19937 &mt) {
+  return GenerateBoardCardsGeneral(mt, 52, 5);
 }
 
 void AssignProbabilities(std::vector<double> &player_range, std::vector<size_t> &indexes, int start,
@@ -1155,37 +1163,47 @@ void AssignProbabilities(std::vector<double> &player_range, std::vector<size_t> 
   }
 }
 
-std::array<std::vector<double>, 2> GenerateRanges(const std::vector<int> &board_cards, std::mt19937 &mt) {
+std::array<std::vector<double>, 2> GenerateRangesGeneral(
+    const std::vector<int> &board_cards, std::mt19937 &mt, algorithms::PokerData poker_data) {
   std::vector<int> full_cards = board_cards;
-  full_cards.insert(full_cards.begin(), 1);
-  full_cards.insert(full_cards.begin(), 0);
+  for (int i = 0; i < poker_data.cards_in_hand_; i++) {
+    full_cards.insert(full_cards.begin(), 0);
+  }
   std::vector<int> hand_strength;
-  hand_strength.reserve(1326);
+  hand_strength.reserve(poker_data.num_hands_);
   // Compute strengths and mapping from cards to possible hands
   int impossible_hands = 0;
-  for (int card_one = 0; card_one < 52 - 1; card_one++) {
-    full_cards[0] = card_one;
-    for (int card_two = card_one + 1; card_two < 52; card_two++) {
-      if (std::find(board_cards.begin(), board_cards.end(), card_two) != board_cards.end() or
-          std::find(board_cards.begin(), board_cards.end(), card_one) != board_cards.end()) {
-        hand_strength.push_back(-1);
-        impossible_hands++;
-      } else {
-        full_cards[1] = card_two;
-        universal_poker::logic::CardSet cards = universal_poker::logic::CardSet(full_cards);
-        hand_strength.push_back(cards.RankCards());
+  for (int hand_index = 0; hand_index < poker_data.num_hands_; hand_index++) {
+    bool card_intersecting = false;
+    for (int card : poker_data.hand_to_cards_[hand_index]) {
+      if (std::find(board_cards.begin(), board_cards.end(), card) != board_cards.end()) {
+        card_intersecting = true;
       }
     }
+    if (card_intersecting) {
+      hand_strength.push_back(-1);
+      impossible_hands++;
+    } else {
+      for (int i = 0; i < poker_data.cards_in_hand_; i++) {
+        full_cards[i] = ConvertToFullPokerCard(poker_data.hand_to_cards_[hand_index][i], poker_data);
+      }
+      universal_poker::logic::CardSet cards = universal_poker::logic::CardSet(full_cards);
+      hand_strength.push_back(cards.RankCards());
+    }
   }
+
   // Sort cards by strength
   std::vector<size_t> idx(hand_strength.size());
   iota(idx.begin(), idx.end(), 0);
   std::stable_sort(idx.begin(), idx.end(),
                    [&hand_strength](size_t i1, size_t i2) { return hand_strength[i1] < hand_strength[i2]; });
   std::array<std::vector<double>, 2> ranges;
-  ranges = {std::vector<double>(1326, 0.), std::vector<double>(1326, 0.)};
-  AssignProbabilities(ranges[0], idx, impossible_hands, 1325, 1, mt);
-  AssignProbabilities(ranges[1], idx, impossible_hands, 1325, 1, mt);
+  ranges = {std::vector<double>(poker_data.num_hands_, 0.), std::vector<double>(poker_data.num_hands_, 0.)};
+  std::uniform_real_distribution<double> distribution(0., 1);
+  double p = distribution(mt);
+  AssignProbabilities(ranges[0], idx, impossible_hands, poker_data.num_hands_ - 1, (p < 0.1 ? 0 : 1), mt);
+  p = distribution(mt);
+  AssignProbabilities(ranges[1], idx, impossible_hands, poker_data.num_hands_ - 1, (p < 0.1 ? 0 : 1), mt);
   std::array<double, 2> probabilities_back{0, 0};
   for (int i : idx) {
     if (hand_strength[i] == -1) {
@@ -1197,16 +1215,14 @@ std::array<std::vector<double>, 2> GenerateRanges(const std::vector<int> &board_
       }
     }
   }
-  SPIEL_CHECK_FLOAT_NEAR(probabilities_back[0], 1, 1e-6);
-  SPIEL_CHECK_FLOAT_NEAR(probabilities_back[1], 1, 1e-6);
   return ranges;
 }
 
-std::vector<int> GenerateActions(const std::shared_ptr<const Game> &game, std::mt19937 &mt) {
+std::vector<int> GenerateActionsGeneral(const std::shared_ptr<const Game> &game, std::mt19937 &mt, int chance_nodes) {
   std::vector<int> action_sequence;
   std::unique_ptr<State> state = game->NewInitialState();
   int chance_visited = 0;
-  while (chance_visited < 9) {
+  while (chance_visited < chance_nodes) {
     if (state->IsChanceNode()) {
       chance_visited++;
       state->ApplyAction(state->LegalActions()[0]);
@@ -1225,20 +1241,54 @@ std::vector<int> GenerateActions(const std::shared_ptr<const Game> &game, std::m
   return action_sequence;
 }
 
-void GenerateAndSavePokerSituations(int n_situations, const std::string &file_name, std::mt19937 &mt) {
-  std::string name = "universal_poker(betting=limit,numPlayers=2,numRounds=4,blind=10 5,"
-                     "firstPlayer=2 1,numSuits=4,numRanks=13,numHoleCards=2,numBoardCards=0 3 "
-                     "1 1,raiseSize=10 10 20 20,maxRaises=3 4 4 4)";
+std::vector<int> GenerateActionsFullRiver(const std::shared_ptr<const Game> &game, std::mt19937 &mt) {
+  return GenerateActionsGeneral(game, mt, 9);
+}
+
+void GenerateAndSavePokerSituations(
+    int n_situations, const std::string &file_name, std::mt19937 &mt, const std::string &poker_type) {
+  std::string name;
+  int cards_in_hand;
+  int n_board_cards;
+  if (poker_type == "full") {
+    cards_in_hand = 2;
+    n_board_cards = 5;
+    name = "universal_poker(betting=limit,numPlayers=2,numRounds=4,blind=10 5,"
+           "firstPlayer=2 1,numSuits=4,numRanks=13,numHoleCards=2,numBoardCards=0 3 "
+           "1 1,raiseSize=10 10 20 20,maxRaises=3 4 4 4)";
+  } else if (poker_type == "small") {
+    cards_in_hand = 2;
+    n_board_cards = 5;
+    name = "universal_poker(betting=limit,numPlayers=2,numRounds=4,blind=10 5,"
+           "firstPlayer=2 1,numSuits=2,numRanks=6,numHoleCards=2,numBoardCards=0 3 "
+           "1 1,raiseSize=10 10 20 20,maxRaises=3 4 4 4)";
+  } else if (poker_type == "leduc") {
+    cards_in_hand = 1;
+    n_board_cards = 1;
+    name = "universal_poker(betting=limit,numPlayers=2,numRounds=2,blind=1 1,"
+           "firstPlayer=1 1,numSuits=2,numRanks=3,numHoleCards=1,numBoardCards=0 1"
+           ",raiseSize=2 4,maxRaises=2 2)";
+  } else if (poker_type == "three_card") {
+    cards_in_hand = 1;
+    n_board_cards = 1;
+    name = "universal_poker(betting=limit,numPlayers=2,numRounds=2,blind=1 1,"
+           "firstPlayer=1 1,numSuits=1,numRanks=3,numHoleCards=1,numBoardCards=0 1"
+           ",raiseSize=2 4,maxRaises=2 2)";
+  } else {
+    SpielFatalError("Incorrect poker type. Possible types: full, small, leduc");
+  }
   std::shared_ptr<const Game> game = LoadGame(name);
   std::ofstream oss;
   oss.open(file_name);
   oss.flags(std::ios::scientific);
+  auto state = GetPokerStatesAfterMoves(game, {}, {}, cards_in_hand);
+  algorithms::PokerData poker_data(*state);
   oss.precision(std::numeric_limits<double>::digits10 + 1);
   for (int situation = 0; situation < n_situations; situation++) {
     // Generation
-    std::vector<int> board_cards = GenerateBoardCards(mt);
-    std::array<std::vector<double>, 2> ranges = GenerateRanges(board_cards, mt);
-    std::vector<int> action_sequence = GenerateActions(game, mt);
+    std::vector<int> board_cards = GenerateBoardCardsGeneral(mt, poker_data.num_cards_, n_board_cards);
+    std::array<std::vector<double>, 2> ranges = GenerateRangesGeneral(board_cards, mt, poker_data);
+    std::vector<int> action_sequence = GenerateActionsGeneral(game, mt, board_cards.size() + 2 * cards_in_hand);
 
     // Writing to file
     oss << "b ";
@@ -1261,37 +1311,37 @@ void GenerateAndSavePokerSituations(int n_situations, const std::string &file_na
   }
 }
 
-std::vector<int> ReadBoardCards(std::ifstream &file) {
+std::vector<int> ReadBoardCards(std::ifstream &file, int num_board_cards) {
   std::string read_label;
-  std::vector<int> board_cards(5, 0);
+  std::vector<int> board_cards(num_board_cards, 0);
   file >> read_label;
   SPIEL_CHECK_EQ(read_label, "b");
-  for (int i = 0; i < 5; i++) {
+  for (int i = 0; i < num_board_cards; i++) {
     file >> board_cards[i];
   }
   return board_cards;
 }
 
-std::array<std::vector<double>, 2> ReadCFVs(std::ifstream &file) {
-  std::array<std::vector<double>, 2> cfvs = {std::vector<double>(1326, 0.), std::vector<double>(1326, 0.)};
+std::array<std::vector<double>, 2> ReadCFVs(std::ifstream &file, int num_hands) {
+  std::array<std::vector<double>, 2> cfvs = {std::vector<double>(num_hands, 0.), std::vector<double>(num_hands, 0.)};
   std::string read_label;
   file >> read_label;
   SPIEL_CHECK_EQ(read_label, "v");
   for (int player = 0; player < 2; player++) {
-    for (int i = 0; i < 1326; i++) {
+    for (int i = 0; i < num_hands; i++) {
       file >> cfvs[player][i];
     }
   }
   return cfvs;
 }
 
-std::array<std::vector<double>, 2> ReadRanges(std::ifstream &file) {
-  std::array<std::vector<double>, 2> ranges = {std::vector<double>(1326, 0.), std::vector<double>(1326, 0.)};
+std::array<std::vector<double>, 2> ReadRanges(std::ifstream &file, int num_hands) {
+  std::array<std::vector<double>, 2> ranges = {std::vector<double>(num_hands, 0.), std::vector<double>(num_hands, 0.)};
   std::string read_label;
   file >> read_label;
   SPIEL_CHECK_EQ(read_label, "r");
   for (int player = 0; player < 2; player++) {
-    for (int i = 0; i < 1326; i++) {
+    for (int i = 0; i < num_hands; i++) {
       file >> ranges[player][i];
     }
   }
@@ -1311,68 +1361,15 @@ std::vector<int> ReadActions(std::ifstream &file) {
   return action_sequence;
 }
 
-std::array<std::vector<double>, 2> SolveLimitPokerSituationFromInputs(const std::vector<int> &board_cards,
-                                                                      const std::array<std::vector<double>, 2> &ranges,
-                                                                      const std::vector<int> &action_sequence,
-                                                                      int iterations) {
-  std::string name = "universal_poker(betting=limit,numPlayers=2,numRounds=4,blind=10 5,"
-                     "firstPlayer=2 1,numSuits=4,numRanks=13,numHoleCards=2,numBoardCards=0 3 "
-                     "1 1,raiseSize=10 10 20 20,maxRaises=3 4 4 4)";
-  std::shared_ptr<const Game> game = LoadGame(name);
-
-  std::unique_ptr<State> state = game->NewInitialState();
-
-  std::vector<int> initial_cards;
-  int card = 0;
-  while (initial_cards.size() < 4) {
-    if (std::find(board_cards.begin(), board_cards.end(), card) == board_cards.end()) {
-      initial_cards.push_back(card);
-    }
-    card++;
-  }
-
-  // Deal 4 cards
-  state->ApplyAction(initial_cards[0]);
-  state->ApplyAction(initial_cards[1]);
-  state->ApplyAction(initial_cards[2]);
-  state->ApplyAction(initial_cards[3]);
-
-  // Pre-flop betting
-  int action_index = 0;
-  while (state->IsPlayerNode()) {
-    state->ApplyAction(action_sequence[action_index]);
-    action_index++;
-  }
-
-  // Deal 3 board cards (Flop)
-  state->ApplyAction(board_cards[0]);
-  state->ApplyAction(board_cards[1]);
-  state->ApplyAction(board_cards[2]);
-
-  // Flop betting
-  while (state->IsPlayerNode()) {
-    state->ApplyAction(action_sequence[action_index]);
-    action_index++;
-  }
-
-  // Deal board card (Turn)
-  state->ApplyAction(board_cards[3]);
-
-  // Turn betting
-  while (state->IsPlayerNode()) {
-    state->ApplyAction(action_sequence[action_index]);
-    action_index++;
-  }
-
-  // Deal board card (River)
-  state->ApplyAction(board_cards[4]);
-
+std::array<std::vector<double>, 2> SolveLimitPokerSituationFromInputs(
+    const std::vector<int> &board_cards, const std::array<std::vector<double>, 2> &ranges,
+    const std::vector<int> &action_sequence, int iterations, std::string poker_type, algorithms::PokerData poker_data,
+    const std::shared_ptr<const Game> &game) {
+  auto state = GetPokerStatesAfterMoves(game, board_cards, action_sequence, poker_data.cards_in_hand_);
   std::shared_ptr<Observer> infostate_observer = game->MakeObserver(kInfoStateObsType, {});
   std::shared_ptr<Observer> public_observer = game->MakeObserver(kPublicStateObsType, {});
 
-  std::vector<double> chance_reaches(1326, 1. / 1326);
-
-  algorithms::PokerData poker_data = algorithms::PokerData(*state);
+  std::vector<double> chance_reaches(poker_data.num_hands_, 1. / poker_data.num_hands_);
 
   UpdateChanceReaches(chance_reaches, poker_data, board_cards);
   for (auto &chance_reach : chance_reaches) {
@@ -1389,7 +1386,7 @@ std::array<std::vector<double>, 2> SolveLimitPokerSituationFromInputs(const std:
   out->initial_state().beliefs = ranges;
 
   std::shared_ptr<const PublicStateEvaluator>
-      terminal_evaluator = std::make_shared<const PokerTerminalEvaluatorLinear>(poker_data, board_cards);
+      terminal_evaluator = std::make_shared<const GeneralPokerTerminalEvaluatorLinear>();
 
 
   SubgameSolver solver = SubgameSolver(out, nullptr, terminal_evaluator,
@@ -1403,23 +1400,60 @@ std::array<std::vector<double>, 2> SolveLimitPokerSituationFromInputs(const std:
   return root_public_state.values;
 }
 
-void SolvePokerSubgames(const std::string &file_in, const std::string &file_out, int num_games, int iterations) {
+void SolvePokerSubgames(const std::string &file_in, const std::string &file_out,
+                        int num_games, int iterations, const std::string &poker_type) {
   // Create in and out filestreams
   std::ifstream read_file(file_in);
   std::ofstream oss;
   oss.open(file_out);
   oss.flags(std::ios::scientific);
   oss.precision(std::numeric_limits<double>::digits10 + 1);
+
+  // Create the game
+  std::string name;
+  int cards_in_hand;
+  int n_board_cards;
+  if (poker_type == "full") {
+    cards_in_hand = 2;
+    n_board_cards = 5;
+    name = "universal_poker(betting=limit,numPlayers=2,numRounds=4,blind=10 5,"
+           "firstPlayer=2 1,numSuits=4,numRanks=13,numHoleCards=2,numBoardCards=0 3 "
+           "1 1,raiseSize=10 10 20 20,maxRaises=3 4 4 4)";
+  } else if (poker_type == "small") {
+    cards_in_hand = 2;
+    n_board_cards = 5;
+    name = "universal_poker(betting=limit,numPlayers=2,numRounds=4,blind=10 5,"
+           "firstPlayer=2 1,numSuits=2,numRanks=6,numHoleCards=2,numBoardCards=0 3 "
+           "1 1,raiseSize=10 10 20 20,maxRaises=3 4 4 4)";
+  } else if (poker_type == "leduc") {
+    cards_in_hand = 1;
+    n_board_cards = 1;
+    name = "universal_poker(betting=limit,numPlayers=2,numRounds=2,blind=1 1,"
+           "firstPlayer=1 1,numSuits=2,numRanks=3,numHoleCards=1,numBoardCards=0 1"
+           ",raiseSize=2 4,maxRaises=2 2)";
+  } else if (poker_type == "three_card") {
+    cards_in_hand = 1;
+    n_board_cards = 1;
+    name = "universal_poker(betting=limit,numPlayers=2,numRounds=2,blind=1 1,"
+           "firstPlayer=1 1,numSuits=1,numRanks=3,numHoleCards=1,numBoardCards=0 1"
+           ",raiseSize=2 4,maxRaises=2 2)";
+  } else {
+    SpielFatalError("Incorrect poker type. Possible types: full, small, leduc, three_card");
+  }
+  std::shared_ptr<const Game> game = LoadGame(name);
+  auto state = GetPokerStatesAfterMoves(game, {}, {}, cards_in_hand);
+  algorithms::PokerData poker_data(*state);
+
   // Iterate over different situations
   for (int game_index = 0; game_index < num_games; game_index++) {
     // Load the situation from the input file
-    std::vector<int> board_cards = ReadBoardCards(read_file);
-    std::array<std::vector<double>, 2> ranges = ReadRanges(read_file);
+    std::vector<int> board_cards = ReadBoardCards(read_file, n_board_cards);
+    std::array<std::vector<double>, 2> ranges = ReadRanges(read_file, poker_data.num_hands_);
     std::vector<int> action_sequence = ReadActions(read_file);
 
     // Solve the situation
-    std::array<std::vector<double>, 2>
-        cf_values = SolveLimitPokerSituationFromInputs(board_cards, ranges, action_sequence, iterations);
+    std::array<std::vector<double>, 2> cf_values = SolveLimitPokerSituationFromInputs(
+        board_cards, ranges, action_sequence, iterations, poker_type, poker_data, game);
 
     // Write the solution to the output file     // Writing to file
     oss << "b ";
@@ -1450,18 +1484,14 @@ void SolvePokerSubgames(const std::string &file_in, const std::string &file_out,
   }
 }
 
-int GetPotFromActions(const std::vector<int> &action_sequence) {
+int GetPotFromActions(const std::vector<int> &action_sequence, const std::string &poker_type,
+                      const std::vector<int> &round_bets, int initial_pot) {
   int round = 0;
-  int pot = 20;
+  int pot = initial_pot;
   bool first_round_action = true;
-
   for (int action : action_sequence) {
     if (action == 2) {
-      if (round < 2) {
-        pot += 20;
-      } else {
-        pot += 40;
-      }
+      pot += 2 * round_bets[round];
       first_round_action = false;
     } else {
       if (first_round_action) {
@@ -1531,11 +1561,51 @@ void NetworkTraining(const std::string &file_name,
                      int epochs,
                      int batch_size,
                      bool normalize,
-                     const std::string &log_file) {
-
+                     const std::string &log_file,
+                     const std::string &poker_type,
+                     int layer_size,
+                     int layer_number) {
+  int cards_in_hand;
+  int n_board_cards;
+  int deck_cards;
+  int num_hands;
+  int initial_pot;
+  std::vector<int> round_bets;
+  if (poker_type == "full") {
+    deck_cards = 52;
+    num_hands = 1326;
+    cards_in_hand = 2;
+    n_board_cards = 5;
+    initial_pot = 20;
+    round_bets = {10, 10, 20, 20};
+  } else if (poker_type == "small") {
+    num_hands = 66;
+    deck_cards = 12;
+    cards_in_hand = 2;
+    n_board_cards = 5;
+    initial_pot = 20;
+    round_bets = {10, 10, 20, 20};
+  } else if (poker_type == "leduc") {
+    num_hands = 6;
+    deck_cards = 6;
+    cards_in_hand = 1;
+    n_board_cards = 1;
+    initial_pot = 2;
+    round_bets = {2, 4};
+  } else if (poker_type == "three_card") {
+    deck_cards = 3;
+    num_hands = 3;
+    cards_in_hand = 1;
+    n_board_cards = 1;
+    initial_pot = 2;
+    round_bets = {2, 4};
+  } else {
+    SpielFatalError("Incorrect poker type. Possible types: full, small, leduc");
+  }
   ClearLog(log_file);
+  LogLine("Started training", log_file);
 
-  auto net = std::make_shared<Net>();
+  auto net = std::make_shared<Net>(deck_cards, num_hands, layer_size, layer_number);
 
   torch::Device device("cpu");
 
@@ -1543,85 +1613,116 @@ void NetworkTraining(const std::string &file_name,
 
   std::ifstream read_file(file_name);
 
-  torch::Tensor training_data_tensor = torch::zeros({training_samples, 2705});
-  torch::Tensor training_target_tensor = torch::zeros({training_samples, 2652});
-  for (int i = 0; i < training_samples; i++) {
-    std::vector<int> board_cards = ReadBoardCards(read_file);
-    std::array<std::vector<double>, 2> ranges = ReadRanges(read_file);
-    std::vector<int> action_sequence = ReadActions(read_file);
-    int pot = GetPotFromActions(action_sequence);
-    std::array<std::vector<double>, 2> cfvs = ReadCFVs(read_file);
+  std::cout << training_samples << ", " << net->input_size_ << "\n";
 
-    training_data_tensor[i][board_cards[4]] = 1;
-    std::vector<double> range_magnitudes(2);
-    if (normalize) {
-      for (int card_index = 0; card_index < 1326; card_index++) {
-        range_magnitudes[0] += ranges[0][card_index];
-        range_magnitudes[1] += ranges[1][card_index];
-      }
-    }
-    std::vector<double> range_means(2);
-    range_means[0] = range_magnitudes[0] / 1326;
-    range_means[1] = range_magnitudes[1] / 1326;
-    for (int card_index = 0; card_index < 1326; card_index++) {
-      training_data_tensor[i][card_index + 52] =
-          (ranges[0][card_index] / (normalize ? range_magnitudes[0] : 1)) - range_means[0];
-      training_data_tensor[i][card_index + 1326 + 52] =
-          (ranges[1][card_index] / (normalize ? range_magnitudes[1] : 1)) - range_means[1];
-
-      training_target_tensor[i][card_index] = cfvs[0][card_index] * 1081 / (normalize ? range_magnitudes[1] : 1);
-      training_target_tensor[i][card_index + 1326] = cfvs[1][card_index] * 1081 / (normalize ? range_magnitudes[0] : 1);
-    }
-    training_data_tensor[i][2704] = pot;
-  }
-
-  torch::Tensor validation_data_tensor = torch::zeros({validation_samples, 2705});
-  torch::Tensor validation_target_tensor = torch::zeros({validation_samples, 2652});
-  for (int i = 0; i < validation_samples; i++) {
-    std::vector<int> board_cards = ReadBoardCards(read_file);
-    std::array<std::vector<double>, 2> ranges = ReadRanges(read_file);
-    std::vector<int> action_sequence = ReadActions(read_file);
-    int pot = GetPotFromActions(action_sequence);
-    std::array<std::vector<double>, 2> cfvs = ReadCFVs(read_file);
-
-    validation_data_tensor[i][board_cards[4]] = 1;
-
-    std::vector<double> range_magnitudes(2);
-    if (normalize) {
-      for (int card_index = 0; card_index < 1326; card_index++) {
-        range_magnitudes[0] += ranges[0][card_index];
-        range_magnitudes[1] += ranges[1][card_index];
-      }
-    }
-    std::vector<double> range_means(2);
-    range_means[0] = range_magnitudes[0] / 1326;
-    range_means[1] = range_magnitudes[1] / 1326;
-    for (int card_index = 0; card_index < 1326; card_index++) {
-      validation_data_tensor[i][card_index + 52] =
-          (ranges[0][card_index] / (normalize ? range_magnitudes[0] : 1)) - range_means[0];
-      validation_data_tensor[i][card_index + 1326 + 52] =
-          (ranges[1][card_index] / (normalize ? range_magnitudes[1] : 1)) - range_means[1];
-
-      validation_target_tensor[i][card_index] = cfvs[0][card_index] * 1081 / (normalize ? range_magnitudes[1] : 1);
-      validation_target_tensor[i][card_index + 1326] =
-          cfvs[1][card_index] * 1081 / (normalize ? range_magnitudes[0] : 1);
-    }
-    validation_data_tensor[i][2704] = pot;
-  }
-
-  std::ofstream oss;
-  oss.open("subgame1_loss");
-
-  auto optimizer = std::make_shared<torch::optim::Adam>(net->parameters(), torch::optim::AdamOptions(1e-3));
   int batches = training_samples / batch_size;
 
-  LogLine("Initial:   ", log_file);
+  std::vector<torch::Tensor> training_data;
+  std::vector<torch::Tensor> training_targets;
+  training_data.reserve(batches);
+  training_targets.reserve(batches);
+  int batch_index = 0;
+  int point_index = 0;
+  for (int i = 0; i < training_samples; i++) {
+    if (point_index == 0) {
+      training_data.push_back(torch::zeros({batch_size, net->input_size_}));
+      training_targets.push_back(torch::zeros({batch_size, net->output_size_}));
+    }
+    std::vector<int> board_cards = ReadBoardCards(read_file, n_board_cards);
+    std::array<std::vector<double>, 2> ranges = ReadRanges(read_file, num_hands);
+    std::vector<int> action_sequence = ReadActions(read_file);
+    int pot = GetPotFromActions(action_sequence, poker_type, round_bets, initial_pot);
+    std::array<std::vector<double>, 2> cfvs = ReadCFVs(read_file, num_hands);
 
-  torch::Tensor init_train_output = net->forward(training_data_tensor);
-  torch::Tensor init_train_loss = torch::nn::functional::smooth_l1_loss(init_train_output, training_target_tensor);
-  std::cout << "Training loss: " << init_train_loss.item().to<double>() << "\n";
+    training_data[batch_index][point_index][board_cards.back()] = 1;
+    std::vector<double> range_magnitudes(2);
+    if (normalize) {
+      for (int card_index = 0; card_index < num_hands; card_index++) {
+        range_magnitudes[0] += ranges[0][card_index];
+        range_magnitudes[1] += ranges[1][card_index];
+      }
+    }
+    for (double &range_magnitude : range_magnitudes) {
+      if (range_magnitude < 1e-3) {
+        range_magnitude = 1;
+      }
+    }
+    for (int card_index = 0; card_index < num_hands; card_index++) {
+      training_data[batch_index][point_index][card_index + deck_cards] =
+          ranges[0][card_index] / (normalize ? range_magnitudes[0] : 1);
+      training_data[batch_index][point_index][card_index + num_hands + deck_cards] =
+          ranges[1][card_index] / (normalize ? range_magnitudes[1] : 1);
+
+      training_targets[batch_index][point_index][card_index] =
+          cfvs[0][card_index] / ((normalize ? range_magnitudes[1] : 1) * pot);
+      training_targets[batch_index][point_index][card_index + num_hands] =
+          cfvs[1][card_index] / ((normalize ? range_magnitudes[0] : 1) * pot);
+    }
+    training_data[batch_index][point_index][net->input_size_ - 1] = pot;
+    point_index++;
+    if (point_index == batch_size) {
+      point_index = 0;
+      batch_index++;
+    }
+  }
+
+  torch::Tensor validation_data_tensor = torch::zeros({validation_samples, net->input_size_});
+  torch::Tensor validation_target_tensor = torch::zeros({validation_samples, net->output_size_});
+  for (int i = 0; i < validation_samples; i++) {
+    std::vector<int> board_cards = ReadBoardCards(read_file, n_board_cards);
+    std::array<std::vector<double>, 2> ranges = ReadRanges(read_file, num_hands);
+    std::vector<int> action_sequence = ReadActions(read_file);
+    int pot = GetPotFromActions(action_sequence, poker_type, round_bets, initial_pot);
+    std::array<std::vector<double>, 2> cfvs = ReadCFVs(read_file, num_hands);
+
+    validation_data_tensor[i][board_cards.back()] = 1;
+
+    std::vector<double> range_magnitudes(2);
+    if (normalize) {
+      for (int card_index = 0; card_index < num_hands; card_index++) {
+        range_magnitudes[0] += ranges[0][card_index];
+        range_magnitudes[1] += ranges[1][card_index];
+      }
+    }
+    for (double &range_magnitude : range_magnitudes) {
+      if (range_magnitude < 1e-3) {
+        range_magnitude = 1;
+      }
+    }
+    for (int card_index = 0; card_index < num_hands; card_index++) {
+      validation_data_tensor[i][card_index + deck_cards] =
+          ranges[0][card_index] / (normalize ? range_magnitudes[0] : 1);
+      validation_data_tensor[i][card_index + num_hands + deck_cards] =
+          ranges[1][card_index] / (normalize ? range_magnitudes[1] : 1);
+
+      validation_target_tensor[i][card_index] = cfvs[0][card_index] / ((normalize ? range_magnitudes[1] : 1) * pot);
+      validation_target_tensor[i][card_index + num_hands] =
+          cfvs[1][card_index] / ((normalize ? range_magnitudes[0] : 1) * pot);
+    }
+    validation_data_tensor[i][net->input_size_ - 1] = pot;
+  }
+
+  std::cout << training_data[0] << "\n";
+  std::cout << training_targets[0] << "\n";
+
+  std::ofstream oss;
+  oss.open(poker_type + "_" + std::to_string(layer_size) + "_" + std::to_string(layer_number) + "_losses");
+
+  std::cout << "Batches: " << batches << "\n";
+
+  double lower_lr_bound = 1e-6;
+  auto optimizer = std::make_shared<torch::optim::Adam>(net->parameters(), torch::optim::AdamOptions(1e-4));
+
+  LogLine("Initial:   ", log_file);
+  double init_cumulative_loss = 0;
+  for (int batch = 0; batch < batches; batch++) {
+    torch::Tensor output = net->forward(training_data[batch]);
+    torch::Tensor loss = torch::nn::functional::smooth_l1_loss(output, training_targets[batch]);
+    init_cumulative_loss += loss.item().to<double>();
+  }
+  std::cout << "Training loss: " << init_cumulative_loss / batches << "\n";
   Log("Training loss: ", log_file);
-  Log(std::to_string(init_train_loss.item().to<double>()), log_file);
+  Log(std::to_string(init_cumulative_loss / batches), log_file);
   Log("   ", log_file);
 
   torch::Tensor init_output = net->forward(validation_data_tensor);
@@ -1631,7 +1732,7 @@ void NetworkTraining(const std::string &file_name,
   Log(std::to_string(init_loss.item().to<double>()), log_file);
   LogLine("   ", log_file);
 
-  oss << init_train_loss.item().to<double>() << " " << init_loss.item().to<double>() << "\n";
+  oss << init_cumulative_loss / batches << " " << init_loss.item().to<double>() << "\n";
 
   for (int epoch = 0; epoch < epochs; epoch++) {
     std::cout << "Epoch " << epoch << ":   ";
@@ -1640,17 +1741,16 @@ void NetworkTraining(const std::string &file_name,
     LogLine(":   ", log_file);
     double cumulative_loss = 0;
     for (int batch = 0; batch < batches; batch++) {
-      int i_s = batch * batch_size;
-      int i_e = (batch + 1) * batch_size - 1;
-      optimizer->zero_grad();
-      torch::Tensor output = net->forward(training_data_tensor[i_s, i_e]);
-      torch::Tensor loss = torch::nn::functional::smooth_l1_loss(output, training_target_tensor[i_s, i_e]);
+      torch::Tensor output = net->forward(training_data[batch]);
+      torch::Tensor loss = torch::nn::functional::smooth_l1_loss(output, training_targets[batch]);
       loss.backward();
       optimizer->step();
       cumulative_loss += loss.item().to<double>();
       std::cout << "." << std::flush;
       if (epoch % 10 == 0) {
-        torch::save(net, "models/subgame1_epoch_" + std::to_string(epoch));
+        torch::save(net,
+                    "models/" + poker_type + "_epoch_" + std::to_string(epoch) + "_layers_"
+                        + std::to_string(layer_number) + "x" + std::to_string(layer_size));
       }
     }
     Log("Training loss: ", log_file);
@@ -1664,35 +1764,65 @@ void NetworkTraining(const std::string &file_name,
     Log(std::to_string(loss.item().to<double>()), log_file);
     LogLine("   ", log_file);
     oss << cumulative_loss / batches << " " << loss.item().to<double>() << "\n";
+    if (epoch > 200) {
+      for (auto &group : optimizer->param_groups()) {
+        if (group.has_options()) {
+          auto &options = static_cast<torch::optim::AdamOptions &>(group.options());
+          options.lr(std::max(options.lr() * 0.999, lower_lr_bound));
+          std::cout << options.lr() << "\n";
+        }
+      }
+    }
   }
 }
 
 void NetExploitabilityTrunkStrategy(
     int iterations, int full_iterations, const std::string &net_file,
-    const std::string &log_file, const std::string &poker) {
+    const std::string &log_file, const std::string &poker, int layer_size, int layer_number) {
   ClearLog(log_file);
   LogLine("Exploitability experiment", log_file);
   auto start_time = GetTime();
   std::vector<int> board_cards;
   std::string name;
+  std::vector<int> action_sequence;
+  int cards_in_hand;
+  std::array<std::vector<double>, 2> ranges;
   if (poker == "full") {
+    action_sequence = {1, 1, 1, 2, 1};
     board_cards = {23, 28, 30, 32};
+    cards_in_hand = 2;
+    ranges = GetReachesFromVector(SUBGAME_ONE_RANGES);
     name = "universal_poker(betting=limit,numPlayers=2,numRounds=4,blind=10 5,"
            "firstPlayer=2 1,numSuits=4,numRanks=13,numHoleCards=2,numBoardCards=0 3 "
            "1 1,raiseSize=10 10 20 20,maxRaises=3 4 4 4)";
-  } else {
+  } else if (poker == "small") {
+    action_sequence = {1, 1, 1, 2, 1};
     board_cards = {1, 3, 5, 9};
+    cards_in_hand = 2;
     name = "universal_poker(betting=limit,numPlayers=2,numRounds=4,blind=10 5,"
            "firstPlayer=2 1,numSuits=2,numRanks=6,numHoleCards=2,numBoardCards=0 3 "
            "1 1,raiseSize=10 10 20 20,maxRaises=3 4 4 4)";
+  } else if (poker == "leduc") {
+    cards_in_hand = 1;
+    action_sequence = {};
+    board_cards = {};
+    name = "universal_poker(betting=limit,numPlayers=2,numRounds=2,blind=1 1,"
+           "firstPlayer=1 1,numSuits=2,numRanks=3,numHoleCards=1,numBoardCards=0 1"
+           ",raiseSize=2 4,maxRaises=2 2)";
+  } else if (poker == "three_card") {
+    cards_in_hand = 1;
+    action_sequence = {};
+    board_cards = {};
+    name = "universal_poker(betting=limit,numPlayers=2,numRounds=2,blind=1 1,"
+           "firstPlayer=1 1,numSuits=1,numRanks=3,numHoleCards=1,numBoardCards=0 1"
+           ",raiseSize=2 4,maxRaises=2 2)";
+  } else {
+    SpielFatalError("Incorrect poker type. Possible types: full, small, leduc");
   }
-  std::vector<int> action_sequence = {1, 1, 1, 2, 1};
   std::shared_ptr<const Game> game = LoadGame(name);
 
-  std::array<std::vector<double>, 2> ranges = GetReachesFromVector(SUBGAME_ONE_RANGES);
-
-  std::unique_ptr<State> state = GetPokerStatesAfterMoves(game, board_cards, action_sequence);
-  std::unique_ptr<State> full_state = GetPokerStatesAfterMoves(game, board_cards, action_sequence);
+  std::unique_ptr<State> state = GetPokerStatesAfterMoves(game, board_cards, action_sequence, cards_in_hand);
+  std::unique_ptr<State> full_state = GetPokerStatesAfterMoves(game, board_cards, action_sequence, cards_in_hand);
 
   LogLine("States created: " + std::to_string(ElapsedTime(start_time)), log_file);
   start_time = GetTime();
@@ -1716,13 +1846,16 @@ void NetExploitabilityTrunkStrategy(
 
   auto out = std::make_shared<Subgame>(game, public_observer, trees);
 
-  out->initial_state().beliefs = ranges;
+  if (!ranges[0].empty()) {
+    out->initial_state().beliefs = ranges;
+  }
 
   std::shared_ptr<const PublicStateEvaluator>
       terminal_evaluator = std::make_shared<const GeneralPokerTerminalEvaluatorLinear>();
 
   std::shared_ptr<const PublicStateEvaluator> leaf_evaluator =
-      std::make_shared<const RiverNetworkLeafEvaluator>(net_file);
+      std::make_shared<const RiverNetworkLeafEvaluator>(
+          net_file, poker_data.num_cards_, poker_data.num_hands_, layer_size, layer_number);
 
   SubgameSolver solver = SubgameSolver(out, leaf_evaluator, terminal_evaluator,
                                        std::make_shared<std::mt19937>(0), "RegretMatchingPlus");
@@ -1739,7 +1872,9 @@ void NetExploitabilityTrunkStrategy(
 
   auto full_out = std::make_shared<Subgame>(game, public_observer, full_trees);
 
-  full_out->initial_state().beliefs = ranges;
+  if (!ranges[0].empty()) {
+    full_out->initial_state().beliefs = ranges;
+  }
 
   SubgameSolver full_solver = SubgameSolver(full_out, nullptr, terminal_evaluator,
                                             std::make_shared<std::mt19937>(0), "RegretMatchingPlus");
@@ -1822,24 +1957,63 @@ void NetExploitabilityTrunkStrategy(
 
     best_response.Reset();
     best_response.RunSimultaneousIterations(2);
-    std::cout << "Best response: " << best_response.RootValues() << "\n";
+//    std::cout << "Best response: " << best_response.RootValues() << "\n";
     Log("Best response ", log_file);
-    Log(std::to_string(best_response.RootValues()[1]) + ", ", log_file);
+    Log(std::to_string(best_response.RootValues()[0]) + ", ", log_file);
     LogLine(std::to_string(best_response.RootValues()[1]), log_file);
     nash_conv += best_response.RootValues()[1 - player];
 
     LogLine("Best response evaluated: " + std::to_string(ElapsedTime(start_time)), log_file);
     start_time = GetTime();
   }
-  std::cout << "Exploitability: " << nash_conv / 2 << "\n";
+  std::cout << nash_conv / 2 << "\n";
   LogLine("Exploitability: " + std::to_string(nash_conv / 2), log_file);
 }
 
-void ComputeNetLosses(const std::string &data_file, int samples_from, int samples,
-                      const std::string &net_directory, int models, bool normalize, const std::string &log_file) {
+void ComputeNetLosses(const std::string &data_file, int samples_from, int samples, const std::string &net_directory,
+                      int models, bool normalize, const std::string &log_file, const std::string &poker_type,
+                      int layer_size, int layer_number) {
+  int cards_in_hand;
+  int n_board_cards;
+  int deck_cards;
+  int num_hands;
+  int initial_pot;
+  std::vector<int> round_bets;
+  if (poker_type == "full") {
+    deck_cards = 52;
+    num_hands = 1326;
+    cards_in_hand = 2;
+    n_board_cards = 5;
+    initial_pot = 20;
+    round_bets = {10, 10, 20, 20};
+  } else if (poker_type == "small") {
+    num_hands = 66;
+    deck_cards = 12;
+    cards_in_hand = 2;
+    n_board_cards = 5;
+    initial_pot = 20;
+    round_bets = {10, 10, 20, 20};
+  } else if (poker_type == "leduc") {
+    num_hands = 6;
+    deck_cards = 6;
+    cards_in_hand = 1;
+    n_board_cards = 1;
+    initial_pot = 2;
+    round_bets = {2, 4};
+  } else if (poker_type == "three_card") {
+    deck_cards = 3;
+    num_hands = 3;
+    cards_in_hand = 1;
+    n_board_cards = 1;
+    initial_pot = 2;
+    round_bets = {2, 4};
+  } else {
+    SpielFatalError("Incorrect poker type. Possible types: full, small, leduc");
+  }
+
   ClearLog(log_file);
 
-  auto net = std::make_shared<Net>();
+  auto net = std::make_shared<Net>(deck_cards, num_hands, layer_size, layer_number);
 
   torch::Device device("cpu");
 
@@ -1847,45 +2021,50 @@ void ComputeNetLosses(const std::string &data_file, int samples_from, int sample
 
   std::ifstream read_file(data_file);
 
-  torch::Tensor data_tensor = torch::zeros({samples, 2705});
-  torch::Tensor target_tensor = torch::zeros({samples, 2652});
+  torch::Tensor data_tensor = torch::zeros({samples, net->input_size_});
+  torch::Tensor target_tensor = torch::zeros({samples, net->output_size_});
   for (int i = 0; i < samples_from; i++) {
-    std::vector<int> board_cards = ReadBoardCards(read_file);
-    std::array<std::vector<double>, 2> ranges = ReadRanges(read_file);
+    std::vector<int> board_cards = ReadBoardCards(read_file, n_board_cards);
+    std::array<std::vector<double>, 2> ranges = ReadRanges(read_file, num_hands);
     std::vector<int> action_sequence = ReadActions(read_file);
-    int pot = GetPotFromActions(action_sequence);
-    std::array<std::vector<double>, 2> cfvs = ReadCFVs(read_file);
+    int pot = GetPotFromActions(action_sequence, poker_type, round_bets, initial_pot);
+    std::array<std::vector<double>, 2> cfvs = ReadCFVs(read_file, num_hands);
   }
 
   for (int i = 0; i < samples; i++) {
-    std::vector<int> board_cards = ReadBoardCards(read_file);
-    std::array<std::vector<double>, 2> ranges = ReadRanges(read_file);
+    std::vector<int> board_cards = ReadBoardCards(read_file, n_board_cards);
+    std::array<std::vector<double>, 2> ranges = ReadRanges(read_file, num_hands);
     std::vector<int> action_sequence = ReadActions(read_file);
-    int pot = GetPotFromActions(action_sequence);
-    std::array<std::vector<double>, 2> cfvs = ReadCFVs(read_file);
+    int pot = GetPotFromActions(action_sequence, poker_type, round_bets, initial_pot);
+    std::array<std::vector<double>, 2> cfvs = ReadCFVs(read_file, num_hands);
 
-    data_tensor[i][board_cards[4]] = 1;
+    data_tensor[i][board_cards.back()] = 1;
 
     std::vector<double> range_magnitudes(2);
     if (normalize) {
-      for (int card_index = 0; card_index < 1326; card_index++) {
+      for (int card_index = 0; card_index < num_hands; card_index++) {
         range_magnitudes[0] += ranges[0][card_index];
         range_magnitudes[1] += ranges[1][card_index];
       }
     }
-
-    for (int card_index = 0; card_index < 1326; card_index++) {
-      data_tensor[i][card_index + 52] = ranges[0][card_index] / (normalize ? range_magnitudes[0] : 1);
-      data_tensor[i][card_index + 1326 + 52] = ranges[1][card_index] / (normalize ? range_magnitudes[1] : 1);
-
-      target_tensor[i][card_index] = cfvs[0][card_index] / (normalize ? range_magnitudes[1] : 1);
-      target_tensor[i][card_index + 1326] = cfvs[1][card_index] / (normalize ? range_magnitudes[0] : 1);
+    for (double &range_magnitude : range_magnitudes) {
+      if (range_magnitude < 1e-3) {
+        range_magnitude = 1;
+      }
     }
-    data_tensor[i][2704] = pot;
+    for (int card_index = 0; card_index < num_hands; card_index++) {
+      data_tensor[i][card_index + deck_cards] =
+          ranges[0][card_index] / (normalize ? range_magnitudes[0] : 1);
+      data_tensor[i][card_index + num_hands + deck_cards] =
+          ranges[1][card_index] / (normalize ? range_magnitudes[1] : 1);
+
+      target_tensor[i][card_index] = cfvs[0][card_index] / ((normalize ? range_magnitudes[1] : 1) * pot);
+      target_tensor[i][card_index + num_hands] = cfvs[1][card_index] / ((normalize ? range_magnitudes[0] : 1) * pot);
+    }
   }
 
   for (int i = 0; i < models; i++) {
-    std::string net_file = net_directory + "/subgame1_epoch_" + std::to_string(i * 10);
+    std::string net_file = net_directory + "_epoch_" + std::to_string(i * 10) + "_layers_" + std::to_string(layer_size);
     torch::load(net, net_file);
 
     torch::Tensor output = net->forward(data_tensor);
@@ -1896,8 +2075,8 @@ void ComputeNetLosses(const std::string &data_file, int samples_from, int sample
   }
 }
 
-void CDBR(int iterations, int bad_iterations,
-          const std::string &net_file, const std::string &log_file, const std::string &poker) {
+void CDBR(int iterations, int bad_iterations, const std::string &net_file, const std::string &log_file,
+          const std::string &poker, int layer_size, int layer_number) {
   ClearLog(log_file);
   LogLine("Started CDBR", log_file);
 
@@ -1905,24 +2084,45 @@ void CDBR(int iterations, int bad_iterations,
   auto start = GetTime();
   std::vector<int> board_cards;
   std::string name;
+  std::vector<int> action_sequence;
+  int cards_in_hand;
+  std::array<std::vector<double>, 2> ranges;
   if (poker == "full") {
+    action_sequence = {1, 1, 1, 2, 1};
     board_cards = {23, 28, 30, 32};
+    cards_in_hand = 2;
+    ranges = GetReachesFromVector(SUBGAME_ONE_RANGES);
     name = "universal_poker(betting=limit,numPlayers=2,numRounds=4,blind=10 5,"
            "firstPlayer=2 1,numSuits=4,numRanks=13,numHoleCards=2,numBoardCards=0 3 "
            "1 1,raiseSize=10 10 20 20,maxRaises=3 4 4 4)";
-  } else {
+  } else if (poker == "small") {
+    action_sequence = {1, 1, 1, 2, 1};
     board_cards = {1, 3, 5, 9};
+    cards_in_hand = 2;
     name = "universal_poker(betting=limit,numPlayers=2,numRounds=4,blind=10 5,"
            "firstPlayer=2 1,numSuits=2,numRanks=6,numHoleCards=2,numBoardCards=0 3 "
            "1 1,raiseSize=10 10 20 20,maxRaises=3 4 4 4)";
+  } else if (poker == "leduc") {
+    cards_in_hand = 1;
+    action_sequence = {};
+    board_cards = {};
+    name = "universal_poker(betting=limit,numPlayers=2,numRounds=2,blind=1 1,"
+           "firstPlayer=1 1,numSuits=2,numRanks=3,numHoleCards=1,numBoardCards=0 1"
+           ",raiseSize=2 4,maxRaises=2 2)";
+  } else if (poker == "three_card") {
+    cards_in_hand = 1;
+    action_sequence = {};
+    board_cards = {};
+    name = "universal_poker(betting=limit,numPlayers=2,numRounds=2,blind=1 1,"
+           "firstPlayer=1 1,numSuits=1,numRanks=3,numHoleCards=1,numBoardCards=0 1"
+           ",raiseSize=2 4,maxRaises=2 2)";
+  } else {
+    SpielFatalError("Incorrect poker type. Possible types: full, small, leduc");
   }
-  std::vector<int> action_sequence = {1, 1, 1, 2, 1};
   std::shared_ptr<const Game> game = LoadGame(name);
 
-  std::array<std::vector<double>, 2> ranges = GetReachesFromVector(SUBGAME_ONE_RANGES);
-
-  std::unique_ptr<State> state = GetPokerStatesAfterMoves(game, board_cards, action_sequence);
-  std::unique_ptr<State> full_state = GetPokerStatesAfterMoves(game, board_cards, action_sequence);
+  std::unique_ptr<State> state = GetPokerStatesAfterMoves(game, board_cards, action_sequence, cards_in_hand);
+  std::unique_ptr<State> full_state = GetPokerStatesAfterMoves(game, board_cards, action_sequence, cards_in_hand);
 
   LogLine("States created: " + std::to_string(ElapsedTime(start)), log_file);
   start = GetTime();
@@ -1946,13 +2146,15 @@ void CDBR(int iterations, int bad_iterations,
 
   auto out = std::make_shared<Subgame>(game, public_observer, trees);
 
-  out->initial_state().beliefs = ranges;
-
+  if (!ranges[0].empty()) {
+    out->initial_state().beliefs = ranges;
+  }
   std::shared_ptr<const PublicStateEvaluator>
       terminal_evaluator = std::make_shared<const GeneralPokerTerminalEvaluatorLinear>();
 
   std::shared_ptr<const PublicStateEvaluator> leaf_evaluator =
-      std::make_shared<const RiverNetworkLeafEvaluator>(net_file);
+      std::make_shared<const RiverNetworkLeafEvaluator>(net_file, poker_data.num_cards_,
+                                                        poker_data.num_hands_, layer_size, layer_number);
 
   SubgameSolver solver = SubgameSolver(out, leaf_evaluator, terminal_evaluator,
                                        std::make_shared<std::mt19937>(0), "RegretMatchingPlus");
@@ -1969,7 +2171,9 @@ void CDBR(int iterations, int bad_iterations,
 
   auto full_out = std::make_shared<Subgame>(game, public_observer, full_trees);
 
-  full_out->initial_state().beliefs = ranges;
+  if (!ranges[0].empty()) {
+    full_out->initial_state().beliefs = ranges;
+  }
 
   SubgameSolver full_solver = SubgameSolver(full_out, nullptr, terminal_evaluator,
                                             std::make_shared<std::mt19937>(0), "RegretMatchingPlus");
@@ -2042,14 +2246,209 @@ void CDBR(int iterations, int bad_iterations,
   LogLine("Full time: " + std::to_string(ElapsedTime(complete_beginning)), log_file);
 }
 
+void OracleTest(int iterations,
+                int full_iterations,
+                int subgame_iterations,
+                const std::string &log_file,
+                const std::string &poker) {
+  ClearLog(log_file);
+  LogLine("Oracle experiment", log_file);
+  std::vector<int> board_cards;
+  std::string name;
+  std::vector<int> action_sequence;
+  int cards_in_hand;
+  std::array<std::vector<double>, 2> ranges;
+  if (poker == "full") {
+    action_sequence = {1, 1, 1, 2, 1};
+    board_cards = {23, 28, 30, 32};
+    cards_in_hand = 2;
+    ranges = GetReachesFromVector(SUBGAME_ONE_RANGES);
+    name = "universal_poker(betting=limit,numPlayers=2,numRounds=4,blind=10 5,"
+           "firstPlayer=2 1,numSuits=4,numRanks=13,numHoleCards=2,numBoardCards=0 3 "
+           "1 1,raiseSize=10 10 20 20,maxRaises=3 4 4 4)";
+  } else if (poker == "small") {
+    action_sequence = {1, 1, 1, 2, 1};
+    board_cards = {1, 3, 5, 9};
+    cards_in_hand = 2;
+    name = "universal_poker(betting=limit,numPlayers=2,numRounds=4,blind=10 5,"
+           "firstPlayer=2 1,numSuits=2,numRanks=6,numHoleCards=2,numBoardCards=0 3 "
+           "1 1,raiseSize=10 10 20 20,maxRaises=3 4 4 4)";
+  } else if (poker == "leduc") {
+    cards_in_hand = 1;
+    action_sequence = {};
+    board_cards = {};
+    name = "universal_poker(betting=limit,numPlayers=2,numRounds=2,blind=1 1,"
+           "firstPlayer=1 1,numSuits=2,numRanks=3,numHoleCards=1,numBoardCards=0 1"
+           ",raiseSize=2 4,maxRaises=2 2)";
+  } else if (poker == "three_card") {
+    cards_in_hand = 1;
+    action_sequence = {};
+    board_cards = {};
+    name = "universal_poker(betting=limit,numPlayers=2,numRounds=2,blind=1 1,"
+           "firstPlayer=1 1,numSuits=1,numRanks=3,numHoleCards=1,numBoardCards=0 1"
+           ",raiseSize=2 4,maxRaises=2 2)";
+  } else {
+    SpielFatalError("Incorrect poker type. Possible types: full, small, leduc");
+  }
+
+  auto start_time = GetTime();
+  std::shared_ptr<const Game> game = LoadGame(name);
+
+  std::unique_ptr<State> state = GetPokerStatesAfterMoves(game, board_cards, action_sequence, cards_in_hand);
+  std::unique_ptr<State> full_state = GetPokerStatesAfterMoves(game, board_cards, action_sequence, cards_in_hand);
+
+  LogLine("States created: " + std::to_string(ElapsedTime(start_time)), log_file);
+  start_time = GetTime();
+
+  std::shared_ptr<Observer> infostate_observer = game->MakeObserver(kInfoStateObsType, {});
+  std::shared_ptr<Observer> public_observer = game->MakeObserver(kPublicStateObsType, {});
+
+  algorithms::PokerData poker_data = algorithms::PokerData(*state);
+
+  std::vector<double> chance_reaches(poker_data.num_hands_, 1. / poker_data.num_hands_);
+
+  UpdateChanceReaches(chance_reaches, poker_data, board_cards);
+
+  std::vector<double> full_chance_reaches = chance_reaches;
+
+  std::vector<std::shared_ptr<algorithms::InfostateTree>> trees = algorithms::MakePokerInfostateTrees(
+      state, chance_reaches, infostate_observer, 1, kDlCfrInfostateTreeStorage, board_cards);
+
+  LogLine("Made DL trees: " + std::to_string(ElapsedTime(start_time)), log_file);
+  start_time = GetTime();
+
+  auto out = std::make_shared<Subgame>(game, public_observer, trees);
+
+  if (!ranges[0].empty()) {
+    out->initial_state().beliefs = ranges;
+  }
+  std::shared_ptr<const PublicStateEvaluator>
+      terminal_evaluator = std::make_shared<const GeneralPokerTerminalEvaluatorLinear>();
+
+  std::shared_ptr<const PublicStateEvaluator> leaf_evaluator =
+      std::make_shared<const PokerCFREvaluator>(game, terminal_evaluator, public_observer, infostate_observer,
+                                                subgame_iterations);
+
+  SubgameSolver solver = SubgameSolver(out, leaf_evaluator, terminal_evaluator,
+                                       std::make_shared<std::mt19937>(0), "RegretMatchingPlus");
+
+  LogLine("Made DL solver: " + std::to_string(ElapsedTime(start_time)), log_file);
+  start_time = GetTime();
+
+  // Create solver for full TURN
+  std::vector<std::shared_ptr<algorithms::InfostateTree>> full_trees = algorithms::MakePokerInfostateTrees(
+      full_state, full_chance_reaches, infostate_observer, 1000, kDlCfrInfostateTreeStorage, board_cards);
+
+  LogLine("Made full trees: " + std::to_string(ElapsedTime(start_time)), log_file);
+  start_time = GetTime();
+
+  auto full_out = std::make_shared<Subgame>(game, public_observer, full_trees);
+
+  if (!ranges[0].empty()) {
+    full_out->initial_state().beliefs = ranges;
+  }
+
+  SubgameSolver full_solver = SubgameSolver(full_out, nullptr, terminal_evaluator,
+                                            std::make_shared<std::mt19937>(0), "RegretMatchingPlus");
+
+  LogLine("Made full solver: " + std::to_string(ElapsedTime(start_time)), log_file);
+  start_time = GetTime();
+
+  for (int iteration = 0; iteration < iterations; iteration++) {
+    solver.RunSimultaneousIterations(1);
+    LogLine("Iteration: " + std::to_string(iteration), log_file);
+  }
+
+  return;
+
+  LogLine("Computed trunk strategy: " + std::to_string(ElapsedTime(start_time)), log_file);
+  start_time = GetTime();
+
+  auto strategy = down_cast<algorithms::BanditsAveragePolicy>(*solver.AveragePolicy());
+
+  std::array<TabularPolicy, 2> separated_policies = {TabularPolicy(), TabularPolicy()};
+
+  separated_policies[0] = strategy.TabularizeAveragePlayer(0);
+  separated_policies[1] = strategy.TabularizeAveragePlayer(1);
+
+//  for (int player = 0; player < 2; player++) {
+//    algorithms::BanditVector &bandits = solver.bandits()[player];
+//    for (algorithms::DecisionId id : bandits.range()) {
+//      algorithms::InfostateNode *node = solver.subgame()->trees[player]->decision_infostate(id);
+//      const std::string &infostate = node->infostate_string();
+//      ActionsAndProbs infostate_policy = strategy->GetStatePolicy(infostate);
+//      separated_policies[player].SetStatePolicy(infostate, infostate_policy);
+//    }
+//  }
+
+  LogLine("Created separated policies from trunk strategy: " + std::to_string(ElapsedTime(start_time)), log_file);
+  start_time = GetTime();
+
+  double nash_conv = 0;
+
+  for (int player = 0; player < 2; player++) {
+    SubgameSolver best_response = SubgameSolver(full_out, nullptr, terminal_evaluator,
+                                                std::make_shared<std::mt19937>(0), "RegretMatchingPlus");
+    algorithms::BanditVector &bandits = best_response.bandits()[player];
+    for (algorithms::DecisionId id : bandits.range()) {
+      algorithms::InfostateNode *node = best_response.subgame()->trees[player]->decision_infostate(id);
+      const std::string &infostate = node->infostate_string();
+      ActionsAndProbs infostate_policy = strategy.GetStatePolicy(infostate);
+      if (!infostate_policy.empty()) {
+        bandits[id] = std::make_unique<algorithms::bandits::FixedStrategy>(GetProbs(infostate_policy));
+      }
+    }
+
+    LogLine("Prepared solver for DL BR: " + std::to_string(ElapsedTime(start_time)), log_file);
+    start_time = GetTime();
+
+    for (int full_iteration = 0; full_iteration < full_iterations; full_iteration++) {
+      best_response.RunSimultaneousIterations(1);
+      LogLine("Iteration " + std::to_string(full_iteration), log_file);
+    }
+
+    LogLine("Solved the exploitability: " + std::to_string(ElapsedTime(start_time)), log_file);
+    start_time = GetTime();
+
+    auto response_strategy = down_cast<algorithms::BanditsAveragePolicy>(*best_response.AveragePolicy());
+    auto separated_response_strategy = response_strategy.TabularizeAverage();
+
+    for (Player bandit_player = 0; bandit_player < 2; bandit_player++) {
+      auto policy = best_response.AveragePolicy();
+      algorithms::BanditVector &local_bandits = best_response.bandits()[bandit_player];
+      for (algorithms::DecisionId id : local_bandits.range()) {
+        algorithms::InfostateNode *node = best_response.subgame()->trees[bandit_player]->decision_infostate(id);
+        const std::string &infostate = node->infostate_string();
+        ActionsAndProbs infostate_policy = separated_response_strategy[bandit_player].GetStatePolicy(infostate);
+        if (!infostate_policy.empty()) {
+          local_bandits[id] = std::make_unique<algorithms::bandits::FixedStrategy>(GetProbs(infostate_policy));
+        }
+      }
+    }
+
+    LogLine("Copied strategies: " + std::to_string(ElapsedTime(start_time)), log_file);
+    start_time = GetTime();
+
+    best_response.Reset();
+    best_response.RunSimultaneousIterations(2);
+    std::cout << "Best response: " << best_response.RootValues() << "\n";
+    Log("Best response ", log_file);
+    Log(std::to_string(best_response.RootValues()[0]) + ", ", log_file);
+    LogLine(std::to_string(best_response.RootValues()[1]), log_file);
+    nash_conv += best_response.RootValues()[1 - player];
+
+    LogLine("Best response evaluated: " + std::to_string(ElapsedTime(start_time)), log_file);
+    start_time = GetTime();
+  }
+  std::cout << "Exploitability: " << nash_conv / 2 << "\n";
+  LogLine("Exploitability: " + std::to_string(nash_conv / 2), log_file);
+}
+
 }
 }
 }
 
 int main(int argc, char **argv) {
-//  open_spiel::papers_with_code::SolvePokerSubgames("test_file_0", "solved_file_0", 1, 1);
-
-//  open_spiel::papers_with_code::TestGeneralPokerEvaluator();
 //  if (argc > 2) {
 //    int iterations = 1000;
 //    int situations = 1;
@@ -2077,30 +2476,30 @@ int main(int argc, char **argv) {
 //    std::cout
 //        << "Please specify the experiment to run. -gen + filename to generate data and -sol + file_in + file_out to solve the situations";
 //  }
-//  if (argc > 2) {
-//    int iterations = 1000;
-//    int situations = 100000;
-//    int machines = 50;
-//    // Linear evaluator infostate CFR
-//    if (std::strcmp(argv[1], "-gen") == 0) {
-//      std::string file_in = argv[2];
-//      std::random_device rd;
-//      std::mt19937 mt(rd());
-//      for (int i = 0; i < machines; i++) {
-//        open_spiel::papers_with_code::GenerateAndSavePokerSituations(
-//            situations / machines, file_in + std::to_string(i), mt);
-//      }
-//    }
-//
-//    if (std::strcmp(argv[1], "-sol") == 0) {
-//      std::string file_in = argv[2];
-//      std::string file_out = argv[3];
-//      open_spiel::papers_with_code::SolvePokerSubgames(file_in, file_out, situations / machines, iterations);
-//    }
-//  } else {
-//    std::cout
-//        << "Please specify the experiment to run. -gen + filename to generate data and -sol + file_in + file_out to solve the situations";
-//  }
+  // Linear evaluator infostate CFR
+  if (std::strcmp(argv[1], "gen") == 0) {
+    std::string file_in = argv[2];
+    std::random_device rd;
+    std::mt19937 mt(rd());
+    std::string poker_type = argv[3];
+    int situations = std::atoi(argv[4]);
+    int machines = std::atoi(argv[5]);
+    for (int i = 0; i < machines; i++) {
+      open_spiel::papers_with_code::GenerateAndSavePokerSituations(
+          situations / machines, file_in + std::to_string(i), mt, poker_type);
+    }
+  }
+
+  if (std::strcmp(argv[1], "sol") == 0) {
+    std::string file_in = argv[2];
+    std::string file_out = argv[3];
+    std::string poker_type = argv[4];
+    int iterations = std::atoi(argv[5]);
+    int situations = std::atoi(argv[6]);
+    int machines = std::atoi(argv[7]);
+
+    open_spiel::papers_with_code::SolvePokerSubgames(file_in, file_out, situations / machines, iterations, poker_type);
+  }
 //  open_spiel::papers_with_code::GenerateAndSavePokerSituations(poker_situations, file_name);
 
 //  open_spiel::papers_with_code::CheckExploitability();
@@ -2196,9 +2595,13 @@ int main(int argc, char **argv) {
     int epochs = std::atoi(argv[5]);
     int batch_size = std::atoi(argv[6]);
     std::string log_file = argv[7];
+    std::string poker_type = argv[8];
+    int layer_size = std::atoi(argv[9]);
+    int layer_number = std::atoi(argv[10]);
     bool normalize = true;
     open_spiel::papers_with_code::NetworkTraining(
-        file_template, training_samples, validation_samples, epochs, batch_size, normalize, log_file);
+        file_template, training_samples, validation_samples, epochs, batch_size, normalize, log_file, poker_type,
+        layer_size, layer_number);
   }
 
   if(strcmp(argv[1], "test") == 0) {
@@ -2208,7 +2611,11 @@ int main(int argc, char **argv) {
     int samples = std::atoi(argv[5]);
     int models = std::atoi(argv[6]);
     std::string log_file = argv[7];
-    open_spiel::papers_with_code::ComputeNetLosses(data_file, samples_from, samples, net_dir, models, true, log_file);
+    std::string poker_type = argv[8];
+    int layer_size = std::atoi(argv[9]);
+    int layer_number = std::atoi(argv[10]);
+    open_spiel::papers_with_code::ComputeNetLosses(
+        data_file, samples_from, samples, net_dir, models, true, log_file, poker_type, layer_size, layer_number);
   }
 
   if (strcmp(argv[1], "expl") == 0) {
@@ -2217,8 +2624,10 @@ int main(int argc, char **argv) {
     int full_iterations = std::atoi(argv[4]);
     std::string log_file = argv[5];
     std::string poker = argv[6];
+    int layer_size = std::atoi(argv[7]);
+    int layer_number = std::atoi(argv[8]);
     open_spiel::papers_with_code::NetExploitabilityTrunkStrategy(
-        iterations, full_iterations, net_file, log_file, poker);
+        iterations, full_iterations, net_file, log_file, poker, layer_size, layer_number);
   }
 
   if (strcmp(argv[1], "cdbr") == 0) {
@@ -2227,6 +2636,16 @@ int main(int argc, char **argv) {
     int bad_iterations = std::atoi(argv[4]);
     std::string log_file = argv[5];
     std::string poker = argv[6];
-    open_spiel::papers_with_code::CDBR(iterations, bad_iterations, net_file, log_file, poker);
+    int layer_size = std::atoi(argv[7]);
+    int layer_number = std::atoi(argv[8]);
+    open_spiel::papers_with_code::CDBR(iterations, bad_iterations, net_file, log_file, poker, layer_size, layer_number);
+  }
+  if (strcmp(argv[1], "oracle") == 0) {
+    int iterations = std::atoi(argv[2]);
+    int full_iterations = std::atoi(argv[3]);
+    int subgame_iterations = std::atoi(argv[4]);
+    std::string log_file = argv[5];
+    std::string poker = argv[6];
+    open_spiel::papers_with_code::OracleTest(iterations, full_iterations, subgame_iterations, log_file, poker);
   }
 }
