@@ -13,7 +13,7 @@
 // limitations under the License.
 
 
-#include "open_spiel/papers_with_code/1906.06412.value_functions/infostate_tree_br.h"
+#include "open_spiel/papers_with_code/public_state_cfr/infostate_tree_br.h"
 
 namespace open_spiel {
 namespace papers_with_code {

@@ -201,7 +201,6 @@ add_library(open_spiel_core OBJECT ${OPEN_SPIEL_CORE_FILES})
 target_include_directories (
   open_spiel_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} abseil-cpp)
 link_libraries(open_spiel_core
-        absl::container
         absl::flags
         absl::flags_parse
         absl::flat_hash_map
@@ -226,7 +225,6 @@ set (OPEN_SPIEL_OBJECTS
   $<TARGET_OBJECTS:algorithms>
   $<TARGET_OBJECTS:utils>
   $<TARGET_OBJECTS:tests>
-  $<TARGET_OBJECTS:open_spiel_ortools>
 )
 if (OPEN_SPIEL_BUILD_WITH_ORTOOLS)
   # Compile with OR-Tools headers and link against binary distribution,
@@ -329,7 +327,7 @@ if(NOT DEFINED ENV{BUILD_SHARED_LIB})
   set (ENV{BUILD_SHARED_LIB} OFF)
 endif()
 set (BUILD_SHARED_LIB $ENV{BUILD_SHARED_LIB})
-if (BUILD_SHARED_LIB)
+if (BUILD_SHARED_LIB)  
   if (OPEN_SPIEL_BUILD_WITH_ORTOOLS)
     add_library(open_spiel SHARED ${OPEN_SPIEL_OBJECTS}
       # Optionally include files that use external dependencies, for example
@@ -337,7 +335,7 @@ if (BUILD_SHARED_LIB)
       $<TARGET_OBJECTS:open_spiel_ortools>
     )
   else()
-    add_library(open_spiel SHARED ${OPEN_SPIEL_OBJECTS})
+  add_library(open_spiel SHARED ${OPEN_SPIEL_OBJECTS})
   endif()
   target_include_directories(open_spiel PUBLIC
       ${CMAKE_CURRENT_SOURCE_DIR} abseil-cpp)

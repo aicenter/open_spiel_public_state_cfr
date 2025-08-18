@@ -95,7 +95,7 @@ function cached_clone() {
 
 DIR="./pybind11"
 if [[ ! -d ${DIR} ]]; then
-  cached_clone -b smart_holder --single-branch --depth 1 https://github.com/pybind/pybind11.git ${DIR}
+  cached_clone -b archive/smart_holder --single-branch --depth 1 https://github.com/pybind/pybind11.git ${DIR}
 fi
 # The official https://github.com/dds-bridge/dds.git seems to not accept PR,
 # so we have forked it.

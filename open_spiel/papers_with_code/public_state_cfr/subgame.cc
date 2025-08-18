@@ -14,7 +14,7 @@
 
 
 #include "open_spiel/abseil-cpp/absl/hash/hash.h"
-#include "open_spiel/papers_with_code/1906.06412.value_functions/subgame.h"
+#include "open_spiel/papers_with_code/public_state_cfr/subgame.h"
 #include "open_spiel/algorithms/bandits.h"
 #include "open_spiel/algorithms/bandits_policy.h"
 #include "open_spiel/utils/format_observation.h"
@@ -38,24 +38,6 @@ void CheckConsistency(const PublicState &s) {
       SPIEL_CHECK_EQ(node->tree().acting_player(), pl);
       if (node->type() == algorithms::kTerminalInfostateNode) num_terminals++;
       else num_nonterminals++;
-
-//      for (const std::unique_ptr<State> &state : node->corresponding_states()) {
-//        std::unique_ptr<std::vector<Action>> h;
-//        if (node->type() == algorithms::kTerminalInfostateNode) {
-//          h = std::make_unique<std::vector<Action>>(node->TerminalHistory());
-//        } else {
-//          h = std::make_unique<std::vector<Action>>(state->History());
-//        }
-//        if (pl == 0) {
-//          SPIEL_CHECK_TRUE(state_histories.find(*h) == state_histories.end());
-//          state_histories.insert(*h);
-//        } else {
-//          SPIEL_CHECK_TRUE(state_histories.find(*h) != state_histories.end());
-//        }
-//
-////        if (state->IsTerminal()) num_terminals++;
-////        else num_nonterminals++;
-//      }
     }
   }
   SPIEL_CHECK_FALSE(num_terminals > 0 && num_nonterminals > 0);
@@ -388,60 +370,6 @@ bool CompatibleHands(const std::vector<int> &hand_one, const std::vector<int> &h
 std::unique_ptr<PublicStateContext> GeneralPokerTerminalEvaluatorLinear::CreateContext(
     const PublicState &state) const {
   return std::make_unique<GeneralPokerTerminalPublicStateContext>(state);
-}
-
-// River network evaluator
-RiverNetworkPublicStateContext::RiverNetworkPublicStateContext(const PublicState &state) {
-  const auto &poker_state =
-      open_spiel::down_cast<const universal_poker::UniversalPokerState &>(*state.nodes[0][0]->corresponding_states()[0]);
-  pot_ = poker_state.GetCurrentPot();
-  card_ = poker_state.History().back();
-}
-
-std::unique_ptr<PublicStateContext> RiverNetworkLeafEvaluator::CreateContext(const PublicState &state) const {
-  return std::make_unique<RiverNetworkPublicStateContext>(state);
-}
-
-RiverNetworkLeafEvaluator::RiverNetworkLeafEvaluator(
-    const std::string &network_file, int board_cards, int possible_hands, int layer_size, int hidden_layers) {
-  board_cards_ = board_cards;
-  possible_hands_ = possible_hands;
-  net = std::make_shared<Net>(board_cards, possible_hands, layer_size, hidden_layers);
-  torch::load(net, network_file);
-}
-
-void RiverNetworkLeafEvaluator::EvaluatePublicState(PublicState *state, PublicStateContext *context) const {
-  SpielFatalError("Evaluation should be done in bulk.");
-//  auto *net_context = open_spiel::down_cast<RiverNetworkPublicStateContext *>(context);
-//  std::vector<double> belief_magnitudes(2, 0.);
-//  for (int belief_index = 0; belief_index < state->beliefs[0].size(); belief_index++) {
-//    for (Player player = 0; player < 2; player++) {
-//      belief_magnitudes[player] += state->beliefs[player][belief_index];
-//    }
-//  }
-//  for(Player pl = 0; pl < 2; pl++) {
-//    if(belief_magnitudes[pl] < 0.001) {
-//      belief_magnitudes[pl] = 1;
-//    }
-//  }
-//  std::vector<double> belief_means(2);
-//  belief_means[0] = belief_magnitudes[0] / 1326;
-//  belief_means[1] = belief_magnitudes[1] / 1326;
-//  for (int belief_index = 0; belief_index < state->beliefs[0].size(); belief_index++) {
-//    net_context->data_tensor[0][52 + belief_index] =
-//        (state->beliefs[0][belief_index] / belief_magnitudes[0]) - belief_means[0];
-//    net_context->data_tensor[0][1326 + 52 + belief_index] =
-//        (state->beliefs[1][belief_index] / belief_magnitudes[1]) - belief_means[1];
-//  }
-//  torch::Tensor output = net->forward(net_context->data_tensor);
-//  for (int value_index = 0; value_index < state->values[0].size(); value_index++) {
-//    state->values[0][value_index] = output[0][value_index].item<double>() * belief_magnitudes[1];
-//    state->values[1][value_index] = output[0][value_index + 1326].item<double>() * belief_magnitudes[0];
-//  }
-}
-
-torch::Tensor RiverNetworkLeafEvaluator::EvaluateAllStates(const torch::Tensor &input) const {
-  return net->forward(input);
 }
 
 // General poker evaluator
@@ -1038,11 +966,8 @@ void SubgameSolver::RunSimultaneousIterations(int iterations, bool network_evalu
     }
 
     // 3. Evaluate leaves using current reach probs.
-    if (network_evaluation) {
-      EvaluateLeavesNetwork();
-    } else {
-      EvaluateLeaves();
-    }
+    EvaluateLeaves();
+    
 //    if (nonterminal_evaluator_) {
 //      std::cout << "Reaches: " << reach_probs_ << "\n";
 //      std::cout << "CFVs: " << cf_values_ << "\n";
@@ -1064,102 +989,6 @@ void SubgameSolver::RunSimultaneousIterations(int iterations, bool network_evalu
 
   if (init_save_values_ == PolicySelection::kCurrentPolicy) {
     CopyCurrentValuesToInitialState();
-  }
-}
-
-void SubgameSolver::EvaluateLeavesNetwork() {
-  SPIEL_CHECK_EQ(subgame()->public_states.size(), contexts_.size());
-  int network_leaf_states = 0;
-  for (int i = 0; i < subgame()->public_states.size(); ++i) {
-    PublicState *state = &subgame()->public_states[i];
-    if (state->IsLeaf() and !state->IsTerminal()) {
-      network_leaf_states++;
-    }
-  }
-
-  const auto net_evaluator = open_spiel::down_cast<const RiverNetworkLeafEvaluator>(*nonterminal_evaluator_);
-  std::vector<std::vector<double>> normalization_factors;
-  normalization_factors.reserve(network_leaf_states);
-  int num_hands = net_evaluator.GetPossibleHands();
-  int num_cards = net_evaluator.GetBoardCards();
-  torch::Tensor network_input = torch::zeros({network_leaf_states, num_cards + 2 * num_hands + 1});
-  int state_index = 0;
-  for (int i = 0; i < subgame()->public_states.size(); ++i) {
-    PublicState *state = &subgame()->public_states[i];
-    if (!state->IsLeaf()) continue;
-    PublicStateContext *context = contexts_[i].get();
-    if (state->IsTerminal()) {
-      EvaluateLeaf(state, context);
-    } else {
-//      std::cout << state->public_id << "\n";
-      std::vector<double> range_magnitudes(2, 0.);
-      for (int pl = 0; pl < 2; pl++) {
-        const int num_leaves = state->nodes[pl].size();
-        for (int j = 0; j < num_leaves; ++j) {
-          const algorithms::InfostateNode *leaf_node = state->nodes[pl][j];
-          if (leaf_node->terminal_chance_reach_prob() == 0) {
-            continue;
-          }
-          const int trunk_position = state->nodes_positions.at(leaf_node);
-          range_magnitudes[pl] += reach_probs_[pl][trunk_position];
-        }
-        if (range_magnitudes[pl] < 0.001) {
-          range_magnitudes[pl] = 1;
-        }
-//        std::cout << "RMag:" << range_magnitudes << "\n";
-        for (int j = 0; j < num_leaves; ++j) {
-          const algorithms::InfostateNode *leaf_node = state->nodes[pl][j];
-          if (leaf_node->terminal_chance_reach_prob() == 0) {
-            continue;
-          }
-          const int trunk_position = state->nodes_positions.at(leaf_node);
-//          std::cout << "RP: " << reach_probs_[pl][trunk_position] << "Pl: " << pl << "Tp: " << trunk_position << "\n";
-          network_input[state_index][j + num_cards + num_hands * pl] =
-              reach_probs_[pl][trunk_position] / range_magnitudes[pl];
-        }
-      }
-      normalization_factors.push_back(range_magnitudes);
-      auto *net_context = open_spiel::down_cast<RiverNetworkPublicStateContext *>(context);
-      network_input[state_index][net_context->card_] = 1;
-      network_input[state_index][num_cards + 2 * num_hands] = net_context->pot_;
-//      std::cout << network_input[state_index] << "\n";
-      state_index++;
-    }
-  }
-  torch::Tensor network_output = net_evaluator.EvaluateAllStates(network_input);
-  state_index = 0;
-  for (int i = 0; i < subgame()->public_states.size(); ++i) {
-    PublicState *state = &subgame()->public_states[i];
-    if (!state->IsLeaf()) continue;
-    if (!state->IsTerminal()) {
-      PublicStateContext *context = contexts_[i].get();
-      auto *net_context = open_spiel::down_cast<RiverNetworkPublicStateContext *>(context);
-//      std::cout << state->public_id << "\n";
-//      std::cout << network_output[state_index] << "\n";
-//      std::cout << normalization_factors[state_index] << "\n";
-//      std::cout << net_context->pot_ << "\n";
-//      std::cout << "[";
-      for (int pl = 0; pl < 2; pl++) {
-        const int num_leaves = state->nodes[pl].size();
-        for (int j = 0; j < num_leaves; ++j) {
-          const algorithms::InfostateNode *leaf_node = state->nodes[pl][j];
-          const int trunk_position = state->nodes_positions.at(leaf_node);
-          cf_values_[pl][trunk_position] =
-              network_output[state_index][j + num_hands * pl].item<double>()
-                  * normalization_factors[state_index][1 - pl] * leaf_node->terminal_chance_reach_prob()
-                  * net_context->pot_;
-//          std::cout << cf_values_[pl][trunk_position] << "(" << leaf_node->terminal_chance_reach_prob() << "), ";
-        }
-//        std::cout << "], [";
-      }
-//      std::cout << "]\n";
-//      std::cout << "[";
-//      for(int j = 0; j < network_input.size(1); j++) {
-//        std::cout << network_input[state_index][j].item<double>() << ", ";
-//      }
-//      std::cout << "]\n";
-      state_index++;
-    }
   }
 }
 

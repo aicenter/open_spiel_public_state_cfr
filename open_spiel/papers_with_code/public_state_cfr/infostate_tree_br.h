@@ -17,7 +17,7 @@
 
 #include "open_spiel/algorithms/is_mcts.h"
 #include "open_spiel/algorithms/infostate_tree.h"
-#include "open_spiel/papers_with_code/1906.06412.value_functions/subgame.h"
+#include "open_spiel/papers_with_code/public_state_cfr/subgame.h"
 
 namespace open_spiel {
 namespace papers_with_code {

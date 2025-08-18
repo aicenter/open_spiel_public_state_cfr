@@ -23,13 +23,6 @@
 #include "open_spiel/spiel.h"
 #include "open_spiel/spiel_utils.h"
 
-#include "ortools/sat/cp_model.h"
-#include "ortools/sat/model.h"
-#include "ortools/sat/sat_parameters.pb.h"
-#include "ortools/util/time_limit.h"
-
-#include "open_spiel/papers_with_code/1906.06412.value_functions/particle_regeneration.h"
-
 namespace open_spiel {
 namespace goofspiel {
 namespace {

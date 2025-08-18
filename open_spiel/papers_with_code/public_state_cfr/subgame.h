@@ -28,7 +28,6 @@
 #include "open_spiel/spiel.h"
 #include "open_spiel/spiel_utils.h"
 #include "open_spiel/utils/data_structures.h"
-#include "turn_poker_net.h"
 #include "open_spiel/algorithms/poker_data.h"
 
 // Depth-limited CFR is conceptually similar to what `infostate_cfr.h` does.
@@ -238,26 +237,6 @@ struct RiverNetworkPublicStateContext final : public PublicStateContext {
   int pot_;
   int card_;
   explicit RiverNetworkPublicStateContext(const PublicState &state);
-};
-
-class RiverNetworkLeafEvaluator final : public PublicStateEvaluator {
- public:
-  RiverNetworkLeafEvaluator(const std::string &network_file,
-                            int board_cards,
-                            int possible_hands,
-                            int layer_size,
-                            int hidden_layers);
-  std::unique_ptr<PublicStateContext> CreateContext(
-      const PublicState &state) const override;
-  void EvaluatePublicState(
-      PublicState *state, PublicStateContext *context) const override;
-  torch::Tensor EvaluateAllStates(const torch::Tensor &input) const;
-  int GetBoardCards() const { return board_cards_; }
-  int GetPossibleHands() const { return possible_hands_; }
- private:
-  int board_cards_;
-  int possible_hands_;
-  std::shared_ptr<Net> net;
 };
 
 // General poker terminal evaluator
