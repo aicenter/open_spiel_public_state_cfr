@@ -1,4 +1,4 @@
-# Revisiting Game Representations: The~Hidden Costs of Efficiency in Sequential Decision-making Algorithms
+# Revisiting Game Representations: The Hidden Costs of Efficiency in Sequential Decision-making Algorithms
 
 
 ## Abstract
